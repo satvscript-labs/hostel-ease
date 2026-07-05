@@ -1,23 +1,21 @@
 <?php
 
-use App\Http\Controllers\Admin\AcBillController;
 use App\Http\Controllers\Admin\AssignmentController;
 use App\Http\Controllers\Admin\BedController;
 use App\Http\Controllers\Admin\ComplaintController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\ExpenseController;
+use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\FloorController;
-use App\Http\Controllers\Admin\LedgerController;
-use App\Http\Controllers\Admin\MonthlyRentController;
+use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentModeController;
 use App\Http\Controllers\Admin\PromiseController;
+use App\Http\Controllers\Admin\PropertyController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoomController;
-use App\Http\Controllers\Admin\SemesterFeeController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\StudentDocumentController;
-use App\Http\Controllers\Admin\VacancyController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchController;
@@ -166,33 +164,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::post('payments/{payment}/whatsapp', [PaymentController::class, 'whatsapp'])->name('payments.whatsapp');
             Route::post('payments/{payment}/email', [PaymentController::class, 'email'])->name('payments.email');
 
-            // --- Module 6: Semester Fees ---
-            Route::get('semester-fees', [SemesterFeeController::class, 'index'])->name('semester-fees.index');
-            Route::post('semester-fees', [SemesterFeeController::class, 'store'])->name('semester-fees.store');
-            Route::put('semester-fees/{semester_fee}', [SemesterFeeController::class, 'update'])->name('semester-fees.update');
-            Route::post('semester-fees/{semester_fee}/collect', [SemesterFeeController::class, 'collect'])->name('semester-fees.collect');
-            Route::delete('semester-fees/{semester_fee}', [SemesterFeeController::class, 'destroy'])->name('semester-fees.destroy');
-
-            // --- Module 6: Monthly Rent ---
-            Route::get('monthly-rents', [MonthlyRentController::class, 'index'])->name('monthly-rents.index');
-            Route::post('monthly-rents/generate', [MonthlyRentController::class, 'generate'])->name('monthly-rents.generate');
-            Route::post('monthly-rents/{monthly_rent}/collect', [MonthlyRentController::class, 'collect'])->name('monthly-rents.collect');
-            Route::delete('monthly-rents/{monthly_rent}', [MonthlyRentController::class, 'destroy'])->name('monthly-rents.destroy');
-
-            // --- Module 7: Payment Ledger ---
-            Route::get('ledger', [LedgerController::class, 'index'])->name('ledger.index');
-            Route::get('ledger/export/summary', [LedgerController::class, 'exportSummary'])->name('ledger.export.summary');
-            Route::get('ledger/{student}', [LedgerController::class, 'show'])->name('ledger.show');
-            Route::get('ledger/{student}/pdf', [LedgerController::class, 'pdf'])->name('ledger.pdf');
-            Route::get('ledger/{student}/excel', [LedgerController::class, 'excel'])->name('ledger.excel');
-
-            // --- Module 8: AC Bills ---
-            Route::get('ac-bills', [AcBillController::class, 'index'])->name('ac-bills.index');
-            Route::get('ac-bills/create', [AcBillController::class, 'create'])->name('ac-bills.create');
-            Route::post('ac-bills', [AcBillController::class, 'store'])->name('ac-bills.store');
-            Route::get('ac-bills/{ac_bill}', [AcBillController::class, 'show'])->name('ac-bills.show');
-            Route::delete('ac-bills/{ac_bill}', [AcBillController::class, 'destroy'])->name('ac-bills.destroy');
-            Route::post('ac-bills/shares/{share}/collect', [AcBillController::class, 'collect'])->name('ac-bills.collect');
+            // --- Module 6: Finance & Invoices ---
+            Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');
+            Route::resource('invoices', InvoiceController::class)->only(['store', 'update', 'destroy']);
+            Route::post('invoices/generate-rent', [InvoiceController::class, 'generateRent'])->name('invoices.generate_rent');
 
             // --- Module 9: Reports ---
             Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

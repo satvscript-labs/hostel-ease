@@ -134,22 +134,36 @@ class DemoHostelSeeder extends Seeder
 
             $slot['bed']->update(['status' => 'occupied']);
 
-            // A couple of demo payments spread across recent months.
+            // Create a couple of demo invoices and payments
             for ($m = 0; $m < 2; $m++) {
-                Payment::firstOrCreate(
+                $monthDate = now()->subMonths($m)->startOfMonth();
+                $type = $student->occupation_type === 'working' ? 'rent' : 'fee';
+                $title = $type === 'rent' ? 'Rent - ' . $monthDate->format('M Y') : 'Semester Fee - S' . ($m + 1);
+
+                $invoice = \App\Models\Invoice::firstOrCreate(
                     [
                         'hostel_id' => $hostel->id,
                         'student_id' => $student->id,
-                        'receipt_number' => "RCPT-{$hostel->id}-{$student->id}-{$m}",
+                        'type' => $type,
+                        'title' => $title,
                     ],
                     [
-                        'amount' => $slot['room']->rent,
-                        'payment_type' => 'full',
-                        'mode' => ['cash', 'upi'][$m % 2],
-                        'paid_on' => now()->subMonths($m)->startOfMonth()->addDays(2),
-                        'collected_by' => $admin->id,
+                        'amount' => $slot['room']->rent * ($type === 'rent' ? 1 : 6),
+                        'due_date' => $monthDate->copy()->addDays(5),
                     ]
                 );
+
+                // Use PaymentService to process payment
+                app(\App\Services\PaymentService::class)->record([
+                    'hostel_id' => $hostel->id,
+                    'student_id' => $student->id,
+                    'amount' => $invoice->amount,
+                    'payment_type' => 'full',
+                    'mode' => ['cash', 'upi'][$m % 2],
+                    'paid_on' => $monthDate->copy()->addDays(6),
+                    'collected_by' => $admin->id,
+                    'reference_number' => "RCPT-{$hostel->id}-{$student->id}-{$m}",
+                ]);
             }
         }
 

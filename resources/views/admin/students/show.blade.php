@@ -189,40 +189,52 @@
 
             <!-- TAB: Fees & Dues -->
             <div class="he-tab-panel" :class="{ active: tab === 'fees' }">
-                <!-- Fee Dues -->
-                <div class="mb-4">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                        <h3 class="h6 fw-bold mb-0">
-                            <i class="fa-solid fa-graduation-cap text-primary me-1"></i> Fees
-                            @if($paymentSummary['outstanding_fees'] > 0)
-                                <span class="badge-premium bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding_fees']) }} due</span>
-                            @endif
-                        </h3>
-                        <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#collectModal"
-                                onclick="openCollect('fees', {{ $paymentSummary['outstanding_fees'] }})">
-                            <i class="fa-solid fa-indian-rupee-sign me-1"></i> Collect
-                        </button>
-                    </div>
-                    @include('admin.students._dues_table', ['rows' => $feesDues])
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <h3 class="h6 fw-bold mb-0">
+                        <i class="fa-solid fa-file-invoice-dollar text-primary me-1"></i> Invoices & Dues
+                        @if($paymentSummary['outstanding'] > 0)
+                            <span class="badge-premium bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding']) }} due</span>
+                        @endif
+                    </h3>
+                    <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#collectModal"
+                            onclick="openCollect({{ $paymentSummary['outstanding'] }})">
+                        <i class="fa-solid fa-indian-rupee-sign me-1"></i> Collect Payment
+                    </button>
                 </div>
-
-                <!-- AC Dues -->
-                <div>
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                        <h3 class="h6 fw-bold mb-0">
-                            <i class="fa-solid fa-snowflake text-info me-1"></i> AC Bills
-                            @if($paymentSummary['outstanding_ac'] > 0)
-                                <span class="badge-premium bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding_ac']) }} due</span>
-                            @endif
-                        </h3>
-                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#collectModal"
-                                onclick="openCollect('ac', {{ $paymentSummary['outstanding_ac'] }})"
-                                style="border-radius: var(--he-radius-sm);">
-                            <i class="fa-solid fa-snowflake me-1"></i> Collect AC
-                        </button>
+                
+                @forelse($invoices as $invoice)
+                    <div class="due-card mb-2">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div class="d-flex gap-3 align-items-center">
+                                <div class="bento-icon bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }}-subtle text-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }}" style="width:40px;height:40px">
+                                    <i class="fa-solid fa-{{ $invoice->type === 'fee' ? 'graduation-cap' : ($invoice->type === 'rent' ? 'home' : ($invoice->type === 'ac' ? 'snowflake' : 'receipt')) }}"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">{{ $invoice->title }}</div>
+                                    <div class="text-secondary small text-uppercase">{{ $invoice->type }}</div>
+                                    @if($invoice->status !== 'paid' && $invoice->due_date)
+                                        <div class="small text-muted mt-1"><i class="fa-regular fa-clock"></i> Due: {{ $invoice->due_date->format('d M Y') }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold" style="font-size:1.1rem">{{ hostelease_money($invoice->amount) }}</div>
+                                <div class="small {{ $invoice->status === 'paid' ? 'text-success' : 'text-danger' }}">
+                                    @if($invoice->status === 'paid')
+                                        Fully Paid
+                                    @else
+                                        Bal: {{ hostelease_money($invoice->balance) }}
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    @include('admin.students._dues_table', ['rows' => $acDues])
-                </div>
+                @empty
+                    <div class="empty-state py-4">
+                        <i class="fa-solid fa-check-circle text-success fs-1 mb-2"></i>
+                        <p>No invoices found. Student is all cleared up!</p>
+                    </div>
+                @endforelse
             </div>
 
             <!-- TAB: Documents -->
@@ -327,7 +339,7 @@
     </div>
 </div>
 
-{{-- Collect (fees / AC) modal --}}
+{{-- Collect global modal --}}
 <div class="modal fade" id="collectModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" id="collectForm" method="POST"
@@ -336,9 +348,8 @@
               data-promise-action="{{ route('admin.students.promise', $student) }}"
               style="border-radius: var(--he-radius-lg); overflow: hidden;">
             @csrf
-            <input type="hidden" name="scope" id="collectScope" value="fees">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="collectTitle">Collect Fees</h5>
+                <h5 class="modal-title fw-bold" id="collectTitle">Collect Payment</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -437,9 +448,8 @@
 
 @push('scripts')
 <script>
-    function openCollect(scope, amount) {
-        document.getElementById('collectScope').value = scope;
-        document.getElementById('collectTitle').textContent = scope === 'ac' ? 'Collect AC Bill' : 'Collect Fees';
+    function openCollect(amount) {
+        document.getElementById('collectTitle').textContent = 'Collect Payment';
         const amt = document.getElementById('collectAmount');
         if (amt) amt.value = amount > 0 ? amount : '';
         const payRadio = document.getElementById('modePay');

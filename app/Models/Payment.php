@@ -6,7 +6,7 @@ use App\Models\Concerns\BelongsToHostel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payment extends Model
@@ -16,12 +16,10 @@ class Payment extends Model
     protected $fillable = [
         'hostel_id',
         'student_id',
-        'payable_type',
-        'payable_id',
         'receipt_number',
         'amount',
-        'payment_type',
-        'mode',
+        'payment_type', // 'full', 'partial', 'advance'
+        'mode', // 'cash', 'upi', 'cheque', etc.
         'reference_number',
         'paid_on',
         'remarks',
@@ -41,9 +39,11 @@ class Payment extends Model
         return $this->belongsTo(Student::class);
     }
 
-    public function payable(): MorphTo
+    public function invoices(): BelongsToMany
     {
-        return $this->morphTo();
+        return $this->belongsToMany(Invoice::class, 'invoice_payment')
+            ->withPivot('amount')
+            ->withTimestamps();
     }
 
     public function collector(): BelongsTo

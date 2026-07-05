@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AcBillStudent;
 use App\Models\Bed;
-use App\Models\MonthlyRent;
 use App\Models\Payment;
 use App\Models\Room;
-use App\Models\SemesterFee;
+use App\Models\Invoice;
 use App\Models\Student;
 use Carbon\Carbon;
 use Illuminate\View\View;
@@ -28,11 +26,8 @@ class DashboardController extends Controller
             'total_beds' => $totalBeds,
             'students' => Student::active()->count(),
             'monthly_income' => (float) Payment::whereBetween('paid_on', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
-            'pending_fees' => (float) SemesterFee::where('status', '!=', 'paid')->sum('balance')
-                + (float) MonthlyRent::where('status', '!=', 'paid')->sum('balance'),
-            'ac_pending' => (float) AcBillStudent::where('status', '!=', 'paid')
-                ->get()
-                ->sum(fn ($s) => (float) $s->amount - (float) $s->paid_amount),
+            'pending_fees' => (float) Invoice::where('status', '!=', 'paid')->whereIn('type', ['fee', 'rent'])->sum('balance'),
+            'ac_pending' => (float) Invoice::where('status', '!=', 'paid')->where('type', 'ac')->sum('balance'),
             'occupancy_pct' => $totalBeds > 0 ? round(($occupiedBeds / $totalBeds) * 100, 1) : 0,
         ];
 

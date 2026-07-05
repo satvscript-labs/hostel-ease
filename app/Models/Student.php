@@ -60,19 +60,9 @@ class Student extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function semesterFees(): HasMany
+    public function invoices(): HasMany
     {
-        return $this->hasMany(SemesterFee::class);
-    }
-
-    public function monthlyRents(): HasMany
-    {
-        return $this->hasMany(MonthlyRent::class);
-    }
-
-    public function acBillShares(): HasMany
-    {
-        return $this->hasMany(AcBillStudent::class);
+        return $this->hasMany(Invoice::class);
     }
 
     public function getPhotoUrlAttribute(): string

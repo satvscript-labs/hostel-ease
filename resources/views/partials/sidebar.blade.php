@@ -38,11 +38,7 @@
             <a class="nav-link {{ request()->routeIs('admin.staff.*') ? 'active' : '' }}" href="{{ route('admin.staff.index') }}"><i class="fa-solid fa-id-badge"></i> {{ __('Staff') }}</a>
             <a class="nav-link {{ request()->routeIs('admin.registrations.*') ? 'active' : '' }}" href="{{ route('admin.registrations.index') }}"><i class="fa-solid fa-user-check"></i> {{ __('Registrations') }}</a>
             <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Finance') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.payments.*') ? 'active' : '' }}" href="{{ route('admin.payments.index') }}"><i class="fa-solid fa-money-bill-wave"></i> {{ __('Fees') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.semester-fees.*') ? 'active' : '' }}" href="{{ route('admin.semester-fees.index') }}"><i class="fa-solid fa-graduation-cap"></i> {{ __('Semester Fees') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.monthly-rents.*') ? 'active' : '' }}" href="{{ route('admin.monthly-rents.index') }}"><i class="fa-solid fa-calendar-day"></i> {{ __('Monthly Rent') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.ac-bills.*') ? 'active' : '' }}" href="{{ route('admin.ac-bills.index') }}"><i class="fa-solid fa-snowflake"></i> {{ __('AC Bills') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.ledger.*') ? 'active' : '' }}" href="{{ route('admin.ledger.index') }}"><i class="fa-solid fa-book"></i> {{ __('Ledger') }}</a>
+            <a class="nav-link {{ request()->routeIs('admin.finance.*') ? 'active' : '' }}" href="{{ route('admin.finance.index') }}"><i class="fa-solid fa-chart-line"></i> {{ __('Finance Board') }}</a>
             <a class="nav-link {{ request()->routeIs('admin.pocket-money.*') ? 'active' : '' }}" href="{{ route('admin.pocket-money.index') }}"><i class="fa-solid fa-wallet"></i> {{ __('Pocket Money') }}</a>
             <a class="nav-link {{ request()->routeIs('admin.expenses.*') ? 'active' : '' }}" href="{{ route('admin.expenses.index') }}"><i class="fa-solid fa-money-bill-trend-up"></i> {{ __('Expenses') }}</a>
             <a class="nav-link {{ request()->routeIs('admin.payment-modes.*') ? 'active' : '' }}" href="{{ route('admin.payment-modes.index') }}"><i class="fa-solid fa-sliders"></i> {{ __('Payment Modes') }}</a>
