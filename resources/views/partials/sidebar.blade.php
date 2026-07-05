@@ -29,10 +29,7 @@
                 <i class="fa-solid fa-gauge-high"></i> {{ __('Dashboard') }}
             </a>
             <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Property') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.floors.*') ? 'active' : '' }}" href="{{ route('admin.floors.index') }}"><i class="fa-solid fa-layer-group"></i> {{ __('Floors') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.rooms.*') ? 'active' : '' }}" href="{{ route('admin.rooms.index') }}"><i class="fa-solid fa-door-open"></i> {{ __('Rooms') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.beds.*') ? 'active' : '' }}" href="{{ route('admin.beds.layout') }}"><i class="fa-solid fa-bed"></i> {{ __('Beds Layout') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.vacancy.*') ? 'active' : '' }}" href="{{ route('admin.vacancy.index') }}"><i class="fa-solid fa-square-poll-vertical"></i> {{ __('Vacancy') }}</a>
+            <a class="nav-link {{ request()->routeIs('admin.property.*') ? 'active' : '' }}" href="{{ route('admin.property.index') }}"><i class="fa-solid fa-building"></i> {{ __('Property Board') }}</a>
             <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('People') }}</div>
             <a class="nav-link {{ request()->routeIs('admin.students.*') ? 'active' : '' }}" href="{{ route('admin.students.index') }}"><i class="fa-solid fa-users"></i> {{ __('Students') }}</a>
             <a class="nav-link {{ request()->routeIs('admin.assignments.*') ? 'active' : '' }}" href="{{ route('admin.assignments.index') }}"><i class="fa-solid fa-bed-pulse"></i> {{ __('Bed Assignment') }}</a>

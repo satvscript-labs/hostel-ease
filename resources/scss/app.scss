@@ -18,6 +18,9 @@ $font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, 
 // Select2 + DataTables (Bootstrap 5 themes)
 @import "select2/dist/css/select2.min.css";
 
+// Premium Liquid UI overrides
+@import "premium";
+
 :root {
     --hsms-sidebar-width: 260px;
     --hsms-sidebar-bg: #0f172a;

@@ -134,12 +134,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->prefix('admin')->name('admin.')->group(function () {
             Route::get('dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
-            // --- Module 1: Property (Floors, Rooms, Beds) ---
-            Route::resource('floors', FloorController::class)
-                ->only(['index', 'store', 'update', 'destroy']);
-            Route::resource('rooms', RoomController::class)
-                ->except(['show']);
-            Route::get('beds/layout', [BedController::class, 'layout'])->name('beds.layout');
+            // --- Module 1: Property Board ---
+            Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
+            Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::resource('rooms', RoomController::class)->except(['show']);
             Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
             Route::patch('beds/{bed}/status', [BedController::class, 'updateStatus'])->name('beds.status');
 
@@ -160,8 +158,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::patch('assignments/{assignment}/release', [AssignmentController::class, 'release'])->name('assignments.release');
             Route::patch('assignments/{assignment}/transfer', [AssignmentController::class, 'transfer'])->name('assignments.transfer');
 
-            // --- Module 4: Vacancy ---
-            Route::get('vacancy', [VacancyController::class, 'index'])->name('vacancy.index');
 
             // --- Module 5: Fees & Receipts ---
             Route::resource('payments', PaymentController::class)
