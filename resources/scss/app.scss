@@ -1,0 +1,376 @@
+// HSMS — Blue theme built on Bootstrap 5
+$primary: #2563eb;
+$secondary: #64748b;
+$success: #22c55e;
+$danger: #ef4444;
+$warning: #eab308;
+$info: #0ea5e9;
+$light: #f8fafc;
+$dark: #0f172a;
+
+$body-bg: #f1f5f9;
+$border-radius: .65rem;
+$border-radius-lg: .9rem;
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+@import "~bootstrap/scss/bootstrap";
+
+// Select2 + DataTables (Bootstrap 5 themes)
+@import "select2/dist/css/select2.min.css";
+
+:root {
+    --hsms-sidebar-width: 260px;
+    --hsms-sidebar-bg: #0f172a;
+    --hsms-sidebar-accent: #1e293b;
+}
+
+body {
+    min-height: 100vh;
+}
+
+/* ---------- Layout shell ---------- */
+.hsms-sidebar {
+    width: var(--hsms-sidebar-width);
+    background: var(--hsms-sidebar-bg);
+    color: #cbd5e1;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1045;
+    display: flex;
+    flex-direction: column;
+    transition: transform .25s ease;
+    will-change: transform;
+
+    .brand {
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: .5px;
+    }
+
+    // Nav must be a single vertical column that scrolls up/down — never wrap
+    // into extra columns (which caused horizontal scrolling).
+    .nav {
+        flex-wrap: nowrap;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .nav-link {
+        color: #cbd5e1;
+        border-radius: .5rem;
+        padding: .6rem .85rem;
+        margin: .12rem .6rem;
+        display: flex;
+        align-items: center;
+        gap: .65rem;
+        font-size: .925rem;
+
+        &:hover { background: var(--hsms-sidebar-accent); color: #fff; }
+        &.active { background: $primary; color: #fff; }
+        i, svg { width: 20px; text-align: center; }
+    }
+}
+
+.hsms-content {
+    margin-left: var(--hsms-sidebar-width);
+    min-height: 100vh;
+    transition: margin .25s ease;
+}
+
+.hsms-topbar {
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+}
+
+/* Backdrop behind the off-canvas sidebar on mobile */
+.hsms-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, .5);
+    z-index: 1044;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .25s ease;
+}
+.hsms-backdrop.show { opacity: 1; visibility: visible; }
+
+.sidebar-close { display: none; }
+
+@media (max-width: 991.98px) {
+    .hsms-sidebar {
+        transform: translateX(-100%);
+        box-shadow: 0 0 40px rgba(0, 0, 0, .35);
+    }
+    .hsms-sidebar.show { transform: translateX(0); }
+    .hsms-content { margin-left: 0; }
+    .sidebar-close { display: inline-flex; }
+    /* Prevent background scroll while the drawer is open */
+    body.sidebar-open { overflow: hidden; }
+}
+
+@media (min-width: 992px) {
+    /* Desktop: sidebar is always visible, never a drawer */
+    .hsms-backdrop { display: none !important; }
+}
+
+/* ---------- Dashboard cards ---------- */
+.stat-card {
+    border: none;
+    border-radius: $border-radius-lg;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+    transition: transform .15s ease, box-shadow .15s ease;
+
+    &:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15, 23, 42, .12); }
+
+    .stat-icon {
+        width: 52px; height: 52px;
+        border-radius: 14px;
+        display: grid; place-items: center;
+        font-size: 1.4rem;
+    }
+    .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; white-space: nowrap; }
+    .stat-label { color: $secondary; font-size: .85rem; }
+}
+
+/* Tablet: trim the dashboard stat cards a little */
+@media (max-width: 767.98px) {
+    .stat-card .card-body { padding: .8rem .9rem; }
+    .stat-card .stat-icon { width: 44px; height: 44px; font-size: 1.15rem; border-radius: 12px; }
+    .stat-card .stat-value { font-size: 1.25rem; }
+}
+
+/* Phones: compact cards so every number stays on a single line */
+@media (max-width: 575.98px) {
+    .stat-card .card-body { padding: .6rem .65rem; gap: .55rem !important; }
+    .stat-card .stat-icon { width: 34px; height: 34px; font-size: .9rem; border-radius: 10px; flex: 0 0 auto; }
+    .stat-card .stat-value { font-size: .95rem; }
+    .stat-card .stat-label { font-size: .68rem; line-height: 1.15; }
+}
+
+/* ---------- Bed / room visual layout ---------- */
+.floor-block { margin-bottom: 1.5rem; }
+
+.bed-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: .6rem;
+}
+
+.bed-tile {
+    border-radius: .65rem;
+    padding: .65rem .35rem;
+    text-align: center;
+    color: #fff;
+    font-weight: 600;
+    font-size: .85rem;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+    transition: transform .1s ease;
+
+    &:active { transform: scale(.96); }
+    small { display: block; font-weight: 400; font-size: .7rem; opacity: .9; }
+
+    &.bed-empty       { background: $success; }
+    &.bed-occupied    { background: $danger; }
+    &.bed-reserved    { background: $warning; color: #1f2937; }
+    &.bed-maintenance { background: #9ca3af; }
+}
+
+.legend-dot {
+    width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+}
+
+/* ---------- Misc ---------- */
+.table-responsive { border-radius: $border-radius; }
+.avatar-sm { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; }
+
+/* ---------- Mobile fine-tuning ---------- */
+@media (max-width: 575.98px) {
+    main.flex-grow-1 { padding: .85rem !important; }
+
+    h1.h4 { font-size: 1.15rem; }
+
+    .stat-card .card-body { padding: .8rem; gap: .6rem !important; }
+    .stat-icon { width: 40px; height: 40px; font-size: 1.05rem; border-radius: 12px; flex: 0 0 auto; }
+    .stat-value { font-size: 1.1rem; overflow-wrap: anywhere; line-height: 1.15; }
+    .stat-label { font-size: .76rem; }
+    /* Let the text block shrink/wrap instead of overflowing the card */
+    .stat-card .card-body > div:last-child { min-width: 0; }
+
+    /* Tighter bed grid so a room card fits a phone */
+    .bed-grid { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .4rem; }
+    .bed-tile { padding: .5rem .25rem; font-size: .8rem; }
+
+    .table { font-size: .85rem; }
+    .btn { --bs-btn-padding-x: .6rem; }
+
+    /* Topbar: keep search usable, let items wrap */
+    .hsms-topbar { flex-wrap: wrap; row-gap: .5rem; }
+    .hsms-topbar .flex-grow-1 { order: 3; max-width: 100% !important; flex: 0 0 100%; }
+
+    /* Modals flush to bottom feel */
+    .modal-dialog { margin: .5rem; }
+}
+
+/* Make every table horizontally scrollable on small screens even if not wrapped */
+@media (max-width: 767.98px) {
+    .table-responsive { -webkit-overflow-scrolling: touch; }
+}
+
+/* ======================================================================
+   Modern UI refresh (applies across every page)
+   ====================================================================== */
+body { color: #111827; -webkit-font-smoothing: antialiased; }
+
+.card {
+    border: 1px solid #e6e8ef;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+.card .card-header {
+    background: #fff;
+    border-bottom: 1px solid #eef0f5;
+    font-weight: 600;
+}
+
+.btn { border-radius: .6rem; font-weight: 600; }
+.btn-sm { border-radius: .5rem; }
+.btn-primary { box-shadow: 0 2px 10px rgba(37, 99, 235, .22); }
+
+.form-control, .form-select {
+    border-radius: .6rem;
+    border-color: #e2e6ef;
+    background: #f7f8fc;
+    padding: .6rem .8rem;
+}
+.form-control:focus, .form-select:focus {
+    background: #fff;
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+}
+.input-group-text { background: #f7f8fc; border-color: #e2e6ef; border-radius: .6rem; }
+
+.table > :not(caption) > * > * { padding: .8rem .9rem; }
+.table thead th {
+    text-transform: uppercase;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    color: #6b7280;
+    background: #f8fafc;
+    border-bottom: 1px solid #e6e8ef;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.table tbody tr { border-color: #f1f3f9; }
+.table-hover tbody tr:hover { background: #f7f9ff; }
+
+.badge { font-weight: 600; border-radius: .5rem; padding: .42em .62em; }
+
+/* Sidebar: subtle gradient + active accent bar */
+.hsms-sidebar { background: linear-gradient(180deg, #0f172a 0%, #111c33 100%); }
+.hsms-sidebar .nav-link { font-weight: 500; }
+.hsms-sidebar .nav-link.active {
+    background: rgba(37, 99, 235, .18);
+    color: #fff;
+    position: relative;
+}
+.hsms-sidebar .nav-link.active::before {
+    content: "";
+    position: absolute; left: -.6rem; top: .35rem; bottom: .35rem;
+    width: 3px; border-radius: 3px; background: $primary;
+}
+.hsms-sidebar .text-uppercase.small { letter-spacing: .08em; color: #64748b !important; }
+
+.hsms-topbar { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
+
+main h1 { font-weight: 800; letter-spacing: -.01em; }
+
+.stat-card { border: 1px solid #eef0f5; box-shadow: 0 1px 2px rgba(16, 24, 40, .05); }
+.stat-card:hover { box-shadow: 0 10px 28px rgba(16, 24, 40, .10); }
+
+.modal-content { border: none; border-radius: 1rem; box-shadow: 0 20px 60px rgba(16, 24, 40, .2); }
+.modal-header { border-bottom: 1px solid #eef0f5; }
+.modal-footer { border-top: 1px solid #eef0f5; }
+
+.dropdown-menu { border: 1px solid #e6e8ef; border-radius: .8rem; box-shadow: 0 12px 34px rgba(16, 24, 40, .12); }
+
+/* WhatsApp action button */
+.btn-whatsapp { background: #25D366; border-color: #25D366; color: #fff; }
+.btn-whatsapp:hover { background: #1ebe5b; border-color: #1ebe5b; color: #fff; }
+
+/* ---------- Bento dashboard ---------- */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 134px;
+    grid-auto-flow: row dense;
+    gap: 1rem;
+}
+.bento .bento-card {
+    background: #fff;
+    border: 1px solid #e6e8ef;
+    border-radius: 1.25rem;
+    padding: 1.1rem 1.2rem;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+    overflow: hidden;
+    transition: transform .15s ease, box-shadow .15s ease;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+}
+.bento .bento-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(16, 24, 40, .10); }
+.bento .c2 { grid-column: span 2; }
+.bento .r2 { grid-row: span 2; }
+.bento .bento-icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 1.15rem; }
+.bento .bento-value { font-size: 1.7rem; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+.bento .bento-label { color: #6b7280; font-size: .82rem; }
+.bento .bento-card.hero { background: linear-gradient(135deg, #2563eb, #1e3a8a); color: #fff; border: none; }
+.bento .bento-card.hero .bento-label { color: rgba(255, 255, 255, .8); }
+.bento canvas { flex: 1 1 auto; min-height: 0; }
+.bento .bento-list { overflow-y: auto; margin: 0; }
+
+@media (max-width: 991.98px) {
+    .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 126px; }
+    .bento .c2 { grid-column: span 2; }
+}
+@media (max-width: 575.98px) {
+    .bento { gap: .7rem; grid-auto-rows: 110px; }
+    .bento .bento-value { font-size: 1.3rem; }
+    .bento .bento-card { padding: .85rem .9rem; border-radius: 1rem; }
+    .bento .bento-icon { width: 36px; height: 36px; font-size: .95rem; border-radius: 11px; }
+}
+
+/* ---------- Minimal sidebar + thin scrollbar ---------- */
+.hsms-sidebar .nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, .35) transparent;
+    padding-right: 2px;
+}
+.hsms-sidebar .nav::-webkit-scrollbar { width: 5px; }
+.hsms-sidebar .nav::-webkit-scrollbar-track { background: transparent; }
+.hsms-sidebar .nav::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .28); border-radius: 6px; }
+.hsms-sidebar .nav::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .55); }
+
+.hsms-sidebar .nav-link {
+    font-size: .875rem;
+    padding: .5rem .8rem;
+    margin: .08rem .55rem;
+    border-radius: .55rem;
+    font-weight: 500;
+}
+.hsms-sidebar .nav-link i, .hsms-sidebar .nav-link svg { font-size: .9rem; opacity: .8; }
+.hsms-sidebar .nav-link.active i, .hsms-sidebar .nav-link.active svg { opacity: 1; }
+.hsms-sidebar .text-uppercase.small {
+    font-size: .66rem !important;
+    letter-spacing: .1em;
+    color: #5b6678 !important;
+    margin-top: 1rem !important;
+    margin-bottom: .15rem !important;
+    padding-left: 1rem !important;
+}
+.hsms-sidebar .brand { font-size: 1.02rem; font-weight: 700; }

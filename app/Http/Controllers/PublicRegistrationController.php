@@ -1,0 +1,57 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Hostel;
+use App\Models\StudentRegistration;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+/**
+ * Public (unauthenticated) student self-registration form, reached via a
+ * per-hostel token/QR link. Submissions land in a pending list for the admin
+ * to approve.
+ */
+class PublicRegistrationController extends Controller
+{
+    public function show(string $token)
+    {
+        $hostel = Hostel::where('registration_token', $token)->firstOrFail();
+
+        return view('public.register', ['hostel' => $hostel, 'token' => $token]);
+    }
+
+    public function submit(Request $request, string $token)
+    {
+        $hostel = Hostel::where('registration_token', $token)->firstOrFail();
+
+        $digits = fn ($v) => $v === null ? null : substr(preg_replace('/\D+/', '', $v), -10);
+        $request->merge([
+            'mobile' => $digits($request->mobile),
+            'father_mobile' => $digits($request->father_mobile),
+            'mother_mobile' => $digits($request->mother_mobile),
+            'aadhaar' => $request->aadhaar ? preg_replace('/\D+/', '', $request->aadhaar) : null,
+        ]);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'mobile' => ['required', 'digits:10'],
+            'father_mobile' => ['nullable', 'digits:10'],
+            'mother_mobile' => ['nullable', 'digits:10'],
+            'aadhaar' => ['nullable', 'digits:12'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'occupation_type' => ['required', Rule::in(array_keys(config('hsms.occupation_types')))],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store('registrations/photos', 'public');
+        }
+
+        StudentRegistration::create($data + ['hostel_id' => $hostel->id, 'status' => 'pending']);
+
+        return view('public.register', ['hostel' => $hostel, 'token' => $token, 'submitted' => true]);
+    }
+}
