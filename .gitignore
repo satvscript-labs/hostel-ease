@@ -10,7 +10,7 @@
 .env
 .env.backup
 .env.production
-.env.example
+
 .env.hostinger
 .phpactor.json
 .phpunit.result.cache
