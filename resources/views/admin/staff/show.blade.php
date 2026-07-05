@@ -10,7 +10,7 @@
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card stat-card"><div class="card-body">
-            <p class="mb-1"><strong>Salary:</strong> {{ hsms_money($staff->monthly_salary) }}/month</p>
+            <p class="mb-1"><strong>Salary:</strong> {{ hostelease_money($staff->monthly_salary) }}/month</p>
             @if($staff->mobile)<p class="mb-1"><strong>Mobile:</strong> <x-mobile-link :mobile="$staff->mobile" /></p>@endif
             @if($staff->join_date)<p class="mb-1"><strong>Joined:</strong> {{ $staff->join_date->format('d-m-Y') }}</p>@endif
             <p class="mb-0"><strong>Status:</strong> <span class="badge bg-{{ $staff->is_active ? 'success' : 'secondary' }}">{{ $staff->is_active ? 'Active' : 'Inactive' }}</span></p>
@@ -35,7 +35,7 @@
                     @forelse($payments as $p)
                         <tr>
                             <td>{{ $p->salary_month->format('M Y') }}</td>
-                            <td>{{ hsms_money($p->amount) }}</td>
+                            <td>{{ hostelease_money($p->amount) }}</td>
                             <td>{{ ucfirst($p->mode) }}</td>
                             <td>{{ $p->paid_on->format('d-m-Y') }}</td>
                             <td class="text-end"><form action="{{ route('admin.staff.salary.destroy', [$staff, $p]) }}" method="POST" data-confirm="Delete this salary entry?">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger"><i class="fa-solid fa-trash"></i></button></form></td>
@@ -50,3 +50,4 @@
     </div>
 </div>
 @endsection
+

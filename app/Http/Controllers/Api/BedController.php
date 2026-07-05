@@ -94,7 +94,7 @@ class BedController extends Controller
                 'maintenance' => Bed::where('status', 'maintenance')->count(),
                 'occupancy_pct' => $totalBeds > 0 ? round(($occupied / $totalBeds) * 100, 1) : 0,
             ],
-            'statuses' => config('hsms.bed_statuses'),
+            'statuses' => config('hostelease.bed_statuses'),
         ]);
     }
 
@@ -146,3 +146,4 @@ class BedController extends Controller
         return response()->json(['message' => "Bed {$model->bed_number} marked as {$data['status']}."]);
     }
 }
+

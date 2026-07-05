@@ -30,7 +30,7 @@ class UserController extends Controller
         // Sub-users whose primary hostel is the active one, excluding the owner.
         $users = User::where('hostel_id', $hostelId)
             ->where('id', '!=', $request->user()->id)
-            ->whereIn('role', array_keys(config('hsms.staff_roles')))
+            ->whereIn('role', array_keys(config('hostelease.staff_roles')))
             ->with(['role', 'branch'])
             ->orderBy('name')->get()
             ->map(fn ($u) => [
@@ -38,7 +38,7 @@ class UserController extends Controller
                 'name' => $u->name,
                 'mobile' => $u->mobile,
                 'role' => $u->role,
-                'role_label' => config('hsms.staff_roles.'.$u->role, $u->role),
+                'role_label' => config('hostelease.staff_roles.'.$u->role, $u->role),
                 'role_id' => $u->role_id,
                 'role_name' => $u->role()->first()?->display_name,
                 'branch_id' => $u->branch_id,
@@ -46,16 +46,16 @@ class UserController extends Controller
                 'is_active' => (bool) $u->is_active,
             ]);
 
-        $roles = Role::whereIn('name', array_keys(config('hsms.staff_roles')))->get();
+        $roles = Role::whereIn('name', array_keys(config('hostelease.staff_roles')))->get();
         $branches = Branch::where('hostel_id', $hostelId)->where('is_active', true)->get(['id', 'name']);
 
         return response()->json([
             'users' => $users,
-            'roles' => config('hsms.staff_roles'),
+            'roles' => config('hostelease.staff_roles'),
             'all_roles' => $roles->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'display_name' => $r->display_name]),
             'branches' => $branches,
-            'role_access' => collect(config('hsms.staff_roles'))->keys()->mapWithKeys(fn ($r) => [
-                $r => config('hsms.role_access.'.$r),
+            'role_access' => collect(config('hostelease.staff_roles'))->keys()->mapWithKeys(fn ($r) => [
+                $r => config('hostelease.role_access.'.$r),
             ]),
         ]);
     }
@@ -65,7 +65,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'regex:/^\+91\d{10}$|^\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
-            'role' => ['required', Rule::in(array_keys(config('hsms.staff_roles')))],
+            'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'role_id' => ['nullable', 'exists:roles,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'password' => ['nullable', 'string', 'min:6', 'max:60'],
@@ -103,7 +103,7 @@ class UserController extends Controller
         $model = $this->find($user);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'role' => ['required', Rule::in(array_keys(config('hsms.staff_roles')))],
+            'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'role_id' => ['nullable', 'exists:roles,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'is_active' => ['nullable', 'boolean'],
@@ -143,7 +143,8 @@ class UserController extends Controller
     protected function find(int $id): User
     {
         return User::where('hostel_id', Tenant::id())
-            ->whereIn('role', array_keys(config('hsms.staff_roles')))
+            ->whereIn('role', array_keys(config('hostelease.staff_roles')))
             ->findOrFail($id);
     }
 }
+

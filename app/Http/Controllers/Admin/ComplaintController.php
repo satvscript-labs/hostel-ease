@@ -43,8 +43,8 @@ class ComplaintController extends Controller
         $data = $request->validate([
             'student_id' => ['nullable', Rule::exists('students', 'id')->where('hostel_id', \App\Support\Tenant::id())],
             'title' => ['required', 'string', 'max:150'],
-            'category' => ['required', Rule::in(array_keys(config('hsms.complaint_categories')))],
-            'priority' => ['required', Rule::in(array_keys(config('hsms.complaint_priorities')))],
+            'category' => ['required', Rule::in(array_keys(config('hostelease.complaint_categories')))],
+            'priority' => ['required', Rule::in(array_keys(config('hostelease.complaint_priorities')))],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -57,7 +57,7 @@ class ComplaintController extends Controller
     public function update(Request $request, Complaint $complaint): RedirectResponse
     {
         $data = $request->validate([
-            'status' => ['required', Rule::in(array_keys(config('hsms.complaint_statuses')))],
+            'status' => ['required', Rule::in(array_keys(config('hostelease.complaint_statuses')))],
             'resolution' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -75,3 +75,4 @@ class ComplaintController extends Controller
         return back()->with('success', 'Complaint removed.');
     }
 }
+

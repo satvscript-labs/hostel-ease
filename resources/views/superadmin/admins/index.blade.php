@@ -23,7 +23,7 @@
                             <span class="badge bg-primary-subtle text-primary">{{ $a->hostels->count() }} branches</span>
                         @endif
                     </td>
-                    <td>{{ hsms_phone($a->mobile) }}</td>
+                    <td>{{ hostelease_phone($a->mobile) }}</td>
                     <td>{{ $a->last_login_at ? $a->last_login_at->format('d M Y H:i') : 'Never' }}</td>
                     <td><span class="badge bg-{{ $a->is_active ? 'success' : 'secondary' }}">{{ $a->is_active ? 'Active' : 'Disabled' }}</span></td>
                     <td class="text-end">
@@ -88,3 +88,4 @@
     </form>
 </div></div>
 @endsection
+

@@ -48,7 +48,7 @@ class ExpenseController extends Controller
     {
         $expense = Expense::create($request->validated() + ['recorded_by' => Auth::id()]);
 
-        $this->logger->log('expense.create', "Expense {$expense->category} ".hsms_money($expense->amount), $expense);
+        $this->logger->log('expense.create', "Expense {$expense->category} ".hostelease_money($expense->amount), $expense);
 
         return back()->with('success', 'Expense recorded.');
     }
@@ -61,3 +61,4 @@ class ExpenseController extends Controller
         return back()->with('success', 'Expense removed.');
     }
 }
+

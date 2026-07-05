@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Flash messages -> toast
-    const flash = window.HSMS_FLASH;
+    const flash = window.hostelease_FLASH;
     if (flash && flash.message) {
         Swal.fire({
             toast: true,
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalSearch();
 
     // Idle session timeout (minutes from config, injected per-page)
-    const timeoutMin = window.HSMS_SESSION_TIMEOUT;
+    const timeoutMin = window.hostelease_SESSION_TIMEOUT;
     if (timeoutMin) {
         let timer;
         const reset = () => {
@@ -160,3 +160,4 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
 }
+

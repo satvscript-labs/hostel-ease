@@ -46,7 +46,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'modes' => $modes,
-            'payment_types' => config('hsms.payment_types'),
+            'payment_types' => config('hostelease.payment_types'),
         ]);
     }
 
@@ -77,7 +77,7 @@ class PaymentController extends Controller
         $data = $request->validate([
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())->whereNull('deleted_at')],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
-            'payment_type' => ['required', Rule::in(array_keys(config('hsms.payment_types')))],
+            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
             'reference_number' => [
                 Rule::requiredIf(fn () => (bool) optional(
@@ -161,3 +161,4 @@ class PaymentController extends Controller
         return $class::where('student_id', $data['student_id'])->findOrFail($data['payable_id']);
     }
 }
+

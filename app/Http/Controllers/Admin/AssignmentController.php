@@ -73,8 +73,8 @@ class AssignmentController extends Controller
     {
         $data = $request->validate([
             'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
-            'fee_frequency' => ['required', Rule::in(array_keys(config('hsms.fee_frequencies')))],
-            'semester' => ['nullable', 'integer', Rule::in(config('hsms.semesters'))],
+            'fee_frequency' => ['required', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
+            'semester' => ['nullable', 'integer', Rule::in(config('hostelease.semesters'))],
         ]);
 
         $this->service->updateFee($assignment, $data);
@@ -120,3 +120,4 @@ class AssignmentController extends Controller
         return redirect()->route('admin.assignments.index')->with('success', 'Student transferred.');
     }
 }
+

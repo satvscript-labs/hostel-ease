@@ -5,7 +5,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h4 fw-bold mb-0">Staff
         <span class="badge bg-primary-subtle text-primary">{{ $summary['active'] }}/{{ $summary['total'] }} active</span>
-        <span class="badge bg-success-subtle text-success">Payroll {{ hsms_money($summary['payroll']) }}/mo</span>
+        <span class="badge bg-success-subtle text-success">Payroll {{ hostelease_money($summary['payroll']) }}/mo</span>
     </h1>
     <div class="d-flex gap-2">
         <a href="{{ route('admin.staff.attendance') }}" class="btn btn-outline-primary"><i class="fa-solid fa-clipboard-check me-1"></i> Attendance</a>
@@ -24,9 +24,9 @@
                     <td class="fw-semibold"><a href="{{ route('admin.staff.show', $s) }}">{{ $s->name }}</a></td>
                     <td>{{ $s->designation ?? '—' }}</td>
                     <td>@if($s->mobile)<x-mobile-link :mobile="$s->mobile" />@else — @endif</td>
-                    <td>{{ hsms_money($s->monthly_salary) }}</td>
+                    <td>{{ hostelease_money($s->monthly_salary) }}</td>
                     <td>{{ $s->present_this_month }}</td>
-                    <td>{{ hsms_money($s->paid_this_month) }}</td>
+                    <td>{{ hostelease_money($s->paid_this_month) }}</td>
                     <td class="text-end text-nowrap">
                         <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#salaryModal" onclick="paySalary({{ $s->id }}, @js($s->name))"><i class="fa-solid fa-money-bill"></i></button>
                         <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#staffModal" onclick="editStaff(@js($sd))"><i class="fa-solid fa-pen"></i></button>
@@ -102,3 +102,4 @@
     }
 </script>
 @endpush
+

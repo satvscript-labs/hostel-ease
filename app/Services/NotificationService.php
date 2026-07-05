@@ -78,13 +78,13 @@ class NotificationService
         $feeDue = (float) SemesterFee::where('status', '!=', 'paid')->sum('balance')
             + (float) MonthlyRent::where('status', '!=', 'paid')->sum('balance');
         $this->toggle($feeDue > 0, $hostel->id, 'fee_pending', 'fees',
-            'Pending fees', hsms_money($feeDue).' outstanding across students.', 'warning');
+            'Pending fees', hostelease_money($feeDue).' outstanding across students.', 'warning');
 
         // Pending AC bills
         $acDue = (float) (AcBillStudent::where('status', '!=', 'paid')->sum('amount')
             - AcBillStudent::where('status', '!=', 'paid')->sum('paid_amount'));
         $this->toggle($acDue > 0, $hostel->id, 'ac_pending', 'ac',
-            'Pending AC bills', hsms_money($acDue).' AC dues outstanding.', 'info');
+            'Pending AC bills', hostelease_money($acDue).' AC dues outstanding.', 'info');
 
         // Document expiry within 30 days
         $expiring = StudentDocument::expiringWithin(30)->count();
@@ -137,3 +137,4 @@ class NotificationService
             : $this->clear($hostelId, $type, $sig);
     }
 }
+

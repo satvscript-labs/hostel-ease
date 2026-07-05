@@ -34,7 +34,7 @@ class ExpenseController extends Controller
             'expenses' => $expenses->map(fn ($e) => [
                 'id' => $e->id,
                 'category' => $e->category,
-                'category_label' => config('hsms.expense_categories.'.$e->category, $e->category),
+                'category_label' => config('hostelease.expense_categories.'.$e->category, $e->category),
                 'title' => $e->title,
                 'amount' => (float) $e->amount,
                 'expense_date' => $e->expense_date?->toDateString(),
@@ -46,8 +46,8 @@ class ExpenseController extends Controller
                 'expense' => $totalExpense,
                 'profit' => $income - $totalExpense,
             ],
-            'categories' => config('hsms.expense_categories'),
-            'modes' => config('hsms.payment_modes'),
+            'categories' => config('hostelease.expense_categories'),
+            'modes' => config('hostelease.payment_modes'),
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
         ]);
@@ -56,12 +56,12 @@ class ExpenseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'category' => ['required', Rule::in(array_keys(config('hsms.expense_categories')))],
+            'category' => ['required', Rule::in(array_keys(config('hostelease.expense_categories')))],
             'title' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'expense_date' => ['required', 'date', 'before_or_equal:today'],
             'paid_to' => ['nullable', 'string', 'max:150'],
-            'mode' => ['required', Rule::in(array_keys(config('hsms.payment_modes')))],
+            'mode' => ['required', Rule::in(array_keys(config('hostelease.payment_modes')))],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -81,3 +81,4 @@ class ExpenseController extends Controller
         return response()->json(['message' => 'Expense removed.']);
     }
 }
+

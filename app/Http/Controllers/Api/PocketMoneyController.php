@@ -72,7 +72,7 @@ class PocketMoneyController extends Controller
             $balance = PocketMoneyTransaction::balanceFor($model->id);
             if ($data['amount'] > $balance) {
                 throw ValidationException::withMessages([
-                    'amount' => ['Insufficient balance. Available: '.hsms_money($balance)],
+                    'amount' => ['Insufficient balance. Available: '.hostelease_money($balance)],
                 ]);
             }
         }
@@ -104,3 +104,4 @@ class PocketMoneyController extends Controller
         ]);
     }
 }
+

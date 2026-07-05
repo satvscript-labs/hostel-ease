@@ -71,8 +71,20 @@ class SetupController extends Controller
             $log[] = 'DB check failed: '.$e->getMessage();
         }
 
+        try {
+            $envPath = base_path('.env');
+            if (File::exists($envPath)) {
+                $envContent = File::get($envPath);
+                $envContent = preg_replace('/^SETUP_TOKEN=.*$/m', 'SETUP_TOKEN=', $envContent);
+                File::put($envPath, $envContent);
+                $log[] = '✔ Auto-disabled SETUP_TOKEN in .env';
+            }
+        } catch (\Throwable $e) {
+            $log[] = '✘ Failed to auto-disable SETUP_TOKEN: '.$e->getMessage();
+        }
+
         $log[] = '';
-        $log[] = '== DONE. Now blank SETUP_TOKEN in .env and run config:cache (or re-deploy) to disable this page. ==';
+        $log[] = '== DONE. Setup token has been removed from .env. Run config:cache or re-deploy. ==';
 
         return response('<pre style="font:14px/1.5 monospace;padding:24px;">'
             .e(implode("\n", $log)).'</pre>');

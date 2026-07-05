@@ -86,7 +86,7 @@
             <i class="fa-solid fa-circle-user fs-5"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-            <li><span class="dropdown-item-text small text-muted">{{ hsms_phone($user->mobile) }}</span></li>
+            <li><span class="dropdown-item-text small text-muted">{{ hostelease_phone($user->mobile) }}</span></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ route('profile.password') }}"><i class="fa-solid fa-key me-2"></i>{{ __('Change Password') }}</a></li>
             <li>
@@ -98,3 +98,4 @@
         </ul>
     </div>
 </header>
+

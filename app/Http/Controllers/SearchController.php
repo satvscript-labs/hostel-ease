@@ -42,7 +42,7 @@ class SearchController extends Controller
             ->each(function ($s) use (&$results) {
                 $results[] = [
                     'group' => 'Students', 'icon' => 'fa-user',
-                    'label' => $s->name, 'sub' => hsms_phone($s->mobile),
+                    'label' => $s->name, 'sub' => hostelease_phone($s->mobile),
                     'url' => route('admin.students.show', $s),
                 ];
             });
@@ -76,8 +76,9 @@ class SearchController extends Controller
             ->limit(8)->get()
             ->map(fn ($h) => [
                 'group' => 'Hostels', 'icon' => 'fa-hotel',
-                'label' => $h->name, 'sub' => $h->owner_name.' · '.hsms_phone($h->mobile),
+                'label' => $h->name, 'sub' => $h->owner_name.' · '.hostelease_phone($h->mobile),
                 'url' => url('superadmin/hostels/'.$h->id),
             ])->all();
     }
 }
+

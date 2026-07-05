@@ -39,7 +39,7 @@
             <input name="mobile" class="form-control" inputmode="numeric" maxlength="10" required value="{{ old('mobile') }}"></div>
           <div class="col-6 mb-3"><label class="form-label">Occupation *</label>
             <select name="occupation_type" class="form-select" required>
-              @foreach(config('hsms.occupation_types') as $k => $v)
+              @foreach(config('hostelease.occupation_types') as $k => $v)
                 <option value="{{ $k }}" @selected(old('occupation_type')===$k)>{{ $v }}</option>
               @endforeach
             </select></div>
@@ -70,3 +70,4 @@
 </div>
 </body>
 </html>
+

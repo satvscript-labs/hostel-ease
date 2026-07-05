@@ -31,7 +31,7 @@
                 @php($ud = ['id'=>$u->id,'name'=>$u->name,'mobile'=>$u->mobile,'role'=>$u->role,'role_id'=>$u->role_id,'branch_id'=>$u->branch_id,'is_active'=>(bool)$u->is_active])
                 <tr>
                     <td class="fw-semibold">{{ $u->name }}</td>
-                    <td>{{ hsms_phone($u->mobile) }}</td>
+                    <td>{{ hostelease_phone($u->mobile) }}</td>
                     <td><span class="badge bg-primary-subtle text-primary">{{ $u->role ? ($allRoles->find($u->role_id)?->display_name ?? ucfirst($u->role)) : 'Unassigned' }}</span></td>
                     <td>{{ $u->branch?->name ?? '—' }}</td>
                     <td><span class="badge bg-{{ $u->is_active ? 'success' : 'secondary' }}">{{ $u->is_active ? 'Active' : 'Disabled' }}</span></td>
@@ -113,3 +113,4 @@
     }
 </script>
 @endpush
+

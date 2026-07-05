@@ -31,7 +31,7 @@ class BackupService
         $filename = 'hsms-'.Carbon::now()->format('Y-m-d_His').'.sql';
         $path = $this->directory().DIRECTORY_SEPARATOR.$filename;
 
-        $binary = config('hsms.dump_binary', env('DB_DUMP_BINARY', 'mysqldump'));
+        $binary = config('hostelease.dump_binary', env('DB_DUMP_BINARY', 'mysqldump'));
 
         $command = [
             $binary,
@@ -117,3 +117,4 @@ class BackupService
         return $removed;
     }
 }
+

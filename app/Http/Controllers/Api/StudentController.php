@@ -36,7 +36,7 @@ class StudentController extends Controller
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
-            'payment_type' => ['required', Rule::in(array_keys(config('hsms.payment_types')))],
+            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             'remarks' => ['nullable', 'string', 'max:500'],
@@ -205,7 +205,7 @@ class StudentController extends Controller
 
         return response()->json([
             'students' => $data,
-            'occupation_types' => config('hsms.occupation_types'),
+            'occupation_types' => config('hostelease.occupation_types'),
         ]);
     }
 
@@ -374,7 +374,7 @@ class StudentController extends Controller
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
-            'occupation_type' => ['required', Rule::in(array_keys(config('hsms.occupation_types')))],
+            'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
             'join_date' => ['nullable', 'date'],
             'leave_date' => ['nullable', 'date', 'after_or_equal:join_date'],
             'status' => ['required', Rule::in(['active', 'left'])],
@@ -463,3 +463,4 @@ class StudentController extends Controller
         return $this->outstandingFees($student) + $this->outstandingAc($student);
     }
 }
+

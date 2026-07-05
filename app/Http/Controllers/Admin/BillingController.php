@@ -60,7 +60,7 @@ class BillingController extends Controller
         try {
             $order = $this->razorpay->createOrder(
                 $quote['amount_paise'],
-                'hsms_'.$owner->id.'_'.now()->timestamp,
+                'hostelease_'.$owner->id.'_'.now()->timestamp,
                 [
                     'owner_id' => (string) $owner->id,
                     'period' => $data['period'],
@@ -120,7 +120,7 @@ class BillingController extends Controller
 
             $this->logger->log(
                 'subscription.paid',
-                "Online {$data['period']} renewal — ".hsms_money($quote['amount'])." · {$quote['payable']}/{$quote['branches']} branch(es)",
+                "Online {$data['period']} renewal — ".hostelease_money($quote['amount'])." · {$quote['payable']}/{$quote['branches']} branch(es)",
                 $subscription,
             );
         }
@@ -131,3 +131,4 @@ class BillingController extends Controller
         ]);
     }
 }
+

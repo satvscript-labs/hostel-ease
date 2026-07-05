@@ -11,7 +11,7 @@
     <div class="col-lg-5">
         <div class="card text-white mb-3" style="background:#2563eb;border-radius:16px;"><div class="card-body text-center py-4">
             <div class="opacity-75">Balance</div>
-            <div class="display-6 fw-bold">{{ hsms_money($balance) }}</div>
+            <div class="display-6 fw-bold">{{ hostelease_money($balance) }}</div>
         </div></div>
         <div class="row g-2">
             <div class="col-6"><form method="POST" action="{{ route('admin.pocket-money.store', $student) }}" class="card stat-card"><div class="card-body">@csrf
@@ -40,7 +40,7 @@
                     @forelse($transactions as $t)
                         <tr>
                             <td>@if($t->type==='deposit')<span class="badge bg-success">Deposit</span>@else<span class="badge bg-warning text-dark">Withdraw</span>@endif</td>
-                            <td>{{ hsms_money($t->amount) }}</td>
+                            <td>{{ hostelease_money($t->amount) }}</td>
                             <td>{{ $t->note ?? '—' }}</td>
                             <td class="small text-nowrap">{{ $t->created_at->format('d M Y H:i') }}</td>
                             <td class="text-end"><form action="{{ route('admin.pocket-money.destroy', [$student, $t]) }}" method="POST" data-confirm="Delete this transaction?">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger"><i class="fa-solid fa-trash"></i></button></form></td>
@@ -55,3 +55,4 @@
     </div>
 </div>
 @endsection
+

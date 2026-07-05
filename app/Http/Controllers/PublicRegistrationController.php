@@ -42,7 +42,7 @@ class PublicRegistrationController extends Controller
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
-            'occupation_type' => ['required', Rule::in(array_keys(config('hsms.occupation_types')))],
+            'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -55,3 +55,4 @@ class PublicRegistrationController extends Controller
         return view('public.register', ['hostel' => $hostel, 'token' => $token, 'submitted' => true]);
     }
 }
+

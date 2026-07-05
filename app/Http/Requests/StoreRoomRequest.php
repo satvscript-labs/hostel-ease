@@ -26,8 +26,8 @@ class StoreRoomRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->ignore($roomId),
             ],
-            'room_type' => ['required', Rule::in(array_keys(config('hsms.room_types')))],
-            'sharing' => ['required', 'integer', Rule::in(config('hsms.sharing_options'))],
+            'room_type' => ['required', Rule::in(array_keys(config('hostelease.room_types')))],
+            'sharing' => ['required', 'integer', Rule::in(config('hostelease.sharing_options'))],
         ];
     }
 
@@ -38,3 +38,4 @@ class StoreRoomRequest extends FormRequest
         ];
     }
 }
+

@@ -38,8 +38,8 @@
             @forelse($pending as $r)
                 <tr>
                     <td class="fw-semibold">{{ $r->name }}</td>
-                    <td>{{ hsms_phone($r->mobile) }}</td>
-                    <td>{{ config('hsms.occupation_types.'.$r->occupation_type, $r->occupation_type) }}</td>
+                    <td>{{ hostelease_phone($r->mobile) }}</td>
+                    <td>{{ config('hostelease.occupation_types.'.$r->occupation_type, $r->occupation_type) }}</td>
                     <td>{{ $r->city ?? '—' }}</td>
                     <td class="small text-nowrap">{{ $r->created_at->format('d M Y H:i') }}</td>
                     <td class="text-end text-nowrap">
@@ -55,3 +55,4 @@
     </div>
 </div></div>
 @endsection
+

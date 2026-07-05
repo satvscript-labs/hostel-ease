@@ -62,7 +62,7 @@ class ReportService
             ->get()
             ->map(function ($r) {
                 $name = optional(\App\Models\PaymentMode::where('code', $r->mode)->first())->name
-                    ?? config('hsms.payment_modes.'.$r->mode, ucfirst((string) $r->mode));
+                    ?? config('hostelease.payment_modes.'.$r->mode, ucfirst((string) $r->mode));
 
                 return [$name, (int) $r->cnt, (float) $r->total];
             });
@@ -112,7 +112,7 @@ class ReportService
             ->filter(fn ($pair) => $pair[1]['outstanding'] > 0)
             ->map(fn ($pair) => [
                 $pair[0]->name,
-                hsms_phone($pair[0]->mobile),
+                hostelease_phone($pair[0]->mobile),
                 $pair[1]['billed'],
                 $pair[1]['paid'],
                 $pair[1]['outstanding'],
@@ -135,7 +135,7 @@ class ReportService
             ->whereBetween('expense_date', [$from->startOfDay(), $to->endOfDay()])
             ->get(['amount', 'category'])
             ->groupBy('category')
-            ->map(fn ($g, $cat) => [config('hsms.expense_categories.'.$cat, ucfirst((string) $cat)), $g->count(), (float) $g->sum('amount')])
+            ->map(fn ($g, $cat) => [config('hostelease.expense_categories.'.$cat, ucfirst((string) $cat)), $g->count(), (float) $g->sum('amount')])
             ->sortByDesc(fn ($r) => $r[2])
             ->values();
 
@@ -196,3 +196,4 @@ class ReportService
         ];
     }
 }
+

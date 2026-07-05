@@ -44,7 +44,7 @@ class RoomController extends Controller
         // Floors list for the room form dropdown.
         $floors = Floor::ordered()->get(['id', 'name']);
 
-        return response()->json(['rooms' => $rooms, 'floors' => $floors, 'room_types' => config('hsms.room_types'), 'sharing_options' => config('hsms.sharing_options')]);
+        return response()->json(['rooms' => $rooms, 'floors' => $floors, 'room_types' => config('hostelease.room_types'), 'sharing_options' => config('hostelease.sharing_options')]);
     }
 
     public function store(Request $request): JsonResponse
@@ -98,10 +98,11 @@ class RoomController extends Controller
                 'required', 'string', 'max:50',
                 Rule::unique('rooms', 'room_number')->where('hostel_id', Tenant::id())->whereNull('deleted_at')->ignore($roomId),
             ],
-            'room_type' => ['required', Rule::in(array_keys(config('hsms.room_types')))],
-            'sharing' => ['required', 'integer', Rule::in(config('hsms.sharing_options'))],
+            'room_type' => ['required', Rule::in(array_keys(config('hostelease.room_types')))],
+            'sharing' => ['required', 'integer', Rule::in(config('hostelease.sharing_options'))],
         ], [
             'room_number.unique' => 'A room with this number already exists in your hostel.',
         ]);
     }
 }
+

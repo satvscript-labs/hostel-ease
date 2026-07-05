@@ -8,7 +8,7 @@ use Illuminate\Support\Carbon;
 
 class GenerateMonthlyRents extends Command
 {
-    protected $signature = 'hsms:generate-monthly-rents {--month= : Month in YYYY-MM (defaults to current)}';
+    protected $signature = 'hostelease:generate-monthly-rents {--month= : Month in YYYY-MM (defaults to current)}';
 
     protected $description = 'Generate monthly rent rows for all active working professionals across every hostel.';
 
@@ -26,3 +26,4 @@ class GenerateMonthlyRents extends Command
         return self::SUCCESS;
     }
 }
+

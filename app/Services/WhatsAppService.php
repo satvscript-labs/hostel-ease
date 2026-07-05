@@ -26,7 +26,7 @@ class WhatsAppService
      */
     public function link(?string $mobile, string $message): ?string
     {
-        return hsms_whatsapp_link($mobile, $message);
+        return hostelease_whatsapp_link($mobile, $message);
     }
 
     /**
@@ -35,7 +35,7 @@ class WhatsAppService
      */
     public function send(?string $mobile, string $message): bool
     {
-        $phone = hsms_phone($mobile);
+        $phone = hostelease_phone($mobile);
 
         if (! $phone) {
             return false;
@@ -65,3 +65,4 @@ class WhatsAppService
         }
     }
 }
+

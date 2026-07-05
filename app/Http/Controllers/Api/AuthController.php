@@ -100,8 +100,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $roleLabel = config('hsms.roles.'.$user->role)
-            ?? config('hsms.staff_roles.'.$user->role)
+        $roleLabel = config('hostelease.roles.'.$user->role)
+            ?? config('hostelease.staff_roles.'.$user->role)
             ?? ucfirst($user->role);
 
         return [
@@ -119,3 +119,4 @@ class AuthController extends Controller
         ];
     }
 }
+

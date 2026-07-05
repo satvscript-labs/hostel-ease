@@ -9,10 +9,10 @@ return [
     | Central configuration for the Hostel Management SaaS domain logic.
     */
 
-    'country_code' => env('HSMS_DEFAULT_COUNTRY_CODE', '+91'),
+    'country_code' => env('hostelease_DEFAULT_COUNTRY_CODE', '+91'),
 
     // Idle session timeout in minutes (enforced client + server side).
-    'session_timeout' => (int) env('HSMS_SESSION_TIMEOUT', 30),
+    'session_timeout' => (int) env('hostelease_SESSION_TIMEOUT', 30),
 
     'roles' => [
         'super_admin' => 'Super Admin',
@@ -100,7 +100,7 @@ return [
     // Vacancy lookahead windows (days).
     'vacancy_windows' => [7, 15, 30],
 
-    'subscription_amount' => (float) env('HSMS_SUBSCRIPTION_AMOUNT', 5000),
+    'subscription_amount' => (float) env('hostelease_SUBSCRIPTION_AMOUNT', 5000),
 
     /*
     | Account-level subscription pricing. Billing is per OWNER (account), not
@@ -109,9 +109,9 @@ return [
     | free branches = floor(total / free_per), payable = total - free.
     */
     'subscription_pricing' => [
-        'yearly' => (float) env('HSMS_PRICE_YEARLY', 10000),
-        'monthly' => (float) env('HSMS_PRICE_MONTHLY', 1000),
-        'free_per' => (int) env('HSMS_FREE_PER_BRANCHES', 3),
+        'yearly' => (float) env('hostelease_PRICE_YEARLY', 10000),
+        'monthly' => (float) env('hostelease_PRICE_MONTHLY', 1000),
+        'free_per' => (int) env('hostelease_FREE_PER_BRANCHES', 3),
     ],
 
     // Path to the mysqldump binary (XAMPP: D:\xampp\mysql\bin\mysqldump.exe).
@@ -148,3 +148,4 @@ return [
     ],
 
 ];
+

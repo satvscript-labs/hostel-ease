@@ -44,10 +44,11 @@ class StoreStudentRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
-            'occupation_type' => ['required', Rule::in(array_keys(config('hsms.occupation_types')))],
+            'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
             'join_date' => ['nullable', 'date'],
             'leave_date' => ['nullable', 'date', 'after_or_equal:join_date'],
             'status' => ['required', Rule::in(['active', 'left'])],
         ];
     }
 }
+

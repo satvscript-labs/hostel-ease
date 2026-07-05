@@ -38,7 +38,7 @@ class BedAssignment extends Model
 
     public function feeFrequencyLabel(): string
     {
-        return config('hsms.fee_frequencies.'.$this->fee_frequency, ucfirst((string) $this->fee_frequency));
+        return config('hostelease.fee_frequencies.'.$this->fee_frequency, ucfirst((string) $this->fee_frequency));
     }
 
     public function bed(): BelongsTo
@@ -63,3 +63,4 @@ class BedAssignment extends Model
         return $query->where('is_active', true);
     }
 }
+

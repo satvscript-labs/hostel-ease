@@ -26,7 +26,7 @@ class SubscriptionBillingService
     /** Free branches = floor(total / free_per). */
     public function freeBranches(int $total): int
     {
-        $per = max(1, (int) config('hsms.subscription_pricing.free_per', 3));
+        $per = max(1, (int) config('hostelease.subscription_pricing.free_per', 3));
 
         return intdiv($total, $per);
     }
@@ -172,3 +172,4 @@ class SubscriptionBillingService
                 ->first();
     }
 }
+

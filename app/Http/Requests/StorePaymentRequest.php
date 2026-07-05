@@ -18,7 +18,7 @@ class StorePaymentRequest extends FormRequest
         return [
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())->whereNull('deleted_at')],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
-            'payment_type' => ['required', Rule::in(array_keys(config('hsms.payment_types')))],
+            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
             'mode' => ['required', Rule::in(\App\Models\PaymentMode::active()->pluck('code')->all())],
             // Modes flagged as requiring a reference must carry one.
             'reference_number' => [
@@ -41,3 +41,4 @@ class StorePaymentRequest extends FormRequest
         ];
     }
 }
+

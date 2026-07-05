@@ -31,7 +31,7 @@
                         <td class="d-none d-md-table-cell"><x-mobile-link :mobile="$a->student->mobile" /></td>
                         <td>{{ $a->bed->room->floor->name }} · {{ $a->bed->room->room_number }} · <span class="badge bg-danger-subtle text-danger">{{ $a->bed->bed_number }}</span></td>
                         <td class="d-none d-sm-table-cell">{{ $a->join_date->format('d-m-Y') }}</td>
-                        <td class="text-nowrap">{{ hsms_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
+                        <td class="text-nowrap">{{ hostelease_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
                         <td class="d-none d-lg-table-cell">{{ $a->durationInDays() }}</td>
                         <td class="text-end">
                             @php
@@ -103,13 +103,13 @@
                 <div class="mb-3">
                     <label class="form-label">Fee Frequency</label>
                     <select name="fee_frequency" id="feeFreq" class="form-select" required onchange="feeToggleSem()">
-                        @foreach(config('hsms.fee_frequencies') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach
+                        @foreach(config('hostelease.fee_frequencies') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach
                     </select>
                 </div>
                 <div class="mb-1" id="feeSemWrap">
                     <label class="form-label">Semester</label>
                     <select name="semester" id="feeSem" class="form-select">
-                        @foreach(config('hsms.semesters') as $s)<option value="{{ $s }}">Semester {{ $s }}</option>@endforeach
+                        @foreach(config('hostelease.semesters') as $s)<option value="{{ $s }}">Semester {{ $s }}</option>@endforeach
                     </select>
                 </div>
             </div>
@@ -145,3 +145,4 @@
     }
 </script>
 @endpush
+

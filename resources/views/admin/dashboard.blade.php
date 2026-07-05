@@ -9,7 +9,7 @@
     <div class="bento-card hero c2 r2">
         <div class="bento-icon" style="background:rgba(255,255,255,.18);color:#fff"><i class="fa-solid fa-money-bill-wave"></i></div>
         <div class="mt-auto">
-            <div class="bento-value" style="font-size:2.4rem">{{ hsms_money($stats['monthly_income']) }}</div>
+            <div class="bento-value" style="font-size:2.4rem">{{ hostelease_money($stats['monthly_income']) }}</div>
             <div class="bento-label">Income · {{ now()->format('M Y') }}</div>
             <div class="mt-2 small" style="color:rgba(255,255,255,.85)">{{ $stats['students'] }} students · {{ $stats['occupancy_pct'] }}% occupancy</div>
         </div>
@@ -41,8 +41,8 @@
 
     @php
         $tiles2 = [
-            ['Pending Fees', hsms_money($stats['pending_fees']), 'fa-hourglass-half', 'warning'],
-            ['AC Pending', hsms_money($stats['ac_pending']), 'fa-snowflake', 'info'],
+            ['Pending Fees', hostelease_money($stats['pending_fees']), 'fa-hourglass-half', 'warning'],
+            ['AC Pending', hostelease_money($stats['ac_pending']), 'fa-snowflake', 'info'],
             ['Total Rooms', $stats['total_rooms'], 'fa-door-open', 'primary'],
         ];
     @endphp
@@ -82,8 +82,8 @@
         <div class="fw-bold mb-2"><i class="fa-solid fa-bolt text-primary me-1"></i> Quick Alerts</div>
         <div class="d-flex flex-column gap-2">
             <div class="alert alert-success mb-0 py-2">{{ $alerts['empty_beds'] }} empty beds available.</div>
-            <div class="alert alert-warning mb-0 py-2">{{ hsms_money($stats['pending_fees']) }} in pending fees.</div>
-            <div class="alert alert-info mb-0 py-2">{{ hsms_money($stats['ac_pending']) }} in pending AC bills.</div>
+            <div class="alert alert-warning mb-0 py-2">{{ hostelease_money($stats['pending_fees']) }} in pending fees.</div>
+            <div class="alert alert-info mb-0 py-2">{{ hostelease_money($stats['ac_pending']) }} in pending AC bills.</div>
         </div>
     </div>
 </div>
@@ -113,3 +113,4 @@
     });
 </script>
 @endpush
+

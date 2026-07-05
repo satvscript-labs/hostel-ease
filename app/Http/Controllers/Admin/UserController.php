@@ -25,7 +25,7 @@ class UserController extends Controller
     {
         try {
             $users = User::where('hostel_id', Tenant::id())
-                ->whereIn('role', array_keys(config('hsms.staff_roles')))
+                ->whereIn('role', array_keys(config('hostelease.staff_roles')))
                 ->orderBy('name')->get();
         } catch (\Exception $e) {
             $users = collect();
@@ -45,8 +45,8 @@ class UserController extends Controller
 
         return view('admin.users.index', [
             'users' => $users,
-            'roles' => config('hsms.staff_roles'),
-            'access' => config('hsms.role_access'),
+            'roles' => config('hostelease.staff_roles'),
+            'access' => config('hostelease.role_access'),
             'allRoles' => $roles,
             'branches' => $branches,
         ]);
@@ -57,7 +57,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'regex:/^\+91\d{10}$|^\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
-            'role' => ['required', Rule::in(array_keys(config('hsms.staff_roles')))],
+            'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'role_id' => ['nullable', 'exists:roles,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
         ]);
@@ -88,7 +88,7 @@ class UserController extends Controller
         $this->authorizeUser($user);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'role' => ['required', Rule::in(array_keys(config('hsms.staff_roles')))],
+            'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'role_id' => ['nullable', 'exists:roles,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'is_active' => ['nullable', 'boolean'],
@@ -125,8 +125,9 @@ class UserController extends Controller
     protected function authorizeUser(User $user): void
     {
         abort_unless(
-            $user->hostel_id === Tenant::id() && array_key_exists($user->role, config('hsms.staff_roles')),
+            $user->hostel_id === Tenant::id() && array_key_exists($user->role, config('hostelease.staff_roles')),
             403
         );
     }
 }
+

@@ -31,7 +31,7 @@
                         <option value="">Select student…</option>
                         @foreach($students as $s)
                             <option value="{{ $s->id }}" @selected(old('student_id') == $s->id)>
-                                {{ $s->name }} ({{ hsms_phone($s->mobile) }}) · {{ config('hsms.occupation_types.'.$s->occupation_type) }}
+                                {{ $s->name }} ({{ hostelease_phone($s->mobile) }}) · {{ config('hostelease.occupation_types.'.$s->occupation_type) }}
                             </option>
                         @endforeach
                     </select>
@@ -68,7 +68,7 @@
                 <div class="col-md-3">
                     <label class="form-label">Fee Frequency <span class="text-danger">*</span></label>
                     <select name="fee_frequency" id="feeFrequency" class="form-select" required>
-                        @foreach(config('hsms.fee_frequencies') as $k => $label)
+                        @foreach(config('hostelease.fee_frequencies') as $k => $label)
                             <option value="{{ $k }}" @selected(old('fee_frequency', 'semester') === $k)>{{ $label }}</option>
                         @endforeach
                     </select>
@@ -76,7 +76,7 @@
                 <div class="col-md-3" id="semesterWrap">
                     <label class="form-label">Semester <span class="text-danger">*</span></label>
                     <select name="semester" class="form-select">
-                        @foreach(config('hsms.semesters') as $s)
+                        @foreach(config('hostelease.semesters') as $s)
                             <option value="{{ $s }}" @selected(old('semester', '1') == $s)>Semester {{ $s }}</option>
                         @endforeach
                     </select>
@@ -119,3 +119,4 @@
     })();
 </script>
 @endpush
+

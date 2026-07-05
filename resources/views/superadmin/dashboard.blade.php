@@ -8,8 +8,8 @@
         ['label' => 'Expired Hostels', 'value' => $stats['expired_hostels'], 'icon' => 'fa-circle-xmark', 'bg' => 'danger'],
         ['label' => 'Due Renewals (30d)', 'value' => $stats['due_renewals'], 'icon' => 'fa-bell', 'bg' => 'warning'],
         ['label' => 'Total Students', 'value' => $stats['total_students'], 'icon' => 'fa-users', 'bg' => 'info'],
-        ['label' => 'Total Income', 'value' => hsms_money($stats['total_income']), 'icon' => 'fa-sack-dollar', 'bg' => 'success'],
-        ['label' => 'Monthly Revenue', 'value' => hsms_money($stats['monthly_revenue']), 'icon' => 'fa-chart-line', 'bg' => 'primary'],
+        ['label' => 'Total Income', 'value' => hostelease_money($stats['total_income']), 'icon' => 'fa-sack-dollar', 'bg' => 'success'],
+        ['label' => 'Monthly Revenue', 'value' => hostelease_money($stats['monthly_revenue']), 'icon' => 'fa-chart-line', 'bg' => 'primary'],
     ];
 @endphp
 
@@ -98,3 +98,4 @@
     });
 </script>
 @endpush
+

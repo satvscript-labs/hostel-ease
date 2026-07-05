@@ -8,9 +8,9 @@
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hsms_money($summary['total']) }}</div><div class="stat-label">Total Fees</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($summary['paid']) }}</div><div class="stat-label">Collected</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hsms_money($summary['due']) }}</div><div class="stat-label">Outstanding</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hostelease_money($summary['total']) }}</div><div class="stat-label">Total Fees</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($summary['paid']) }}</div><div class="stat-label">Collected</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hostelease_money($summary['due']) }}</div><div class="stat-label">Outstanding</div></div></div></div>
 </div>
 
 <form method="GET" class="row g-2 mb-3">
@@ -23,7 +23,7 @@
     <div class="col-6 col-md-3">
         <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">All semesters</option>
-            @foreach(config('hsms.semesters') as $n)<option value="{{ $n }}" @selected(request('semester')==$n)>Semester {{ $n }}</option>@endforeach
+            @foreach(config('hostelease.semesters') as $n)<option value="{{ $n }}" @selected(request('semester')==$n)>Semester {{ $n }}</option>@endforeach
         </select>
     </div>
 </form>
@@ -37,9 +37,9 @@
                 <tr>
                     <td><a href="{{ route('admin.students.show', $fee->student) }}" class="text-decoration-none">{{ $fee->student->name }}</a></td>
                     <td>@if(($fee->period_type ?? 'semester') === 'yearly')<span class="badge bg-primary-subtle text-primary">Year {{ $fee->semester }}</span>@else{{ $fee->semester }}@endif</td>
-                    <td>{{ hsms_money($fee->total_fee) }}</td>
-                    <td class="text-success">{{ hsms_money($fee->paid_amount) }}</td>
-                    <td class="text-danger">{{ hsms_money($fee->balance) }}</td>
+                    <td>{{ hostelease_money($fee->total_fee) }}</td>
+                    <td class="text-success">{{ hostelease_money($fee->paid_amount) }}</td>
+                    <td class="text-danger">{{ hostelease_money($fee->balance) }}</td>
                     <td>{{ optional($fee->due_date)->format('d-m-Y') ?? '—' }}</td>
                     <td>
                         <span class="badge bg-{{ $fee->status==='paid'?'success':($fee->status==='partial'?'warning text-dark':'danger') }}">{{ ucfirst($fee->status) }}</span>
@@ -85,7 +85,7 @@
             </div>
             <div class="row g-3">
                 <div class="col-4"><label class="form-label">Semester</label>
-                    <select name="semester" class="form-select" required>@foreach(config('hsms.semesters') as $n)<option value="{{ $n }}">{{ $n }}</option>@endforeach</select></div>
+                    <select name="semester" class="form-select" required>@foreach(config('hostelease.semesters') as $n)<option value="{{ $n }}">{{ $n }}</option>@endforeach</select></div>
                 <div class="col-4"><label class="form-label">Total Fee (₹)</label><input type="number" step="0.01" min="0" name="total_fee" class="form-control" required></div>
                 <div class="col-4"><label class="form-label">Due Date</label><input type="date" name="due_date" class="form-control"></div>
             </div>
@@ -98,3 +98,4 @@
 @include('admin.partials.collect_modal')
 @include('admin.partials.promise_modal')
 @endsection
+

@@ -16,7 +16,7 @@ trait CollectsPayments
     {
         return $request->validate([
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
-            'payment_type' => ['required', Rule::in(array_keys(config('hsms.payment_types')))],
+            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
             'reference_number' => [
                 Rule::requiredIf(fn () => (bool) optional(
@@ -31,3 +31,4 @@ trait CollectsPayments
         ]);
     }
 }
+

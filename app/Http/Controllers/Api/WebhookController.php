@@ -74,7 +74,7 @@ class WebhookController extends Controller
                             ]);
                             $this->logger->log(
                                 'subscription.paid',
-                                "Webhook {$period} renewal — ".hsms_money($quote['amount']),
+                                "Webhook {$period} renewal — ".hostelease_money($quote['amount']),
                                 $subscription,
                             );
                         } finally {
@@ -93,3 +93,4 @@ class WebhookController extends Controller
         return response()->json(['status' => 'ok']);
     }
 }
+

@@ -26,7 +26,7 @@ class PaymentHistoryExport implements FromCollection, WithHeadings, WithMapping
         return [
             $payment->receipt_number,
             $payment->paid_on->format('d-m-Y'),
-            config('hsms.payment_types.'.$payment->payment_type),
+            config('hostelease.payment_types.'.$payment->payment_type),
             strtoupper($payment->mode),
             $payment->reference_number,
             number_format((float) $payment->amount, 2),
@@ -38,3 +38,4 @@ class PaymentHistoryExport implements FromCollection, WithHeadings, WithMapping
         return ['Receipt', 'Date', 'Type', 'Mode', 'Reference', 'Amount'];
     }
 }
+

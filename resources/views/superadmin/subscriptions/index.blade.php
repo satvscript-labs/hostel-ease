@@ -8,8 +8,8 @@
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($summary['total']) }}</div><div class="stat-label">Collected (paid)</div></div></div></div>
-    <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-warning">{{ hsms_money($summary['pending']) }}</div><div class="stat-label">Pending</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($summary['total']) }}</div><div class="stat-label">Collected (paid)</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-warning">{{ hostelease_money($summary['pending']) }}</div><div class="stat-label">Pending</div></div></div></div>
     <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-primary">{{ $summary['active_accounts'] }}</div><div class="stat-label">Active accounts</div></div></div></div>
     <div class="col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ $summary['expired_accounts'] }}</div><div class="stat-label">Expired accounts</div></div></div></div>
 </div>
@@ -33,8 +33,8 @@
                         <span class="badge bg-primary-subtle text-primary">{{ $a['payable'] }} billable</span>
                         @if($a['free'] > 0)<span class="badge bg-success-subtle text-success">{{ $a['free'] }} free</span>@endif
                     </td>
-                    <td class="text-end">{{ hsms_money($a['yearly']) }}</td>
-                    <td class="text-end">{{ hsms_money($a['monthly']) }}</td>
+                    <td class="text-end">{{ hostelease_money($a['yearly']) }}</td>
+                    <td class="text-end">{{ hostelease_money($a['monthly']) }}</td>
                     <td>{{ $a['end'] ? $a['end']->format('d M Y') : '—' }}</td>
                     <td>
                         @if($a['active'])
@@ -73,7 +73,7 @@
                     <td>{{ ucfirst($s->plan) }}</td>
                     <td>{{ $s->start_date->format('d M Y') }}</td>
                     <td>{{ $s->end_date->format('d M Y') }}</td>
-                    <td class="text-end">{{ hsms_money($s->amount) }}</td>
+                    <td class="text-end">{{ hostelease_money($s->amount) }}</td>
                     <td>{{ $s->payment_method ? ucfirst($s->payment_method) : '—' }}</td>
                     <td><span class="badge bg-{{ $s->payment_status==='paid'?'success':($s->payment_status==='pending'?'warning text-dark':'danger') }}">{{ ucfirst($s->payment_status) }}</span></td>
                     <td>{{ $s->transaction_number ?? '—' }}</td>
@@ -116,8 +116,8 @@
             <div class="row g-3">
                 <div class="col-6"><label class="form-label">Period</label>
                     <select name="period" id="periodSelect" class="form-select">
-                        <option value="yearly">Yearly (₹{{ number_format(config('hsms.subscription_pricing.yearly')) }}/branch)</option>
-                        <option value="monthly">Monthly (₹{{ number_format(config('hsms.subscription_pricing.monthly')) }}/branch)</option>
+                        <option value="yearly">Yearly (₹{{ number_format(config('hostelease.subscription_pricing.yearly')) }}/branch)</option>
+                        <option value="monthly">Monthly (₹{{ number_format(config('hostelease.subscription_pricing.monthly')) }}/branch)</option>
                     </select>
                 </div>
                 <div class="col-6"><label class="form-label">Amount (₹)</label><input type="number" step="0.01" name="amount" id="amountInput" class="form-control" required>
@@ -126,7 +126,7 @@
                 <div class="col-6"><label class="form-label">Payment Status</label>
                     <select name="payment_status" class="form-select"><option value="paid">Paid</option><option value="pending">Pending</option></select></div>
                 <div class="col-6"><label class="form-label">Method</label>
-                    <select name="payment_method" class="form-select"><option value="">—</option>@foreach(config('hsms.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach<option value="online">Online</option></select></div>
+                    <select name="payment_method" class="form-select"><option value="">—</option>@foreach(config('hostelease.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach<option value="online">Online</option></select></div>
                 <div class="col-12"><label class="form-label">Transaction No. / Remarks</label><input type="text" name="transaction_number" class="form-control mb-2" placeholder="Reference (optional)"><input type="text" name="remarks" class="form-control" placeholder="Remarks (optional)"></div>
             </div>
         </div>
@@ -148,7 +148,7 @@
                 <div class="col-6"><label class="form-label">Payment Status</label>
                     <select name="payment_status" id="e_status" class="form-select"><option value="paid">Paid</option><option value="pending">Pending</option><option value="failed">Failed</option></select></div>
                 <div class="col-6"><label class="form-label">Method</label>
-                    <select name="payment_method" id="e_method" class="form-select"><option value="">—</option>@foreach(config('hsms.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach<option value="online">Online</option></select></div>
+                    <select name="payment_method" id="e_method" class="form-select"><option value="">—</option>@foreach(config('hostelease.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach<option value="online">Online</option></select></div>
                 <div class="col-12"><label class="form-label">Transaction No.</label><input type="text" name="transaction_number" id="e_txn" class="form-control"></div>
                 <div class="col-12"><label class="form-label">Remarks</label><input type="text" name="remarks" id="e_remarks" class="form-control"></div>
             </div>
@@ -208,3 +208,4 @@ function editSub(id) {
 }
 </script>
 @endpush
+

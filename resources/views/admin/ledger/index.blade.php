@@ -8,9 +8,9 @@
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hsms_money($grand['billed']) }}</div><div class="stat-label">Total Billed</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($grand['paid']) }}</div><div class="stat-label">Total Collected</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hsms_money($grand['outstanding']) }}</div><div class="stat-label">Total Outstanding</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hostelease_money($grand['billed']) }}</div><div class="stat-label">Total Billed</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($grand['paid']) }}</div><div class="stat-label">Total Collected</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hostelease_money($grand['outstanding']) }}</div><div class="stat-label">Total Outstanding</div></div></div></div>
 </div>
 
 <div class="card stat-card"><div class="card-body">
@@ -21,10 +21,10 @@
             @foreach($students as $s)
                 <tr>
                     <td class="fw-semibold">{{ $s->name }}</td>
-                    <td>{{ config('hsms.occupation_types.'.$s->occupation_type) }}</td>
-                    <td class="text-end">{{ hsms_money($s->totals['billed']) }}</td>
-                    <td class="text-end text-success">{{ hsms_money($s->totals['paid']) }}</td>
-                    <td class="text-end {{ $s->totals['outstanding'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ hsms_money($s->totals['outstanding']) }}</td>
+                    <td>{{ config('hostelease.occupation_types.'.$s->occupation_type) }}</td>
+                    <td class="text-end">{{ hostelease_money($s->totals['billed']) }}</td>
+                    <td class="text-end text-success">{{ hostelease_money($s->totals['paid']) }}</td>
+                    <td class="text-end {{ $s->totals['outstanding'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ hostelease_money($s->totals['outstanding']) }}</td>
                     <td class="text-end"><a href="{{ route('admin.ledger.show', $s) }}" class="btn btn-sm btn-light"><i class="fa-solid fa-book-open"></i></a></td>
                 </tr>
             @endforeach
@@ -33,3 +33,4 @@
     </div>
 </div></div>
 @endsection
+

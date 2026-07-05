@@ -65,7 +65,7 @@ class BillingController extends Controller
         try {
             $order = $this->razorpay->createOrder(
                 $quote['amount_paise'],
-                'hsms_'.$owner->id.'_'.now()->timestamp,
+                'hostelease_'.$owner->id.'_'.now()->timestamp,
                 ['owner_id' => (string) $owner->id, 'period' => $data['period'], 'branches' => (string) $quote['branches']],
             );
         } catch (RuntimeException $e) {
@@ -111,7 +111,7 @@ class BillingController extends Controller
 
             $this->logger->log(
                 'subscription.paid',
-                "App {$data['period']} renewal — ".hsms_money($quote['amount']),
+                "App {$data['period']} renewal — ".hostelease_money($quote['amount']),
                 $subscription,
             );
         }
@@ -119,3 +119,4 @@ class BillingController extends Controller
         return response()->json(['message' => 'Payment successful — your subscription is renewed.']);
     }
 }
+

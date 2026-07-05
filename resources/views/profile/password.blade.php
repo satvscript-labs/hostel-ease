@@ -18,7 +18,7 @@
                     <i class="fa-solid fa-circle-user fs-2 text-primary"></i>
                     <div>
                         <div class="fw-semibold">{{ $user->name }}</div>
-                        <div class="text-muted small">{{ hsms_phone($user->mobile) }} · {{ config('hsms.roles.'.$user->role, ucfirst($user->role)) }}</div>
+                        <div class="text-muted small">{{ hostelease_phone($user->mobile) }} · {{ config('hostelease.roles.'.$user->role, ucfirst($user->role)) }}</div>
                     </div>
                 </div>
 
@@ -49,3 +49,4 @@
     </div>
 </div>
 @endsection
+

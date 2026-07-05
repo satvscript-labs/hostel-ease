@@ -26,9 +26,9 @@
 </form>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hsms_money($summary['amount']) }}</div><div class="stat-label">Billed</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($summary['paid']) }}</div><div class="stat-label">Collected</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hsms_money($summary['due']) }}</div><div class="stat-label">Due</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hostelease_money($summary['amount']) }}</div><div class="stat-label">Billed</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($summary['paid']) }}</div><div class="stat-label">Collected</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hostelease_money($summary['due']) }}</div><div class="stat-label">Due</div></div></div></div>
 </div>
 
 <div class="card stat-card"><div class="card-body">
@@ -39,9 +39,9 @@
             @forelse($rows as $r)
                 <tr>
                     <td><a href="{{ route('admin.students.show', $r->student) }}" class="text-decoration-none">{{ $r->student->name }}</a></td>
-                    <td>{{ hsms_money($r->amount) }}</td>
-                    <td class="text-success">{{ hsms_money($r->paid_amount) }}</td>
-                    <td class="text-danger">{{ hsms_money($r->balance) }}</td>
+                    <td>{{ hostelease_money($r->amount) }}</td>
+                    <td class="text-success">{{ hostelease_money($r->paid_amount) }}</td>
+                    <td class="text-danger">{{ hostelease_money($r->balance) }}</td>
                     <td>{{ optional($r->due_date)->format('d-m-Y') ?? '—' }}</td>
                     <td>
                         <span class="badge bg-{{ $r->status==='paid'?'success':($r->status==='partial'?'warning text-dark':'danger') }}">{{ ucfirst($r->status) }}</span>
@@ -77,3 +77,4 @@
 @include('admin.partials.collect_modal')
 @include('admin.partials.promise_modal')
 @endsection
+

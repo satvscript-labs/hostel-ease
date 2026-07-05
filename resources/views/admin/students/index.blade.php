@@ -20,7 +20,7 @@
     <div class="col-6 col-md-3">
         <select name="occupation" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">All occupations</option>
-            @foreach(config('hsms.occupation_types') as $k => $label)
+            @foreach(config('hostelease.occupation_types') as $k => $label)
                 <option value="{{ $k }}" @selected(request('occupation')===$k)>{{ $label }}</option>
             @endforeach
         </select>
@@ -45,7 +45,7 @@
                             </div>
                         </td>
                         <td><x-mobile-link :mobile="$s->mobile" /></td>
-                        <td>{{ config('hsms.occupation_types.'.$s->occupation_type) }}</td>
+                        <td>{{ config('hostelease.occupation_types.'.$s->occupation_type) }}</td>
                         <td>{{ $asg ? $asg->bed->room->room_number.' / '.$asg->bed->bed_number : '—' }}</td>
                         <td>{{ optional($s->join_date)->format('d-m-Y') ?? '—' }}</td>
                         <td>
@@ -70,3 +70,4 @@
     </div>
 </div>
 @endsection
+

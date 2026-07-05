@@ -17,13 +17,13 @@
     <div class="col-6 col-md-3">
         <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">All statuses</option>
-            @foreach(config('hsms.complaint_statuses') as $k=>$l)<option value="{{ $k }}" @selected(request('status')===$k)>{{ $l }}</option>@endforeach
+            @foreach(config('hostelease.complaint_statuses') as $k=>$l)<option value="{{ $k }}" @selected(request('status')===$k)>{{ $l }}</option>@endforeach
         </select>
     </div>
     <div class="col-6 col-md-3">
         <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">All priorities</option>
-            @foreach(config('hsms.complaint_priorities') as $k=>$l)<option value="{{ $k }}" @selected(request('priority')===$k)>{{ $l }}</option>@endforeach
+            @foreach(config('hostelease.complaint_priorities') as $k=>$l)<option value="{{ $k }}" @selected(request('priority')===$k)>{{ $l }}</option>@endforeach
         </select>
     </div>
 </form>
@@ -37,9 +37,9 @@
                 <tr>
                     <td class="fw-semibold">{{ $c->title }}</td>
                     <td>{{ $c->student?->name ?? '—' }}</td>
-                    <td>{{ config('hsms.complaint_categories.'.$c->category, $c->category) }}</td>
+                    <td>{{ config('hostelease.complaint_categories.'.$c->category, $c->category) }}</td>
                     <td><span class="badge bg-{{ $c->priority==='high'?'danger':($c->priority==='medium'?'warning text-dark':'secondary') }}">{{ ucfirst($c->priority) }}</span></td>
-                    <td><span class="badge bg-{{ $c->status==='resolved'||$c->status==='closed'?'success':($c->status==='in_progress'?'warning text-dark':'danger') }}">{{ config('hsms.complaint_statuses.'.$c->status) }}</span></td>
+                    <td><span class="badge bg-{{ $c->status==='resolved'||$c->status==='closed'?'success':($c->status==='in_progress'?'warning text-dark':'danger') }}">{{ config('hostelease.complaint_statuses.'.$c->status) }}</span></td>
                     <td class="small">{{ $c->created_at->format('d M Y') }}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#upd{{ $c->id }}"><i class="fa-solid fa-pen"></i></button>
@@ -55,7 +55,7 @@
                         <div class="modal-body">
                             @if($c->description)<p class="text-muted small">{{ $c->description }}</p>@endif
                             <div class="mb-3"><label class="form-label">Status</label>
-                                <select name="status" class="form-select">@foreach(config('hsms.complaint_statuses') as $k=>$l)<option value="{{ $k }}" @selected($c->status===$k)>{{ $l }}</option>@endforeach</select></div>
+                                <select name="status" class="form-select">@foreach(config('hostelease.complaint_statuses') as $k=>$l)<option value="{{ $k }}" @selected($c->status===$k)>{{ $l }}</option>@endforeach</select></div>
                             <div class="mb-1"><label class="form-label">Resolution / Notes</label><textarea name="resolution" class="form-control" rows="2">{{ $c->resolution }}</textarea></div>
                         </div>
                         <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
@@ -78,9 +78,9 @@
                 <div class="col-6"><label class="form-label">Student (optional)</label>
                     <select name="student_id" class="form-select" data-select2><option value="">—</option>@foreach($students as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select></div>
                 <div class="col-6"><label class="form-label">Category</label>
-                    <select name="category" class="form-select" required>@foreach(config('hsms.complaint_categories') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
+                    <select name="category" class="form-select" required>@foreach(config('hostelease.complaint_categories') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
                 <div class="col-6"><label class="form-label">Priority</label>
-                    <select name="priority" class="form-select" required>@foreach(config('hsms.complaint_priorities') as $k=>$l)<option value="{{ $k }}" @selected($k==='medium')>{{ $l }}</option>@endforeach</select></div>
+                    <select name="priority" class="form-select" required>@foreach(config('hostelease.complaint_priorities') as $k=>$l)<option value="{{ $k }}" @selected($k==='medium')>{{ $l }}</option>@endforeach</select></div>
                 <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="3"></textarea></div>
             </div>
         </div>
@@ -88,3 +88,4 @@
     </form>
 </div></div>
 @endsection
+

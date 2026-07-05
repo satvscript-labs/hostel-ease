@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "satvscript/hsms",
+    "name": "satvscript/dorm-shpere",
     "type": "project",
-    "description": "HSMS - Multi-Tenant Hostel Management SaaS (Laravel 12).",
+    "description": "HostelEase - Multi-Tenant Hostel Management SaaS (Laravel 12).",
     "keywords": ["laravel", "hostel", "saas", "pg-management"],
     "license": "proprietary",
     "require": {

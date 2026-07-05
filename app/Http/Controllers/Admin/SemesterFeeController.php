@@ -45,7 +45,7 @@ class SemesterFeeController extends Controller
     {
         $data = $request->validate([
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', \App\Support\Tenant::id())],
-            'semester' => ['required', 'integer', Rule::in(config('hsms.semesters'))],
+            'semester' => ['required', 'integer', Rule::in(config('hostelease.semesters'))],
             'total_fee' => ['required', 'numeric', 'min:0', 'max:9999999'],
             'due_date' => ['nullable', 'date'],
         ]);
@@ -100,3 +100,4 @@ class SemesterFeeController extends Controller
         return back()->with('success', 'Semester fee removed.');
     }
 }
+

@@ -1,5 +1,5 @@
 @props(['mobile' => null, 'label' => null, 'showCall' => true])
-@php($phone = hsms_phone($mobile))
+@php($phone = hostelease_phone($mobile))
 @if($phone)
     <span {{ $attributes->merge(['class' => 'text-nowrap']) }}>
         @if($showCall)
@@ -7,9 +7,10 @@
         @else
             {{ $label ?? $phone }}
         @endif
-        <a href="{{ hsms_whatsapp_link($mobile) }}" target="_blank" rel="noopener"
+        <a href="{{ hostelease_whatsapp_link($mobile) }}" target="_blank" rel="noopener"
            class="text-success ms-1" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
     </span>
 @else
     <span class="text-muted">—</span>
 @endif
+

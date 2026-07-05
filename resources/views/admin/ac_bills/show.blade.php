@@ -9,8 +9,8 @@
 
 <div class="row g-3 mb-3">
     <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ rtrim(rtrim(number_format($bill->total_units, 2), '0'), '.') }}</div><div class="stat-label">Units ({{ $bill->previous_unit }} → {{ $bill->current_unit }})</div></div></div></div>
-    <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hsms_money($bill->unit_price) }}</div><div class="stat-label">Per Unit</div></div></div></div>
-    <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-primary">{{ hsms_money($bill->total_amount) }}</div><div class="stat-label">Total Bill</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hostelease_money($bill->unit_price) }}</div><div class="stat-label">Per Unit</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-primary">{{ hostelease_money($bill->total_amount) }}</div><div class="stat-label">Total Bill</div></div></div></div>
     <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ ucfirst($bill->distribution) }}</div><div class="stat-label">Distribution · {{ $bill->shares->count() }} students</div></div></div></div>
 </div>
 
@@ -23,9 +23,9 @@
             @foreach($bill->shares as $share)
                 <tr>
                     <td><a href="{{ route('admin.students.show', $share->student) }}" class="text-decoration-none">{{ $share->student->name }}</a></td>
-                    <td class="text-end">{{ hsms_money($share->amount) }}</td>
-                    <td class="text-end text-success">{{ hsms_money($share->paid_amount) }}</td>
-                    <td class="text-end text-danger">{{ hsms_money($share->balance) }}</td>
+                    <td class="text-end">{{ hostelease_money($share->amount) }}</td>
+                    <td class="text-end text-success">{{ hostelease_money($share->paid_amount) }}</td>
+                    <td class="text-end text-danger">{{ hostelease_money($share->balance) }}</td>
                     <td>
                         <span class="badge bg-{{ $share->status==='paid'?'success':($share->status==='partial'?'warning text-dark':'danger') }}">{{ ucfirst($share->status) }}</span>
                         @if($share->promise_date && $share->status !== 'paid')
@@ -53,3 +53,4 @@
 @include('admin.partials.collect_modal')
 @include('admin.partials.promise_modal')
 @endsection
+

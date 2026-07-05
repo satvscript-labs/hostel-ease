@@ -18,7 +18,7 @@
     <div class="col-md-4">
         <label class="form-label">Room Type <span class="text-danger">*</span></label>
         <select name="room_type" class="form-select" required>
-            @foreach(config('hsms.room_types') as $key => $label)
+            @foreach(config('hostelease.room_types') as $key => $label)
                 <option value="{{ $key }}" @selected(old('room_type', $room?->room_type) === $key)>{{ $label }}</option>
             @endforeach
         </select>
@@ -26,7 +26,7 @@
     <div class="col-md-4">
         <label class="form-label">Sharing <span class="text-danger">*</span></label>
         <select name="sharing" class="form-select" required>
-            @foreach(config('hsms.sharing_options') as $n)
+            @foreach(config('hostelease.sharing_options') as $n)
                 <option value="{{ $n }}" @selected(old('sharing', $room?->sharing) == $n)>{{ $n }} Sharing</option>
             @endforeach
         </select>
@@ -38,3 +38,4 @@
     Fees aren't set on the room. You'll choose each student's <strong>fee amount &amp; frequency</strong>
     (Monthly / Semester) when assigning them to a bed.
 </p>
+

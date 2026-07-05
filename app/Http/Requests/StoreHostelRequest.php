@@ -35,7 +35,7 @@ class StoreHostelRequest extends FormRequest
             'gst_number' => ['nullable', 'string', 'max:20'],
             'subscription_start' => ['required', 'date'],
             'subscription_end' => ['required', 'date', 'after:subscription_start'],
-            'status' => ['required', Rule::in(array_keys(config('hsms.hostel_status')))],
+            'status' => ['required', Rule::in(array_keys(config('hostelease.hostel_status')))],
             // Subscription (create only)
             'amount' => ['nullable', 'numeric', 'min:0'],
             'payment_status' => ['nullable', Rule::in(['paid', 'pending', 'failed'])],
@@ -51,3 +51,4 @@ class StoreHostelRequest extends FormRequest
         ];
     }
 }
+

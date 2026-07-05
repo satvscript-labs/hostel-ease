@@ -2,17 +2,17 @@
 
 use Illuminate\Support\Str;
 
-if (! function_exists('hsms_phone')) {
+if (! function_exists('hostelease_phone')) {
     /**
      * Normalise an Indian mobile number to +91XXXXXXXXXX form.
      */
-    function hsms_phone(?string $mobile): ?string
+    function hostelease_phone(?string $mobile): ?string
     {
         if (blank($mobile)) {
             return null;
         }
 
-        $code = config('hsms.country_code', '+91');
+        $code = config('hostelease.country_code', '+91');
         $digits = preg_replace('/\D+/', '', $mobile);
 
         // Strip a leading country code if already present.
@@ -27,13 +27,13 @@ if (! function_exists('hsms_phone')) {
     }
 }
 
-if (! function_exists('hsms_whatsapp_link')) {
+if (! function_exists('hostelease_whatsapp_link')) {
     /**
      * Build a wa.me click-to-chat link for a mobile number.
      */
-    function hsms_whatsapp_link(?string $mobile, ?string $text = null): ?string
+    function hostelease_whatsapp_link(?string $mobile, ?string $text = null): ?string
     {
-        $phone = hsms_phone($mobile);
+        $phone = hostelease_phone($mobile);
 
         if (! $phone) {
             return null;
@@ -49,11 +49,11 @@ if (! function_exists('hsms_whatsapp_link')) {
     }
 }
 
-if (! function_exists('hsms_money')) {
+if (! function_exists('hostelease_money')) {
     /**
      * Format a value as Indian Rupees.
      */
-    function hsms_money(int|float|null $amount): string
+    function hostelease_money(int|float|null $amount): string
     {
         return '₹'.number_format((float) ($amount ?? 0), 2);
     }
@@ -93,11 +93,11 @@ if (! function_exists('normalize_phone')) {
     }
 }
 
-if (! function_exists('hsms_receipt_number')) {
+if (! function_exists('hostelease_receipt_number')) {
     /**
      * Generate a unique receipt number for a hostel.
      */
-    function hsms_receipt_number(int $hostelId): string
+    function hostelease_receipt_number(int $hostelId): string
     {
         return sprintf('RCPT-%d-%s', $hostelId, strtoupper(Str::random(8)));
     }

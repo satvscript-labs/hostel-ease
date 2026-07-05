@@ -33,7 +33,7 @@
     </div>
 </div></form>
 
-<div class="alert alert-success py-2"><strong>Total (filtered):</strong> {{ hsms_money($total) }} across {{ $payments->count() }} payment(s).</div>
+<div class="alert alert-success py-2"><strong>Total (filtered):</strong> {{ hostelease_money($total) }} across {{ $payments->count() }} payment(s).</div>
 
 <div class="card stat-card">
     <div class="card-body">
@@ -48,10 +48,10 @@
                         <td class="fw-semibold">{{ $p->receipt_number }}</td>
                         <td>{{ $p->paid_on->format('d-m-Y') }}</td>
                         <td><a href="{{ route('admin.students.show', $p->student) }}" class="text-decoration-none">{{ $p->student->name }}</a></td>
-                        <td>{{ config('hsms.payment_types.'.$p->payment_type) }}</td>
+                        <td>{{ config('hostelease.payment_types.'.$p->payment_type) }}</td>
                         <td><span class="badge bg-secondary-subtle text-secondary text-uppercase">{{ $p->mode }}</span></td>
                         <td>{{ $p->reference_number ?? '—' }}</td>
-                        <td class="text-end fw-semibold">{{ hsms_money($p->amount) }}</td>
+                        <td class="text-end fw-semibold">{{ hostelease_money($p->amount) }}</td>
                         <td class="text-end">
                             <a href="{{ route('admin.payments.show', $p) }}" class="btn btn-sm btn-light"><i class="fa-solid fa-receipt"></i></a>
                             <a href="{{ route('admin.payments.pdf', $p) }}" class="btn btn-sm btn-light"><i class="fa-solid fa-file-pdf"></i></a>
@@ -64,3 +64,4 @@
     </div>
 </div>
 @endsection
+

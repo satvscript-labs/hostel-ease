@@ -30,7 +30,7 @@
             <div class="col-md-3">
                 <label class="form-label">Occupation <span class="text-danger">*</span></label>
                 <select name="occupation_type" class="form-select" required>
-                    @foreach(config('hsms.occupation_types') as $k => $label)
+                    @foreach(config('hostelease.occupation_types') as $k => $label)
                         <option value="{{ $k }}" @selected(old('occupation_type', $student?->occupation_type) === $k)>{{ $label }}</option>
                     @endforeach
                 </select>
@@ -94,3 +94,4 @@
         </select>
     </div>
 </div>
+

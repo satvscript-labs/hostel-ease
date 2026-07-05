@@ -7,7 +7,7 @@ We have received your payment. The details are below, and a PDF copy is attached
 
 @component('mail::panel')
 **Receipt No:** {{ $payment->receipt_number }}
-**Amount:** {{ hsms_money($payment->amount) }}
+**Amount:** {{ hostelease_money($payment->amount) }}
 **Mode:** {{ strtoupper($payment->mode) }}
 **Date:** {{ $payment->paid_on->format('d M Y') }}
 @endcomponent
@@ -15,3 +15,4 @@ We have received your payment. The details are below, and a PDF copy is attached
 Thank you,<br>
 **{{ $payment->hostel->name }}**
 @endcomponent
+

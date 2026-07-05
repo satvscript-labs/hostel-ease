@@ -23,14 +23,14 @@
 
     <table style="width:100%;margin-top:12px;"><tr>
         <td><strong>{{ $student->name }}</strong><br>
-            <span class="muted">{{ hsms_phone($student->mobile) }} · {{ config('hsms.occupation_types.'.$student->occupation_type) }}</span></td>
+            <span class="muted">{{ hostelease_phone($student->mobile) }} · {{ config('hostelease.occupation_types.'.$student->occupation_type) }}</span></td>
         <td class="right"><span class="muted">Status</span><br>{{ ucfirst($student->status) }}</td>
     </tr></table>
 
     <table class="totals"><tr>
-        <td><div class="muted">Total Fees</div><div class="v">{{ hsms_money($totals['billed']) }}</div></td>
-        <td><div class="muted">Total Paid</div><div class="v" style="color:#16a34a;">{{ hsms_money($totals['paid']) }}</div></td>
-        <td><div class="muted">Remaining</div><div class="v" style="color:#dc2626;">{{ hsms_money($totals['outstanding']) }}</div></td>
+        <td><div class="muted">Total Fees</div><div class="v">{{ hostelease_money($totals['billed']) }}</div></td>
+        <td><div class="muted">Total Paid</div><div class="v" style="color:#16a34a;">{{ hostelease_money($totals['paid']) }}</div></td>
+        <td><div class="muted">Remaining</div><div class="v" style="color:#dc2626;">{{ hostelease_money($totals['outstanding']) }}</div></td>
     </tr></table>
 
     <h2>Obligations</h2>
@@ -41,9 +41,9 @@
             <tr>
                 <td>{{ optional($o['date'])->format('d-m-Y') ?? '—' }}</td>
                 <td>{{ $o['particular'] }}</td>
-                <td class="right">{{ hsms_money($o['amount']) }}</td>
-                <td class="right">{{ hsms_money($o['paid']) }}</td>
-                <td class="right">{{ hsms_money($o['balance']) }}</td>
+                <td class="right">{{ hostelease_money($o['amount']) }}</td>
+                <td class="right">{{ hostelease_money($o['paid']) }}</td>
+                <td class="right">{{ hostelease_money($o['balance']) }}</td>
                 <td>{{ ucfirst($o['status']) }}</td>
             </tr>
         @empty
@@ -60,10 +60,10 @@
             <tr>
                 <td>{{ $p->receipt_number }}</td>
                 <td>{{ $p->paid_on->format('d-m-Y') }}</td>
-                <td>{{ config('hsms.payment_types.'.$p->payment_type) }}</td>
+                <td>{{ config('hostelease.payment_types.'.$p->payment_type) }}</td>
                 <td>{{ strtoupper($p->mode) }}</td>
                 <td>{{ $p->reference_number ?? '—' }}</td>
-                <td class="right">{{ hsms_money($p->amount) }}</td>
+                <td class="right">{{ hostelease_money($p->amount) }}</td>
             </tr>
         @empty
             <tr><td colspan="6">No payments.</td></tr>
@@ -72,3 +72,4 @@
     </table>
 </body>
 </html>
+

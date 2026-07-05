@@ -34,7 +34,7 @@
                 <h2 class="h4 fw-bold text-primary mb-0">{{ $payment->hostel->name }}</h2>
                 <p class="text-muted small mb-0">
                     {{ $payment->hostel->address }}{{ $payment->hostel->city ? ', '.$payment->hostel->city : '' }}<br>
-                    {{ hsms_phone($payment->hostel->mobile) }}
+                    {{ hostelease_phone($payment->hostel->mobile) }}
                 </p>
             </div>
             <div class="text-end">
@@ -48,7 +48,7 @@
             <div class="col-6">
                 <div class="text-muted small">Received From</div>
                 <div class="fw-semibold">{{ $payment->student->name }}</div>
-                <div class="small">{{ hsms_phone($payment->student->mobile) }}</div>
+                <div class="small">{{ hostelease_phone($payment->student->mobile) }}</div>
             </div>
             <div class="col-6 text-end">
                 <div class="text-muted small">Date</div>
@@ -58,7 +58,7 @@
 
         <table class="table table-sm mb-3">
             <tbody>
-                <tr><th class="text-muted">Payment Type</th><td class="text-end">{{ config('hsms.payment_types.'.$payment->payment_type) }}</td></tr>
+                <tr><th class="text-muted">Payment Type</th><td class="text-end">{{ config('hostelease.payment_types.'.$payment->payment_type) }}</td></tr>
                 <tr><th class="text-muted">Mode</th><td class="text-end text-uppercase">{{ $payment->mode }}</td></tr>
                 @if($payment->reference_number)
                     <tr><th class="text-muted">Reference No.</th><td class="text-end">{{ $payment->reference_number }}</td></tr>
@@ -71,7 +71,7 @@
 
         <div class="d-flex justify-content-between align-items-center bg-light rounded p-3">
             <span class="fw-semibold">Amount Paid</span>
-            <span class="h4 fw-bold text-success mb-0">{{ hsms_money($payment->amount) }}</span>
+            <span class="h4 fw-bold text-success mb-0">{{ hostelease_money($payment->amount) }}</span>
         </div>
 
         <div class="d-flex justify-content-between mt-4 pt-4">
@@ -104,3 +104,4 @@
     }
 </script>
 @endpush
+

@@ -36,8 +36,8 @@
     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">@csrf</form>
 
     <script>
-        window.HSMS_SESSION_TIMEOUT = {{ (int) config('hsms.session_timeout') }};
-        window.HSMS_FLASH = @json([
+        window.hostelease_SESSION_TIMEOUT = {{ (int) config('hostelease.session_timeout') }};
+        window.hostelease_FLASH = @json([
             'type' => session('success') ? 'success' : (session('warning') ? 'warning' : (session('error') ? 'error' : null)),
             'message' => session('success') ?? session('warning') ?? session('error'),
         ]);
@@ -45,3 +45,4 @@
     @stack('scripts')
 </body>
 </html>
+

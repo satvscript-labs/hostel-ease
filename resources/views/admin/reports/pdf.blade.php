@@ -29,7 +29,7 @@
         @forelse($data['rows'] as $row)
             <tr>
                 @foreach($row as $i => $cell)
-                    <td class="{{ in_array($i, $data['money']) ? 'right' : '' }}">{{ in_array($i, $data['money']) ? hsms_money($cell) : $cell }}</td>
+                    <td class="{{ in_array($i, $data['money']) ? 'right' : '' }}">{{ in_array($i, $data['money']) ? hostelease_money($cell) : $cell }}</td>
                 @endforeach
             </tr>
         @empty
@@ -39,9 +39,10 @@
         @if(! is_null($data['total']))
         <tfoot><tr>
             <td colspan="{{ count($data['headings']) - 1 }}" class="right">Total</td>
-            <td class="right">{{ hsms_money($data['total']) }}</td>
+            <td class="right">{{ hostelease_money($data['total']) }}</td>
         </tr></tfoot>
         @endif
     </table>
 </body>
 </html>
+

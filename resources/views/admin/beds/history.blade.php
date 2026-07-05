@@ -30,8 +30,8 @@
                         <td>{{ $a->join_date->format('d-m-Y') }}</td>
                         <td>{{ optional($a->leave_date)->format('d-m-Y') ?? '—' }}</td>
                         <td>{{ $a->durationInDays() }} days</td>
-                        <td>{{ hsms_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
-                        <td>{{ hsms_money($a->window_paid) }}</td>
+                        <td>{{ hostelease_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
+                        <td>{{ hostelease_money($a->window_paid) }}</td>
                         <td>{{ $a->remarks }}</td>
                     </tr>
                 @empty
@@ -43,3 +43,4 @@
     </div>
 </div>
 @endsection
+

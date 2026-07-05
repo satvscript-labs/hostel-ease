@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class GenerateNotifications extends Command
 {
-    protected $signature = 'hsms:generate-notifications';
+    protected $signature = 'hostelease:generate-notifications';
 
     protected $description = 'Generate dashboard alerts (renewals, fees, AC, leaving, document expiry) for all hostels.';
 
@@ -23,3 +23,4 @@ class GenerateNotifications extends Command
         return self::SUCCESS;
     }
 }
+

@@ -49,21 +49,21 @@
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <h5 class="fw-bold mb-0">{{ __('Yearly') }}</h5>
-                    <div class="text-muted small">{{ hsms_money($yearly['unit']) }} / {{ __('branch / year') }}</div>
+                    <div class="text-muted small">{{ hostelease_money($yearly['unit']) }} / {{ __('branch / year') }}</div>
                 </div>
                 <span class="badge bg-primary-subtle text-primary">{{ __('Best value') }}</span>
             </div>
             <div class="my-3">
-                <span class="display-6 fw-bold">{{ hsms_money($yearly['amount']) }}</span>
+                <span class="display-6 fw-bold">{{ hostelease_money($yearly['amount']) }}</span>
                 <span class="text-muted">/ {{ __('year') }}</span>
             </div>
             <ul class="list-unstyled small text-muted mb-3">
-                <li><i class="fa-solid fa-check text-success me-1"></i> {{ $yearly['payable'] }} × {{ hsms_money($yearly['unit']) }} = {{ hsms_money($yearly['amount']) }}</li>
+                <li><i class="fa-solid fa-check text-success me-1"></i> {{ $yearly['payable'] }} × {{ hostelease_money($yearly['unit']) }} = {{ hostelease_money($yearly['amount']) }}</li>
                 <li><i class="fa-solid fa-check text-success me-1"></i> {{ $yearly['free'] }} {{ __('branch(es) free') }}</li>
                 <li><i class="fa-solid fa-calendar-check me-1"></i> {{ __('Covers all branches until') }} {{ $yearly['end']->format('d M Y') }}</li>
             </ul>
             <button class="btn btn-primary w-100 pay-btn" data-period="yearly" @disabled(! $razorpayEnabled || $yearly['amount_paise'] < 100)>
-                <i class="fa-solid fa-lock me-1"></i> {{ __('Pay') }} {{ hsms_money($yearly['amount']) }}
+                <i class="fa-solid fa-lock me-1"></i> {{ __('Pay') }} {{ hostelease_money($yearly['amount']) }}
             </button>
         </div></div>
     </div>
@@ -72,18 +72,18 @@
     <div class="col-md-6">
         <div class="card stat-card h-100"><div class="card-body">
             <h5 class="fw-bold mb-0">{{ __('Monthly') }}</h5>
-            <div class="text-muted small">{{ hsms_money($monthly['unit']) }} / {{ __('branch / month') }}</div>
+            <div class="text-muted small">{{ hostelease_money($monthly['unit']) }} / {{ __('branch / month') }}</div>
             <div class="my-3">
-                <span class="display-6 fw-bold">{{ hsms_money($monthly['amount']) }}</span>
+                <span class="display-6 fw-bold">{{ hostelease_money($monthly['amount']) }}</span>
                 <span class="text-muted">/ {{ __('month') }}</span>
             </div>
             <ul class="list-unstyled small text-muted mb-3">
-                <li><i class="fa-solid fa-check text-success me-1"></i> {{ $monthly['payable'] }} × {{ hsms_money($monthly['unit']) }} = {{ hsms_money($monthly['amount']) }}</li>
+                <li><i class="fa-solid fa-check text-success me-1"></i> {{ $monthly['payable'] }} × {{ hostelease_money($monthly['unit']) }} = {{ hostelease_money($monthly['amount']) }}</li>
                 <li><i class="fa-solid fa-check text-success me-1"></i> {{ $monthly['free'] }} {{ __('branch(es) free') }}</li>
                 <li><i class="fa-solid fa-calendar-check me-1"></i> {{ __('Covers all branches until') }} {{ $monthly['end']->format('d M Y') }}</li>
             </ul>
             <button class="btn btn-outline-primary w-100 pay-btn" data-period="monthly" @disabled(! $razorpayEnabled || $monthly['amount_paise'] < 100)>
-                <i class="fa-solid fa-lock me-1"></i> {{ __('Pay') }} {{ hsms_money($monthly['amount']) }}
+                <i class="fa-solid fa-lock me-1"></i> {{ __('Pay') }} {{ hostelease_money($monthly['amount']) }}
             </button>
         </div></div>
     </div>
@@ -175,3 +175,4 @@
 })();
 </script>
 @endpush
+

@@ -96,7 +96,7 @@
                                                 'room' => $room->room_number,
                                                 'floor' => $floor->name,
                                                 'student' => $student?->name,
-                                                'mobile' => $student ? hsms_phone($student->mobile) : null,
+                                                'mobile' => $student ? hostelease_phone($student->mobile) : null,
                                                 'pending_dues' => $pendingDues->count(),
                                                 'pending_amount' => (float) $pendingAmount,
                                             ];
@@ -230,3 +230,4 @@
     }
 </script>
 @endpush
+

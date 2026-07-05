@@ -10,9 +10,9 @@
             <tr>
                 <td><span class="badge bg-primary-subtle text-primary">{{ $d['kind'] }}</span></td>
                 <td>{{ $d['label'] }}</td>
-                <td class="text-end">{{ hsms_money($d['total']) }}</td>
-                <td class="text-end text-success">{{ hsms_money($d['paid']) }}</td>
-                <td class="text-end fw-semibold {{ $d['balance'] > 0 ? 'text-danger' : '' }}">{{ hsms_money($d['balance']) }}</td>
+                <td class="text-end">{{ hostelease_money($d['total']) }}</td>
+                <td class="text-end text-success">{{ hostelease_money($d['paid']) }}</td>
+                <td class="text-end fw-semibold {{ $d['balance'] > 0 ? 'text-danger' : '' }}">{{ hostelease_money($d['balance']) }}</td>
                 <td><span class="badge bg-{{ $badge }}-subtle text-{{ $badge }}">{{ ucfirst($d['status']) }}</span></td>
             </tr>
         @empty
@@ -21,3 +21,4 @@
         </tbody>
     </table>
 </div>
+

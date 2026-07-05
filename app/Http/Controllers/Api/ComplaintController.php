@@ -37,9 +37,9 @@ class ComplaintController extends Controller
                 'resolved' => Complaint::where('status', 'resolved')->count(),
             ],
             'options' => [
-                'categories' => config('hsms.complaint_categories'),
-                'priorities' => config('hsms.complaint_priorities'),
-                'statuses' => config('hsms.complaint_statuses'),
+                'categories' => config('hostelease.complaint_categories'),
+                'priorities' => config('hostelease.complaint_priorities'),
+                'statuses' => config('hostelease.complaint_statuses'),
             ],
         ]);
     }
@@ -49,8 +49,8 @@ class ComplaintController extends Controller
         $data = $request->validate([
             'student_id' => ['nullable', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())],
             'title' => ['required', 'string', 'max:150'],
-            'category' => ['required', Rule::in(array_keys(config('hsms.complaint_categories')))],
-            'priority' => ['required', Rule::in(array_keys(config('hsms.complaint_priorities')))],
+            'category' => ['required', Rule::in(array_keys(config('hostelease.complaint_categories')))],
+            'priority' => ['required', Rule::in(array_keys(config('hostelease.complaint_priorities')))],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -69,7 +69,7 @@ class ComplaintController extends Controller
         $complaint = Complaint::findOrFail($complaint);
 
         $data = $request->validate([
-            'status' => ['required', Rule::in(array_keys(config('hsms.complaint_statuses')))],
+            'status' => ['required', Rule::in(array_keys(config('hostelease.complaint_statuses')))],
             'resolution' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -100,3 +100,4 @@ class ComplaintController extends Controller
         ];
     }
 }
+

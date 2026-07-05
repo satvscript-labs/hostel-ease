@@ -33,7 +33,7 @@
             <h2 class="h6 fw-bold mb-2">Admins</h2>
             @foreach($hostel->admins as $a)
                 <div class="d-flex justify-content-between align-items-center small mb-1">
-                    <span>{{ $a->name }} · {{ hsms_phone($a->mobile) }}</span>
+                    <span>{{ $a->name }} · {{ hostelease_phone($a->mobile) }}</span>
                     <span class="badge bg-{{ $a->is_active ? 'success' : 'secondary' }}">{{ $a->is_active ? 'Active' : 'Disabled' }}</span>
                 </div>
             @endforeach
@@ -53,7 +53,7 @@
                     <tr>
                         <td>{{ $s->start_date->format('d M Y') }}</td>
                         <td>{{ $s->end_date->format('d M Y') }}</td>
-                        <td class="text-end">{{ hsms_money($s->amount) }}</td>
+                        <td class="text-end">{{ hostelease_money($s->amount) }}</td>
                         <td><span class="badge bg-{{ $s->payment_status==='paid'?'success':($s->payment_status==='pending'?'warning text-dark':'danger') }}">{{ ucfirst($s->payment_status) }}</span></td>
                     </tr>
                 @empty
@@ -65,3 +65,4 @@
     </div>
 </div>
 @endsection
+

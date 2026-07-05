@@ -71,7 +71,7 @@ class AssignmentController extends Controller
         return response()->json([
             'students' => $students,
             'floors' => $floors,
-            'fee_frequencies' => config('hsms.fee_frequencies'),
+            'fee_frequencies' => config('hostelease.fee_frequencies'),
         ]);
     }
 
@@ -82,8 +82,8 @@ class AssignmentController extends Controller
             'bed_id' => ['required', Rule::exists('beds', 'id')->where('hostel_id', Tenant::id())],
             'join_date' => ['required', 'date'],
             'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
-            'fee_frequency' => ['required', Rule::in(array_keys(config('hsms.fee_frequencies')))],
-            'semester' => ['nullable', 'integer', Rule::in(config('hsms.semesters'))],
+            'fee_frequency' => ['required', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
+            'semester' => ['nullable', 'integer', Rule::in(config('hostelease.semesters'))],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -117,8 +117,8 @@ class AssignmentController extends Controller
         $model = BedAssignment::with('student')->findOrFail($assignment);
         $data = $request->validate([
             'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
-            'fee_frequency' => ['required', Rule::in(array_keys(config('hsms.fee_frequencies')))],
-            'semester' => ['nullable', 'integer', Rule::in(config('hsms.semesters'))],
+            'fee_frequency' => ['required', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
+            'semester' => ['nullable', 'integer', Rule::in(config('hostelease.semesters'))],
         ]);
 
         $this->service->updateFee($model, $data);
@@ -157,3 +157,4 @@ class AssignmentController extends Controller
         return response()->json(['message' => 'Student transferred.']);
     }
 }
+

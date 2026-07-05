@@ -38,7 +38,7 @@
     <div class="col-md-4">
         <label class="form-label">Status <span class="text-danger">*</span></label>
         <select name="status" class="form-select" required>
-            @foreach(config('hsms.hostel_status') as $k => $label)
+            @foreach(config('hostelease.hostel_status') as $k => $label)
                 <option value="{{ $k }}" @selected(old('status', $hostel?->status ?? 'active') === $k)>{{ $label }}</option>
             @endforeach
         </select>
@@ -56,7 +56,7 @@
     @if($isCreate)
         <div class="col-md-2">
             <label class="form-label">Amount (₹)</label>
-            <input type="number" step="0.01" name="amount" class="form-control" value="{{ old('amount', config('hsms.subscription_amount')) }}">
+            <input type="number" step="0.01" name="amount" class="form-control" value="{{ old('amount', config('hostelease.subscription_amount')) }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">Payment</label>
@@ -69,8 +69,9 @@
             <label class="form-label">Method</label>
             <select name="payment_method" class="form-select">
                 <option value="">—</option>
-                @foreach(config('hsms.payment_modes') as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
+                @foreach(config('hostelease.payment_modes') as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
             </select>
         </div>
     @endif
 </div>
+

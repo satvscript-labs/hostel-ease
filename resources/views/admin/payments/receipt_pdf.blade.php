@@ -24,7 +24,7 @@
             <div class="hostel">{{ $payment->hostel->name }}</div>
             <div class="muted">
                 {{ $payment->hostel->address }}{{ $payment->hostel->city ? ', '.$payment->hostel->city : '' }}<br>
-                {{ hsms_phone($payment->hostel->mobile) }}
+                {{ hostelease_phone($payment->hostel->mobile) }}
                 @if($payment->hostel->gst_number) · GST: {{ $payment->hostel->gst_number }}@endif
             </div>
         </td>
@@ -39,7 +39,7 @@
         <td>
             <span class="muted">Received From</span><br>
             <strong>{{ $payment->student->name }}</strong><br>
-            {{ hsms_phone($payment->student->mobile) }}
+            {{ hostelease_phone($payment->student->mobile) }}
         </td>
         <td class="right">
             <span class="muted">Date</span><br>
@@ -48,7 +48,7 @@
     </tr></table>
 
     <table>
-        <tr class="row"><th>Payment Type</th><td class="right">{{ config('hsms.payment_types.'.$payment->payment_type) }}</td></tr>
+        <tr class="row"><th>Payment Type</th><td class="right">{{ config('hostelease.payment_types.'.$payment->payment_type) }}</td></tr>
         <tr class="row"><th>Mode</th><td class="right">{{ strtoupper($payment->mode) }}</td></tr>
         @if($payment->reference_number)
             <tr class="row"><th>Reference No.</th><td class="right">{{ $payment->reference_number }}</td></tr>
@@ -60,7 +60,7 @@
 
     <table class="amount"><tr>
         <td>Amount Paid</td>
-        <td class="right">{{ hsms_money($payment->amount) }}</td>
+        <td class="right">{{ hostelease_money($payment->amount) }}</td>
     </tr></table>
 
     <table class="sign"><tr>
@@ -71,3 +71,4 @@
     <p class="muted" style="text-align:center;margin-top:20px;">This is a computer-generated receipt.</p>
 </body>
 </html>
+

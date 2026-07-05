@@ -52,7 +52,7 @@ class SemesterFeeController extends Controller
                 'due' => (float) $fees->sum('balance'),
             ],
             'students' => Student::active()->where('occupation_type', 'student')->orderBy('name')->get(['id', 'name', 'mobile']),
-            'semesters' => config('hsms.semesters'),
+            'semesters' => config('hostelease.semesters'),
         ]);
     }
 
@@ -60,7 +60,7 @@ class SemesterFeeController extends Controller
     {
         $data = $request->validate([
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())],
-            'semester' => ['required', 'integer', Rule::in(config('hsms.semesters'))],
+            'semester' => ['required', 'integer', Rule::in(config('hostelease.semesters'))],
             'total_fee' => ['required', 'numeric', 'min:0', 'max:9999999'],
             'due_date' => ['nullable', 'date'],
         ]);
@@ -112,3 +112,4 @@ class SemesterFeeController extends Controller
         return response()->json(['message' => 'Semester fee removed.']);
     }
 }
+

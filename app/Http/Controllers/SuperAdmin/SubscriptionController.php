@@ -111,7 +111,7 @@ class SubscriptionController extends Controller
 
         $this->logger->log(
             'subscription.create',
-            "Account renewal for {$owner->name} ({$data['period']}) — ".hsms_money($data['amount']),
+            "Account renewal for {$owner->name} ({$data['period']}) — ".hostelease_money($data['amount']),
             $subscription,
         );
 
@@ -153,7 +153,7 @@ class SubscriptionController extends Controller
         $this->billing->syncBranchesToSubscription($subscription->fresh());
 
         $owner = $this->billing->ownerFor($subscription);
-        $this->logger->log('subscription.paid', 'Accepted payment '.hsms_money($subscription->amount).($owner ? " · {$owner->name}" : ''), $subscription);
+        $this->logger->log('subscription.paid', 'Accepted payment '.hostelease_money($subscription->amount).($owner ? " · {$owner->name}" : ''), $subscription);
 
         return back()->with('success', 'Payment accepted — all branches extended to '.$subscription->end_date->format('d M Y').'.');
     }
@@ -165,3 +165,4 @@ class SubscriptionController extends Controller
         return back()->with('success', 'Subscription record removed.');
     }
 }
+

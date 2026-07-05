@@ -86,13 +86,13 @@ class User extends Authenticatable
     /** The owner login plus any sub-user role — all hostel-scoped app users. */
     public function isHostelStaff(): bool
     {
-        return $this->role === 'hostel_admin' || array_key_exists($this->role, config('hsms.staff_roles', []));
+        return $this->role === 'hostel_admin' || array_key_exists($this->role, config('hostelease.staff_roles', []));
     }
 
     /** Areas + readonly flag for this user's role. */
     public function roleAccess(): array
     {
-        return config('hsms.role_access.'.$this->role, ['areas' => [], 'readonly' => true]);
+        return config('hostelease.role_access.'.$this->role, ['areas' => [], 'readonly' => true]);
     }
 
     public function canAccessArea(string $area): bool
@@ -126,3 +126,4 @@ class User extends Authenticatable
         return $query->where('is_active', true);
     }
 }
+

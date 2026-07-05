@@ -13,16 +13,16 @@
     <div class="col-6 col-md-3">
         <select name="category" class="form-select form-select-sm">
             <option value="">All categories</option>
-            @foreach(config('hsms.expense_categories') as $k=>$l)<option value="{{ $k }}" @selected(request('category')===$k)>{{ $l }}</option>@endforeach
+            @foreach(config('hostelease.expense_categories') as $k=>$l)<option value="{{ $k }}" @selected(request('category')===$k)>{{ $l }}</option>@endforeach
         </select>
     </div>
     <div class="col-6 col-md-3"><button class="btn btn-primary btn-sm"><i class="fa-solid fa-filter me-1"></i> Filter</button></div>
 </form>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($summary['income']) }}</div><div class="stat-label">Income (period)</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hsms_money($summary['expense']) }}</div><div class="stat-label">Expenses (period)</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value {{ $summary['profit'] >= 0 ? 'text-success' : 'text-danger' }}">{{ hsms_money($summary['profit']) }}</div><div class="stat-label">{{ $summary['profit'] >= 0 ? 'Profit' : 'Loss' }}</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($summary['income']) }}</div><div class="stat-label">Income (period)</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hostelease_money($summary['expense']) }}</div><div class="stat-label">Expenses (period)</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value {{ $summary['profit'] >= 0 ? 'text-success' : 'text-danger' }}">{{ hostelease_money($summary['profit']) }}</div><div class="stat-label">{{ $summary['profit'] >= 0 ? 'Profit' : 'Loss' }}</div></div></div></div>
 </div>
 
 <div class="card stat-card"><div class="card-body">
@@ -33,11 +33,11 @@
             @forelse($expenses as $e)
                 <tr>
                     <td>{{ $e->expense_date->format('d-m-Y') }}</td>
-                    <td><span class="badge bg-secondary-subtle text-secondary">{{ config('hsms.expense_categories.'.$e->category, $e->category) }}</span></td>
+                    <td><span class="badge bg-secondary-subtle text-secondary">{{ config('hostelease.expense_categories.'.$e->category, $e->category) }}</span></td>
                     <td>{{ $e->title }}</td>
                     <td>{{ $e->paid_to ?? '—' }}</td>
                     <td class="text-uppercase">{{ $e->mode }}</td>
-                    <td class="text-end fw-semibold">{{ hsms_money($e->amount) }}</td>
+                    <td class="text-end fw-semibold">{{ hostelease_money($e->amount) }}</td>
                     <td class="text-end">
                         <form action="{{ route('admin.expenses.destroy', $e) }}" method="POST" class="d-inline" data-confirm="Delete this expense?">
                             @csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger"><i class="fa-solid fa-trash"></i></button>
@@ -58,12 +58,12 @@
         <div class="modal-body">
             <div class="row g-3">
                 <div class="col-6"><label class="form-label">Category</label>
-                    <select name="category" class="form-select" required>@foreach(config('hsms.expense_categories') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
+                    <select name="category" class="form-select" required>@foreach(config('hostelease.expense_categories') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
                 <div class="col-6"><label class="form-label">Date</label><input type="date" name="expense_date" class="form-control" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></div>
                 <div class="col-12"><label class="form-label">Title</label><input type="text" name="title" class="form-control" required></div>
                 <div class="col-6"><label class="form-label">Amount (₹)</label><input type="number" step="0.01" min="1" name="amount" class="form-control" required></div>
                 <div class="col-6"><label class="form-label">Mode</label>
-                    <select name="mode" class="form-select">@foreach(config('hsms.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
+                    <select name="mode" class="form-select">@foreach(config('hostelease.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
                 <div class="col-6"><label class="form-label">Paid To</label><input type="text" name="paid_to" class="form-control"></div>
                 <div class="col-6"><label class="form-label">Reference No.</label><input type="text" name="reference_number" class="form-control"></div>
                 <div class="col-12"><label class="form-label">Notes</label><input type="text" name="notes" class="form-control"></div>
@@ -73,3 +73,4 @@
     </form>
 </div></div>
 @endsection
+

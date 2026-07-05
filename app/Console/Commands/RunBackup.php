@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class RunBackup extends Command
 {
-    protected $signature = 'hsms:backup {--prune=30 : Delete backups older than N days (0 to keep all)}';
+    protected $signature = 'hostelease:backup {--prune=30 : Delete backups older than N days (0 to keep all)}';
 
     protected $description = 'Create a database backup and prune old archives.';
 
@@ -31,3 +31,4 @@ class RunBackup extends Command
         return self::SUCCESS;
     }
 }
+

@@ -16,8 +16,9 @@ Artisan::command('inspire', function () {
 | Commands are registered as their modules are built.
 */
 // Auto-generate monthly rent rows on the 1st of each month.
-Schedule::command('hsms:generate-monthly-rents')->monthlyOn(1, '00:30');
+Schedule::command('hostelease:generate-monthly-rents')->monthlyOn(1, '00:30');
 // Refresh dashboard alerts every morning.
-Schedule::command('hsms:generate-notifications')->dailyAt('08:00');
+Schedule::command('hostelease:generate-notifications')->dailyAt('08:00');
 // Nightly database backup (keeps 30 days).
-Schedule::command('hsms:backup --prune=30')->dailyAt('02:00');
+Schedule::command('hostelease:backup --prune=30')->dailyAt('02:00');
+

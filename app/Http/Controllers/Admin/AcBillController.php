@@ -67,7 +67,7 @@ class AcBillController extends Controller
         $bill = $this->acBills->create($room, $request->validated(), $request->input('students', []));
 
         $this->logger->log('ac_bill.create',
-            "AC bill {$room->room_number} {$bill->bill_month->format('M Y')} — ".hsms_money($bill->total_amount), $bill);
+            "AC bill {$room->room_number} {$bill->bill_month->format('M Y')} — ".hostelease_money($bill->total_amount), $bill);
 
         return redirect()->route('admin.ac-bills.show', $bill)
             ->with('success', 'AC bill generated and split among occupants.');
@@ -103,3 +103,4 @@ class AcBillController extends Controller
         return redirect()->route('admin.ac-bills.index')->with('success', 'AC bill deleted.');
     }
 }
+

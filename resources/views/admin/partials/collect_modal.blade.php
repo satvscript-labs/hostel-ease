@@ -22,7 +22,7 @@
                     <div class="col-6">
                         <label class="form-label">Type</label>
                         <select name="payment_type" class="form-select">
-                            @foreach(config('hsms.payment_types') as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
+                            @foreach(config('hostelease.payment_types') as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
                         </select>
                     </div>
                     <div class="col-6">
@@ -75,3 +75,4 @@
     })();
 </script>
 @endpush
+

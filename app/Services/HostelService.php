@@ -70,7 +70,7 @@ class HostelService
             $this->createSubscription($hostel, [
                 'start_date' => $data['subscription_start'],
                 'end_date' => $data['subscription_end'],
-                'amount' => $data['amount'] ?? config('hsms.subscription_amount'),
+                'amount' => $data['amount'] ?? config('hostelease.subscription_amount'),
                 'payment_status' => $data['payment_status'] ?? 'pending',
                 'payment_method' => $data['payment_method'] ?? null,
                 'transaction_number' => $data['transaction_number'] ?? null,
@@ -140,3 +140,4 @@ class HostelService
         return Str::upper(Str::random(4)).random_int(1000, 9999);
     }
 }
+

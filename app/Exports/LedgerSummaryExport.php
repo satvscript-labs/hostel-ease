@@ -29,8 +29,8 @@ class LedgerSummaryExport implements FromCollection, WithHeadings, WithMapping
 
         return [
             $student->name,
-            hsms_phone($student->mobile),
-            config('hsms.occupation_types.'.$student->occupation_type),
+            hostelease_phone($student->mobile),
+            config('hostelease.occupation_types.'.$student->occupation_type),
             number_format($t['billed'], 2),
             number_format($t['paid'], 2),
             number_format($t['outstanding'], 2),
@@ -43,3 +43,4 @@ class LedgerSummaryExport implements FromCollection, WithHeadings, WithMapping
         return ['Student', 'Mobile', 'Occupation', 'Billed', 'Paid', 'Outstanding', 'Status'];
     }
 }
+

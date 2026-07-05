@@ -8,7 +8,7 @@
     <span class="badge bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}">{{ ucfirst($student->status) }}</span>
     <div class="ms-auto d-flex gap-2">
         @if($student->mobile)
-            <a href="https://wa.me/91{{ preg_replace('/\D+/', '', $student->mobile) }}?text={{ urlencode('Dear '.$student->name.', regarding your hostel account — outstanding balance: '.hsms_money($paymentSummary['outstanding'] ?? 0).'. Thank you, '.optional($student->hostel)->name) }}"
+            <a href="https://wa.me/91{{ preg_replace('/\D+/', '', $student->mobile) }}?text={{ urlencode('Dear '.$student->name.', regarding your hostel account — outstanding balance: '.hostelease_money($paymentSummary['outstanding'] ?? 0).'. Thank you, '.optional($student->hostel)->name) }}"
                target="_blank" rel="noopener" class="btn btn-whatsapp btn-sm"><i class="fa-brands fa-whatsapp me-1"></i> WhatsApp</a>
         @endif
         <a href="{{ route('admin.students.edit', $student) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-pen me-1"></i> Edit</a>
@@ -22,7 +22,7 @@
             <div class="card-body text-center">
                 <img src="{{ $student->photo_url }}" class="rounded mb-3" style="width:130px;height:130px;object-fit:cover;" alt="">
                 <h2 class="h5 fw-bold mb-1">{{ $student->name }}</h2>
-                <p class="text-muted mb-2">{{ config('hsms.occupation_types.'.$student->occupation_type) }}</p>
+                <p class="text-muted mb-2">{{ config('hostelease.occupation_types.'.$student->occupation_type) }}</p>
                 <div class="mb-3"><x-mobile-link :mobile="$student->mobile" /></div>
                 @if($qrSvg)
                     <div class="d-inline-block border rounded p-2 bg-white">{!! $qrSvg !!}</div>
@@ -62,25 +62,25 @@
             <div class="col-6 col-lg-3">
                 <div class="card stat-card h-100"><div class="card-body">
                     <div class="stat-label">Total Billed</div>
-                    <div class="stat-value">{{ hsms_money($paymentSummary['total_billed']) }}</div>
+                    <div class="stat-value">{{ hostelease_money($paymentSummary['total_billed']) }}</div>
                 </div></div>
             </div>
             <div class="col-6 col-lg-3">
                 <div class="card stat-card h-100"><div class="card-body">
                     <div class="stat-label">Total Paid</div>
-                    <div class="stat-value text-success">{{ hsms_money($paymentSummary['total_paid']) }}</div>
+                    <div class="stat-value text-success">{{ hostelease_money($paymentSummary['total_paid']) }}</div>
                 </div></div>
             </div>
             <div class="col-6 col-lg-3">
                 <div class="card stat-card h-100"><div class="card-body">
                     <div class="stat-label">Outstanding</div>
-                    <div class="stat-value {{ $paymentSummary['outstanding'] > 0 ? 'text-danger' : 'text-success' }}">{{ hsms_money($paymentSummary['outstanding']) }}</div>
+                    <div class="stat-value {{ $paymentSummary['outstanding'] > 0 ? 'text-danger' : 'text-success' }}">{{ hostelease_money($paymentSummary['outstanding']) }}</div>
                 </div></div>
             </div>
             <div class="col-6 col-lg-3">
                 <div class="card stat-card h-100"><div class="card-body">
                     <div class="stat-label">Last Payment</div>
-                    <div class="stat-value">{{ $paymentSummary['last_payment'] ? hsms_money($paymentSummary['last_payment']->amount) : '—' }}</div>
+                    <div class="stat-value">{{ $paymentSummary['last_payment'] ? hostelease_money($paymentSummary['last_payment']->amount) : '—' }}</div>
                     <small class="text-muted">{{ optional($paymentSummary['last_payment']?->paid_on)->format('d-m-Y') }}</small>
                 </div></div>
             </div>
@@ -93,7 +93,7 @@
     <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h2 class="h6 fw-bold mb-0">Fees &amp; Dues
-                <span class="badge bg-danger-subtle text-danger ms-1">{{ hsms_money($paymentSummary['outstanding_fees']) }} due</span>
+                <span class="badge bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding_fees']) }} due</span>
             </h2>
             <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#collectModal"
                     onclick="openCollect('fees', {{ $paymentSummary['outstanding_fees'] }})">
@@ -109,7 +109,7 @@
     <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h2 class="h6 fw-bold mb-0">AC Bills
-                <span class="badge bg-danger-subtle text-danger ms-1">{{ hsms_money($paymentSummary['outstanding_ac']) }} due</span>
+                <span class="badge bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding_ac']) }} due</span>
             </h2>
             <button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#collectModal"
                     onclick="openCollect('ac', {{ $paymentSummary['outstanding_ac'] }})">
@@ -125,7 +125,7 @@
     <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
             <h2 class="h6 fw-bold mb-1"><i class="fa-solid fa-wallet text-warning me-1"></i> Pocket Money</h2>
-            <div class="stat-value">{{ hsms_money($pocketBalance) }}</div>
+            <div class="stat-value">{{ hostelease_money($pocketBalance) }}</div>
         </div>
         <a href="{{ route('admin.pocket-money.show', $student) }}" class="btn btn-sm btn-outline-primary">Manage</a>
     </div>
@@ -164,7 +164,7 @@
                         </div>
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">Payment Type</label>
-                                <select name="payment_type" class="form-select">@foreach(config('hsms.payment_types') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
+                                <select name="payment_type" class="form-select">@foreach(config('hostelease.payment_types') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
                             <div class="col-md-6"><label class="form-label">Mode</label>
                                 <select name="mode" class="form-select" required>@foreach($paymentModes as $m)<option value="{{ $m->code }}">{{ $m->name }}</option>@endforeach</select></div>
                             <div class="col-md-6"><label class="form-label">Date</label>
@@ -283,7 +283,7 @@
                         <td>{{ $a->bed->room->room_number }} / {{ $a->bed->bed_number }}</td>
                         <td>{{ $a->join_date->format('d-m-Y') }}</td>
                         <td>{{ optional($a->leave_date)->format('d-m-Y') ?? '—' }}</td>
-                        <td>{{ hsms_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
+                        <td>{{ hostelease_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
                         <td>{{ $a->durationInDays() }} days</td>
                         <td><span class="badge bg-{{ $a->is_active ? 'success' : 'secondary' }}-subtle text-{{ $a->is_active ? 'success' : 'secondary' }}">{{ $a->is_active ? 'Active' : 'Past' }}</span></td>
                     </tr>
@@ -325,3 +325,4 @@
     </div>
 </div>
 @endsection
+

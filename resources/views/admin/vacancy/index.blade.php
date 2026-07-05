@@ -54,7 +54,7 @@
                 <label class="form-label small mb-1">Sharing</label>
                 <select name="sharing" class="form-select form-select-sm">
                     <option value="">Any</option>
-                    @foreach(config('hsms.sharing_options') as $n)<option value="{{ $n }}" @selected($sharing == $n)>{{ $n }} Sharing</option>@endforeach
+                    @foreach(config('hostelease.sharing_options') as $n)<option value="{{ $n }}" @selected($sharing == $n)>{{ $n }} Sharing</option>@endforeach
                 </select>
             </div>
             <div class="col-6 col-md-3 d-flex gap-2">
@@ -129,3 +129,4 @@
     </div>
 </div>
 @endsection
+

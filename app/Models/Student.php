@@ -84,7 +84,7 @@ class Student extends Model
 
     public function getFormattedMobileAttribute(): ?string
     {
-        return hsms_phone($this->mobile);
+        return hostelease_phone($this->mobile);
     }
 
     public function scopeActive($query)
@@ -99,3 +99,4 @@ class Student extends Model
             ->whereBetween('leave_date', [now()->startOfDay(), now()->addDays($days)->endOfDay()]);
     }
 }
+

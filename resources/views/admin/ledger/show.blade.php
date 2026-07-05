@@ -14,9 +14,9 @@
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hsms_money($totals['billed']) }}</div><div class="stat-label">Total Fees</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hsms_money($totals['paid']) }}</div><div class="stat-label">Total Paid</div></div></div></div>
-    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hsms_money($totals['outstanding']) }}</div><div class="stat-label">Remaining</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value">{{ hostelease_money($totals['billed']) }}</div><div class="stat-label">Total Fees</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-success">{{ hostelease_money($totals['paid']) }}</div><div class="stat-label">Total Paid</div></div></div></div>
+    <div class="col-md-4"><div class="card stat-card"><div class="card-body py-3"><div class="stat-value text-danger">{{ hostelease_money($totals['outstanding']) }}</div><div class="stat-label">Remaining</div></div></div></div>
 </div>
 
 <div class="row g-3">
@@ -30,8 +30,8 @@
                     <tr>
                         <td>{{ optional($o['date'])->format('d-m-Y') ?? '—' }}</td>
                         <td>{{ $o['particular'] }}</td>
-                        <td class="text-end">{{ hsms_money($o['amount']) }}</td>
-                        <td class="text-end">{{ hsms_money($o['balance']) }}</td>
+                        <td class="text-end">{{ hostelease_money($o['amount']) }}</td>
+                        <td class="text-end">{{ hostelease_money($o['balance']) }}</td>
                         <td><span class="badge bg-{{ $o['status']==='paid'?'success':($o['status']==='pending'||$o['status']==='due'?'danger':'warning text-dark') }}">{{ ucfirst($o['status']) }}</span></td>
                     </tr>
                 @empty
@@ -52,7 +52,7 @@
                         <td>{{ $p->receipt_number }}</td>
                         <td>{{ $p->paid_on->format('d-m-Y') }}</td>
                         <td class="text-uppercase">{{ $p->mode }}</td>
-                        <td class="text-end">{{ hsms_money($p->amount) }}</td>
+                        <td class="text-end">{{ hostelease_money($p->amount) }}</td>
                         <td class="text-end"><a href="{{ route('admin.payments.show', $p) }}" class="btn btn-sm btn-light"><i class="fa-solid fa-receipt"></i></a></td>
                     </tr>
                 @empty
@@ -64,3 +64,4 @@
     </div>
 </div>
 @endsection
+

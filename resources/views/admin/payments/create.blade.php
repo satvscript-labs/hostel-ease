@@ -24,7 +24,7 @@
                     <select name="student_id" id="studentSelect" class="form-select" data-select2 required>
                         <option value="">Select student…</option>
                         @foreach($students as $s)
-                            <option value="{{ $s->id }}" @selected(old('student_id', $selected) == $s->id)>{{ $s->name }} ({{ hsms_phone($s->mobile) }})</option>
+                            <option value="{{ $s->id }}" @selected(old('student_id', $selected) == $s->id)>{{ $s->name }} ({{ hostelease_phone($s->mobile) }})</option>
                         @endforeach
                     </select>
                 </div>
@@ -46,7 +46,7 @@
                 <div class="col-md-4">
                     <label class="form-label">Payment Type <span class="text-danger">*</span></label>
                     <select name="payment_type" class="form-select" required>
-                        @foreach(config('hsms.payment_types') as $k => $label)
+                        @foreach(config('hostelease.payment_types') as $k => $label)
                             <option value="{{ $k }}" @selected(old('payment_type', 'full') === $k)>{{ $label }}</option>
                         @endforeach
                     </select>
@@ -134,3 +134,4 @@
     syncRef();
 </script>
 @endpush
+

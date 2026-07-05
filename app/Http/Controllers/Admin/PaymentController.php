@@ -65,16 +65,16 @@ class PaymentController extends Controller
             $list = [];
             foreach ($s->semesterFees as $f) {
                 $list[] = ['ref' => "semester_fee:{$f->id}", 'balance' => (float) $f->balance,
-                    'label' => "Semester {$f->semester} — due ".hsms_money($f->balance)];
+                    'label' => "Semester {$f->semester} — due ".hostelease_money($f->balance)];
             }
             foreach ($s->monthlyRents as $r) {
                 $list[] = ['ref' => "monthly_rent:{$r->id}", 'balance' => (float) $r->balance,
-                    'label' => 'Rent '.optional($r->rent_month)->format('M Y').' — due '.hsms_money($r->balance)];
+                    'label' => 'Rent '.optional($r->rent_month)->format('M Y').' — due '.hostelease_money($r->balance)];
             }
             foreach ($s->acBillShares as $a) {
                 $bal = max(0, (float) $a->amount - (float) $a->paid_amount);
                 $list[] = ['ref' => "ac_bill_student:{$a->id}", 'balance' => $bal,
-                    'label' => 'AC Bill '.optional(optional($a->acBill)->bill_month)->format('M Y').' — due '.hsms_money($bal)];
+                    'label' => 'AC Bill '.optional(optional($a->acBill)->bill_month)->format('M Y').' — due '.hostelease_money($bal)];
             }
             if ($list) {
                 $duesMap[$s->id] = $list;
@@ -177,10 +177,11 @@ class PaymentController extends Controller
         return sprintf(
             "Dear %s,\nWe have received %s towards your hostel fees at %s.\nReceipt No: %s\nDate: %s\nThank you!",
             $payment->student->name,
-            hsms_money($payment->amount),
+            hostelease_money($payment->amount),
             $payment->hostel->name,
             $payment->receipt_number,
             $payment->paid_on->format('d M Y'),
         );
     }
 }
+
