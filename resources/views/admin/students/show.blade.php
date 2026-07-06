@@ -1,594 +1,902 @@
 @extends('layouts.app')
 @section('title', $student->name)
 
+@push('styles')
+<style>
+    :root {
+        --he-panel-bg: rgba(255, 255, 255, 0.85);
+        --he-backdrop: blur(24px);
+        --he-border: 1px solid rgba(255, 255, 255, 0.9);
+        --he-shadow-premium: 0 10px 40px rgba(0, 0, 0, 0.04);
+    }
+    
+    .profile-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    @media (min-width: 992px) {
+        .profile-layout {
+            grid-template-columns: 340px 1fr;
+            align-items: start;
+        }
+    }
+    
+    .premium-panel {
+        background: var(--he-panel-bg);
+        backdrop-filter: var(--he-backdrop);
+        border: var(--he-border);
+        border-radius: 1.5rem;
+        box-shadow: var(--he-shadow-premium);
+        overflow: hidden;
+    }
+    
+    /* Hero section */
+    .hero-banner {
+        height: 120px;
+        background: linear-gradient(135deg, var(--he-primary), var(--he-accent));
+        position: relative;
+    }
+    .hero-banner::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        opacity: 0.1;
+        background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.9) 0%, transparent 50%);
+    }
+    .hero-avatar-wrap {
+        position: absolute;
+        bottom: -40px;
+        left: 24px;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        padding: 4px;
+        background: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        z-index: 2;
+    }
+    .hero-avatar {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    /* Bed Visual */
+    .bed-visual {
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.03), rgba(79, 70, 229, 0.01));
+        border: 1px solid rgba(79, 70, 229, 0.1);
+        border-radius: 1rem;
+    }
+
+    /* Quick Action Hub */
+    .quick-action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    .qa-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem 0.5rem;
+        border-radius: 1rem;
+        background: white;
+        border: 1px solid var(--he-border-color);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        color: var(--he-text);
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    .qa-btn i { font-size: 1.25rem; transition: transform 0.2s; }
+    .qa-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        color: var(--he-primary);
+        border-color: rgba(79, 70, 229, 0.3);
+    }
+    .qa-btn:hover i { transform: scale(1.1); }
+    
+    /* Segmented Tabs */
+    .premium-tabs {
+        display: inline-flex;
+        background: rgba(0,0,0,0.04);
+        padding: 0.4rem;
+        border-radius: 1rem;
+        gap: 0.25rem;
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    .premium-tabs::-webkit-scrollbar { display: none; }
+    .premium-tab {
+        padding: 0.6rem 1.25rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--he-text-muted);
+        border: none;
+        background: transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
+    }
+    .premium-tab:hover { color: var(--he-text); }
+    .premium-tab.active {
+        background: white;
+        color: var(--he-primary);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Content Transition Container */
+    .tab-content-container {
+        position: relative;
+        min-height: 500px;
+        overflow: hidden;
+    }
+    .tab-pane-transition {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        padding: 1.5rem;
+    }
+
+    /* Timeline enhancements */
+    .timeline-container { border-left: 2px solid var(--he-border-color); }
+    .timeline-item { position: relative; margin-bottom: 1.5rem; padding-left: 1.5rem; }
+    .timeline-marker {
+        position: absolute;
+        left: -17px;
+        top: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }
+    
+    .transition-hover {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .transition-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    }
+</style>
+@endpush
+
 @section('content')
-<div x-data="{ tab: 'overview' }" class="page-enter">
-    <!-- Header -->
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <a href="{{ route('admin.students.index') }}" class="btn btn-light btn-sm" style="border-radius: var(--he-radius-sm);">
-            <i class="fa-solid fa-arrow-left"></i>
-        </a>
-        <h1 class="h4 fw-bold mb-0 text-truncate" style="max-width:200px">{{ $student->name }}</h1>
-        <span class="badge-premium bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}-subtle text-{{ $student->status === 'active' ? 'success' : 'secondary' }}">
-            {{ ucfirst($student->status) }}
-        </span>
-        <div class="ms-auto d-flex gap-2 flex-shrink-0">
-            @if($student->mobile)
-                <a href="https://wa.me/91{{ preg_replace('/\D+/', '', $student->mobile) }}?text={{ urlencode('Dear '.$student->name.', regarding your hostel account — outstanding balance: '.hostelease_money($paymentSummary['outstanding'] ?? 0).'. Thank you, '.optional($student->hostel)->name) }}"
-                   target="_blank" rel="noopener" class="btn btn-whatsapp btn-sm">
-                    <i class="fa-brands fa-whatsapp"></i><span class="d-none d-sm-inline ms-1">WhatsApp</span>
-                </a>
+<div class="page-enter" x-data="{ tab: 'overview' }">
+    
+    <!-- Top Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <a href="{{ route('admin.students.index') }}" class="btn btn-white rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                <i class="fa-solid fa-arrow-left text-muted"></i>
+            </a>
+            <h1 class="h3 fw-bold mb-0">Student Profile</h1>
+        </div>
+        <div class="d-flex gap-2">
+            @if($qrSvg ?? false)
+            <button class="btn btn-white rounded-pill px-3 shadow-sm d-none d-sm-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#qrModal">
+                <i class="fa-solid fa-qrcode text-primary"></i> <span class="fw-bold">ID QR</span>
+            </button>
             @endif
-            <a href="{{ route('admin.students.edit', $student) }}" class="btn btn-premium btn-sm">
-                <i class="fa-solid fa-pen"></i><span class="d-none d-sm-inline ms-1">Edit</span>
+            <a href="{{ route('admin.students.edit', $student) }}" class="btn btn-premium rounded-pill px-4 shadow-sm fw-bold">
+                <i class="fa-solid fa-pen me-2"></i>Edit Profile
             </a>
         </div>
     </div>
 
-    <!-- Profile Hero Card -->
-    <div class="profile-hero mb-3">
-        <div class="ph-banner"></div>
-        <div class="px-3 px-md-4 pb-3">
-            <div class="d-flex flex-wrap align-items-end gap-3">
-                <div class="ph-avatar-wrap">
-                    <img src="{{ $student->photo_url }}" class="ph-avatar" alt="">
-                </div>
-                <div class="flex-grow-1 pb-1">
-                    <h2 class="h5 fw-bold mb-0">{{ $student->name }}</h2>
-                    <p class="mb-0" style="font-size: var(--he-text-sm); color: var(--he-text-muted);">
-                        {{ config('hostelease.occupation_types.'.$student->occupation_type) }}
-                        · <x-mobile-link :mobile="$student->mobile" />
-                    </p>
-                </div>
-                @if($qrSvg)
-                <div class="d-none d-md-block">
-                    <div class="border rounded-3 p-1 bg-white" style="line-height:0">{!! $qrSvg !!}</div>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Financial Summary Bento -->
-    <div class="bento mb-3 stagger">
-        <div class="bento-card">
-            <div class="d-flex align-items-center gap-3 h-100">
-                <div class="bento-icon bg-primary-subtle text-primary"><i class="fa-solid fa-receipt"></i></div>
-                <div>
-                    <div class="bento-value" style="font-size:1.25rem">{{ hostelease_money($paymentSummary['total_billed']) }}</div>
-                    <div class="bento-label">Total Billed</div>
-                </div>
-            </div>
-        </div>
-        <div class="bento-card">
-            <div class="d-flex align-items-center gap-3 h-100">
-                <div class="bento-icon bg-success-subtle text-success"><i class="fa-solid fa-check-circle"></i></div>
-                <div>
-                    <div class="bento-value text-success" style="font-size:1.25rem">{{ hostelease_money($paymentSummary['total_paid']) }}</div>
-                    <div class="bento-label">Total Paid</div>
-                </div>
-            </div>
-        </div>
-        <div class="bento-card">
-            <div class="d-flex align-items-center gap-3 h-100">
-                <div class="bento-icon bg-{{ $paymentSummary['outstanding'] > 0 ? 'danger' : 'success' }}-subtle text-{{ $paymentSummary['outstanding'] > 0 ? 'danger' : 'success' }}">
-                    <i class="fa-solid fa-{{ $paymentSummary['outstanding'] > 0 ? 'exclamation-triangle' : 'circle-check' }}"></i>
-                </div>
-                <div>
-                    <div class="bento-value {{ $paymentSummary['outstanding'] > 0 ? 'text-danger' : 'text-success' }}" style="font-size:1.25rem">
-                        {{ hostelease_money($paymentSummary['outstanding']) }}
-                    </div>
-                    <div class="bento-label">Outstanding</div>
-                </div>
-            </div>
-        </div>
-        <div class="bento-card">
-            <div class="d-flex align-items-center gap-3 h-100">
-                <div class="bento-icon bg-warning-subtle text-warning"><i class="fa-solid fa-wallet"></i></div>
-                <div>
-                    <div class="bento-value" style="font-size:1.25rem">{{ hostelease_money($pocketBalance) }}</div>
-                    <div class="bento-label">Pocket Money</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabs Navigation -->
-    <div class="card-premium overflow-hidden">
-        <div class="he-tabs px-2">
-            <button class="he-tab" :class="{ active: tab === 'overview' }" @click="tab = 'overview'">
-                <i class="fa-solid fa-user me-1"></i> Overview
-            </button>
-            <button class="he-tab" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">
-                <i class="fa-solid fa-sliders me-1"></i> Fee Settings
-            </button>
-            <button class="he-tab" :class="{ active: tab === 'fees' }" @click="tab = 'fees'">
-                <i class="fa-solid fa-indian-rupee-sign me-1"></i> Fees & Dues
-            </button>
-            <button class="he-tab" :class="{ active: tab === 'documents' }" @click="tab = 'documents'">
-                <i class="fa-solid fa-file-lines me-1"></i> Documents
-            </button>
-            <button class="he-tab" :class="{ active: tab === 'history' }" @click="tab = 'history'">
-                <i class="fa-solid fa-clock-rotate-left me-1"></i> History
-            </button>
-        </div>
-
-        <div class="p-3 p-md-4">
-            <!-- TAB: Overview -->
-            <div class="he-tab-panel" :class="{ active: tab === 'overview' }">
-                <div class="row g-4">
-                    <!-- Contact Info -->
-                    <div class="col-12 col-md-6">
-                        <div class="section-header"><i class="fa-solid fa-phone"></i> Contact Information</div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-user"></i></div>
-                            <div><div class="ir-label">Student Mobile</div><div class="ir-value"><x-mobile-link :mobile="$student->mobile" /></div></div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-person"></i></div>
-                            <div><div class="ir-label">Father's Mobile</div><div class="ir-value"><x-mobile-link :mobile="$student->father_mobile" /></div></div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-person-dress"></i></div>
-                            <div><div class="ir-label">Mother's Mobile</div><div class="ir-value"><x-mobile-link :mobile="$student->mother_mobile" /></div></div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                            <div><div class="ir-label">Guardian's Mobile</div><div class="ir-value"><x-mobile-link :mobile="$student->guardian_mobile" /></div></div>
-                        </div>
-                    </div>
-
-                    <!-- Identity & Stay -->
-                    <div class="col-12 col-md-6">
-                        <div class="section-header"><i class="fa-solid fa-id-card"></i> Identity & Stay</div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-fingerprint"></i></div>
-                            <div><div class="ir-label">Aadhaar</div><div class="ir-value">{{ $student->aadhaar ?? '—' }}</div></div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-location-dot"></i></div>
-                            <div>
-                                <div class="ir-label">Address</div>
-                                <div class="ir-value">{{ $student->address ?? '—' }}{{ $student->city ? ', '.$student->city : '' }}{{ $student->state ? ', '.$student->state : '' }}</div>
-                            </div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-calendar-check"></i></div>
-                            <div>
-                                <div class="ir-label">Join / Leave</div>
-                                <div class="ir-value">{{ optional($student->join_date)->format('d M Y') ?? '—' }} → {{ optional($student->leave_date)->format('d M Y') ?? 'Present' }}</div>
-                            </div>
-                        </div>
-                        <div class="info-row">
-                            <div class="ir-icon"><i class="fa-solid fa-bed"></i></div>
-                            <div>
-                                <div class="ir-label">Current Bed</div>
-                                <div class="ir-value">
-                                    @if($student->activeAssignment)
-                                        {{ $student->activeAssignment->bed->room->floor->name }} ·
-                                        Room {{ $student->activeAssignment->bed->room->room_number }} ·
-                                        Bed {{ $student->activeAssignment->bed->bed_number }}
-                                    @else
-                                        <span class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>Not assigned</span>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Actions -->
-                    <div class="col-12">
-                        <div class="d-flex flex-wrap gap-2">
-                            <a href="{{ route('admin.pocket-money.show', $student) }}" class="btn btn-outline-warning btn-sm" style="border-radius: var(--he-radius-sm);">
-                                <i class="fa-solid fa-wallet me-1"></i> Pocket Money
-                            </a>
-
-                        </div>
+    <div class="profile-layout">
+        
+        <!-- LEFT SIDEBAR -->
+        <div class="d-flex flex-column gap-4">
+            
+            <!-- Hero Card -->
+            <div class="premium-panel">
+                <div class="hero-banner">
+                    <div class="hero-avatar-wrap">
+                        <img src="{{ $student->photo_url }}" class="hero-avatar" alt="{{ $student->name }}">
                     </div>
                 </div>
-            </div>
-
-            <!-- TAB: Fee Settings -->
-            <div class="he-tab-panel" :class="{ active: tab === 'settings' }">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="h6 fw-bold mb-0"><i class="fa-solid fa-sliders text-primary me-1"></i> Fee Settings & Preferences</h3>
-                    <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#feeSettingsModal">
-                        <i class="fa-solid fa-pen me-1"></i> Edit Preferences
-                    </button>
-                </div>
-                
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
-                            <div class="bento-icon bg-primary-subtle text-primary me-3">
-                                <i class="fa-solid fa-door-open"></i>
-                            </div>
-                            <div>
-                                <div class="text-muted small fw-bold text-uppercase">Room Preference</div>
-                                <div class="fw-bold fs-5">{{ $student->room_preference ?? 'Not Set' }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
-                            <div class="bento-icon bg-primary-subtle text-primary me-3">
-                                <i class="fa-solid fa-users"></i>
-                            </div>
-                            <div>
-                                <div class="text-muted small fw-bold text-uppercase">Sharing Preference</div>
-                                <div class="fw-bold fs-5">{{ $student->sharing_preference ?? 'Not Set' }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
-                            <div class="bento-icon bg-primary-subtle text-primary me-3">
-                                <i class="fa-solid fa-calendar-alt"></i>
-                            </div>
-                            <div>
-                                <div class="text-muted small fw-bold text-uppercase">Fee Structure</div>
-                                <div class="fw-bold fs-5 text-capitalize">{{ $student->fee_frequency ?? 'Not Set' }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
-                            <div class="bento-icon bg-primary-subtle text-primary me-3">
-                                <i class="fa-solid fa-indian-rupee-sign"></i>
-                            </div>
-                            <div>
-                                <div class="text-muted small fw-bold text-uppercase">Fee Amount</div>
-                                <div class="fw-bold fs-5">{{ $student->fee_amount ? hostelease_money($student->fee_amount) : 'Not Set' }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Fees & Dues -->
-            <div class="he-tab-panel" :class="{ active: tab === 'fees' }">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                    <h3 class="h6 fw-bold mb-0">
-                        <i class="fa-solid fa-file-invoice-dollar text-primary me-1"></i> Invoices & Dues
-                        @if($paymentSummary['outstanding'] > 0)
-                            <span class="badge-premium bg-danger-subtle text-danger ms-1">{{ hostelease_money($paymentSummary['outstanding']) }} due</span>
-                        @endif
-                    </h3>
-                    <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#collectModal"
-                            onclick="openCollect({{ $paymentSummary['outstanding'] }})">
-                        <i class="fa-solid fa-indian-rupee-sign me-1"></i> Collect Payment
-                    </button>
-                </div>
-                
-                @forelse($invoices as $invoice)
-                    <div class="due-card mb-2">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                            <div class="d-flex gap-3 align-items-center">
-                                <div class="bento-icon bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }}-subtle text-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }}" style="width:40px;height:40px">
-                                    <i class="fa-solid fa-{{ $invoice->type === 'fee' ? 'graduation-cap' : ($invoice->type === 'rent' ? 'home' : ($invoice->type === 'ac' ? 'snowflake' : 'receipt')) }}"></i>
-                                </div>
-                                <div>
-                                    <div class="fw-bold">{{ $invoice->title }}</div>
-                                    <div class="text-secondary small text-uppercase">{{ $invoice->type }}</div>
-                                    @if($invoice->status !== 'paid' && $invoice->due_date)
-                                        <div class="small text-muted mt-1"><i class="fa-regular fa-clock"></i> Due: {{ $invoice->due_date->format('d M Y') }}</div>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold" style="font-size:1.1rem">{{ hostelease_money($invoice->amount) }}</div>
-                                <div class="small {{ $invoice->status === 'paid' ? 'text-success' : 'text-danger' }}">
-                                    @if($invoice->status === 'paid')
-                                        Fully Paid
-                                    @else
-                                        Bal: {{ hostelease_money($invoice->balance) }}
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="empty-state py-4">
-                        <i class="fa-solid fa-check-circle text-success fs-1 mb-2"></i>
-                        <p>No invoices found. Student is all cleared up!</p>
-                    </div>
-                @endforelse
-            </div>
-
-            <!-- TAB: Documents -->
-            <div class="he-tab-panel" :class="{ active: tab === 'documents' }">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="h6 fw-bold mb-0"><i class="fa-solid fa-file-lines text-primary me-1"></i> Documents</h3>
-                    <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#docModal">
-                        <i class="fa-solid fa-upload me-1"></i> Upload
-                    </button>
-                </div>
-
-                @forelse($student->documents as $doc)
-                    <div class="due-card">
-                        <div class="d-flex justify-content-between align-items-center gap-2">
-                            <div class="d-flex align-items-center gap-2 min-width-0">
-                                <div class="bento-icon bg-primary-subtle text-primary" style="width:36px;height:36px;font-size:0.85rem">
-                                    <i class="fa-solid fa-{{ in_array($doc->type, ['photo']) ? 'image' : 'file-pdf' }}"></i>
-                                </div>
-                                <div class="min-width-0">
-                                    <div class="fw-semibold text-truncate" style="font-size: var(--he-text-sm);">{{ $doc->title ?: ucfirst($doc->type) }}</div>
-                                    <div style="font-size: var(--he-text-xs); color: var(--he-text-muted);">
-                                        <span class="badge-premium bg-primary-subtle text-primary">{{ ucfirst($doc->type) }}</span>
-                                        @if($doc->expiry_date)
-                                            · Exp: {{ $doc->expiry_date->format('d M Y') }}
-                                        @endif
-                                        @if($doc->is_signed)
-                                            · <i class="fa-solid fa-check-circle text-success"></i> Signed
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="d-flex gap-1 flex-shrink-0">
-                                <a href="{{ Storage::disk('public')->url($doc->file_path) }}" target="_blank" class="btn btn-sm btn-light" style="border-radius: var(--he-radius-sm);">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                <form action="{{ route('admin.students.documents.destroy', [$student, $doc]) }}" method="POST" class="d-inline" data-confirm="Delete this document?">
-                                    @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-light text-danger" style="border-radius: var(--he-radius-sm);"><i class="fa-solid fa-trash"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="empty-state py-4">
-                        <i class="fa-solid fa-folder-open d-block"></i>
-                        <p>No documents uploaded yet.</p>
-                        <button class="btn btn-premium btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#docModal">
-                            <i class="fa-solid fa-upload me-1"></i> Upload Document
-                        </button>
-                    </div>
-                @endforelse
-            </div>
-
-            <!-- TAB: Timeline & History -->
-            <div class="he-tab-panel" :class="{ active: tab === 'history' }">
-                <h3 class="h6 fw-bold mb-4"><i class="fa-solid fa-clock-rotate-left text-primary me-1"></i> Unified History Timeline</h3>
-                
-                <div class="timeline-container ps-2 ms-2" style="border-left: 2px solid var(--he-border-color);">
-                    @forelse($timeline as $event)
-                        <div class="timeline-item position-relative mb-4 ps-4">
-                            <div class="timeline-marker position-absolute bg-{{ $event->color }}-subtle text-{{ $event->color }} d-flex align-items-center justify-content-center" 
-                                 style="width: 32px; height: 32px; border-radius: 50%; left: -17px; top: 0; border: 2px solid #fff;">
-                                <i class="fa-solid fa-{{ $event->icon }} small"></i>
-                            </div>
-                            <div class="due-card py-2 px-3 m-0">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                    <div>
-                                        <div class="fw-bold" style="font-size: var(--he-text-sm);">{{ $event->title }}</div>
-                                        <div class="mt-1" style="font-size: var(--he-text-xs); color: var(--he-text-muted);">
-                                            {{ \Carbon\Carbon::parse($event->date)->format('d M Y, h:i A') }}
-                                            @if(isset($event->desc)) · {{ $event->desc }} @endif
-                                        </div>
-                                    </div>
-                                    @if(isset($event->amount))
-                                        <div class="text-end">
-                                            <div class="fw-bold text-{{ $event->color }}">{{ hostelease_money($event->amount) }}</div>
-                                            <div style="font-size: var(--he-text-xs); text-transform:uppercase;" class="text-muted">{{ $event->status }}</div>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="empty-state py-4 ps-4">
-                            <i class="fa-solid fa-clock d-block"></i>
-                            <p>No historical events recorded yet.</p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-                @if($paymentSummary['last_payment'])
-                <h3 class="h6 fw-bold mt-4 mb-3"><i class="fa-solid fa-money-bill-wave text-success me-1"></i> Last Payment</h3>
-                <div class="due-card">
-                    <div class="d-flex justify-content-between align-items-center">
+                <div class="px-4 pt-5 pb-4">
+                    <div class="d-flex justify-content-between align-items-start mt-2">
                         <div>
-                            <div class="dc-amount text-success">{{ hostelease_money($paymentSummary['last_payment']->amount) }}</div>
-                            <div style="font-size: var(--he-text-xs); color: var(--he-text-muted);">
-                                {{ $paymentSummary['last_payment']->paid_on->format('d M Y') }}
+                            <h2 class="h4 fw-bold mb-1 text-truncate" style="max-width: 180px;">{{ $student->name }}</h2>
+                            <p class="text-muted mb-0 small fw-bold text-uppercase"><i class="fa-solid fa-id-badge me-1"></i> {{ config('hostelease.occupation_types.'.$student->occupation_type) }}</p>
+                        </div>
+                        <span class="badge bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}-subtle text-{{ $student->status === 'active' ? 'success' : 'secondary' }} rounded-pill px-3 py-2 fw-bold text-uppercase shadow-sm">
+                            {{ $student->status }}
+                        </span>
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-top">
+                        <div class="d-flex flex-column gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 36px; height: 36px"><i class="fa-solid fa-phone"></i></div>
+                                <div class="fw-bold"><x-mobile-link :mobile="$student->mobile" /></div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Current Accommodation -->
+            <div class="premium-panel p-4">
+                <h3 class="h6 fw-bold mb-3 text-uppercase text-muted lh-1">Accommodation</h3>
+                @if($student->activeAssignment)
+                <div class="bed-visual p-3 text-center mb-3">
+                    <div class="d-flex justify-content-center gap-4 align-items-center">
+                        <div>
+                            <div class="text-muted small fw-bold text-uppercase">Room</div>
+                            <div class="fs-3 fw-bold text-dark lh-1 mt-1">{{ $student->activeAssignment->bed->room->room_number }}</div>
+                        </div>
+                        <div style="width: 2px; height: 36px; background: rgba(0,0,0,0.05); border-radius: 2px;"></div>
+                        <div>
+                            <div class="text-muted small fw-bold text-uppercase">Bed</div>
+                            <div class="fs-3 fw-bold text-primary lh-1 mt-1">{{ $student->activeAssignment->bed->bed_number }}</div>
+                        </div>
+                    </div>
+                    <div class="badge bg-white text-dark shadow-sm rounded-pill mt-3 px-4 py-2 border fw-bold">
+                        <i class="fa-solid fa-building me-1 text-muted"></i> {{ $student->activeAssignment->bed->room->floor->name }}
+                    </div>
+                </div>
+                <div class="d-grid">
+                    <a href="{{ route('admin.property.index') }}" class="btn btn-light fw-bold text-primary rounded-pill border py-2">
+                        <i class="fa-solid fa-right-left me-1"></i> Transfer Bed
+                    </a>
+                </div>
+                @else
+                <div class="text-center py-4 bg-light rounded-4 border border-dashed">
+                    <i class="fa-solid fa-bed-pulse text-muted fs-1 mb-2"></i>
+                    <p class="text-muted fw-bold mb-0">Not Assigned</p>
+                    <a href="{{ route('admin.property.index') }}" class="btn btn-primary btn-sm rounded-pill mt-3 fw-bold px-4 shadow-sm">Assign Now</a>
+                </div>
                 @endif
+            </div>
+
+            <!-- Quick Actions Hub -->
+            <div class="premium-panel p-4">
+                <h3 class="h6 fw-bold mb-3 text-uppercase text-muted lh-1">Quick Actions</h3>
+                <div class="quick-action-grid">
+                    <a href="{{ route('admin.students.edit', $student) }}" class="qa-btn">
+                        <i class="fa-solid fa-pen text-success"></i>
+                        <span>Edit Profile</span>
+                    </a>
+                    <button type="button" class="qa-btn" @click="tab = 'fees'" data-bs-toggle="modal" data-bs-target="#collectModal" onclick="openCollect({{ $paymentSummary['outstanding'] ?? 0 }})">
+                        <i class="fa-solid fa-indian-rupee-sign text-primary"></i>
+                        <span>Collect Fee</span>
+                    </button>
+                    <a href="{{ route('admin.pocket-money.show', $student) }}" class="qa-btn">
+                        <i class="fa-solid fa-wallet text-warning"></i>
+                        <span>Add Funds</span>
+                    </a>
+                    <button type="button" class="qa-btn" @click="tab = 'documents'" data-bs-toggle="modal" data-bs-target="#docModal">
+                        <i class="fa-solid fa-upload text-info"></i>
+                        <span>Document</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT MAIN CONTENT -->
+        <div class="d-flex flex-column gap-4">
+            
+            <!-- Financial Bento -->
+            <div class="premium-panel p-4">
+                <h3 class="h6 fw-bold mb-3 text-uppercase text-muted lh-1">Financial Overview</h3>
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="bg-light rounded-4 p-3 h-100 border border-light">
+                            <div class="text-muted small fw-bold text-uppercase mb-1">Total Billed</div>
+                            <div class="fs-4 fw-bold lh-1 text-dark mt-2">{{ hostelease_money($paymentSummary['total_billed'] ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="bg-success-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-success-subtle">
+                            <div class="text-success small fw-bold text-uppercase mb-1">Total Paid</div>
+                            <div class="fs-4 fw-bold lh-1 text-success mt-2">{{ hostelease_money($paymentSummary['total_paid'] ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'bg-danger-subtle border-danger-subtle' : 'bg-light border-light' }} rounded-4 p-3 h-100 border">
+                            <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-muted' }} small fw-bold text-uppercase mb-1">Outstanding</div>
+                            <div class="fs-4 fw-bold lh-1 mt-2 {{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-dark' }}">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="bg-warning-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-warning-subtle">
+                            <div class="text-warning-emphasis small fw-bold text-uppercase mb-1">Pocket Money</div>
+                            <div class="fs-4 fw-bold lh-1 text-warning-emphasis mt-2">{{ hostelease_money($pocketBalance ?? 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Tabs Container -->
+            <div class="premium-panel flex-grow-1 d-flex flex-column">
+                <!-- Tab Navigation -->
+                <div class="border-bottom p-3 bg-light bg-opacity-50">
+                    <div class="premium-tabs w-100 d-flex flex-nowrap">
+                        <button type="button" class="premium-tab flex-fill" :class="{ active: tab === 'overview' }" @click="tab = 'overview'">Overview</button>
+                        <button type="button" class="premium-tab flex-fill" :class="{ active: tab === 'fees' }" @click="tab = 'fees'">Invoices</button>
+                        <button type="button" class="premium-tab flex-fill" :class="{ active: tab === 'documents' }" @click="tab = 'documents'">Documents</button>
+                        <button type="button" class="premium-tab flex-fill" :class="{ active: tab === 'history' }" @click="tab = 'history'">Timeline</button>
+                        <button type="button" class="premium-tab flex-fill" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">Settings</button>
+                    </div>
+                </div>
+
+                <!-- Tab Panes -->
+                <div class="tab-content-container">
+                    
+                    <!-- OVERVIEW -->
+                    <div x-show="tab === 'overview'" 
+                         x-transition:enter="transition ease-out duration-300" 
+                         x-transition:enter-start="opacity-0 transform translate-y-4" 
+                         x-transition:enter-end="opacity-100 transform translate-y-0" 
+                         x-cloak class="tab-pane-transition">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity Details</h4>
+                                <div class="bg-light bg-opacity-50 rounded-4 p-3 border">
+                                    <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                                        <span class="text-muted fw-bold small text-uppercase">Aadhaar No.</span>
+                                        <span class="fw-bold">{{ $student->aadhaar ?? 'Not provided' }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between pb-2 mb-2 border-bottom">
+                                        <span class="text-muted fw-bold small text-uppercase">Join Date</span>
+                                        <span class="fw-bold">{{ optional($student->join_date)->format('d M Y') ?? '—' }}</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="text-muted fw-bold small text-uppercase mb-1">Permanent Address</div>
+                                        <div class="fw-bold lh-sm text-dark">
+                                            {{ $student->address ?? 'Not provided' }}<br>
+                                            @if($student->city || $student->state)
+                                                {{ $student->city }}, {{ $student->state }}
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center"><i class="fa-solid fa-users text-primary me-2"></i> Family Contacts</h4>
+                                <div class="bg-light bg-opacity-50 rounded-4 p-3 border d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-person"></i></div>
+                                        <div>
+                                            <div class="text-muted small fw-bold text-uppercase">Father</div>
+                                            <div class="fw-bold"><x-mobile-link :mobile="$student->father_mobile" /></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-person-dress"></i></div>
+                                        <div>
+                                            <div class="text-muted small fw-bold text-uppercase">Mother</div>
+                                            <div class="fw-bold"><x-mobile-link :mobile="$student->mother_mobile" /></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-shield-halved"></i></div>
+                                        <div>
+                                            <div class="text-muted small fw-bold text-uppercase">Guardian</div>
+                                            <div class="fw-bold"><x-mobile-link :mobile="$student->guardian_mobile" /></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FEES & DUES -->
+                    <div x-show="tab === 'fees'" 
+                         x-transition:enter="transition ease-out duration-300" 
+                         x-transition:enter-start="opacity-0 transform translate-y-4" 
+                         x-transition:enter-end="opacity-100 transform translate-y-0" 
+                         x-cloak class="tab-pane-transition">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                            <h4 class="h5 fw-bold mb-0 d-flex align-items-center">
+                                <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i> Invoices History
+                            </h4>
+                            <button type="button" class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#collectModal" onclick="openCollect({{ $paymentSummary['outstanding'] ?? 0 }})">
+                                <i class="fa-solid fa-indian-rupee-sign me-1"></i> Collect Payment
+                            </button>
+                        </div>
+                        
+                        <div class="d-flex flex-column gap-2">
+                        @forelse($invoices as $invoice)
+                            <div class="bg-light bg-opacity-50 border rounded-4 p-3 transition-hover">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                                    <div class="d-flex gap-3 align-items-center">
+                                        <div class="bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }}-subtle text-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'partial' ? 'warning' : 'danger') }} rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; font-size: 1.1rem;">
+                                            <i class="fa-solid fa-{{ $invoice->type === 'fee' ? 'graduation-cap' : ($invoice->type === 'rent' ? 'home' : ($invoice->type === 'ac' ? 'snowflake' : 'receipt')) }}"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold fs-6">{{ $invoice->title }}</div>
+                                            <div class="text-secondary small fw-bold text-uppercase">{{ $invoice->type }}</div>
+                                            @if($invoice->status !== 'paid' && $invoice->due_date)
+                                                <div class="small text-danger fw-bold mt-1"><i class="fa-regular fa-clock me-1"></i> Due: {{ $invoice->due_date->format('d M Y') }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-bold fs-5">{{ hostelease_money($invoice->amount) }}</div>
+                                        <div class="small fw-bold {{ $invoice->status === 'paid' ? 'text-success' : 'text-danger' }} text-uppercase mt-1">
+                                            @if($invoice->status === 'paid')
+                                                <i class="fa-solid fa-check-circle me-1"></i> Fully Paid
+                                            @else
+                                                Bal: {{ hostelease_money($invoice->balance) }}
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="text-center py-5 bg-light rounded-4 border border-dashed">
+                                <i class="fa-solid fa-check-circle text-success fs-1 mb-2"></i>
+                                <h5 class="fw-bold text-dark">No invoices found</h5>
+                                <p class="text-muted mb-0">Student is all cleared up!</p>
+                            </div>
+                        @endforelse
+                        </div>
+                    </div>
+
+                    <!-- DOCUMENTS -->
+                    <div x-show="tab === 'documents'" 
+                         x-transition:enter="transition ease-out duration-300" 
+                         x-transition:enter-start="opacity-0 transform translate-y-4" 
+                         x-transition:enter-end="opacity-100 transform translate-y-0" 
+                         x-cloak class="tab-pane-transition">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h4 class="h5 fw-bold mb-0 d-flex align-items-center"><i class="fa-solid fa-file-lines text-primary me-2"></i> Uploaded Documents</h4>
+                            <button type="button" class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#docModal">
+                                <i class="fa-solid fa-upload me-1"></i> Upload
+                            </button>
+                        </div>
+
+                        <div class="d-flex flex-column gap-2">
+                        @forelse($student->documents as $doc)
+                            <div class="bg-light bg-opacity-50 border rounded-4 p-3 transition-hover">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-3 min-width-0">
+                                        <div class="bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; font-size: 1.2rem;">
+                                            <i class="fa-solid fa-{{ in_array($doc->type, ['photo']) ? 'image' : 'file-pdf' }}"></i>
+                                        </div>
+                                        <div class="min-width-0">
+                                            <div class="fw-bold fs-6 text-truncate text-dark">{{ $doc->title ?: ucfirst($doc->type) }}</div>
+                                            <div class="mt-1 d-flex gap-2 flex-wrap align-items-center">
+                                                <span class="badge bg-primary-subtle text-primary fw-bold text-uppercase">{{ $doc->type }}</span>
+                                                @if($doc->expiry_date)
+                                                    <span class="small fw-bold text-muted"><i class="fa-regular fa-calendar-xmark"></i> Exp: {{ $doc->expiry_date->format('d M Y') }}</span>
+                                                @endif
+                                                @if($doc->is_signed)
+                                                    <span class="small fw-bold text-success"><i class="fa-solid fa-check-circle"></i> Signed</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 flex-shrink-0">
+                                        <a href="{{ Storage::disk('public')->url($doc->file_path) }}" target="_blank" class="btn btn-white text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        <form action="{{ route('admin.students.documents.destroy', [$student, $doc]) }}" method="POST" class="d-inline" data-confirm="Delete this document?">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-white text-danger rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="text-center py-5 bg-light rounded-4 border border-dashed">
+                                <i class="fa-solid fa-folder-open text-muted fs-1 mb-2 d-block"></i>
+                                <h5 class="fw-bold text-dark">No documents found</h5>
+                                <p class="text-muted mb-3">Keep important student files secure here.</p>
+                                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#docModal">
+                                    <i class="fa-solid fa-upload me-1"></i> Upload Document
+                                </button>
+                            </div>
+                        @endforelse
+                        </div>
+                    </div>
+
+                    <!-- TIMELINE -->
+                    <div x-show="tab === 'history'" 
+                         x-transition:enter="transition ease-out duration-300" 
+                         x-transition:enter-start="opacity-0 transform translate-y-4" 
+                         x-transition:enter-end="opacity-100 transform translate-y-0" 
+                         x-cloak class="tab-pane-transition">
+                        <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i> Activity Timeline</h4>
+                        
+                        <div class="timeline-container ps-2 ms-3 mt-4">
+                            @forelse($timeline as $event)
+                                <div class="timeline-item ps-4">
+                                    <div class="timeline-marker bg-{{ $event->color }}-subtle text-{{ $event->color }} shadow-sm">
+                                        <i class="fa-solid fa-{{ $event->icon }} small"></i>
+                                    </div>
+                                    <div class="bg-light bg-opacity-50 border rounded-4 py-3 px-4 m-0 transition-hover">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                            <div>
+                                                <div class="fw-bold text-dark fs-6">{{ $event->title }}</div>
+                                                <div class="mt-1 small fw-bold text-muted">
+                                                    {{ \Carbon\Carbon::parse($event->date)->format('d M Y, h:i A') }}
+                                                    @if(isset($event->desc)) · {{ $event->desc }} @endif
+                                                </div>
+                                            </div>
+                                            @if(isset($event->amount))
+                                                <div class="text-end">
+                                                    <div class="fw-bold fs-5 text-{{ $event->color }}">{{ hostelease_money($event->amount) }}</div>
+                                                    <div class="small fw-bold text-muted text-uppercase mt-1">{{ $event->status }}</div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="text-center py-5 border border-dashed rounded-4 bg-light ms-3">
+                                    <i class="fa-solid fa-clock text-muted fs-1 mb-2"></i>
+                                    <h5 class="fw-bold text-dark">No History</h5>
+                                    <p class="text-muted mb-0">No historical events recorded yet.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <!-- SETTINGS -->
+                    <div x-show="tab === 'settings'" 
+                         x-transition:enter="transition ease-out duration-300" 
+                         x-transition:enter-start="opacity-0 transform translate-y-4" 
+                         x-transition:enter-end="opacity-100 transform translate-y-0" 
+                         x-cloak class="tab-pane-transition">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h4 class="h5 fw-bold mb-0 d-flex align-items-center"><i class="fa-solid fa-sliders text-primary me-2"></i> Fee & Accommodation Settings</h4>
+                            <button type="button" class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#feeSettingsModal">
+                                <i class="fa-solid fa-pen me-1"></i> Edit Plan
+                            </button>
+                        </div>
+                        
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center p-3 bg-light bg-opacity-50 border rounded-4 transition-hover">
+                                    <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                                        <i class="fa-solid fa-door-open"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small fw-bold text-uppercase mb-1">Room Preference</div>
+                                        <div class="fw-bold fs-5 text-dark">{{ $student->room_preference ?? 'Not Set' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center p-3 bg-light bg-opacity-50 border rounded-4 transition-hover">
+                                    <div class="bg-info-subtle text-info-emphasis rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                                        <i class="fa-solid fa-users"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small fw-bold text-uppercase mb-1">Sharing Preference</div>
+                                        <div class="fw-bold fs-5 text-dark">{{ $student->sharing_preference ?? 'Not Set' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center p-3 bg-light bg-opacity-50 border rounded-4 transition-hover">
+                                    <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                                        <i class="fa-solid fa-calendar-alt"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small fw-bold text-uppercase mb-1">Fee Structure</div>
+                                        <div class="fw-bold fs-5 text-dark text-capitalize">{{ $student->fee_frequency ?? 'Not Set' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center p-3 bg-light bg-opacity-50 border rounded-4 transition-hover">
+                                    <div class="bg-warning-subtle text-warning-emphasis rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                                        <i class="fa-solid fa-indian-rupee-sign"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small fw-bold text-uppercase mb-1">Fee Amount</div>
+                                        <div class="fw-bold fs-5 text-dark">{{ $student->fee_amount ? hostelease_money($student->fee_amount) : 'Not Set' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-{{-- Collect global modal --}}
-<div class="modal fade" id="collectModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content" id="collectForm" method="POST"
-              action="{{ route('admin.students.collect', $student) }}"
-              data-collect-action="{{ route('admin.students.collect', $student) }}"
-              data-promise-action="{{ route('admin.students.promise', $student) }}"
-              style="border-radius: var(--he-radius-lg); overflow: hidden;">
-            @csrf
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="collectTitle">Collect Payment</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                @if($paymentModes->isEmpty())
-                    <div class="alert alert-warning mb-0" style="border-radius: var(--he-radius-md);">
-                        No payment modes yet. Add one under <a href="{{ route('admin.payment-modes.index') }}">Payment Modes</a> first.
-                    </div>
-                @else
-                    {{-- Pay now / Promise toggle --}}
-                    <div class="btn-group w-100 mb-3" role="group">
-                        <input type="radio" class="btn-check" name="collect_mode" id="modePay" value="pay" checked onchange="setCollectMode('pay')">
-                        <label class="btn btn-outline-primary" for="modePay"><i class="fa-solid fa-indian-rupee-sign me-1"></i> Pay now</label>
-                        <input type="radio" class="btn-check" name="collect_mode" id="modePromise" value="promise" onchange="setCollectMode('promise')">
-                        <label class="btn btn-outline-primary" for="modePromise"><i class="fa-regular fa-calendar-check me-1"></i> Promise</label>
-                    </div>
-
-                    {{-- Pay fields --}}
-                    <div id="payFields">
-                        <div class="row mb-3 gx-3">
-                            <div class="col-6">
-                                <div class="p-3 bg-light rounded text-center">
-                                    <div class="text-secondary small fw-bold text-uppercase">Total Outstanding</div>
-                                    <div class="fs-5 fw-bold text-danger">{{ hostelease_money($paymentSummary['outstanding']) }}</div>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="p-3 bg-light rounded text-center">
-                                    <div class="text-secondary small fw-bold text-uppercase">Credit Balance</div>
-                                    <div class="fs-5 fw-bold text-success">{{ hostelease_money($student->credit_balance) }}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="alert alert-info py-2 small mb-3">
-                            <i class="fa-solid fa-circle-info me-1"></i> Any amount paid over the outstanding balance will be automatically added to the student's credit balance.
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Payment Amount (₹)</label>
-                            <input type="number" step="0.01" min="1" name="amount" id="collectAmount" class="form-control" required>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-6"><label class="form-label">Payment Type</label>
-                                <select name="payment_type" class="form-select">@foreach(config('hostelease.payment_types') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
-                            <div class="col-6"><label class="form-label">Mode</label>
-                                <select name="mode" class="form-select" required>@foreach($paymentModes as $m)<option value="{{ $m->code }}">{{ $m->name }}</option>@endforeach</select></div>
-                            <div class="col-6"><label class="form-label">Date</label>
-                                <input type="date" name="paid_on" class="form-control" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></div>
-                            <div class="col-6"><label class="form-label">Reference</label>
-                                <input type="text" name="reference_number" class="form-control" placeholder="Optional"></div>
-                            <div class="col-12"><label class="form-label">Remarks</label>
-                                <input type="text" name="remarks" class="form-control" placeholder="Optional"></div>
-                        </div>
-                    </div>
-
-                    {{-- Promise fields --}}
-                    <div id="promiseFields" class="d-none">
-                        <div class="alert alert-info py-2 small mb-3" style="border-radius: var(--he-radius-sm);">
-                            <i class="fa-solid fa-circle-info me-1"></i> No money is taken now — this records the date the student promised to clear the outstanding.
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Promise Date</label>
-                            <input type="date" name="promise_date" id="promiseDate" class="form-control"
-                                   min="{{ now()->toDateString() }}" value="{{ now()->addDays(7)->toDateString() }}" required disabled>
-                        </div>
-                        <div class="mb-1">
-                            <label class="form-label">Note (optional)</label>
-                            <input type="text" name="promise_note" id="promiseNote" class="form-control" maxlength="255" placeholder="e.g. after salary on 5th" disabled>
-                        </div>
-                    </div>
-                @endif
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
-                @unless($paymentModes->isEmpty())
-                    <button type="submit" class="btn btn-premium" id="collectSubmit">Collect</button>
-                @endunless
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- Fee Settings / Plan Change Modal --}}
-<div class="modal fade" id="feeSettingsModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <form class="modal-content" method="POST" action="{{ route('admin.students.fee-settings.update', $student) }}" 
-              style="border-radius: var(--he-radius-lg); overflow: hidden;"
-              x-data="prorationPreview()">
-            @csrf
-            @method('PUT')
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Change Room / Fee Plan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row g-4 mb-4">
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Room Preference</label>
-                        <select name="room_preference" class="form-select">
-                            <option value="">Select preference</option>
-                            <option value="AC" @selected($student->room_preference === 'AC')>AC Room</option>
-                            <option value="Non-AC" @selected($student->room_preference === 'Non-AC')>Non-AC Room</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Sharing Preference</label>
-                        <select name="sharing_preference" class="form-select">
-                            <option value="">Select sharing</option>
-                            <option value="Single" @selected($student->sharing_preference === 'Single')>Single Occupancy</option>
-                            <option value="Double" @selected($student->sharing_preference === 'Double')>Double Sharing</option>
-                            <option value="Triple" @selected($student->sharing_preference === 'Triple')>Triple Sharing</option>
-                            <option value="Quad" @selected($student->sharing_preference === 'Quad')>Quad Sharing</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Fee Structure</label>
-                        <select name="fee_frequency" class="form-select" x-model="frequency" @change="fetchPreview" required>
-                            <option value="">Select structure</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="semester">Semester-wise</option>
-                            <option value="yearly">Yearly</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">New Fee Amount (₹)</label>
-                        <input type="number" name="fee_amount" class="form-control" x-model="amount" @change="fetchPreview" min="0" step="0.01" required>
-                    </div>
+<!-- TELEPORTED MODALS -->
+<template x-teleport="body">
+    {{-- QR Modal --}}
+    @if($qrSvg ?? false)
+    <div class="modal fade" id="qrModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content" style="border-radius: var(--he-radius-lg); overflow: hidden; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+                <div class="modal-header border-0 pb-0 justify-content-end">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-
-                {{-- Proration Preview Area --}}
-                <div x-show="preview" x-transition class="bg-light p-3 border rounded-3" style="display:none;">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fa-solid fa-calculator text-primary me-2"></i>
-                        <span class="fw-bold">Proration Calculation Preview</span>
-                        <div x-show="loading" class="spinner-border spinner-border-sm text-primary ms-3" role="status"></div>
-                    </div>
-                    <template x-if="preview && preview.has_active_cycle">
-                        <div class="small">
-                            <div class="d-flex justify-content-between text-muted mb-1">
-                                <span>Unused days from current plan (<span x-text="preview.days_unused"></span>/<span x-text="preview.days_total"></span>):</span>
-                                <span class="text-success">+₹<span x-text="preview.refund_credit"></span></span>
-                            </div>
-                            <div class="d-flex justify-content-between text-muted mb-1">
-                                <span>Current credit balance:</span>
-                                <span>+₹<span x-text="preview.current_credit_balance"></span></span>
-                            </div>
-                            <div class="d-flex justify-content-between text-muted mb-2 pb-2 border-bottom">
-                                <span>Cost of new <span x-text="preview.new_frequency"></span> plan starting today:</span>
-                                <span class="text-danger">-₹<span x-text="preview.new_invoice_amount"></span></span>
-                            </div>
-                            <div class="d-flex justify-content-between fw-bold">
-                                <span>Action on Save:</span>
-                                <span>
-                                    <template x-if="preview.net_due > 0">
-                                        <span class="text-danger">Student will owe ₹<span x-text="preview.net_due"></span> (Invoice generated)</span>
-                                    </template>
-                                    <template x-if="preview.net_due == 0">
-                                        <span class="text-success">Paid by credit (New balance: ₹<span x-text="preview.projected_credit_balance"></span>)</span>
-                                    </template>
-                                </span>
-                            </div>
-                        </div>
-                    </template>
-                    <template x-if="preview && !preview.has_active_cycle">
-                        <div class="small text-muted">
-                            <i class="fa-solid fa-circle-info me-1"></i> No active cycle to prorate. A new invoice for ₹<span x-text="preview.new_invoice_amount"></span> will be generated.
-                        </div>
-                    </template>
+                <div class="modal-body text-center pt-0 pb-4">
+                    <h5 class="fw-bold mb-3">Student ID QR</h5>
+                    <div class="border rounded-4 p-3 bg-white d-inline-block shadow-sm" style="line-height:0">{!! $qrSvg !!}</div>
+                    <p class="text-muted small fw-bold mt-3 mb-0 text-uppercase">Scan for verification</p>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
-                <button type="submit" class="btn btn-premium px-4" :disabled="loading"><i class="fa-solid fa-save me-1"></i> Confirm & Save</button>
-            </div>
-        </form>
+        </div>
     </div>
-</div>
+    @endif
+</template>
 
+<template x-teleport="body">
+    {{-- Collect Modal --}}
+    <div class="modal fade" id="collectModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="collectForm" method="POST"
+                  action="{{ route('admin.students.collect', $student) }}"
+                  data-collect-action="{{ route('admin.students.collect', $student) }}"
+                  data-promise-action="{{ route('admin.students.promise', $student) }}"
+                  style="border-radius: var(--he-radius-lg); border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+                @csrf
+                <div class="modal-header border-0 pb-0 mt-2 ms-2">
+                    <h5 class="modal-title fw-bold fs-4" id="collectTitle">Collect Payment</h5>
+                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if(empty($paymentModes) || $paymentModes->isEmpty())
+                        <div class="alert alert-warning fw-bold mb-0 rounded-4">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> No payment modes setup. Please add one under <a href="{{ route('admin.payment-modes.index') }}">Settings > Payment Modes</a>.
+                        </div>
+                    @else
+                        {{-- Pay now / Promise toggle --}}
+                        <div class="btn-group w-100 mb-4 shadow-sm rounded-pill overflow-hidden border" role="group">
+                            <input type="radio" class="btn-check" name="collect_mode" id="modePay" value="pay" checked onchange="setCollectMode('pay')">
+                            <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePay"><i class="fa-solid fa-indian-rupee-sign me-1"></i> Pay Now</label>
+                            
+                            <input type="radio" class="btn-check" name="collect_mode" id="modePromise" value="promise" onchange="setCollectMode('promise')">
+                            <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePromise"><i class="fa-regular fa-calendar-check me-1"></i> Promise</label>
+                        </div>
+
+                        {{-- Pay fields --}}
+                        <div id="payFields">
+                            <div class="row mb-4 gx-3">
+                                <div class="col-6">
+                                    <div class="p-3 bg-danger-subtle rounded-4 text-center border border-danger-subtle">
+                                        <div class="text-danger small fw-bold text-uppercase mb-1">Outstanding</div>
+                                        <div class="fs-4 fw-bold text-danger lh-1">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 bg-success-subtle rounded-4 text-center border border-success-subtle">
+                                        <div class="text-success small fw-bold text-uppercase mb-1">Credit Balance</div>
+                                        <div class="fs-4 fw-bold text-success lh-1">{{ hostelease_money($student->credit_balance) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Payment Amount (₹)</label>
+                                <input type="number" step="0.01" min="1" name="amount" id="collectAmount" class="form-control form-control-lg bg-light" required>
+                            </div>
+                            
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small">Payment Type</label>
+                                    <select name="payment_type" class="form-select bg-light">
+                                        @foreach(config('hostelease.payment_types') as $k => $v)
+                                            <option value="{{ $k }}">{{ $v }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small">Mode</label>
+                                    <select name="mode" class="form-select bg-light" required>
+                                        @foreach($paymentModes as $m)
+                                            <option value="{{ $m->code }}">{{ $m->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small">Date</label>
+                                    <input type="date" name="paid_on" class="form-control bg-light" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small">Reference No.</label>
+                                    <input type="text" name="reference_number" class="form-control bg-light" placeholder="Optional">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold small">Remarks</label>
+                                    <input type="text" name="remarks" class="form-control bg-light" placeholder="Optional note">
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Promise fields --}}
+                        <div id="promiseFields" class="d-none">
+                            <div class="alert alert-info py-3 small mb-4 rounded-4 border-info-subtle fw-bold">
+                                <i class="fa-solid fa-circle-info me-2 fs-5 float-start"></i> 
+                                No money is collected now.<br>This records the promised date to clear the outstanding balance.
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Promise Date</label>
+                                <input type="date" name="promise_date" id="promiseDate" class="form-control form-control-lg bg-light"
+                                       min="{{ now()->toDateString() }}" value="{{ now()->addDays(7)->toDateString() }}" required disabled>
+                            </div>
+                            <div class="mb-1">
+                                <label class="form-label fw-bold small">Note (optional)</label>
+                                <input type="text" name="promise_note" id="promiseNote" class="form-control bg-light" maxlength="255" placeholder="e.g. Will pay after salary on 5th" disabled>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+                <div class="modal-footer border-0 pt-0 mb-2 me-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    @if(!empty($paymentModes) && $paymentModes->isNotEmpty())
+                        <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" id="collectSubmit">Collect Payment</button>
+                    @endif
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+
+<template x-teleport="body">
+    {{-- Document Modal --}}
+    <div class="modal fade" id="docModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="POST" action="{{ route('admin.students.documents.store', $student) }}" enctype="multipart/form-data"
+                  style="border-radius: var(--he-radius-lg); border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+                @csrf
+                <div class="modal-header border-0 pb-0 mt-2 ms-2">
+                    <h5 class="modal-title fw-bold fs-4">Upload Document</h5>
+                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Document Type</label>
+                        <select name="type" class="form-select bg-light" required>
+                            <option value="aadhaar">Aadhaar</option>
+                            <option value="photo">Photo / ID</option>
+                            <option value="agreement">Rental Agreement</option>
+                            <option value="other">Other Document</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Title (optional)</label>
+                        <input type="text" name="title" class="form-control bg-light" placeholder="e.g. Front side of Aadhaar">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">File <span class="text-muted fw-normal">(jpg, png, pdf · max 5MB)</span></label>
+                        <input type="file" name="file" class="form-control bg-light" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small">Expiry Date (optional)</label>
+                        <input type="date" name="expiry_date" class="form-control bg-light">
+                    </div>
+                    <div class="form-check bg-light rounded-4 p-3 d-flex align-items-center">
+                        <input class="form-check-input m-0 flex-shrink-0" type="checkbox" name="is_signed" value="1" id="isSigned" style="width: 1.25rem; height: 1.25rem;">
+                        <label class="form-check-label ms-3 fw-bold" for="isSigned">This document is physically signed</label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 mb-2 me-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm">Upload File</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+
+<template x-teleport="body">
+    {{-- Fee Settings Modal --}}
+    <div class="modal fade" id="feeSettingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <form class="modal-content" method="POST" action="{{ route('admin.students.fee-settings.update', $student) }}" 
+                  style="border-radius: var(--he-radius-lg); border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.1);"
+                  x-data="prorationPreview()">
+                @csrf
+                @method('PUT')
+                <div class="modal-header border-0 pb-0 mt-2 ms-2">
+                    <h5 class="modal-title fw-bold fs-4">Change Fee & Room Plan</h5>
+                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Room Preference</label>
+                            <select name="room_preference" class="form-select bg-light">
+                                <option value="">Select preference</option>
+                                <option value="AC" @selected($student->room_preference === 'AC')>AC Room</option>
+                                <option value="Non-AC" @selected($student->room_preference === 'Non-AC')>Non-AC Room</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Sharing Preference</label>
+                            <select name="sharing_preference" class="form-select bg-light">
+                                <option value="">Select sharing</option>
+                                <option value="Single" @selected($student->sharing_preference === 'Single')>Single Occupancy</option>
+                                <option value="Double" @selected($student->sharing_preference === 'Double')>Double Sharing</option>
+                                <option value="Triple" @selected($student->sharing_preference === 'Triple')>Triple Sharing</option>
+                                <option value="Quad" @selected($student->sharing_preference === 'Quad')>Quad Sharing</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Fee Structure</label>
+                            <select name="fee_frequency" class="form-select bg-light" x-model="frequency" @change="fetchPreview" required>
+                                <option value="">Select structure</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="semester">Semester-wise</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">New Fee Amount (₹)</label>
+                            <input type="number" name="fee_amount" class="form-control bg-light" x-model="amount" @change="fetchPreview" min="0" step="0.01" required>
+                        </div>
+                    </div>
+
+                    {{-- Proration Preview Area --}}
+                    <div x-show="preview" x-transition class="bg-primary-subtle bg-opacity-25 p-4 rounded-4 border border-primary-subtle" style="display:none;">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm me-3" style="width: 32px; height: 32px;"><i class="fa-solid fa-calculator"></i></div>
+                            <span class="fw-bold fs-5 text-primary">Proration Calculation</span>
+                            <div x-show="loading" class="spinner-border spinner-border-sm text-primary ms-3" role="status"></div>
+                        </div>
+                        <template x-if="preview && preview.has_active_cycle">
+                            <div class="fw-bold">
+                                <div class="d-flex justify-content-between text-muted mb-2">
+                                    <span>Unused days from current plan (<span x-text="preview.days_unused"></span>/<span x-text="preview.days_total"></span>)</span>
+                                    <span class="text-success">+₹<span x-text="preview.refund_credit"></span></span>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted mb-2">
+                                    <span>Current credit balance</span>
+                                    <span class="text-success">+₹<span x-text="preview.current_credit_balance"></span></span>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted mb-3 pb-3 border-bottom border-secondary-subtle">
+                                    <span>Cost of new <span x-text="preview.new_frequency"></span> plan (starts today)</span>
+                                    <span class="text-danger">-₹<span x-text="preview.new_invoice_amount"></span></span>
+                                </div>
+                                <div class="d-flex justify-content-between fs-5">
+                                    <span class="text-dark">Action on Save:</span>
+                                    <span>
+                                        <template x-if="preview.net_due > 0">
+                                            <span class="text-danger">Invoice generated for ₹<span x-text="preview.net_due"></span></span>
+                                        </template>
+                                        <template x-if="preview.net_due == 0">
+                                            <span class="text-success">Paid by credit (Bal: ₹<span x-text="preview.projected_credit_balance"></span>)</span>
+                                        </template>
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="preview && !preview.has_active_cycle">
+                            <div class="fw-bold text-muted">
+                                <i class="fa-solid fa-circle-info me-1"></i> No active cycle to prorate. A new invoice for ₹<span x-text="preview.new_invoice_amount"></span> will be generated.
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 mb-2 me-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" :disabled="loading"><i class="fa-solid fa-save me-2"></i>Confirm & Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+
+</div> <!-- end page-enter -->
+
+@push('scripts')
 <script>
 function prorationPreview() {
     return {
@@ -616,70 +924,34 @@ function prorationPreview() {
         }
     }
 }
-</script>
 
-{{-- Upload document modal --}}
-<div class="modal fade" id="docModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content" method="POST" action="{{ route('admin.students.documents.store', $student) }}" enctype="multipart/form-data"
-              style="border-radius: var(--he-radius-lg); overflow: hidden;">
-            @csrf
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Upload Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Type</label>
-                    <select name="type" class="form-select" required>
-                        <option value="aadhaar">Aadhaar</option>
-                        <option value="photo">Photo</option>
-                        <option value="agreement">Agreement</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="mb-3"><label class="form-label">Title (optional)</label><input type="text" name="title" class="form-control"></div>
-                <div class="mb-3"><label class="form-label">File (jpg, png, pdf · max 5MB)</label><input type="file" name="file" class="form-control" accept=".jpg,.jpeg,.png,.webp,.pdf" required></div>
-                <div class="mb-3"><label class="form-label">Expiry Date (optional)</label><input type="date" name="expiry_date" class="form-control"></div>
-                <div class="form-check"><input class="form-check-input" type="checkbox" name="is_signed" value="1" id="isSigned"><label class="form-check-label" for="isSigned">Signed agreement</label></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
-                <button type="submit" class="btn btn-premium">Upload</button>
-            </div>
-        </form>
-    </div>
-</div>
+function openCollect(amount) {
+    document.getElementById('collectTitle').textContent = 'Collect Payment';
+    const amt = document.getElementById('collectAmount');
+    if (amt) amt.value = amount > 0 ? amount : '';
+    const payRadio = document.getElementById('modePay');
+    if (payRadio) { payRadio.checked = true; setCollectMode('pay'); }
+}
 
-@push('scripts')
-<script>
-    function openCollect(amount) {
-        document.getElementById('collectTitle').textContent = 'Collect Payment';
-        const amt = document.getElementById('collectAmount');
-        if (amt) amt.value = amount > 0 ? amount : '';
-        const payRadio = document.getElementById('modePay');
-        if (payRadio) { payRadio.checked = true; setCollectMode('pay'); }
-    }
+function setCollectMode(mode) {
+    const form = document.getElementById('collectForm');
+    if (!form) return;
+    const promising = mode === 'promise';
+    const pay = document.getElementById('payFields');
+    const promise = document.getElementById('promiseFields');
+    const submit = document.getElementById('collectSubmit');
 
-    function setCollectMode(mode) {
-        const form = document.getElementById('collectForm');
-        if (!form) return;
-        const promising = mode === 'promise';
-        const pay = document.getElementById('payFields');
-        const promise = document.getElementById('promiseFields');
-        const submit = document.getElementById('collectSubmit');
+    pay.classList.toggle('d-none', promising);
+    promise.classList.toggle('d-none', !promising);
+    form.action = promising ? form.dataset.promiseAction : form.dataset.collectAction;
 
-        pay.classList.toggle('d-none', promising);
-        promise.classList.toggle('d-none', !promising);
-        form.action = promising ? form.dataset.promiseAction : form.dataset.collectAction;
+    pay.querySelectorAll('input,select').forEach(el => el.disabled = promising);
+    promise.querySelectorAll('input').forEach(el => el.disabled = !promising);
 
-        pay.querySelectorAll('input,select').forEach(el => el.disabled = promising);
-        promise.querySelectorAll('input').forEach(el => el.disabled = !promising);
-
-        submit.textContent = promising ? 'Save Promise' : 'Collect';
-        submit.classList.toggle('btn-premium', !promising);
-        submit.classList.toggle('btn-warning', promising);
-    }
+    submit.innerHTML = promising ? '<i class="fa-solid fa-calendar-check me-2"></i>Save Promise' : '<i class="fa-solid fa-indian-rupee-sign me-2"></i>Collect Payment';
+    submit.classList.toggle('btn-premium', !promising);
+    submit.classList.toggle('btn-warning', promising);
+}
 </script>
 @endpush
 @endsection
