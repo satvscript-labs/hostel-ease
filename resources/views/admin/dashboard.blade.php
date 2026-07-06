@@ -256,7 +256,7 @@
             <div class="action-icon text-danger"><i class="fa-solid fa-receipt"></i></div>
             <div class="fw-bold small">Add Expense</div>
         </a>
-        <a href="{{ route('admin.complaints.index') }}" class="action-tile">
+        <a href="{{ route('admin.frontdesk.index') }}" class="action-tile">
             <div class="action-icon text-warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <div class="fw-bold small">Log Complaint</div>
         </a>
