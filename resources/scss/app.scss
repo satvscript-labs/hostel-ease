@@ -281,7 +281,7 @@ body { color: #111827; -webkit-font-smoothing: antialiased; }
     color: #fff;
     position: relative;
 }
-.hsms-sidebar .nav-link.active::before {
+.hsms-sidebar .nav-link.active:not(.sub-link)::before {
     content: "";
     position: absolute; left: -.6rem; top: .35rem; bottom: .35rem;
     width: 3px; border-radius: 3px; background: $primary;

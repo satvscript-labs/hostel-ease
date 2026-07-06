@@ -3,7 +3,7 @@
 @section('title', __('Finance Board'))
 
 @section('content')
-<div x-data="{ tab: '{{ request('tab', 'invoices') }}', search: '' }" class="page-enter">
+<div x-data="{ tab: '{{ request('tab', 'invoices') }}', search: '' }" @tab-changed.window="tab = $event.detail" class="page-enter">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
