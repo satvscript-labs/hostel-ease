@@ -8,15 +8,14 @@
     <link rel="icon" href="{{ asset('hsms-icon.svg') }}" type="image/svg+xml">
     
     <!-- SEO -->
-    <title>Login · {{ config('app.name', 'HostelEase') }} SaaS</title>
-    <meta name="description" content="Sign in to your HostelEase dashboard to manage your hostel, track payments, and view real-time occupancy insights.">
+    <title>Sign Up · {{ config('app.name', 'HostelEase') }} SaaS</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
     
     <style>
-        /* Ultra Premium Split Screen Login */
+        /* Ultra Premium Split Screen Login/Register */
         body, html { height: 100%; margin: 0; font-family: 'Inter', sans-serif; background: #ffffff; }
         
         .split-layout {
@@ -64,7 +63,7 @@
         }
         
         /* Modern Floating Input */
-        .premium-input-group { position: relative; margin-bottom: 1.5rem; }
+        .premium-input-group { position: relative; margin-bottom: 1.25rem; }
         .premium-input {
             width: 100%; background: #f8fafc; border: 1px solid rgba(0,0,0,0.05);
             border-radius: 0.75rem; padding: 1rem 1.25rem; font-size: 0.95rem;
@@ -167,16 +166,16 @@
 
     <div class="split-layout">
         
-        <!-- Left Side: Login Form -->
+        <!-- Left Side: Register Form -->
         <div class="form-side">
-            <div class="d-flex align-items-center gap-2 mb-5 pb-3">
+            <div class="d-flex align-items-center gap-2 mb-4 pb-2">
                 <img src="{{ asset('hsms-icon.svg') }}" alt="Logo" style="height: 36px;">
                 <span class="fs-4 fw-bold text-dark tracking-tight">{{ config('app.name', 'HostelEase') }}</span>
             </div>
             
-            <div class="mb-5">
-                <h1 class="fw-bold text-dark mb-2" style="letter-spacing: -1px; font-size: 2.25rem;">Welcome back</h1>
-                <p class="text-muted">Enter your credentials to access your dashboard.</p>
+            <div class="mb-4">
+                <h1 class="fw-bold text-dark mb-2" style="letter-spacing: -1px; font-size: 2.25rem;">Start automating today</h1>
+                <p class="text-muted">Create your free account. No credit card required.</p>
             </div>
             
             @if($errors->any())
@@ -186,8 +185,27 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('login.attempt') }}">
+            <form method="POST" action="{{ route('register.attempt') }}">
                 @csrf
+                
+                <div class="premium-input-group">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('Your Name') }}</label>
+                    <div class="position-relative">
+                        <input type="text" name="name" value="{{ old('name') }}"
+                               class="premium-input" placeholder="e.g. John Doe" required autofocus>
+                        <i class="fa-solid fa-user input-icon"></i>
+                    </div>
+                </div>
+
+                <div class="premium-input-group">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('Hostel / PG Name') }}</label>
+                    <div class="position-relative">
+                        <input type="text" name="hostel_name" value="{{ old('hostel_name') }}"
+                               class="premium-input" placeholder="e.g. Skyline PG Accommodations" required>
+                        <i class="fa-solid fa-building input-icon"></i>
+                    </div>
+                </div>
+
                 <div class="premium-input-group">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('Mobile Number') }}</label>
                     <div class="d-flex gap-2">
@@ -197,7 +215,7 @@
                         <div class="position-relative flex-grow-1">
                             <input type="tel" name="mobile" value="{{ old('mobile') }}"
                                    class="premium-input" inputmode="numeric" maxlength="10"
-                                   placeholder="10-digit mobile number" required autofocus>
+                                   placeholder="10-digit mobile number" required>
                             <i class="fa-solid fa-mobile-screen input-icon"></i>
                         </div>
                     </div>
@@ -205,29 +223,27 @@
                 
                 <div class="premium-input-group">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('Password') }}</label>
-                    <input type="password" name="password" class="premium-input" placeholder="••••••••" required>
-                    <i class="fa-solid fa-lock input-icon"></i>
+                    <div class="position-relative">
+                        <input type="password" name="password" class="premium-input" placeholder="••••••••" required>
+                        <i class="fa-solid fa-lock input-icon"></i>
+                    </div>
                 </div>
                 
-                <div class="d-flex justify-content-between align-items-center mb-5">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="remember" id="remember">
-                        <label class="form-check-label small fw-semibold text-muted" for="remember">{{ __('Remember me') }}</label>
-                    </div>
-                    <a href="#" class="small fw-bold text-primary text-decoration-none">{{ __('Forgot Password?') }}</a>
+                <div class="mb-4">
+                    <p class="small text-muted mb-0">By clicking sign up, you agree to our <a href="#" class="text-primary text-decoration-none fw-semibold">Terms of Service</a> and <a href="#" class="text-primary text-decoration-none fw-semibold">Privacy Policy</a>.</p>
                 </div>
                 
                 <button type="submit" class="btn btn-neon mb-4">
-                    {{ __('Sign In to Dashboard') }} <i class="fa-solid fa-arrow-right ms-2"></i>
+                    {{ __('Create Account') }} <i class="fa-solid fa-rocket ms-2"></i>
                 </button>
                 
                 <div class="text-center">
-                    <span class="text-muted small">Don't have an account?</span>
-                    <a href="{{ route('register') }}" class="small fw-bold text-primary text-decoration-none ms-1">Sign up for free</a>
+                    <span class="text-muted small">Already have an account?</span>
+                    <a href="{{ route('login') }}" class="small fw-bold text-primary text-decoration-none ms-1">Log in here</a>
                 </div>
             </form>
             
-            <div class="mt-auto pt-5">
+            <div class="mt-auto pt-4">
                 <div class="d-flex gap-3 justify-content-center">
                     @foreach(config('app.available_locales') as $code => $label)
                         <a href="{{ route('locale.switch', $code) }}" class="small text-decoration-none {{ app()->getLocale() === $code ? 'fw-bold text-dark' : 'text-muted' }}">{{ $label }}</a>
@@ -237,7 +253,7 @@
             </div>
         </div>
         
-        <!-- Right Side: Visuals (Hidden on mobile) -->
+        <!-- Right Side: Visuals -->
         <div class="image-side">
             <div class="glass-overlay"></div>
             

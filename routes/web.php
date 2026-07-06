@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\StudentDocumentController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocaleController;
@@ -38,7 +39,7 @@ use Illuminate\Support\Facades\Route;
 | Public / Guest
 |--------------------------------------------------------------------------
 */
-Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : redirect()->route('login'));
+Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('welcome'));
 
 // Language switcher (available to everyone, incl. the login page).
 Route::get('locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
@@ -53,6 +54,9 @@ Route::post('register/{token}', [\App\Http\Controllers\PublicRegistrationControl
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'show'])->name('login');
     Route::post('login', [LoginController::class, 'login'])->name('login.attempt');
+    
+    Route::get('register', [RegisterController::class, 'show'])->name('register');
+    Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
 });
 
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
