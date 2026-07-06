@@ -8,6 +8,12 @@
         </button>
     </div>
 
+    <style>
+        .hsms-sidebar .nav-link[data-bs-toggle="collapse"] .fa-chevron-down { transition: transform 0.2s; }
+        .hsms-sidebar .nav-link[data-bs-toggle="collapse"]:not(.collapsed) .fa-chevron-down { transform: rotate(180deg); }
+        .hsms-sidebar .collapse .nav-link { padding-left: 2.5rem; font-size: 0.95rem; }
+    </style>
+
     <nav class="nav flex-column flex-nowrap flex-grow-1 overflow-y-auto overflow-x-hidden py-2">
         @if($user->isSuperAdmin())
             <a class="nav-link {{ request()->routeIs('superadmin.dashboard') ? 'active' : '' }}" href="{{ route('superadmin.dashboard') }}">
@@ -26,27 +32,72 @@
             <a class="nav-link {{ request()->routeIs('superadmin.backups.*') ? 'active' : '' }}" href="{{ route('superadmin.backups.index') }}"><i class="fa-solid fa-database"></i> {{ __('Backups') }}</a>
         @else
             <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
-                <i class="fa-solid fa-gauge-high"></i> {{ __('Dashboard') }}
+                <i class="fa-solid fa-gauge-high"></i> <span class="ms-2">{{ __('Dashboard') }}</span>
             </a>
-            <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Property') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.property.*') ? 'active' : '' }}" href="{{ route('admin.property.index') }}"><i class="fa-solid fa-building"></i> {{ __('Property Board') }}</a>
-            <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('People') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.students.*') ? 'active' : '' }}" href="{{ route('admin.students.index') }}"><i class="fa-solid fa-users"></i> {{ __('Students') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.assignments.*') ? 'active' : '' }}" href="{{ route('admin.assignments.index') }}"><i class="fa-solid fa-bed-pulse"></i> {{ __('Bed Assignment') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.visitors.*') ? 'active' : '' }}" href="{{ route('admin.visitors.index') }}"><i class="fa-solid fa-door-closed"></i> {{ __('Visitors') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.complaints.*') ? 'active' : '' }}" href="{{ route('admin.complaints.index') }}"><i class="fa-solid fa-headset"></i> {{ __('Complaints') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.staff.*') ? 'active' : '' }}" href="{{ route('admin.staff.index') }}"><i class="fa-solid fa-id-badge"></i> {{ __('Staff') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.registrations.*') ? 'active' : '' }}" href="{{ route('admin.registrations.index') }}"><i class="fa-solid fa-user-check"></i> {{ __('Registrations') }}</a>
-            <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Finance') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.finance.*') ? 'active' : '' }}" href="{{ route('admin.finance.index') }}"><i class="fa-solid fa-chart-line"></i> {{ __('Finance Board') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.pocket-money.*') ? 'active' : '' }}" href="{{ route('admin.pocket-money.index') }}"><i class="fa-solid fa-wallet"></i> {{ __('Pocket Money') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.expenses.*') ? 'active' : '' }}" href="{{ route('admin.expenses.index') }}"><i class="fa-solid fa-money-bill-trend-up"></i> {{ __('Expenses') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.payment-modes.*') ? 'active' : '' }}" href="{{ route('admin.payment-modes.index') }}"><i class="fa-solid fa-sliders"></i> {{ __('Payment Modes') }}</a>
-            <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Insights') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.index') }}"><i class="fa-solid fa-chart-pie"></i> {{ __('Reports') }}</a>
-            <div class="text-uppercase small text-secondary px-3 mt-3 mb-1">{{ __('Settings') }}</div>
-            <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}"><i class="fa-solid fa-user-gear"></i> {{ __('Users & Roles') }}</a>
-            <a class="nav-link {{ request()->routeIs('admin.billing') ? 'active' : '' }}" href="{{ route('admin.billing') }}"><i class="fa-solid fa-credit-card"></i> {{ __('Subscription') }}</a>
+            
+            <a class="nav-link {{ request()->routeIs('admin.property.*') ? 'active' : '' }}" href="{{ route('admin.property.index') }}">
+                <i class="fa-solid fa-building"></i> <span class="ms-2">{{ __('Property Board') }}</span>
+            </a>
+
+            <!-- People Menu -->
+            @php($peopleActive = request()->routeIs('admin.students.*', 'admin.assignments.*', 'admin.registrations.*'))
+            <a class="nav-link {{ $peopleActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#peopleMenu" role="button" aria-expanded="{{ $peopleActive ? 'true' : 'false' }}">
+                <i class="fa-solid fa-users"></i> <span class="ms-2">{{ __('People') }}</span>
+                <i class="fa-solid fa-chevron-down ms-auto" style="font-size: 0.8em;"></i>
+            </a>
+            <div class="collapse {{ $peopleActive ? 'show' : '' }}" id="peopleMenu">
+                <a class="nav-link {{ request()->routeIs('admin.students.*') ? 'active' : '' }}" href="{{ route('admin.students.index') }}">{{ __('Students') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.assignments.*') ? 'active' : '' }}" href="{{ route('admin.assignments.index') }}">{{ __('Bed Assignment') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.registrations.*') ? 'active' : '' }}" href="{{ route('admin.registrations.index') }}">{{ __('Registrations') }}</a>
+            </div>
+
+            <!-- Front Desk Menu -->
+            @php($deskActive = request()->routeIs('admin.frontdesk.*', 'admin.visitors.*', 'admin.complaints.*'))
+            <a class="nav-link {{ $deskActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#deskMenu" role="button" aria-expanded="{{ $deskActive ? 'true' : 'false' }}">
+                <i class="fa-solid fa-bell-concierge"></i> <span class="ms-2">{{ __('Front Desk') }}</span>
+                <i class="fa-solid fa-chevron-down ms-auto" style="font-size: 0.8em;"></i>
+            </a>
+            <div class="collapse {{ $deskActive ? 'show' : '' }}" id="deskMenu">
+                <a class="nav-link {{ request()->routeIs('admin.frontdesk.*') && request('tab', 'visitors') === 'visitors' ? 'active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'visitors']) }}">{{ __('Visitors') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.frontdesk.*') && request('tab') === 'complaints' ? 'active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'complaints']) }}">{{ __('Complaints') }}</a>
+            </div>
+
+            <!-- Finance Menu -->
+            @php($financeActive = request()->routeIs('admin.finance.*', 'admin.pocket-money.*', 'admin.payment-modes.*', 'admin.expenses.*'))
+            <a class="nav-link {{ $financeActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#financeMenu" role="button" aria-expanded="{{ $financeActive ? 'true' : 'false' }}">
+                <i class="fa-solid fa-chart-pie"></i> <span class="ms-2">{{ __('Finance') }}</span>
+                <i class="fa-solid fa-chevron-down ms-auto" style="font-size: 0.8em;"></i>
+            </a>
+            <div class="collapse {{ $financeActive ? 'show' : '' }}" id="financeMenu">
+                <a class="nav-link {{ request()->routeIs('admin.finance.*') && request('tab') !== 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'invoices']) }}">{{ __('Invoices & Dues') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.finance.*') && request('tab') === 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'transactions']) }}">{{ __('Transactions') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.expenses.*') ? 'active' : '' }}" href="{{ route('admin.expenses.index') }}">{{ __('Expenses') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.pocket-money.*') ? 'active' : '' }}" href="{{ route('admin.pocket-money.index') }}">{{ __('Pocket Money') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.payment-modes.*') ? 'active' : '' }}" href="{{ route('admin.payment-modes.index') }}">{{ __('Payment Modes') }}</a>
+            </div>
+            
+            <!-- Operations Menu -->
+            @php($opsActive = request()->routeIs('admin.staff.*'))
+            <a class="nav-link {{ $opsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#opsMenu" role="button" aria-expanded="{{ $opsActive ? 'true' : 'false' }}">
+                <i class="fa-solid fa-briefcase"></i> <span class="ms-2">{{ __('Staff & Ops') }}</span>
+                <i class="fa-solid fa-chevron-down ms-auto" style="font-size: 0.8em;"></i>
+            </a>
+            <div class="collapse {{ $opsActive ? 'show' : '' }}" id="opsMenu">
+                <a class="nav-link {{ request()->routeIs('admin.staff.*') && request('tab', 'directory') === 'directory' ? 'active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'directory']) }}">{{ __('Staff Directory') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.staff.*') && request('tab') === 'attendance' ? 'active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'attendance']) }}">{{ __('Attendance') }}</a>
+            </div>
+
+            <!-- Insights & Settings Menu -->
+            @php($settingsActive = request()->routeIs('admin.reports.*', 'admin.users.*', 'admin.billing'))
+            <a class="nav-link {{ $settingsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#settingsMenu" role="button" aria-expanded="{{ $settingsActive ? 'true' : 'false' }}">
+                <i class="fa-solid fa-gear"></i> <span class="ms-2">{{ __('Settings & Tools') }}</span>
+                <i class="fa-solid fa-chevron-down ms-auto" style="font-size: 0.8em;"></i>
+            </a>
+            <div class="collapse {{ $settingsActive ? 'show' : '' }}" id="settingsMenu">
+                <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.index') }}">{{ __('Reports') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">{{ __('Users & Roles') }}</a>
+                <a class="nav-link {{ request()->routeIs('admin.billing') ? 'active' : '' }}" href="{{ route('admin.billing') }}">{{ __('Subscription') }}</a>
+            </div>
         @endif
     </nav>
 

@@ -181,24 +181,22 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
 
             // --- Add-on: Expense Management ---
-            Route::get('expenses', [ExpenseController::class, 'index'])->name('expenses.index');
-            Route::post('expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+            Route::get('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'index'])->name('expenses.index');
+            Route::post('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'store'])->name('expenses.store');
             Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
 
-            // --- Add-on: Visitor Register ---
-            Route::get('visitors', [VisitorController::class, 'index'])->name('visitors.index');
+            // --- Add-on: Front Desk (Visitors & Complaints) ---
+            Route::get('frontdesk', [\App\Http\Controllers\Admin\FrontDeskController::class, 'index'])->name('frontdesk.index');
+
             Route::post('visitors', [VisitorController::class, 'store'])->name('visitors.store');
             Route::patch('visitors/{visitor}/checkout', [VisitorController::class, 'checkout'])->name('visitors.checkout');
             Route::delete('visitors/{visitor}', [VisitorController::class, 'destroy'])->name('visitors.destroy');
 
-            // --- Add-on: Complaints / Tickets ---
-            Route::get('complaints', [ComplaintController::class, 'index'])->name('complaints.index');
             Route::post('complaints', [ComplaintController::class, 'store'])->name('complaints.store');
             Route::patch('complaints/{complaint}', [ComplaintController::class, 'update'])->name('complaints.update');
             Route::delete('complaints/{complaint}', [ComplaintController::class, 'destroy'])->name('complaints.destroy');
 
             // --- New module: Staff (salary + attendance) ---
-            Route::get('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'attendance'])->name('staff.attendance');
             Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
             Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show']);
             Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');

@@ -25,7 +25,7 @@ class ExpenseController extends Controller
         $to = $request->filled('to') ? Carbon::parse($request->date('to')) : now()->endOfDay();
 
         $expenses = Expense::with('recorder')
-            ->between($from, $to)
+            ->whereBetween('expense_date', [$from, $to])
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category))
             ->orderByDesc('expense_date')->orderByDesc('id')
             ->get();
@@ -43,6 +43,8 @@ class ExpenseController extends Controller
 
         return view('admin.expenses.index', compact('expenses', 'summary', 'from', 'to'));
     }
+
+
 
     public function store(StoreExpenseRequest $request): RedirectResponse
     {

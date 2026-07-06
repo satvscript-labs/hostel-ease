@@ -17,19 +17,7 @@ class VisitorController extends Controller
     {
     }
 
-    public function index(Request $request): View
-    {
-        $visitors = Visitor::with('student')
-            ->when($request->input('filter') === 'inside', fn ($q) => $q->inside())
-            ->when($request->filled('date'), fn ($q) => $q->whereDate('check_in', $request->date('date')))
-            ->orderByDesc('check_in')
-            ->get();
 
-        $insideCount = Visitor::inside()->count();
-        $students = Student::active()->orderBy('name')->get(['id', 'name']);
-
-        return view('admin.visitors.index', compact('visitors', 'insideCount', 'students'));
-    }
 
     public function store(Request $request): RedirectResponse
     {

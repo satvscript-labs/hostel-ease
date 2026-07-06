@@ -18,25 +18,7 @@ class ComplaintController extends Controller
     {
     }
 
-    public function index(Request $request): View
-    {
-        $complaints = Complaint::with('student', 'creator')
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
-            ->when($request->filled('priority'), fn ($q) => $q->where('priority', $request->priority))
-            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END")
-            ->orderByDesc('created_at')
-            ->get();
 
-        $counts = [
-            'open' => Complaint::where('status', 'open')->count(),
-            'in_progress' => Complaint::where('status', 'in_progress')->count(),
-            'resolved' => Complaint::where('status', 'resolved')->count(),
-        ];
-
-        $students = Student::active()->orderBy('name')->get(['id', 'name']);
-
-        return view('admin.complaints.index', compact('complaints', 'counts', 'students'));
-    }
 
     public function store(Request $request): RedirectResponse
     {

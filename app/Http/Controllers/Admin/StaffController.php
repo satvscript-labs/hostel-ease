@@ -20,7 +20,7 @@ class StaffController extends Controller
     {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $monthStart = now()->startOfMonth()->toDateString();
         $monthEnd = now()->endOfMonth()->toDateString();
@@ -40,7 +40,11 @@ class StaffController extends Controller
             'payroll' => (float) Staff::active()->sum('monthly_salary'),
         ];
 
-        return view('admin.staff.index', compact('staff', 'summary'));
+        // Attendance Data for the tab
+        $date = $request->filled('date') ? Carbon::parse($request->date('date'))->toDateString() : now()->toDateString();
+        $marks = StaffAttendance::whereDate('date', $date)->get()->keyBy('staff_id');
+
+        return view('admin.staff.index', compact('staff', 'summary', 'date', 'marks'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -78,14 +82,7 @@ class StaffController extends Controller
         return view('admin.staff.show', compact('staff', 'counts', 'attendance', 'payments'));
     }
 
-    public function attendance(Request $request): View
-    {
-        $date = $request->filled('date') ? Carbon::parse($request->date('date'))->toDateString() : now()->toDateString();
-        $marks = StaffAttendance::whereDate('date', $date)->get()->keyBy('staff_id');
-        $staff = Staff::active()->orderBy('name')->get();
 
-        return view('admin.staff.attendance', compact('staff', 'marks', 'date'));
-    }
 
     public function saveAttendance(Request $request): RedirectResponse
     {
@@ -102,7 +99,7 @@ class StaffController extends Controller
             );
         }
 
-        return redirect()->route('admin.staff.attendance', ['date' => $date])->with('success', 'Attendance saved.');
+        return redirect()->route('admin.staff.index', ['tab' => 'attendance', 'date' => $date])->with('success', 'Attendance saved.');
     }
 
     public function paySalary(Request $request, Staff $staff): RedirectResponse

@@ -3,7 +3,7 @@
 @section('title', __('Finance Board'))
 
 @section('content')
-<div x-data="{ tab: 'invoices', search: '' }" class="page-enter">
+<div x-data="{ tab: '{{ request('tab', 'invoices') }}', search: '' }" class="page-enter">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
@@ -165,9 +165,6 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
     </div>
 
 </div>
@@ -255,4 +252,5 @@
         </form>
     </div>
 </div>
+
 @endsection
