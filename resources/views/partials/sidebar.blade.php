@@ -128,9 +128,6 @@
             <a class="nav-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
                 <i class="fa-solid fa-receipt"></i> {{ __('Subscriptions') }}
             </a>
-            <a class="nav-link {{ request()->routeIs('superadmin.admins.*') ? 'active' : '' }}" href="{{ route('superadmin.admins.index') }}">
-                <i class="fa-solid fa-user-shield"></i> {{ __('Admins') }}
-            </a>
             <a class="nav-link {{ request()->routeIs('superadmin.activity') ? 'active' : '' }}" href="{{ route('superadmin.activity') }}"><i class="fa-solid fa-list-check"></i> {{ __('Activity Logs') }}</a>
             <a class="nav-link {{ request()->routeIs('superadmin.backups.*') ? 'active' : '' }}" href="{{ route('superadmin.backups.index') }}"><i class="fa-solid fa-database"></i> {{ __('Backups') }}</a>
         @else

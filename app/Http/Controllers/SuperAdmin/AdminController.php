@@ -22,18 +22,6 @@ class AdminController extends Controller
     ) {
     }
 
-    public function index(): View
-    {
-        $admins = User::with('hostel', 'hostels')
-            ->where('role', 'hostel_admin')
-            ->orderBy('name')
-            ->get();
-
-        $hostels = Hostel::orderBy('name')->get(['id', 'name']);
-
-        return view('superadmin.admins.index', compact('admins', 'hostels'));
-    }
-
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -43,7 +31,7 @@ class AdminController extends Controller
             'email' => ['nullable', 'email', 'max:150'],
         ]);
 
-        $password = str()->upper(str()->random(4)).random_int(1000, 9999);
+        $password = str(str()->random(4))->upper()->toString() . random_int(1000, 9999);
 
         $admin = User::create([
             'hostel_id' => $data['hostel_id'],

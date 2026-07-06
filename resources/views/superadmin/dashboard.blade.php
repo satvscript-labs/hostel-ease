@@ -1,32 +1,50 @@
 @extends('layouts.app')
-@section('title', 'Super Admin Dashboard')
+@section('title', 'Superadmin Dashboard')
 
 @php
     $cards = [
-        ['label' => 'Total Hostels', 'value' => $stats['total_hostels'], 'icon' => 'fa-hotel', 'bg' => 'primary'],
-        ['label' => 'Active Hostels', 'value' => $stats['active_hostels'], 'icon' => 'fa-circle-check', 'bg' => 'success'],
-        ['label' => 'Expired Hostels', 'value' => $stats['expired_hostels'], 'icon' => 'fa-circle-xmark', 'bg' => 'danger'],
-        ['label' => 'Due Renewals (30d)', 'value' => $stats['due_renewals'], 'icon' => 'fa-bell', 'bg' => 'warning'],
-        ['label' => 'Total Students', 'value' => $stats['total_students'], 'icon' => 'fa-users', 'bg' => 'info'],
-        ['label' => 'Total Income', 'value' => hostelease_money($stats['total_income']), 'icon' => 'fa-sack-dollar', 'bg' => 'success'],
-        ['label' => 'Monthly Revenue', 'value' => hostelease_money($stats['monthly_revenue']), 'icon' => 'fa-chart-line', 'bg' => 'primary'],
+        ['label' => 'Total Hostels', 'value' => $stats['total_hostels'], 'icon' => 'fa-hotel', 'bg' => 'primary', 'desc' => 'Active branches managed'],
+        ['label' => 'Active Hostels', 'value' => $stats['active_hostels'], 'icon' => 'fa-circle-check', 'bg' => 'success', 'desc' => 'Paying subscriptions'],
+        ['label' => 'Due Renewals', 'value' => $stats['due_renewals'], 'icon' => 'fa-bell', 'bg' => 'warning', 'desc' => 'Expiring within 30 days'],
+        ['label' => 'Total Students', 'value' => $stats['total_students'], 'icon' => 'fa-users', 'bg' => 'info', 'desc' => 'Across all hostels'],
+        ['label' => 'Total Revenue', 'value' => hostelease_money($stats['total_income']), 'icon' => 'fa-sack-dollar', 'bg' => 'success', 'desc' => 'Lifetime earnings'],
+        ['label' => 'Monthly Revenue', 'value' => hostelease_money($stats['monthly_revenue']), 'icon' => 'fa-chart-line', 'bg' => 'primary', 'desc' => 'Earnings this month'],
     ];
 @endphp
 
 @section('content')
-<h1 class="h4 fw-bold mb-3">Super Admin Dashboard</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Superadmin Dashboard</h1>
+        <p class="text-muted mb-0 small">Platform overview, revenue, and active subscriptions.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ route('superadmin.subscriptions.index') }}" class="btn btn-primary shadow-sm rounded-pill px-4">
+            <i class="fa-solid fa-receipt me-2"></i> Subscriptions
+        </a>
+    </div>
+</div>
 
-<div class="row g-3 mb-4">
+<!-- Bento Box Metric Cards -->
+<div class="row g-4 mb-4">
     @foreach($cards as $c)
-        <div class="col-6 col-md-4 col-xl-3">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <div class="stat-icon bg-{{ $c['bg'] }}-subtle text-{{ $c['bg'] }}">
-                        <i class="fa-solid {{ $c['icon'] }}"></i>
+        <div class="col-sm-6 col-lg-4 col-xl-4">
+            <div class="card stat-card border-0 shadow-sm rounded-4 h-100 overflow-hidden position-relative" style="background: linear-gradient(145deg, #ffffff, #f8f9fa);">
+                <div class="position-absolute opacity-10" style="bottom: -10%; right: -5%;">
+                    <i class="fa-solid {{ $c['icon'] }}" style="font-size: 8rem; color: var(--bs-{{ $c['bg'] }}); transform: rotate(-15deg);"></i>
+                </div>
+                <div class="card-body p-4 position-relative z-1 d-flex flex-column justify-content-between h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h2 class="h6 fw-bold mb-0 text-muted text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 1px;">{{ $c['label'] }}</h2>
+                        <div class="rounded-circle bg-{{ $c['bg'] }}-subtle text-{{ $c['bg'] }} d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px;">
+                            <i class="fa-solid {{ $c['icon'] }} fs-6"></i>
+                        </div>
                     </div>
                     <div>
-                        <div class="stat-value">{{ $c['value'] }}</div>
-                        <div class="stat-label">{{ $c['label'] }}</div>
+                        <div class="fs-1 fw-bolder text-dark lh-1 mb-2">{{ $c['value'] }}</div>
+                        <div class="small text-muted fw-medium d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-circle text-{{ $c['bg'] }}" style="font-size: 0.4rem;"></i> {{ $c['desc'] }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -34,42 +52,76 @@
     @endforeach
 </div>
 
-<div class="row g-3">
-    <div class="col-lg-7">
-        <div class="card stat-card h-100">
-            <div class="card-body">
-                <h2 class="h6 fw-bold mb-3">Revenue (Last 12 Months)</h2>
-                <canvas id="revenueChart" height="120"></canvas>
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-primary"></i> Revenue (Last 12 Months)
+                    </h2>
+                </div>
+                <div style="height: 280px; position: relative;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-5">
-        <div class="card stat-card h-100">
-            <div class="card-body">
-                <h2 class="h6 fw-bold mb-3">New Hostel Registrations</h2>
-                <canvas id="regChart" height="160"></canvas>
+    <div class="col-xl-5">
+        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-users text-success"></i> New Hostels
+                    </h2>
+                </div>
+                <div style="height: 280px; position: relative;">
+                    <canvas id="regChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card stat-card mt-3">
-    <div class="card-body">
-        <h2 class="h6 fw-bold mb-3">Upcoming Renewals</h2>
+<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+    <div class="card-body p-0">
+        <div class="p-4 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">Upcoming Renewals (30 days)</h5>
+            <a href="{{ route('superadmin.hostels.index') }}" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm fw-medium">View All Hostels</a>
+        </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead><tr><th>Hostel</th><th>Owner</th><th>End Date</th><th>Days Left</th><th>Status</th></tr></thead>
-                <tbody>
+                <thead class="table-light text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <tr>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0">Hostel Branch</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0">Owner</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0">Expiry Date</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0">Days Left</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0 text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
                 @forelse($upcomingRenewals as $h)
                     <tr>
-                        <td class="fw-semibold">{{ $h->name }}</td>
-                        <td>{{ $h->owner_name }}</td>
-                        <td>{{ optional($h->subscription_end)->format('d M Y') }}</td>
-                        <td>{{ $h->daysUntilExpiry() }}</td>
-                        <td><span class="badge bg-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}">{{ ucfirst($h->status) }}</span></td>
+                        <td class="px-4 py-3 fw-bold text-dark">{{ $h->name }}</td>
+                        <td class="px-4 py-3 fw-medium text-muted">{{ $h->owner_name }}</td>
+                        <td class="px-4 py-3 text-dark fw-medium">{{ optional($h->subscription_end)->format('d M Y') }}</td>
+                        <td class="px-4 py-3">
+                            <span class="badge bg-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }} border border-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3">
+                                {{ $h->daysUntilExpiry() }} days
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-end">
+                            <a href="{{ route('superadmin.hostels.show', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="View Tenant">
+                                <i class="fa-solid fa-arrow-right text-primary"></i>
+                            </a>
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted py-3">No renewals due in the next 30 days.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-5">
+                        <i class="fa-solid fa-face-smile fs-1 text-light mb-3"></i>
+                        <p class="mb-0">All good! No renewals due in the next 30 days.</p>
+                    </td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -80,20 +132,78 @@
 
 @push('scripts')
 <script>
-    // Wait for the deferred Vite module (which defines window.Chart) to load.
     document.addEventListener('DOMContentLoaded', function () {
         const labels = @json($charts['labels']);
-        new Chart(document.getElementById('revenueChart'), {
+        
+        // Define a gradient for the line chart
+        const revCtx = document.getElementById('revenueChart').getContext('2d');
+        const revGradient = revCtx.createLinearGradient(0, 0, 0, 250);
+        revGradient.addColorStop(0, 'rgba(37,99,235,0.4)');
+        revGradient.addColorStop(1, 'rgba(37,99,235,0.0)');
+
+        new Chart(revCtx, {
             type: 'line',
-            data: { labels, datasets: [{ label: 'Revenue (₹)', data: @json($charts['revenue']),
-                borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.12)', fill: true, tension: .35 }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            data: { 
+                labels, 
+                datasets: [{ 
+                    label: 'Revenue (₹)', 
+                    data: @json($charts['revenue']),
+                    borderColor: '#2563eb', 
+                    backgroundColor: revGradient, 
+                    fill: true, 
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#2563eb',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: .4 
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }, 
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        grid: { borderDash: [4, 4], color: 'rgba(0,0,0,0.05)', drawBorder: false }
+                    },
+                    x: {
+                        grid: { display: false, drawBorder: false }
+                    }
+                } 
+            }
         });
-        new Chart(document.getElementById('regChart'), {
+
+        const regCtx = document.getElementById('regChart').getContext('2d');
+        new Chart(regCtx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Registrations', data: @json($charts['registrations']),
-                backgroundColor: '#22c55e', borderRadius: 6 }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+            data: { 
+                labels, 
+                datasets: [{ 
+                    label: 'Registrations', 
+                    data: @json($charts['registrations']),
+                    backgroundColor: '#10b981', 
+                    borderRadius: 6,
+                    barPercentage: 0.6
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }, 
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { precision: 0 },
+                        grid: { borderDash: [4, 4], color: 'rgba(0,0,0,0.05)', drawBorder: false }
+                    },
+                    x: {
+                        grid: { display: false, drawBorder: false }
+                    }
+                } 
+            }
         });
     });
 </script>

@@ -23,7 +23,7 @@ class HostelController extends Controller
         $hostels = Hostel::withCount('students')
             ->withCount(['users as admins_count' => fn ($q) => $q->where('role', 'hostel_admin')])
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(15);
 
         return view('superadmin.hostels.index', compact('hostels'));
     }

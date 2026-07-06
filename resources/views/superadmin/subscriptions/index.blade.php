@@ -1,10 +1,17 @@
 @extends('layouts.app')
-@section('title', 'Subscriptions')
+@section('title', 'Subscriptions & Billing')
 
 @section('content')
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h4 fw-bold mb-0">Subscriptions</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#subModal"><i class="fa-solid fa-plus me-1"></i> Record / Renew</button>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Subscriptions &amp; Billing</h1>
+        <p class="text-muted mb-0 small">Manage SaaS renewals, track revenue, and issue payment bypasses.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary shadow-sm rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#subModal">
+            <i class="fa-solid fa-plus me-2"></i> Record / Renew
+        </button>
+    </div>
 </div>
 
 <div class="row g-3 mb-3">
@@ -15,81 +22,114 @@
 </div>
 
 {{-- Per-account billing --}}
-<div class="card stat-card mb-4"><div class="card-body">
-    <h5 class="fw-bold mb-3">Accounts <span class="text-muted small fw-normal">— one payment covers all of an owner's branches (every 3rd branch free)</span></h5>
+<div class="card stat-card border-0 shadow-sm rounded-4 mb-4 overflow-hidden"><div class="card-body p-0">
+    <div class="p-4 border-bottom bg-light bg-opacity-50">
+        <h5 class="fw-bold mb-1 text-dark">Tenant Accounts</h5>
+        <div class="text-muted small">One payment covers all of an owner's branches (every 3rd branch free).</div>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr>
-                <th>Owner</th><th>Mobile</th><th class="text-center">Branches</th><th class="text-center">Billable</th>
-                <th class="text-end">Yearly</th><th class="text-end">Monthly</th><th>Valid until</th><th>Status</th><th></th>
+            <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;"><tr>
+                <th class="py-3 px-4 border-0">Owner / Account</th>
+                <th class="py-3 px-4 border-0 text-center">Branches</th>
+                <th class="py-3 px-4 border-0 text-center">Billable</th>
+                <th class="py-3 px-4 border-0 text-end">Yearly Rate</th>
+                <th class="py-3 px-4 border-0">Valid until</th>
+                <th class="py-3 px-4 border-0">Status</th>
+                <th class="py-3 px-4 border-0"></th>
             </tr></thead>
-            <tbody>
+            <tbody class="border-top-0">
             @forelse($accounts as $a)
                 <tr>
-                    <td class="fw-semibold">{{ $a['owner']->name }}</td>
-                    <td>{{ $a['owner']->mobile }}</td>
-                    <td class="text-center">{{ $a['branches'] }}</td>
-                    <td class="text-center">
-                        <span class="badge bg-primary-subtle text-primary">{{ $a['payable'] }} billable</span>
-                        @if($a['free'] > 0)<span class="badge bg-success-subtle text-success">{{ $a['free'] }} free</span>@endif
+                    <td class="px-4 py-3">
+                        <div class="fw-bold text-dark fs-6">{{ $a['owner']->name }}</div>
+                        <div class="small text-muted"><i class="fa-solid fa-mobile-screen text-primary me-1"></i> {{ $a['owner']->mobile }}</div>
                     </td>
-                    <td class="text-end">{{ hostelease_money($a['yearly']) }}</td>
-                    <td class="text-end">{{ hostelease_money($a['monthly']) }}</td>
-                    <td>{{ $a['end'] ? $a['end']->format('d M Y') : '—' }}</td>
-                    <td>
+                    <td class="px-4 py-3 text-center fw-semibold fs-6">{{ $a['branches'] }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2">{{ $a['payable'] }} billable</span>
+                        @if($a['free'] > 0)<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 ms-1">{{ $a['free'] }} free</span>@endif
+                    </td>
+                    <td class="px-4 py-3 text-end fw-bold text-dark">{{ hostelease_money($a['yearly']) }}</td>
+                    <td class="px-4 py-3 fw-medium">{{ $a['end'] ? $a['end']->format('d M Y') : '—' }}</td>
+                    <td class="px-4 py-3">
                         @if($a['active'])
-                            <span class="badge bg-success">Active</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3"><i class="fa-solid fa-circle me-1" style="font-size: 0.5rem; vertical-align: middle;"></i> Active</span>
                         @else
-                            <span class="badge bg-danger">Expired</span>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3">Expired</span>
                         @endif
                     </td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-primary renew-btn"
+                    <td class="px-4 py-3 text-end">
+                        <button class="btn btn-sm btn-light text-primary rounded-pill fw-semibold px-3 renew-btn shadow-sm"
                                 data-owner="{{ $a['owner']->id }}"
                                 data-bs-toggle="modal" data-bs-target="#subModal">
-                            <i class="fa-solid fa-rotate me-1"></i> Renew
+                            Renew
                         </button>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center text-muted py-4">No hostel accounts yet.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-5">No hostel accounts yet.</td></tr>
             @endforelse
             </tbody>
         </table>
     </div>
 </div></div>
 
-{{-- Payment history --}}
-<div class="card stat-card"><div class="card-body">
-    <h5 class="fw-bold mb-3">Payment history</h5>
+{{-- Payment history (Stripe-like UI) --}}
+<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-4"><div class="card-body p-0">
+    <div class="p-4 border-bottom bg-light bg-opacity-50">
+        <h5 class="fw-bold mb-0 text-dark">Payment History</h5>
+    </div>
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" data-datatable>
-            <thead><tr><th>Date</th><th>Branch</th><th>Plan</th><th>Start</th><th>End</th><th class="text-end">Amount</th><th>Method</th><th>Status</th><th>Txn</th><th></th></tr></thead>
-            <tbody>
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;"><tr>
+                <th class="py-3 px-4 border-0">Amount</th>
+                <th class="py-3 px-4 border-0">Status</th>
+                <th class="py-3 px-4 border-0">Branch / Plan</th>
+                <th class="py-3 px-4 border-0">Period</th>
+                <th class="py-3 px-4 border-0">Method & Txn</th>
+                <th class="py-3 px-4 border-0 text-end"></th>
+            </tr></thead>
+            <tbody class="border-top-0">
             @foreach($subscriptions as $s)
                 <tr>
-                    <td>{{ $s->created_at?->format('d M Y') }}</td>
-                    <td class="fw-semibold">{{ $s->hostel->name ?? '—' }}</td>
-                    <td>{{ ucfirst($s->plan) }}</td>
-                    <td>{{ $s->start_date->format('d M Y') }}</td>
-                    <td>{{ $s->end_date->format('d M Y') }}</td>
-                    <td class="text-end">{{ hostelease_money($s->amount) }}</td>
-                    <td>{{ $s->payment_method ? ucfirst($s->payment_method) : '—' }}</td>
-                    <td><span class="badge bg-{{ $s->payment_status==='paid'?'success':($s->payment_status==='pending'?'warning text-dark':'danger') }}">{{ ucfirst($s->payment_status) }}</span></td>
-                    <td>{{ $s->transaction_number ?? '—' }}</td>
-                    <td class="text-end text-nowrap">
+                    <td class="px-4 py-3">
+                        <div class="fw-bold fs-5 {{ $s->amount == 0 ? 'text-secondary' : 'text-dark' }}">{{ hostelease_money($s->amount) }}</div>
+                        <div class="small text-muted">{{ $s->created_at?->format('d M Y') }}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                        @if($s->payment_status === 'paid')
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">Paid</span>
+                        @elseif($s->payment_status === 'pending')
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3">Pending</span>
+                        @else
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3">{{ ucfirst($s->payment_status) }}</span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="fw-bold text-dark">{{ $s->hostel->name ?? '—' }}</div>
+                        <div class="small text-muted">{{ ucfirst($s->plan) }} Plan</div>
+                    </td>
+                    <td class="px-4 py-3 fw-medium">
+                        {{ $s->start_date->format('d M Y') }} <i class="fa-solid fa-arrow-right mx-1 text-muted small"></i> {{ $s->end_date->format('d M Y') }}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="fw-semibold text-dark">{{ $s->payment_method ? ucfirst($s->payment_method) : '—' }}</div>
+                        <div class="small text-muted text-truncate" style="max-width: 150px;">{{ $s->transaction_number ?? '—' }}</div>
+                    </td>
+                    <td class="px-4 py-3 text-end text-nowrap">
                         @if($s->payment_status !== 'paid')
                             <form action="{{ route('superadmin.subscriptions.accept', $s) }}" method="POST" class="d-inline" data-confirm="Accept this payment and extend all branches to {{ $s->end_date->format('d M Y') }}?">
-                                @csrf @method('PATCH')<button class="btn btn-sm btn-success" title="Accept payment"><i class="fa-solid fa-check"></i></button>
+                                @csrf @method('PATCH')<button class="btn btn-sm btn-success rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="Mark Paid"><i class="fa-solid fa-check"></i></button>
                             </form>
                         @endif
-                        <button class="btn btn-sm btn-light" title="Edit"
+                        <button class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Edit"
                                 data-bs-toggle="modal" data-bs-target="#editSubModal"
                                 onclick="editSub({{ $s->id }})">
-                            <i class="fa-solid fa-pen"></i>
+                            <i class="fa-solid fa-pen text-primary"></i>
                         </button>
                         <form action="{{ route('superadmin.subscriptions.destroy', $s) }}" method="POST" class="d-inline" data-confirm="Delete this subscription record?">
-                            @csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            @csrf @method('DELETE')<button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="Delete"><i class="fa-solid fa-trash text-danger"></i></button>
                         </form>
                     </td>
                 </tr>
@@ -97,42 +137,87 @@
             </tbody>
         </table>
     </div>
+    @if($subscriptions->hasPages())
+        <div class="p-3 border-top">
+            {{ $subscriptions->links() }}
+        </div>
+    @endif
 </div></div>
 
-{{-- Record / Renew modal (offline) --}}
-<div class="modal fade" id="subModal" tabindex="-1"><div class="modal-dialog">
-    <form class="modal-content" method="POST" action="{{ route('superadmin.subscriptions.store') }}">@csrf
-        <div class="modal-header"><h5 class="modal-title">Record / Renew Subscription</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-            <div class="mb-3">
-                <label class="form-label">Account (owner)</label>
-                <select name="owner_id" id="ownerSelect" class="form-select" data-select2 required>
-                    <option value="">Select…</option>
-                    @foreach($accounts as $a)
-                        <option value="{{ $a['owner']->id }}">{{ $a['owner']->name }} — {{ $a['branches'] }} branch(es), {{ $a['payable'] }} billable</option>
-                    @endforeach
-                </select>
+{{-- Record / Renew modal (Premium & Flexible) --}}
+<div class="modal fade" id="subModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <form class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" method="POST" action="{{ route('superadmin.subscriptions.store') }}">
+            @csrf
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark">Record / Renew Subscription</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="row g-3">
-                <div class="col-6"><label class="form-label">Period</label>
-                    <select name="period" id="periodSelect" class="form-select">
-                        <option value="yearly">Yearly (₹{{ number_format(config('hostelease.subscription_pricing.yearly')) }}/branch)</option>
-                        <option value="monthly">Monthly (₹{{ number_format(config('hostelease.subscription_pricing.monthly')) }}/branch)</option>
-                    </select>
+            <div class="modal-body pt-3">
+                <div class="card border-0 bg-light rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold text-dark mb-0">Select Tenant Account</label>
+                            <span class="badge bg-primary-subtle text-primary rounded-pill px-3" id="tenantInfoBadge">Select an account</span>
+                        </div>
+                        <select name="owner_id" id="ownerSelect" class="form-select form-select-lg border-0 shadow-sm" data-select2 required>
+                            <option value="">Search or select account…</option>
+                            @foreach($accounts as $a)
+                                <option value="{{ $a['owner']->id }}">{{ $a['owner']->name }} — {{ $a['branches'] }} branch(es), {{ $a['payable'] }} billable</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div class="col-6"><label class="form-label">Amount (₹)</label><input type="number" step="0.01" name="amount" id="amountInput" class="form-control" required>
-                    <div class="form-text" id="amountHint">Auto-calculated — you can override.</div>
+
+                <div class="row g-4 mb-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">Subscription Plan</label>
+                        <select name="period" id="periodSelect" class="form-select bg-light">
+                            <option value="yearly">Yearly (₹{{ number_format(config('hostelease.subscription_pricing.yearly')) }}/branch)</option>
+                            <option value="monthly">Monthly (₹{{ number_format(config('hostelease.subscription_pricing.monthly')) }}/branch)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark d-flex justify-content-between">
+                            Amount (₹)
+                            <span class="text-primary fw-medium small" id="autoCalcLabel" style="cursor: pointer;"><i class="fa-solid fa-rotate-left"></i> Auto-calc</span>
+                        </label>
+                        <input type="number" step="0.01" name="amount" id="amountInput" class="form-control fw-bold text-dark fs-5 bg-light" required>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">Payment Status</label>
+                        <select name="payment_status" id="statusSelect" class="form-select bg-light">
+                            <option value="paid">Paid</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">Payment Method</label>
+                        <select name="payment_method" id="methodSelect" class="form-select bg-light">
+                            <option value="">— Select Method —</option>
+                            @foreach(config('hostelease.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
+                            <option value="online">Online</option>
+                            <option value="comp" class="text-primary fw-bold">Comp / Bypassed (Free)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark">Remarks / Txn No.</label>
+                        <div class="row g-2">
+                            <div class="col-md-5"><input type="text" name="transaction_number" class="form-control bg-light" placeholder="Transaction Ref"></div>
+                            <div class="col-md-7"><input type="text" name="remarks" id="remarksInput" class="form-control bg-light" placeholder="Optional remarks"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-6"><label class="form-label">Payment Status</label>
-                    <select name="payment_status" class="form-select"><option value="paid">Paid</option><option value="pending">Pending</option></select></div>
-                <div class="col-6"><label class="form-label">Method</label>
-                    <select name="payment_method" class="form-select"><option value="">—</option>@foreach(config('hostelease.payment_modes') as $k=>$l)<option value="{{ $k }}">{{ $l }}</option>@endforeach<option value="online">Online</option></select></div>
-                <div class="col-12"><label class="form-label">Transaction No. / Remarks</label><input type="text" name="transaction_number" class="form-control mb-2" placeholder="Reference (optional)"><input type="text" name="remarks" class="form-control" placeholder="Remarks (optional)"></div>
             </div>
-        </div>
-        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
-    </form>
-</div></div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-medium" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-medium shadow-sm">Save Record</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 {{-- Edit subscription record modal --}}
 <div class="modal fade" id="editSubModal" tabindex="-1"><div class="modal-dialog">
@@ -166,18 +251,40 @@
     const ownerSelect = document.getElementById('ownerSelect');
     const periodSelect = document.getElementById('periodSelect');
     const amountInput = document.getElementById('amountInput');
-    const amountHint = document.getElementById('amountHint');
+    const statusSelect = document.getElementById('statusSelect');
+    const methodSelect = document.getElementById('methodSelect');
+    const remarksInput = document.getElementById('remarksInput');
+
+    const tenantInfoBadge = document.getElementById('tenantInfoBadge');
+    const autoCalcLabel = document.getElementById('autoCalcLabel');
 
     function recalc() {
         const acc = accounts[ownerSelect.value];
-        if (!acc) { amountHint.textContent = 'Auto-calculated — you can override.'; return; }
+        if (!acc) {
+            tenantInfoBadge.innerHTML = 'Select an account';
+            tenantInfoBadge.className = 'badge bg-primary-subtle text-primary rounded-pill px-3';
+            return;
+        }
+        
+        tenantInfoBadge.innerHTML = `<i class="fa-solid fa-building me-1"></i> ${acc.branches} Branch(es) — ${acc.payable} Billable`;
+        tenantInfoBadge.className = 'badge bg-success text-white rounded-pill px-3 shadow-sm';
+        
         const amt = periodSelect.value === 'monthly' ? acc.monthly : acc.yearly;
         amountInput.value = amt;
-        amountHint.textContent = acc.payable + ' billable branch(es) × unit price = ₹' + Number(amt).toLocaleString('en-IN');
     }
 
     ownerSelect.addEventListener('change', recalc);
     periodSelect.addEventListener('change', recalc);
+    autoCalcLabel.addEventListener('click', recalc);
+
+    // Watch method select for "Comp"
+    methodSelect.addEventListener('change', function() {
+        if (this.value === 'comp') {
+            amountInput.value = 0;
+            statusSelect.value = 'paid';
+            if(!remarksInput.value) remarksInput.value = 'Comp / Payment bypassed by Superadmin';
+        }
+    });
 
     // Prefill owner when the row "Renew" button is used.
     document.querySelectorAll('.renew-btn').forEach((btn) => {

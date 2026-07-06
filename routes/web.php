@@ -112,7 +112,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::patch('subscriptions/{subscription}/accept', [SubscriptionController::class, 'accept'])->name('subscriptions.accept');
         Route::delete('subscriptions/{subscription}', [SubscriptionController::class, 'destroy'])->name('subscriptions.destroy');
 
-        Route::get('admins', [AdminController::class, 'index'])->name('admins.index');
         Route::post('admins', [AdminController::class, 'store'])->name('admins.store');
         Route::patch('admins/{admin}/toggle', [AdminController::class, 'toggle'])->name('admins.toggle');
         Route::patch('admins/{admin}/reset-password', [AdminController::class, 'resetPassword'])->name('admins.reset');

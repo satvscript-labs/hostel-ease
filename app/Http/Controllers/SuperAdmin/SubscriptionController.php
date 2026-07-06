@@ -49,12 +49,11 @@ class SubscriptionController extends Controller
         $subscriptions = Subscription::with('hostel')
             ->when($request->filled('status'), fn ($q) => $q->where('payment_status', $request->status))
             ->orderByDesc('created_at')
-            ->limit(200)
-            ->get();
+            ->paginate(15);
 
         $summary = [
-            'total' => (float) $subscriptions->where('payment_status', 'paid')->sum('amount'),
-            'pending' => (float) $subscriptions->where('payment_status', 'pending')->sum('amount'),
+            'total' => (float) Subscription::where('payment_status', 'paid')->sum('amount'),
+            'pending' => (float) Subscription::where('payment_status', 'pending')->sum('amount'),
             'active_accounts' => $accounts->where('active', true)->count(),
             'expired_accounts' => $accounts->where('active', false)->count(),
         ];
@@ -70,7 +69,7 @@ class SubscriptionController extends Controller
         ]);
 
         // Flat map (subscription id => fields) for the edit modal's JavaScript.
-        $subsJson = $subscriptions->mapWithKeys(fn ($s) => [
+        $subsJson = collect($subscriptions->items())->mapWithKeys(fn ($s) => [
             $s->id => [
                 'plan' => $s->plan,
                 'amount' => $s->amount,
@@ -94,7 +93,7 @@ class SubscriptionController extends Controller
             'period' => ['required', Rule::in(['yearly', 'monthly'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_status' => ['required', Rule::in(['paid', 'pending', 'failed'])],
-            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
@@ -129,7 +128,7 @@ class SubscriptionController extends Controller
             'end_date' => ['required', 'date', 'after:start_date'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_status' => ['required', Rule::in(['paid', 'pending', 'failed'])],
-            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
