@@ -21,9 +21,6 @@ class StoreAssignmentRequest extends FormRequest
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', $tenant)->whereNull('deleted_at')],
             'bed_id' => ['required', Rule::exists('beds', 'id')->where('hostel_id', $tenant)->whereNull('deleted_at')],
             'join_date' => ['required', 'date'],
-            'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
-            'fee_frequency' => ['required', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
-            'semester' => ['nullable', 'integer', Rule::in(config('hostelease.semesters'))],
             'remarks' => ['nullable', 'string', 'max:500'],
         ];
     }

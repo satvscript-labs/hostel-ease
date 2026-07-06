@@ -43,6 +43,7 @@ class PublicRegistrationController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
+            'joining_date' => ['nullable', 'date'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 

@@ -168,6 +168,38 @@ class StudentController extends Controller
             ->with('success', 'Student updated successfully.');
     }
 
+    public function updateFeeSettings(Request $request, Student $student): RedirectResponse
+    {
+        $data = $request->validate([
+            'room_preference' => ['nullable', 'string', 'in:AC,Non-AC'],
+            'sharing_preference' => ['nullable', 'string', 'in:Single,Double,Triple,Quad'],
+            'fee_frequency' => ['required', 'string', 'in:monthly,semester,yearly'],
+            'fee_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $student->update($data);
+        
+        // Generate initial invoice if no invoices exist and we have a joining date
+        if ($student->join_date && $student->invoices()->count() === 0) {
+            $monthYear = $student->join_date->format('M Y');
+            $period = $data['fee_frequency'] === 'monthly' ? "Rent for $monthYear" : ucfirst($data['fee_frequency']) . " Fee";
+            
+            Invoice::create([
+                'student_id' => $student->id,
+                'type' => 'fee',
+                'title' => 'Initial ' . $period,
+                'amount' => $data['fee_amount'],
+                'due_date' => $student->join_date,
+                'status' => 'pending',
+            ]);
+        }
+
+        $this->logger->log('student.fee_settings', "Updated fee settings for {$student->name}", $student);
+
+        return redirect()->route('admin.students.show', $student)
+            ->with('success', 'Fee settings updated successfully.');
+    }
+
     public function destroy(Student $student): RedirectResponse
     {
         if ($student->activeAssignment()->exists()) {

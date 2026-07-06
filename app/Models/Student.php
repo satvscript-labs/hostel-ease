@@ -29,6 +29,11 @@ class Student extends Model
         'occupation_type',
         'join_date',
         'leave_date',
+        'room_preference',
+        'sharing_preference',
+        'fee_amount',
+        'fee_frequency',
+        'credit_balance',
         'status',
     ];
 
@@ -37,6 +42,7 @@ class Student extends Model
         return [
             'join_date' => 'date',
             'leave_date' => 'date',
+            'credit_balance' => 'decimal:2',
         ];
     }
 

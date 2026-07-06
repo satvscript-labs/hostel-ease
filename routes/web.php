@@ -144,6 +144,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
             // --- Module 2: Students ---
             Route::resource('students', StudentController::class);
+            Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.update-fee-settings');
             Route::post('students/{student}/collect', [StudentController::class, 'collect'])->name('students.collect');
             Route::post('students/{student}/promise', [StudentController::class, 'promise'])->name('students.promise');
             Route::post('students/{student}/documents', [StudentDocumentController::class, 'store'])
@@ -155,22 +156,22 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::get('assignments', [AssignmentController::class, 'index'])->name('assignments.index');
             Route::get('assignments/create', [AssignmentController::class, 'create'])->name('assignments.create');
             Route::post('assignments', [AssignmentController::class, 'store'])->name('assignments.store');
-            Route::patch('assignments/{assignment}/fee', [AssignmentController::class, 'updateFee'])->name('assignments.fee');
             Route::patch('assignments/{assignment}/release', [AssignmentController::class, 'release'])->name('assignments.release');
             Route::patch('assignments/{assignment}/transfer', [AssignmentController::class, 'transfer'])->name('assignments.transfer');
 
 
-            // --- Module 5: Fees & Receipts ---
-            Route::resource('payments', PaymentController::class)
-                ->only(['index', 'create', 'store', 'show', 'destroy']);
+            // --- Module 5: Finances (Invoices & Payments) ---
+            Route::get('finances', [FinanceController::class, 'index'])->name('finance.index');
+            
+            // Invoices
+            Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+            Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+
+            // Payments (View, delete, receipt actions)
             Route::get('payments/{payment}/pdf', [PaymentController::class, 'pdf'])->name('payments.pdf');
             Route::post('payments/{payment}/whatsapp', [PaymentController::class, 'whatsapp'])->name('payments.whatsapp');
             Route::post('payments/{payment}/email', [PaymentController::class, 'email'])->name('payments.email');
-
-            // --- Module 6: Finance & Invoices ---
-            Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');
-            Route::resource('invoices', InvoiceController::class)->only(['store', 'update', 'destroy']);
-            Route::post('invoices/generate-rent', [InvoiceController::class, 'generateRent'])->name('invoices.generate_rent');
+            Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
 
             // --- Module 9: Reports ---
             Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

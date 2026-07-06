@@ -36,10 +36,6 @@
                                 <x-mobile-link :mobile="$a->student->mobile" />
                             </div>
                         </div>
-                        <div class="text-end flex-shrink-0">
-                            <div class="fw-bold" style="font-size: var(--he-text-sm);">{{ hostelease_money($a->fee_amount) }}</div>
-                            <div style="font-size: var(--he-text-xs); color: var(--he-text-muted);">/ {{ $a->feeFrequencyLabel() }}</div>
-                        </div>
                     </div>
 
                     <!-- Location & Date Row -->
@@ -63,11 +59,6 @@
                                 'join' => $a->join_date->toDateString(),
                             ];
                         @endphp
-                        <button class="btn btn-sm btn-outline-primary" style="border-radius: var(--he-radius-sm); font-size: var(--he-text-xs);"
-                                data-bs-toggle="modal" data-bs-target="#feeModal"
-                                onclick="prepFee(@js(['id' => $a->id, 'name' => $a->student->name, 'amount' => (float) $a->fee_amount, 'frequency' => $a->fee_frequency]))">
-                            <i class="fa-solid fa-pen me-1"></i>Fee
-                        </button>
                         <button class="btn btn-sm btn-outline-danger" style="border-radius: var(--he-radius-sm); font-size: var(--he-text-xs);"
                                 data-bs-toggle="modal" data-bs-target="#releaseModal"
                                 onclick="prepRelease(@js($relData))">
@@ -125,43 +116,6 @@
     </div>
 </div>
 
-{{-- Edit fee modal --}}
-<div class="modal fade" id="feeModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content" id="feeForm" method="POST" style="border-radius: var(--he-radius-lg); overflow: hidden;">
-            @csrf @method('PATCH')
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Edit Fee — <span id="feeName"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info py-2 small mb-3" style="border-radius: var(--he-radius-sm);">
-                    <i class="fa-solid fa-circle-info me-1"></i> Corrects this assignment's fee and updates the linked due.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Fee Amount (₹)</label>
-                    <input type="number" step="0.01" min="0" name="fee_amount" id="feeAmount" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Fee Frequency</label>
-                    <select name="fee_frequency" id="feeFreq" class="form-select" required onchange="feeToggleSem()">
-                        @foreach(config('hostelease.fee_frequencies') as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach
-                    </select>
-                </div>
-                <div class="mb-1" id="feeSemWrap">
-                    <label class="form-label">Semester</label>
-                    <select name="semester" id="feeSem" class="form-select">
-                        @foreach(config('hostelease.semesters') as $s)<option value="{{ $s }}">Semester {{ $s }}</option>@endforeach
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
-                <button type="submit" class="btn btn-premium">Save</button>
-            </div>
-        </form>
-    </div>
-</div>
 
 @push('scripts')
 <script>
@@ -184,20 +138,9 @@ function prepRelease(a) {
     const d = document.getElementById('relDate');
     d.min = a.join;
 }
-function prepFee(a) {
-    document.getElementById('feeForm').action = relBase + '/' + a.id + '/fee';
-    document.getElementById('feeName').textContent = a.name;
-    document.getElementById('feeAmount').value = a.amount;
-    document.getElementById('feeFreq').value = a.frequency;
-    feeToggleSem();
-}
 function prepTransfer(a) {
     document.getElementById('transferForm').action = relBase + '/' + a.id + '/transfer';
     document.getElementById('trName').textContent = a.name;
-}
-function feeToggleSem() {
-    const f = document.getElementById('feeFreq').value;
-    document.getElementById('feeSemWrap').style.display = (f === 'semester') ? '' : 'none';
 }
 </script>
 @endpush

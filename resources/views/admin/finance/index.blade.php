@@ -11,10 +11,7 @@
             <p class="text-secondary">{{ __('Manage invoices, due balances, and transactions in one place.') }}</p>
         </div>
         <div>
-            <!-- Bulk Generate Rent Button -->
-            <button type="button" class="btn btn-premium" data-bs-toggle="modal" data-bs-target="#generateRentModal">
-                <i class="fa-solid fa-calendar-plus me-1"></i> {{ __('Generate Monthly Rent') }}
-            </button>
+            <!-- Bulk Generate Rent Button (Removed, automated) -->
             <button type="button" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#addInvoiceModal">
                 <i class="fa-solid fa-plus me-1"></i> {{ __('New Invoice') }}
             </button>
@@ -47,10 +44,50 @@
         </button>
     </div>
 
-    <!-- Search Bar -->
-    <div class="mb-4">
-        <input type="text" x-model="search" class="form-control" placeholder="Search by student name or receipt number...">
+    <!-- Filter & Search Bar -->
+    <div class="mb-4 bg-white p-3 rounded border">
+        <form action="{{ route('admin.finance.index') }}" method="GET" class="d-flex flex-wrap gap-3 align-items-end">
+            <input type="hidden" name="tab" x-model="tab">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
+            
+            <div class="flex-grow-1" style="min-width: 250px;">
+                <label class="form-label small fw-medium text-secondary mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-search text-secondary"></i></span>
+                    <input type="text" name="search" value="{{ $search }}" class="form-control border-start-0 ps-0 bg-light" placeholder="Search by student or receipt..." x-on:input.debounce.600ms="$el.form.submit()">
+                </div>
+            </div>
+
+            <div x-show="tab === 'invoices'" x-cloak>
+                <label class="form-label small fw-medium text-secondary mb-1">Status</label>
+                <select name="status" class="form-select bg-light" x-on:change="$el.form.submit()">
+                    <option value="">All Invoices</option>
+                    <option value="paid" {{ $status === 'paid' ? 'selected' : '' }}>Paid</option>
+                    <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Pending</option>
+                    <option value="partial" {{ $status === 'partial' ? 'selected' : '' }}>Partial</option>
+                </select>
+            </div>
+
+            <div>
+                <noscript><button type="submit" class="btn btn-dark">Apply</button></noscript>
+                @if($search || $status || $sort !== 'id')
+                    <a href="{{ route('admin.finance.index', ['tab' => request('tab', 'invoices')]) }}" class="btn btn-light border"><i class="fa-solid fa-xmark"></i> Clear</a>
+                @endif
+            </div>
+        </form>
     </div>
+
+    @php
+        $sortLink = function($column, $label) use ($sort, $direction) {
+            $dir = ($sort === $column && $direction === 'asc') ? 'desc' : 'asc';
+            $icon = $sort === $column 
+                ? ($direction === 'asc' ? '<i class="fa-solid fa-sort-up ms-1"></i>' : '<i class="fa-solid fa-sort-down ms-1"></i>') 
+                : '<i class="fa-solid fa-sort text-muted ms-1" style="opacity: 0.3;"></i>';
+            $url = request()->fullUrlWithQuery(['sort' => $column, 'direction' => $dir]);
+            return '<a href="'.$url.'" class="text-dark text-decoration-none d-flex align-items-center">'.$label.$icon.'</a>';
+        };
+    @endphp
 
     <!-- Invoices Tab -->
     <div x-show="tab === 'invoices'" x-cloak>
@@ -60,19 +97,19 @@
                     <table class="table mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>{{ __('Date') }}</th>
+                                <th>{!! $sortLink('created_at', __('Date')) !!}</th>
                                 <th>{{ __('Student') }}</th>
                                 <th>{{ __('Title') }}</th>
-                                <th>{{ __('Amount') }}</th>
-                                <th>{{ __('Paid') }}</th>
-                                <th>{{ __('Balance') }}</th>
+                                <th>{!! $sortLink('amount', __('Amount')) !!}</th>
+                                <th>{!! $sortLink('paid_amount', __('Paid')) !!}</th>
+                                <th>{!! $sortLink('balance', __('Balance')) !!}</th>
                                 <th>{{ __('Status') }}</th>
                                 <th class="text-end">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($invoices as $invoice)
-                            <tr x-show="search === '' || '{{ strtolower($invoice->student->name) }}'.includes(search.toLowerCase())">
+                            <tr>
                                 <td>
                                     <div class="fw-medium">{{ $invoice->created_at->format('d M Y') }}</div>
                                     <div class="text-secondary small">{{ $invoice->type }}</div>
@@ -115,6 +152,11 @@
                     </table>
                 </div>
             </div>
+            @if($invoices->hasPages())
+            <div class="card-footer border-0 bg-white">
+                {{ $invoices->appends(['tab' => 'invoices', 'search' => request('search')])->links() }}
+            </div>
+            @endif
         </div>
     </div>
 
@@ -126,17 +168,17 @@
                     <table class="table mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>{{ __('Date') }}</th>
+                                <th>{!! $sortLink('paid_on', __('Date')) !!}</th>
                                 <th>{{ __('Receipt') }}</th>
                                 <th>{{ __('Student') }}</th>
                                 <th>{{ __('Mode') }}</th>
-                                <th>{{ __('Amount') }}</th>
+                                <th>{!! $sortLink('amount', __('Amount')) !!}</th>
                                 <th class="text-end">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($payments as $payment)
-                            <tr x-show="search === '' || '{{ strtolower($payment->student->name) }}'.includes(search.toLowerCase()) || '{{ strtolower($payment->receipt_number) }}'.includes(search.toLowerCase())">
+                            <tr>
                                 <td>{{ $payment->paid_on->format('d M Y') }}</td>
                                 <td class="fw-medium">{{ $payment->receipt_number }}</td>
                                 <td>
@@ -165,6 +207,14 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+            </div>
+            @if($payments->hasPages())
+            <div class="card-footer border-0 bg-white">
+                {{ $payments->appends(['tab' => 'transactions', 'search' => request('search')])->links() }}
+            </div>
+            @endif
+        </div>
     </div>
 
 </div>
@@ -218,36 +268,6 @@
             <div class="modal-footer border-0 bg-light rounded-bottom">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-dark">Create Invoice</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Generate Rent Modal -->
-<div class="modal fade" id="generateRentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content" action="{{ route('admin.invoices.generate_rent') }}" method="POST">
-            @csrf
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Bulk Generate Rent</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-secondary small">This will generate a monthly rent invoice for all active students with a bed assignment, using their assignment's monthly fee amount.</p>
-                
-                <div class="mb-3">
-                    <label class="form-label">Rent Month</label>
-                    <input type="month" name="month" class="form-control" required value="{{ date('Y-m') }}">
-                </div>
-                
-                <div class="mb-0">
-                    <label class="form-label">Due Date (Optional)</label>
-                    <input type="date" name="due_date" class="form-control">
-                </div>
-            </div>
-            <div class="modal-footer border-0 bg-light rounded-bottom">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-premium">Generate Now</button>
             </div>
         </form>
     </div>

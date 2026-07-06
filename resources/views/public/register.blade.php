@@ -50,8 +50,12 @@
           <div class="col-6 mb-3"><label class="form-label">Mother's mobile</label>
             <input name="mother_mobile" class="form-control" inputmode="numeric" maxlength="10" value="{{ old('mother_mobile') }}"></div>
         </div>
-        <div class="mb-3"><label class="form-label">Aadhaar number</label>
-          <input name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" value="{{ old('aadhaar') }}"></div>
+        <div class="row">
+          <div class="col-6 mb-3"><label class="form-label">Aadhaar number</label>
+            <input name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" value="{{ old('aadhaar') }}"></div>
+          <div class="col-6 mb-3"><label class="form-label">Joining Date</label>
+            <input type="date" name="joining_date" class="form-control" value="{{ old('joining_date', date('Y-m-d')) }}"></div>
+        </div>
         <div class="mb-3"><label class="form-label">Address</label>
           <textarea name="address" class="form-control" rows="2">{{ old('address') }}</textarea></div>
         <div class="row">

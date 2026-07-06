@@ -59,6 +59,7 @@ class RegistrationController extends Controller
             'city' => $registration->city,
             'state' => $registration->state,
             'occupation_type' => $registration->occupation_type,
+            'join_date' => $registration->joining_date,
             'photo' => $registration->photo,
             'status' => 'active',
         ]);

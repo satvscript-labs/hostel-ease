@@ -21,19 +21,46 @@ class FinanceController extends Controller
         // 3. Pocket money ledger
         // 4. Payment modes
 
-        $invoices = Invoice::with('student')
-            ->orderByDesc('id')
-            ->get();
+        $search = $request->input('search');
+        $status = $request->input('status');
+        $sort = $request->input('sort', 'id');
+        $direction = $request->input('direction', 'desc');
 
-        $payments = Payment::with('student', 'invoices')
-            ->orderByDesc('paid_on')
-            ->orderByDesc('id')
-            ->get();
+        // Whitelist sort columns
+        $validInvoiceSorts = ['id', 'created_at', 'amount', 'paid_amount', 'balance'];
+        $validPaymentSorts = ['id', 'paid_on', 'amount'];
+        $invoiceSort = in_array($sort, $validInvoiceSorts) ? $sort : 'id';
+        $paymentSort = in_array($sort, $validPaymentSorts) ? $sort : 'paid_on';
+        $direction = in_array($direction, ['asc', 'desc']) ? $direction : 'desc';
+
+        $invoicesQuery = Invoice::with('student')->orderBy($invoiceSort, $direction);
+        $paymentsQuery = Payment::with('student', 'invoices')->orderBy($paymentSort, $direction);
+
+        if ($search) {
+            $invoicesQuery->where(function($query) use ($search) {
+                $query->whereHas('student', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")->orWhere('mobile', 'like', "%{$search}%");
+                })->orWhere('title', 'like', "%{$search}%");
+            });
+
+            $paymentsQuery->where(function($query) use ($search) {
+                $query->whereHas('student', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")->orWhere('mobile', 'like', "%{$search}%");
+                })->orWhere('receipt_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status) {
+            $invoicesQuery->where('status', $status);
+        }
+
+        $invoices = $invoicesQuery->paginate(20, ['*'], 'invoices_page')->withQueryString();
+        $payments = $paymentsQuery->paginate(20, ['*'], 'payments_page')->withQueryString();
 
         $paymentModes = PaymentMode::orderBy('name')->get();
 
         $students = Student::active()->orderBy('name')->get(['id', 'name', 'mobile']);
 
-        return view('admin.finance.index', compact('invoices', 'payments', 'paymentModes', 'students'));
+        return view('admin.finance.index', compact('invoices', 'payments', 'paymentModes', 'students', 'search', 'status', 'sort', 'direction'));
     }
 }

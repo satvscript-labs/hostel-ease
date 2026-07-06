@@ -69,21 +69,7 @@ class AssignmentController extends Controller
             ->with('success', "{$student->name} assigned to bed {$bed->bed_number}.");
     }
 
-    public function updateFee(Request $request, BedAssignment $assignment): RedirectResponse
-    {
-        $data = $request->validate([
-            'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
-            'fee_frequency' => ['required', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
-            'semester' => ['nullable', 'integer', Rule::in(config('hostelease.semesters'))],
-        ]);
 
-        $this->service->updateFee($assignment, $data);
-
-        $this->logger->log('assignment.fee_update',
-            "Updated fee for {$assignment->student->name} to {$data['fee_amount']} ({$data['fee_frequency']})", $assignment);
-
-        return back()->with('success', 'Fee updated.');
-    }
 
     public function release(Request $request, BedAssignment $assignment): RedirectResponse
     {

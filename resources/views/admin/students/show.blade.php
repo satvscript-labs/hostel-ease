@@ -99,6 +99,9 @@
             <button class="he-tab" :class="{ active: tab === 'overview' }" @click="tab = 'overview'">
                 <i class="fa-solid fa-user me-1"></i> Overview
             </button>
+            <button class="he-tab" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">
+                <i class="fa-solid fa-sliders me-1"></i> Fee Settings
+            </button>
             <button class="he-tab" :class="{ active: tab === 'fees' }" @click="tab = 'fees'">
                 <i class="fa-solid fa-indian-rupee-sign me-1"></i> Fees & Dues
             </button>
@@ -179,9 +182,64 @@
                             <a href="{{ route('admin.pocket-money.show', $student) }}" class="btn btn-outline-warning btn-sm" style="border-radius: var(--he-radius-sm);">
                                 <i class="fa-solid fa-wallet me-1"></i> Pocket Money
                             </a>
-                            <a href="{{ route('admin.ledger.show', $student) }}" class="btn btn-outline-primary btn-sm" style="border-radius: var(--he-radius-sm);">
-                                <i class="fa-solid fa-book me-1"></i> Full Ledger
-                            </a>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Fee Settings -->
+            <div class="he-tab-panel" :class="{ active: tab === 'settings' }">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="h6 fw-bold mb-0"><i class="fa-solid fa-sliders text-primary me-1"></i> Fee Settings & Preferences</h3>
+                    <button class="btn btn-premium btn-sm" data-bs-toggle="modal" data-bs-target="#feeSettingsModal">
+                        <i class="fa-solid fa-pen me-1"></i> Edit Preferences
+                    </button>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
+                            <div class="bento-icon bg-primary-subtle text-primary me-3">
+                                <i class="fa-solid fa-door-open"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-bold text-uppercase">Room Preference</div>
+                                <div class="fw-bold fs-5">{{ $student->room_preference ?? 'Not Set' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
+                            <div class="bento-icon bg-primary-subtle text-primary me-3">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-bold text-uppercase">Sharing Preference</div>
+                                <div class="fw-bold fs-5">{{ $student->sharing_preference ?? 'Not Set' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
+                            <div class="bento-icon bg-primary-subtle text-primary me-3">
+                                <i class="fa-solid fa-calendar-alt"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-bold text-uppercase">Fee Structure</div>
+                                <div class="fw-bold fs-5 text-capitalize">{{ $student->fee_frequency ?? 'Not Set' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3" style="background: rgba(var(--he-primary-rgb), 0.05); border-radius: var(--he-radius-md);">
+                            <div class="bento-icon bg-primary-subtle text-primary me-3">
+                                <i class="fa-solid fa-indian-rupee-sign"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-bold text-uppercase">Fee Amount</div>
+                                <div class="fw-bold fs-5">{{ $student->fee_amount ? hostelease_money($student->fee_amount) : 'Not Set' }}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -368,8 +426,25 @@
 
                     {{-- Pay fields --}}
                     <div id="payFields">
+                        <div class="row mb-3 gx-3">
+                            <div class="col-6">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <div class="text-secondary small fw-bold text-uppercase">Total Outstanding</div>
+                                    <div class="fs-5 fw-bold text-danger">{{ hostelease_money($paymentSummary['outstanding']) }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <div class="text-secondary small fw-bold text-uppercase">Credit Balance</div>
+                                    <div class="fs-5 fw-bold text-success">{{ hostelease_money($student->credit_balance) }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i> Any amount paid over the outstanding balance will be automatically added to the student's credit balance.
+                        </div>
                         <div class="mb-3">
-                            <label class="form-label">Amount (₹)</label>
+                            <label class="form-label">Payment Amount (₹)</label>
                             <input type="number" step="0.01" min="1" name="amount" id="collectAmount" class="form-control" required>
                         </div>
                         <div class="row g-3">
@@ -408,6 +483,60 @@
                 @unless($paymentModes->isEmpty())
                     <button type="submit" class="btn btn-premium" id="collectSubmit">Collect</button>
                 @endunless
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Fee Settings Modal --}}
+<div class="modal fade" id="feeSettingsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form class="modal-content" method="POST" action="{{ route('admin.students.update-fee-settings', $student) }}" 
+              style="border-radius: var(--he-radius-lg); overflow: hidden;">
+            @csrf
+            @method('PUT')
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Edit Fee Preferences</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Room Preference</label>
+                        <select name="room_preference" class="form-select">
+                            <option value="">Select preference</option>
+                            <option value="AC" @selected($student->room_preference === 'AC')>AC Room</option>
+                            <option value="Non-AC" @selected($student->room_preference === 'Non-AC')>Non-AC Room</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Sharing Preference</label>
+                        <select name="sharing_preference" class="form-select">
+                            <option value="">Select sharing</option>
+                            <option value="Single" @selected($student->sharing_preference === 'Single')>Single Occupancy</option>
+                            <option value="Double" @selected($student->sharing_preference === 'Double')>Double Sharing</option>
+                            <option value="Triple" @selected($student->sharing_preference === 'Triple')>Triple Sharing</option>
+                            <option value="Quad" @selected($student->sharing_preference === 'Quad')>Quad Sharing</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Fee Structure</label>
+                        <select name="fee_frequency" class="form-select" required>
+                            <option value="">Select structure</option>
+                            <option value="monthly" @selected($student->fee_frequency === 'monthly')>Monthly</option>
+                            <option value="semester" @selected($student->fee_frequency === 'semester')>Semester-wise</option>
+                            <option value="yearly" @selected($student->fee_frequency === 'yearly')>Yearly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Fee Amount (₹)</label>
+                        <input type="number" name="fee_amount" class="form-control" value="{{ $student->fee_amount }}" min="0" step="0.01" required>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
+                <button type="submit" class="btn btn-premium px-4"><i class="fa-solid fa-save me-1"></i> Save Settings</button>
             </div>
         </form>
     </div>

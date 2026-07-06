@@ -53,6 +53,8 @@ class ShraddhaSeeder extends Seeder
                 break;   // ran out of beds
             }
 
+            $feeAmount = [30000, 33000, 36000][$i % 3];
+
             $student = Student::firstOrCreate(
                 ['hostel_id' => $hostel->id, 'mobile' => '93000000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)],
                 [
@@ -64,6 +66,10 @@ class ShraddhaSeeder extends Seeder
                     'join_date' => now()->subDays(rand(15, 150)),
                     'leave_date' => $i % 6 === 0 ? now()->addDays(rand(5, 28)) : null,
                     'status' => 'active',
+                    'room_preference' => ['AC', 'Non-AC'][$i % 2],
+                    'sharing_preference' => ['Single', 'Double', 'Triple'][$i % 3],
+                    'fee_amount' => $feeAmount,
+                    'fee_frequency' => 'semester',
                 ]
             );
 
@@ -72,30 +78,32 @@ class ShraddhaSeeder extends Seeder
                 continue;
             }
 
-            $feeAmount = [30000, 33000, 36000][$i % 3];
-
             $assigner->assign($student, $beds[$i], [
                 'join_date' => $student->join_date->toDateString(),
-                'fee_amount' => $feeAmount,
-                'fee_frequency' => 'semester',
             ]);
 
-            // A semester-fee obligation, partly paid for realism.
-            $fee = SemesterFee::firstOrCreate(
-                ['hostel_id' => $hostel->id, 'student_id' => $student->id, 'semester' => 1],
-                ['total_fee' => $feeAmount, 'paid_amount' => 0, 'balance' => $feeAmount,
-                    'status' => 'pending', 'due_date' => now()->addDays(20)],
+            // Create initial invoice
+            $invoice = \App\Models\Invoice::firstOrCreate(
+                ['hostel_id' => $hostel->id, 'student_id' => $student->id, 'title' => 'Initial Semester Fee'],
+                ['type' => 'fee', 'amount' => $feeAmount, 'balance' => $feeAmount, 'due_date' => now()->addDays(20), 'status' => 'pending']
             );
 
             if ($i % 2 === 0) {
-                $payments->record([
+                // Record partial payment
+                $paidAmount = round($feeAmount / 2);
+                $payment = \App\Models\Payment::create([
                     'hostel_id' => $hostel->id,
                     'student_id' => $student->id,
-                    'amount' => round($feeAmount / 2),
-                    'payment_type' => 'partial',
+                    'invoice_id' => $invoice->id,
+                    'amount' => $paidAmount,
                     'mode' => ['cash', 'upi'][$i % 2],
+                    'reference_number' => null,
                     'paid_on' => now()->subDays(rand(1, 20))->toDateString(),
-                ], $fee);
+                ]);
+                $invoice->update([
+                    'balance' => $invoice->amount - $paidAmount,
+                    'status' => 'partial'
+                ]);
             }
 
             $created++;

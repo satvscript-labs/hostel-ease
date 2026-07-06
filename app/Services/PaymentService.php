@@ -65,6 +65,14 @@ class PaymentService
                 $unallocated -= $apply;
             }
 
+            if ($unallocated > 0.001) {
+                $student = Student::find($payment->student_id);
+                if ($student) {
+                    $student->credit_balance = (float) $student->credit_balance + $unallocated;
+                    $student->save();
+                }
+            }
+
             $this->logger->log('payment.create',
                 "Received {$payment->amount} from student #{$payment->student_id} ({$payment->mode})",
                 $payment,
@@ -82,12 +90,23 @@ class PaymentService
         DB::transaction(function () use ($payment) {
             $invoices = $payment->invoices()->lockForUpdate()->get();
 
+            $totalApplied = 0;
             foreach ($invoices as $invoice) {
                 $appliedAmount = (float) $invoice->pivot->amount;
+                $totalApplied += $appliedAmount;
                 
                 $invoice->paid_amount = max(0, (float) $invoice->paid_amount - $appliedAmount);
                 $invoice->recalculate();
                 $invoice->save();
+            }
+
+            $unallocated = (float) $payment->amount - $totalApplied;
+            if ($unallocated > 0.001) {
+                $student = Student::find($payment->student_id);
+                if ($student) {
+                    $student->credit_balance = max(0, (float) $student->credit_balance - $unallocated);
+                    $student->save();
+                }
             }
 
             // Detach pivot records

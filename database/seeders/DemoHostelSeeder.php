@@ -114,21 +114,18 @@ class DemoHostelSeeder extends Seeder
                     'join_date' => now()->subDays(rand(10, 120)),
                     'leave_date' => $idx % 5 === 0 ? now()->addDays(rand(3, 25)) : null,
                     'status' => 'active',
+                    'room_preference' => $slot['room']->room_type === 'ac' ? 'AC' : 'Non-AC',
+                    'sharing_preference' => ['Single', 'Double', 'Triple', 'Quad'][$slot['room']->sharing - 1] ?? 'Single',
+                    'fee_amount' => $idx % 4 === 0 ? $slot['room']->rent : $slot['room']->rent * 6,
+                    'fee_frequency' => $idx % 4 === 0 ? 'monthly' : 'semester',
                 ]
             );
-
-            // Working professionals pay monthly; students pay per semester.
-            $frequency = $student->occupation_type === 'working' ? 'monthly' : 'semester';
-            $feeAmount = $student->occupation_type === 'working' ? $slot['room']->rent : $slot['room']->rent * 6;
 
             BedAssignment::firstOrCreate(
                 ['hostel_id' => $hostel->id, 'bed_id' => $slot['bed']->id, 'student_id' => $student->id, 'is_active' => true],
                 [
                     'join_date' => $student->join_date,
                     'leave_date' => $student->leave_date,
-                    'fee_amount' => $feeAmount,
-                    'fee_frequency' => $frequency,
-                    'monthly_rent' => $frequency === 'monthly' ? $slot['room']->rent : 0,
                 ]
             );
 

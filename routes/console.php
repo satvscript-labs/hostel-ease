@@ -22,3 +22,5 @@ Schedule::command('hostelease:generate-notifications')->dailyAt('08:00');
 // Nightly database backup (keeps 30 days).
 Schedule::command('hostelease:backup --prune=30')->dailyAt('02:00');
 
+
+Schedule::command('hostel:generate-invoices')->dailyAt('01:00');
