@@ -36,14 +36,14 @@ class PublicRegistrationController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'digits:10'],
-            'father_mobile' => ['nullable', 'digits:10'],
+            'father_mobile' => ['required', 'digits:10'],
             'mother_mobile' => ['nullable', 'digits:10'],
-            'aadhaar' => ['nullable', 'digits:12'],
-            'address' => ['nullable', 'string', 'max:500'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'state' => ['nullable', 'string', 'max:100'],
+            'aadhaar' => ['required', 'digits:12'],
+            'address' => ['required', 'string', 'max:500'],
+            'city' => ['required', 'string', 'max:100'],
+            'state' => ['required', 'string', 'max:100'],
             'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
-            'joining_date' => ['nullable', 'date'],
+            'joining_date' => ['required', 'date'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 

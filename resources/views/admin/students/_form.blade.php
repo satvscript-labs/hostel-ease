@@ -155,11 +155,11 @@
             <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-users text-primary me-2"></i> Family Contacts</h4>
             <div class="row g-4">
                 <div class="col-12 col-md-4">
-                    <label class="form-label fw-bold small">Father's Mobile</label>
+                    <label class="form-label fw-bold small">Father's Mobile <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10"
-                               value="{{ old('father_mobile', substr($student?->father_mobile ?? '', -10) ?: '') }}" placeholder="Optional">
+                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" required
+                               value="{{ old('father_mobile', substr($student?->father_mobile ?? '', -10) ?: '') }}" placeholder="10-digit mobile number">
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
@@ -186,21 +186,21 @@
             <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity & Address</h4>
             <div class="row g-4">
                 <div class="col-12 col-sm-6 col-md-4">
-                    <label class="form-label fw-bold small">Aadhaar Number</label>
-                    <input type="text" name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" pattern="\d{12}"
+                    <label class="form-label fw-bold small">Aadhaar Number <span class="text-danger">*</span></label>
+                    <input type="text" name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" pattern="\d{12}" required
                            value="{{ old('aadhaar', $student?->aadhaar) }}" placeholder="12-digit number">
                 </div>
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">City</label>
-                    <input type="text" name="city" class="form-control" value="{{ old('city', $student?->city) }}" placeholder="City name">
+                    <label class="form-label fw-bold small">City <span class="text-danger">*</span></label>
+                    <input type="text" name="city" class="form-control" required value="{{ old('city', $student?->city) }}" placeholder="City name">
                 </div>
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">State</label>
-                    <input type="text" name="state" class="form-control" value="{{ old('state', $student?->state) }}" placeholder="State name">
+                    <label class="form-label fw-bold small">State <span class="text-danger">*</span></label>
+                    <input type="text" name="state" class="form-control" required value="{{ old('state', $student?->state) }}" placeholder="State name">
                 </div>
                 <div class="col-12">
-                    <label class="form-label fw-bold small">Full Address</label>
-                    <textarea name="address" class="form-control" rows="2" placeholder="Street address, locality...">{{ old('address', $student?->address) }}</textarea>
+                    <label class="form-label fw-bold small">Full Address <span class="text-danger">*</span></label>
+                    <textarea name="address" class="form-control" rows="2" required placeholder="Street address, locality...">{{ old('address', $student?->address) }}</textarea>
                 </div>
             </div>
         </div>
@@ -210,8 +210,8 @@
             <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-calendar-days text-primary me-2"></i> Stay Information</h4>
             <div class="row g-4">
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">Join Date</label>
-                    <input type="date" name="join_date" class="form-control" value="{{ old('join_date', optional($student?->join_date)->format('Y-m-d')) }}">
+                    <label class="form-label fw-bold small">Join Date <span class="text-danger">*</span></label>
+                    <input type="date" name="join_date" class="form-control" required value="{{ old('join_date', optional($student?->join_date)->format('Y-m-d')) }}">
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label fw-bold small">Leave Date</label>
