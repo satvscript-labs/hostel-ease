@@ -8,6 +8,10 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Invoice;
 use App\Models\Student;
+use App\Models\Complaint;
+use App\Models\Visitor;
+use App\Models\Expense;
+use App\Models\StudentRegistration;
 use Carbon\Carbon;
 use Illuminate\View\View;
 
@@ -19,15 +23,39 @@ class DashboardController extends Controller
         $occupiedBeds = Bed::where('status', 'occupied')->count();
         $emptyBeds = Bed::where('status', 'empty')->count();
 
+        // Greeting Logic
+        $hour = now()->hour;
+        if ($hour < 12) $greeting = "Good Morning";
+        elseif ($hour < 17) $greeting = "Good Afternoon";
+        else $greeting = "Good Evening";
+
+        $unresolvedComplaints = Complaint::where('status', '!=', 'resolved')->count();
+        $pendingDues = (float) Invoice::where('status', '!=', 'paid')->sum('balance');
+        $studentsLeaving = Student::leavingWithin(7)->count();
+
+        // Building the summary text
+        $summaryParts = [];
+        if ($unresolvedComplaints > 0) $summaryParts[] = "<span class=\"text-danger fw-bold\">{$unresolvedComplaints} unresolved complaints</span>";
+        if ($studentsLeaving > 0) $summaryParts[] = "{$studentsLeaving} students leaving soon";
+        if ($pendingDues > 0) $summaryParts[] = "₹" . number_format($pendingDues) . " in pending dues";
+        
+        $summaryText = empty($summaryParts) 
+            ? "All systems normal. You have no pending urgent items today."
+            : "You have " . implode(', ', $summaryParts) . " requiring attention.";
+
         $stats = [
+            'greeting' => $greeting,
+            'summary' => $summaryText,
             'total_rooms' => Room::count(),
             'occupied_beds' => $occupiedBeds,
             'empty_beds' => $emptyBeds,
             'total_beds' => $totalBeds,
             'students' => Student::active()->count(),
             'monthly_income' => (float) Payment::whereBetween('paid_on', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
-            'pending_fees' => (float) Invoice::where('status', '!=', 'paid')->whereIn('type', ['fee', 'rent'])->sum('balance'),
-            'ac_pending' => (float) Invoice::where('status', '!=', 'paid')->where('type', 'ac')->sum('balance'),
+            'pending_fees' => $pendingDues,
+            'unresolved_complaints' => $unresolvedComplaints,
+            'visitors_today' => Visitor::whereDate('visit_date', now()->toDateString())->count(),
+            'expenses_month' => (float) Expense::whereBetween('expense_date', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
             'occupancy_pct' => $totalBeds > 0 ? round(($occupiedBeds / $totalBeds) * 100, 1) : 0,
         ];
 
@@ -49,11 +77,47 @@ class DashboardController extends Controller
             'collection_values' => $months->map(fn ($m) => (float) ($collection[$m] ?? 0))->values(),
         ];
 
-        $alerts = [
-            'leaving_soon' => Student::leavingWithin(7)->with('activeAssignment.bed.room')->get(),
-            'empty_beds' => $emptyBeds,
-        ];
+        // Build Unified Live Feed
+        $feed = collect();
 
-        return view('admin.dashboard', compact('stats', 'charts', 'alerts'));
+        // Latest 5 Payments
+        Payment::with('student')->latest('id')->take(5)->get()->each(function ($p) use ($feed) {
+            $feed->push((object)[
+                'type' => 'payment',
+                'title' => 'Payment Received',
+                'desc' => "₹{$p->amount} from " . ($p->student->name ?? 'Student'),
+                'time' => $p->created_at,
+                'icon' => 'indian-rupee-sign',
+                'color' => 'success'
+            ]);
+        });
+
+        // Latest 5 Complaints
+        Complaint::with('student')->latest('id')->take(5)->get()->each(function ($c) use ($feed) {
+            $feed->push((object)[
+                'type' => 'complaint',
+                'title' => 'Complaint Logged',
+                'desc' => $c->category . ' by ' . ($c->student->name ?? 'Student'),
+                'time' => $c->created_at,
+                'icon' => 'triangle-exclamation',
+                'color' => 'warning'
+            ]);
+        });
+
+        // Latest 3 Registrations
+        StudentRegistration::latest('id')->take(3)->get()->each(function ($r) use ($feed) {
+            $feed->push((object)[
+                'type' => 'registration',
+                'title' => 'New Registration',
+                'desc' => $r->name . ' registered',
+                'time' => $r->created_at,
+                'icon' => 'user-plus',
+                'color' => 'info'
+            ]);
+        });
+
+        $feed = $feed->sortByDesc('time')->take(10)->values();
+
+        return view('admin.dashboard', compact('stats', 'charts', 'feed'));
     }
 }
