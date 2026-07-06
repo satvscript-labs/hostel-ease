@@ -75,7 +75,6 @@
     /* The Blueprint Layout */
     .floor-section {
         margin-bottom: 4rem;
-        animation: fade-up 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     .floor-title {
         display: flex;
@@ -132,81 +131,125 @@
     .room-type.non-ac { background: rgba(100, 116, 139, 0.1); color: #64748b; }
 
     .bed-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        display: flex;
+        flex-wrap: wrap;
         gap: 0.75rem;
     }
 
-    /* Bed Tiles */
+    /* Capsule Bed Tiles */
     .bed-tile {
         position: relative;
-        padding: 0.75rem;
-        border-radius: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
         text-align: center;
         cursor: pointer;
         transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        border: 2px solid transparent;
-        display: flex;
-        flex-direction: column;
+        border: 1px solid transparent;
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        min-height: 80px;
+        gap: 0.5rem;
+        font-size: 0.85rem;
     }
-    .bed-tile::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        box-shadow: 0 0 15px currentColor;
-        z-index: -1;
-    }
-    .bed-tile:hover { transform: translateY(-3px) scale(1.05); z-index: 10; }
-    .bed-tile:hover::before { opacity: 0.3; }
+    .bed-tile:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.08); z-index: 10; }
 
     /* Empty Bed */
     .bed-empty {
-        background: rgba(16, 185, 129, 0.05);
-        border-color: rgba(16, 185, 129, 0.2);
-        color: #10b981;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        color: #64748b;
     }
     .bed-empty:hover {
-        background: rgba(16, 185, 129, 0.1);
-        border-color: #10b981;
+        background: #fff;
+        border: 1px solid var(--he-primary);
+        color: var(--he-primary);
     }
     
     /* Occupied Bed */
     .bed-occupied {
-        background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(220, 38, 38, 0.1));
-        border-color: rgba(239, 68, 68, 0.3);
-        color: #ef4444;
+        background: white;
+        border: 1px solid rgba(0,0,0,0.05);
+        color: var(--he-text-main);
+        padding-left: 0.35rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
     .bed-occupied:hover {
-        border-color: #ef4444;
+        border-color: rgba(79, 70, 229, 0.3);
     }
     .occupant-name {
-        font-size: 0.75rem;
         font-weight: 700;
-        margin-top: 0.25rem;
-        max-width: 100%;
+        max-width: 80px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: var(--he-text-main);
     }
     .occupant-avatar {
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
-        margin-bottom: 0.25rem;
         object-fit: cover;
-        border: 2px solid white;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
     /* Maintenance */
-    .bed-maintenance { background: rgba(100, 116, 139, 0.1); color: #64748b; border-color: rgba(100, 116, 139, 0.3); cursor: not-allowed; }
+    .bed-maintenance { 
+        background: rgba(245, 158, 11, 0.1); 
+        color: #f59e0b; 
+        border-color: rgba(245, 158, 11, 0.2); 
+        cursor: not-allowed; 
+    }
+
+    /* Spotlight Assign Modal */
+    .spotlight-backdrop {
+        position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); z-index: 2000;
+        display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh;
+    }
+    .spotlight-panel {
+        width: 100%; max-width: 600px; background: rgba(255,255,255,0.95); backdrop-filter: blur(30px);
+        border-radius: 1.5rem; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.5);
+    }
+    .spotlight-input-container { position: relative; border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .spotlight-input {
+        width: 100%; padding: 1.5rem 1.5rem 1.5rem 4rem; font-size: 1.25rem; border: none; background: transparent; outline: none;
+    }
+    .spotlight-input-container i { position: absolute; left: 1.5rem; top: 50%; transform: translateY(-50%); font-size: 1.25rem; color: var(--he-primary); }
+    .spotlight-results { max-height: 400px; overflow-y: auto; padding: 0.5rem; }
+    .spotlight-item {
+        display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1rem; cursor: pointer; transition: all 0.2s;
+    }
+    .spotlight-item:hover { background: rgba(79, 70, 229, 0.1); }
+    .spotlight-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    
+    /* Segmented Floor Tabs (iOS style) */
+    .floor-tabs-container {
+        display: inline-flex;
+        background: rgba(241, 245, 249, 0.8);
+        padding: 0.35rem;
+        border-radius: 50px;
+        backdrop-filter: blur(10px);
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        margin-bottom: 2rem;
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .floor-tabs-container::-webkit-scrollbar { display: none; }
+    .floor-tab {
+        padding: 0.75rem 1.5rem; 
+        background: transparent; 
+        border-radius: 50px; 
+        font-weight: 700; 
+        color: var(--he-text-muted);
+        border: none; 
+        cursor: pointer; 
+        white-space: nowrap; 
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .floor-tab:hover { color: var(--he-text-main); }
+    .floor-tab.active { 
+        background: white; 
+        color: var(--he-primary); 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+    }
 
     /* Slide-over Panel (Alpine) */
     .slide-over-backdrop {
@@ -288,7 +331,7 @@
 @endpush
 
 @section('content')
-<div x-data="propertyBoard()" class="page-enter pb-5">
+<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false">
     
     <!-- Header -->
     <div class="pb-header flex-wrap gap-3">
@@ -299,7 +342,7 @@
         <div class="d-flex gap-3 align-items-center">
             <div class="pb-search-wrapper">
                 <i class="fa-solid fa-search"></i>
-                <input type="text" class="pb-search" placeholder="Find student, room, or bed..." x-model="searchQuery">
+                <input type="text" class="pb-search" placeholder="Find room or occupant..." x-model="searchQuery">
             </div>
             <a href="{{ route('admin.floors.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
                 <i class="fa-solid fa-hammer me-2"></i>Layout Builder
@@ -339,18 +382,23 @@
         </div>
     </div>
 
-    <!-- The Blueprint -->
-    <div class="stagger">
+    <!-- Floor Tabs -->
+    <div class="floor-tabs-container stagger">
         @foreach($floors as $floor)
-        <div class="floor-section" x-show="floorHasVisibleRooms('{{ $floor->id }}')">
-            <div class="floor-title">
-                <h2>{{ $floor->name }}</h2>
-            </div>
+        <button class="floor-tab" :class="{'active': activeFloorId === {{ $floor->id }}}" @click="activeFloorId = {{ $floor->id }}">
+            {{ $floor->name }}
+        </button>
+        @endforeach
+    </div>
+
+    <!-- The Blueprint -->
+    <div class="stagger relative min-h-[400px]">
+        @foreach($floors as $floor)
+        <div class="floor-section" x-show="activeFloorId === {{ $floor->id }}" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0" x-cloak>
             
             <div class="room-grid">
                 @foreach($floor->rooms as $room)
                 <div class="room-card" 
-                     data-floor="{{ $floor->id }}"
                      :class="{ 'dimmed': !roomMatchesSearch('{{ $room->room_number }}', {{ json_encode($room->beds->map(fn($b) => $b->activeAssignment?->student->name)->filter()->values()) }}) }">
                     <div class="room-header">
                         <div class="room-number">Room {{ $room->room_number }}</div>
@@ -359,11 +407,17 @@
                     
                     <div class="bed-grid">
                         @foreach($room->beds as $bed)
-                            @if($bed->status === 'available' || $bed->status === 'empty')
-                                <div class="bed-tile bed-empty" 
-                                     @click="openAssign('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}')"
-                                     title="Available">
-                                    <i class="fa-solid fa-plus mb-1 fs-5"></i>
+                            @if(in_array($bed->status, ['available', 'empty', 'maintenance', 'reserved']))
+                                <div class="bed-tile {{ $bed->status === 'maintenance' ? 'bed-maintenance' : ($bed->status === 'reserved' ? 'bed-reserved' : 'bed-empty') }}" 
+                                     @click="openSpotlight('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
+                                     title="Manage Bed">
+                                     @if($bed->status === 'maintenance')
+                                        <i class="fa-solid fa-wrench mb-1 text-warning"></i>
+                                     @elseif($bed->status === 'reserved')
+                                        <i class="fa-solid fa-bookmark mb-1 text-info"></i>
+                                     @else
+                                        <i class="fa-solid fa-plus mb-1 opacity-50"></i>
+                                     @endif
                                     <div class="fw-bold">{{ $bed->bed_number }}</div>
                                 </div>
                             @elseif($bed->status === 'occupied' && $bed->activeAssignment)
@@ -387,11 +441,6 @@
                                     <div class="fw-bold">{{ $bed->bed_number }}</div>
                                     <div class="occupant-name">{{ strtok($student->name, ' ') }}</div>
                                 </div>
-                            @else
-                                <div class="bed-tile bed-maintenance" title="Maintenance">
-                                    <i class="fa-solid fa-wrench mb-1 fs-5"></i>
-                                    <div class="fw-bold">{{ $bed->bed_number }}</div>
-                                </div>
                             @endif
                         @endforeach
                     </div>
@@ -402,58 +451,78 @@
         @endforeach
     </div>
 
-    <!-- Quick Assign Slide-over -->
+    <!-- Spotlight Quick Assign Modal -->
     <template x-teleport="body">
-        <div x-show="panels.assign.open" class="slide-over-backdrop" x-cloak x-transition.opacity></div>
-    </template>
-    <template x-teleport="body">
-        <div x-show="panels.assign.open" class="slide-over-panel" x-cloak
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="transform translate-x-full"
-             x-transition:enter-end="transform translate-x-0"
-             x-transition:leave="transition ease-in duration-300"
-             x-transition:leave-start="transform translate-x-0"
-             x-transition:leave-end="transform translate-x-full"
-             @click.away="panels.assign.open = false">
-            
-            <form action="{{ route('admin.property.assign') }}" method="POST" class="d-flex flex-column h-100">
-                @csrf
-                <input type="hidden" name="bed_id" x-model="panels.assign.bedId">
+        <div x-show="spotlight.open" class="spotlight-backdrop" x-cloak x-transition.opacity>
+            <div class="spotlight-panel" @click.away="spotlight.open = false" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                <div class="bg-primary text-white p-3 text-center fw-bold">
+                    Managing Bed <span x-text="spotlight.room"></span>/<span x-text="spotlight.bed"></span>
+                </div>
                 
-                <div class="slide-header">
+                <template x-if="spotlight.status === 'empty' || spotlight.status === 'available'">
                     <div>
-                        <h4 class="fw-bold mb-0">Assign Bed</h4>
-                        <div class="text-primary fw-bold mt-1">Room <span x-text="panels.assign.room"></span> &bull; Bed <span x-text="panels.assign.bed"></span></div>
+                        <div class="spotlight-input-container">
+                            <i class="fa-solid fa-search"></i>
+                            <input type="text" x-model="spotlight.query" class="spotlight-input" placeholder="Type a student name to assign..." x-ref="spotlightInput" @keydown.escape="spotlight.open = false">
+                        </div>
+                        <div class="spotlight-results">
+                            <template x-for="student in filteredStudents" :key="student.id">
+                                <div class="spotlight-item" @click="confirmAssignment(student)">
+                                    <img :src="student.photo_url || 'https://ui-avatars.com/api/?name='+encodeURI(student.name)+'&background=2563eb&color=fff'" class="spotlight-avatar">
+                                    <div>
+                                        <div class="fw-bold fs-5" x-text="student.name"></div>
+                                        <div class="small text-muted" x-text="student.mobile"></div>
+                                    </div>
+                                    <div class="ms-auto text-primary opacity-50"><i class="fa-solid fa-arrow-right"></i></div>
+                                </div>
+                            </template>
+                            <div x-show="filteredStudents.length === 0" class="p-5 text-center text-muted">
+                                <i class="fa-solid fa-user-slash fs-1 opacity-25 mb-3"></i>
+                                <h5>No unassigned students found.</h5>
+                                <p class="small">Try a different search or register a new student.</p>
+                            </div>
+                        </div>
                     </div>
-                    <button type="button" class="btn-close" @click="panels.assign.open = false"></button>
-                </div>
-                
-                <div class="slide-body">
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Select Student</label>
-                        <select name="student_id" class="glass-input" required>
-                            <option value="">Choose an active student...</option>
-                            @foreach($unassignedStudents as $s)
-                                <option value="{{ $s->id }}">{{ $s->name }} ({{ hostelease_phone($s->mobile) }})</option>
-                            @endforeach
-                        </select>
-                        <div class="form-text mt-2"><i class="fa-solid fa-circle-info text-primary me-1"></i>Only showing students without an active bed assignment.</div>
+                </template>
+
+                <template x-if="spotlight.status !== 'empty' && spotlight.status !== 'available'">
+                    <div class="p-5 text-center text-muted">
+                        <i class="fa-solid fa-lock fs-1 opacity-25 mb-3"></i>
+                        <h5>This bed is currently <span class="text-uppercase text-warning fw-bold" x-text="spotlight.status"></span>.</h5>
+                        <p class="small">You must mark it as available before assigning a student.</p>
                     </div>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Join Date</label>
-                        <input type="date" name="join_date" class="glass-input" value="{{ now()->toDateString() }}" required>
-                        <div class="form-text mt-2">The financial billing cycles will start from this date.</div>
-                    </div>
+                </template>
+
+                <div class="bg-light p-3 border-top d-flex justify-content-center gap-2">
+                    <template x-if="spotlight.status === 'empty' || spotlight.status === 'available'">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" @click="markBedStatus('maintenance')">
+                                <i class="fa-solid fa-wrench me-1"></i> Mark as Maintenance
+                            </button>
+                        </div>
+                    </template>
+                    <template x-if="spotlight.status === 'maintenance' || spotlight.status === 'reserved'">
+                        <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-bold shadow-sm" @click="markBedStatus('empty')">
+                            <i class="fa-solid fa-check me-1"></i> Mark as Available
+                        </button>
+                    </template>
                 </div>
-                
-                <div class="slide-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4" @click="panels.assign.open = false">Cancel</button>
-                    <button type="submit" class="btn btn-premium rounded-pill px-5 ms-auto">Confirm Assignment</button>
-                </div>
-            </form>
+            </div>
         </div>
     </template>
+
+    <!-- Hidden Form for Assignment -->
+    <form id="assignForm" action="{{ route('admin.property.assign') }}" method="POST" class="d-none">
+        @csrf
+        <input type="hidden" name="bed_id" x-model="spotlight.bedId">
+        <input type="hidden" name="student_id" x-model="spotlight.studentId">
+    </form>
+
+    <!-- Hidden Form for Status Update -->
+    <form id="statusForm" :action="'/admin/beds/' + spotlight.bedId + '/status'" method="POST" class="d-none">
+        @csrf @method('PATCH')
+        <input type="hidden" name="status" id="statusInput">
+    </form>
 
     <!-- Bed & Occupant Details Slide-over -->
     <template x-teleport="body">
@@ -472,7 +541,7 @@
             <div class="d-flex flex-column h-100">
                 <div class="slide-header">
                     <div>
-                        <h4 class="fw-bold mb-0">Bed Details</h4>
+                        <h4 class="fw-bold mb-0">Occupant Details</h4>
                         <div class="text-danger fw-bold mt-1">Room <span x-text="panels.details.room"></span> &bull; Bed <span x-text="panels.details.bed"></span></div>
                     </div>
                     <button type="button" class="btn-close" @click="closeDetails()"></button>
@@ -502,12 +571,14 @@
                         </div>
                     </div>
 
-                    <div class="d-grid gap-3">
+                    <div class="d-flex flex-column gap-2 mt-auto">
+                        <h6 class="text-uppercase text-muted fw-bold small mb-2">Quick Actions</h6>
+                        
                         <button type="button" class="btn btn-light text-start p-3 rounded-4 fw-bold d-flex align-items-center" @click="openTransfer()">
                             <div class="bg-primary text-white rounded-3 p-2 me-3"><i class="fa-solid fa-right-left"></i></div>
                             <div>
-                                <div class="fs-6">Transfer Bed</div>
-                                <div class="small text-muted fw-normal">Move student to a different bed</div>
+                                <div class="fs-6 text-primary">Transfer Bed</div>
+                                <div class="small text-muted fw-normal">Move to a different room</div>
                             </div>
                         </button>
                         
@@ -533,76 +604,82 @@
     </template>
 
     <!-- Modals for Transfer and Release -->
-    <div class="modal fade" id="transferModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST">
-                @csrf @method('PATCH')
-                <div class="modal-header border-0 pb-0 mt-2 ms-2">
-                    <h5 class="modal-title fw-bold fs-4">Transfer Student</h5>
-                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <p class="text-muted">Move <strong x-text="panels.details.data.student_name"></strong> to a new bed.</p>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Select New Bed</label>
-                        <select name="bed_id" class="glass-input bg-light" required>
-                            <option value="">Choose an available bed...</option>
-                            @foreach($allFloors as $f)
-                                <optgroup label="{{ $f->name }}">
-                                    @foreach($f->rooms as $r)
-                                        @foreach($r->beds as $b)
-                                            <option value="{{ $b->id }}">Room {{ $r->room_number }} - Bed {{ $b->bed_number }}</option>
+    <template x-teleport="body">
+        <div class="modal fade" id="transferModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST">
+                    @csrf @method('PATCH')
+                    <div class="modal-header border-0 pb-0 mt-2 ms-2">
+                        <h5 class="modal-title fw-bold fs-4">Transfer Student</h5>
+                        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-muted">Move <strong x-text="panels.details.data.student_name"></strong> to a new bed.</p>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Select New Bed</label>
+                            <select name="bed_id" class="glass-input bg-light" required>
+                                <option value="">Choose an available bed...</option>
+                                @foreach($allFloors as $f)
+                                    <optgroup label="{{ $f->name }}">
+                                        @foreach($f->rooms as $r)
+                                            @foreach($r->beds as $b)
+                                                @if($b->status === 'available' || $b->status === 'empty')
+                                                    <option value="{{ $b->id }}">Room {{ $r->room_number }} - Bed {{ $b->bed_number }}</option>
+                                                @endif
+                                            @endforeach
                                         @endforeach
-                                    @endforeach
-                                </optgroup>
-                            @endforeach
-                        </select>
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Transfer Date</label>
+                            <input type="date" name="join_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required>
+                        </div>
                     </div>
-                    
-                    <div class="mb-2">
-                        <label class="form-label fw-bold">Transfer Date</label>
-                        <input type="date" name="join_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required>
+                    <div class="modal-footer border-0 pt-0 mb-2 me-2">
+                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4">Transfer Now</button>
                     </div>
-                </div>
-                <div class="modal-footer border-0 pt-0 mb-2 me-2">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-premium rounded-pill px-4">Transfer Now</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
-    </div>
+    </template>
 
-    <div class="modal fade" id="releaseModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST">
-                @csrf @method('PATCH')
-                <div class="modal-header border-0 pb-0 mt-2 ms-2">
-                    <h5 class="modal-title fw-bold fs-4 text-danger">Release Student</h5>
-                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <p class="text-muted mb-4">Release <strong x-text="panels.details.data.student_name"></strong> from bed <strong x-text="panels.details.bed"></strong>? The bed will become available immediately.</p>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Leave Date</label>
-                        <input type="date" name="leave_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
+    <template x-teleport="body">
+        <div class="modal fade" id="releaseModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST">
+                    @csrf @method('PATCH')
+                    <div class="modal-header border-0 pb-0 mt-2 ms-2">
+                        <h5 class="modal-title fw-bold fs-4 text-danger">Release Student</h5>
+                        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
                     </div>
-                    
-                    <div class="form-check p-3 bg-danger-subtle rounded-3">
-                        <input class="form-check-input ms-1" type="checkbox" name="mark_student_left" value="1" id="markLeft" checked>
-                        <label class="form-check-label ms-2 text-danger fw-bold" for="markLeft">
-                            Also mark student as "Left" (Vacating Hostel entirely)
-                        </label>
+                    <div class="modal-body p-4">
+                        <p class="text-muted mb-4">Release <strong x-text="panels.details.data.student_name"></strong> from bed <strong x-text="panels.details.bed"></strong>? The bed will become available immediately.</p>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Leave Date</label>
+                            <input type="date" name="leave_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
+                        </div>
+                        
+                        <div class="form-check p-3 bg-danger-subtle rounded-3 d-flex align-items-center">
+                            <input class="form-check-input m-0 flex-shrink-0" type="checkbox" name="mark_student_left" value="1" id="markLeft" checked style="width: 1.25rem; height: 1.25rem;">
+                            <label class="form-check-label ms-3 text-danger fw-bold lh-sm" for="markLeft">
+                                Also mark student as "Left" (Vacating Hostel entirely)
+                            </label>
+                        </div>
                     </div>
-                </div>
-                <div class="modal-footer border-0 pt-0 mb-2 me-2">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm">Release Student</button>
-                </div>
-            </form>
+                    <div class="modal-footer border-0 pt-0 mb-2 me-2">
+                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm">Release Student</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
+    </template>
 
 </div>
 @endsection
@@ -610,14 +687,34 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('propertyBoard', () => ({
+    Alpine.data('propertyBoard', (firstFloorId, studentsList) => ({
+        activeFloorId: firstFloorId,
         searchQuery: '',
+        students: studentsList,
+        
+        spotlight: {
+            open: false,
+            query: '',
+            bedId: '',
+            studentId: '',
+            room: '',
+            bed: ''
+        },
+
         panels: {
-            assign: { open: false, bedId: '', room: '', bed: '' },
             details: { 
                 open: false, bedId: '', room: '', bed: '', 
                 data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '' } 
             }
+        },
+        
+        get filteredStudents() {
+            if (!this.spotlight.query) return this.students;
+            const q = this.spotlight.query.toLowerCase().trim();
+            return this.students.filter(s => 
+                s.name.toLowerCase().includes(q) || 
+                (s.mobile && s.mobile.includes(q))
+            );
         },
         
         roomMatchesSearch(roomNum, occupants) {
@@ -630,16 +727,26 @@ document.addEventListener('alpine:init', () => {
             return false;
         },
         
-        floorHasVisibleRooms(floorId) {
-            // CSS flexbox handles it visually, but this can be enhanced if needed
-            return true;
+        openSpotlight(bedId, room, bed, bedStatus) {
+            this.spotlight.bedId = bedId;
+            this.spotlight.room = room;
+            this.spotlight.bed = bed;
+            this.spotlight.status = bedStatus;
+            this.spotlight.query = '';
+            this.spotlight.studentId = '';
+            this.spotlight.open = true;
         },
-        
-        openAssign(bedId, room, bed) {
-            this.panels.assign.bedId = bedId;
-            this.panels.assign.room = room;
-            this.panels.assign.bed = bed;
-            this.panels.assign.open = true;
+
+        confirmAssignment(student) {
+            this.spotlight.studentId = student.id;
+            this.$nextTick(() => {
+                document.getElementById('assignForm').submit();
+            });
+        },
+
+        markBedStatus(status) {
+            document.getElementById('statusInput').value = status;
+            document.getElementById('statusForm').submit();
         },
         
         openDetails(bedId, room, bed, data) {

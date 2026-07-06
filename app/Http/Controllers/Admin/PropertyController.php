@@ -68,7 +68,6 @@ class PropertyController extends Controller
         $data = $request->validate([
             'student_id' => ['required', 'integer', 'exists:students,id'],
             'bed_id' => ['required', 'integer', 'exists:beds,id'],
-            'join_date' => ['required', 'date'],
         ]);
 
         $student = Student::findOrFail($data['student_id']);

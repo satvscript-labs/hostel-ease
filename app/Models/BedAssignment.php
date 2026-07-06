@@ -19,8 +19,6 @@ class BedAssignment extends Model
         'join_date',
         'leave_date',
         'monthly_rent',
-        'fee_amount',
-        'fee_frequency',
         'is_active',
         'remarks',
     ];

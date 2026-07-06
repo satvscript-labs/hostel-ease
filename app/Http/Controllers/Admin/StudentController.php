@@ -151,7 +151,7 @@ class StudentController extends Controller
                 'date' => $a->join_date,
                 'type' => 'assignment',
                 'title' => "Assigned to Room {$a->bed->room->room_number} / Bed {$a->bed->bed_number}",
-                'amount' => $a->fee_amount,
+                'amount' => $a->monthly_rent,
                 'status' => $a->is_active ? 'active' : 'past',
                 'icon' => 'bed',
                 'color' => 'primary'

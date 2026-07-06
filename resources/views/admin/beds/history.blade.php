@@ -24,18 +24,18 @@
     
     .timeline {
         position: relative;
-        padding-left: 2.5rem;
+        padding-left: 4rem; /* 64px */
         margin-top: 2rem;
     }
     .timeline::before {
         content: '';
         position: absolute;
-        left: 11px;
+        left: 1rem; /* 16px */
         top: 0;
         bottom: 0;
-        width: 3px;
+        width: 4px;
         background: rgba(0,0,0,0.05);
-        border-radius: 3px;
+        border-radius: 4px;
     }
 
     .timeline-item {
@@ -52,10 +52,11 @@
 
     .timeline-marker {
         position: absolute;
-        left: -2.5rem;
-        top: 0;
-        width: 25px;
-        height: 25px;
+        left: -3rem; /* Exactly on the line */
+        top: 3.5rem; /* Center vertically with the avatar (24px padding + 32px half avatar) */
+        transform: translate(-50%, -50%);
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         background: white;
         border: 4px solid var(--he-primary);
@@ -128,17 +129,22 @@
                 <div class="timeline-item {{ $a->is_active ? 'active' : '' }}">
                     <div class="timeline-marker"></div>
                     <div class="timeline-card d-flex flex-wrap gap-4 align-items-center">
-                        <img src="{{ $a->student->photo_url }}" class="rounded-circle shadow-sm" style="width: 64px; height: 64px; object-fit: cover;">
+                        <a href="{{ route('admin.students.show', $a->student) }}" class="flex-shrink-0 text-decoration-none">
+                            <img src="{{ $a->student->photo_url }}" class="rounded-circle shadow-sm border border-2 border-primary" style="width: 64px; height: 64px; object-fit: cover;">
+                        </a>
                         
                         <div class="flex-grow-1">
                             <h4 class="fw-bold mb-1">
-                                <a href="{{ route('admin.students.show', $a->student) }}" class="text-decoration-none text-dark">{{ $a->student->name }}</a>
+                                <a href="{{ route('admin.students.show', $a->student) }}" class="text-decoration-none text-dark text-hover-primary">{{ $a->student->name }}</a>
                                 @if($a->is_active)
-                                    <span class="badge bg-success ms-2 rounded-pill">Currently Occupying</span>
+                                    <span class="badge bg-success ms-2 rounded-pill shadow-sm">Currently Occupying</span>
                                 @endif
                             </h4>
                             <div class="text-muted small">
                                 <i class="fa-solid fa-phone me-1"></i> <x-mobile-link :mobile="$a->student->mobile" />
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ route('admin.students.show', $a->student) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View Profile</a>
                             </div>
                         </div>
                         
