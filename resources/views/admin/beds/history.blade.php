@@ -1,46 +1,160 @@
 @extends('layouts.app')
 @section('title', 'Bed History')
 
-@section('content')
-<div class="d-flex align-items-center gap-2 mb-3">
-    <a href="{{ route('admin.beds.layout') }}" class="btn btn-light btn-sm"><i class="fa-solid fa-arrow-left"></i></a>
-    <h1 class="h4 fw-bold mb-0">
-        Bed History — {{ $bed->room->floor->name }} · Room {{ $bed->room->room_number }} · Bed {{ $bed->bed_number }}
-    </h1>
-    <span class="badge bg-{{ $bed->status === 'occupied' ? 'danger' : ($bed->status === 'empty' ? 'success' : 'secondary') }}">
-        {{ ucfirst($bed->status) }}
-    </span>
-</div>
+@push('styles')
+<style>
+    .history-header {
+        background: linear-gradient(135deg, var(--he-primary), var(--he-accent));
+        color: white;
+        border-radius: 1.5rem;
+        padding: 3rem 2.5rem;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 3rem;
+        box-shadow: 0 20px 40px rgba(79, 70, 229, 0.25);
+    }
+    .header-mesh {
+        position: absolute;
+        inset: 0;
+        opacity: 0.8;
+        background-image: radial-gradient(at 80% 0%, rgba(0,0,0,0.3) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(255,255,255,0.1) 0px, transparent 50%);
+        z-index: 1;
+    }
+    .history-header-content { position: relative; z-index: 2; }
+    
+    .timeline {
+        position: relative;
+        padding-left: 2.5rem;
+        margin-top: 2rem;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 11px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: rgba(0,0,0,0.05);
+        border-radius: 3px;
+    }
 
-<div class="card stat-card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr><th>Student</th><th>Mobile</th><th>Join</th><th>Leave</th><th>Duration</th><th>Fee</th><th>Paid (this stay)</th><th></th></tr>
-                </thead>
-                <tbody>
-                @forelse($assignments as $a)
-                    <tr class="{{ $a->is_active ? 'table-success' : '' }}">
-                        <td>
-                            <a href="{{ route('admin.students.show', $a->student) }}" class="fw-semibold text-decoration-none">{{ $a->student->name }}</a>
-                            @if($a->is_active)<span class="badge bg-success ms-1">Current</span>@endif
-                        </td>
-                        <td><x-mobile-link :mobile="$a->student->mobile" /></td>
-                        <td>{{ $a->join_date->format('d-m-Y') }}</td>
-                        <td>{{ optional($a->leave_date)->format('d-m-Y') ?? '—' }}</td>
-                        <td>{{ $a->durationInDays() }} days</td>
-                        <td>{{ hostelease_money($a->fee_amount) }} <small class="text-muted">/ {{ $a->feeFrequencyLabel() }}</small></td>
-                        <td>{{ hostelease_money($a->window_paid) }}</td>
-                        <td>{{ $a->remarks }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="8" class="text-center text-muted py-4">This bed has never been occupied.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
+    .timeline-item {
+        position: relative;
+        margin-bottom: 2.5rem;
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fade-up 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    }
+    .timeline-item:nth-child(1) { animation-delay: 0.1s; }
+    .timeline-item:nth-child(2) { animation-delay: 0.2s; }
+    .timeline-item:nth-child(3) { animation-delay: 0.3s; }
+    .timeline-item:nth-child(4) { animation-delay: 0.4s; }
+
+    .timeline-marker {
+        position: absolute;
+        left: -2.5rem;
+        top: 0;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: white;
+        border: 4px solid var(--he-primary);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        z-index: 2;
+    }
+    .timeline-item.active .timeline-marker {
+        border-color: #10b981;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.4), 0 0 0 4px rgba(16, 185, 129, 0.1);
+    }
+
+    .timeline-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.8);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .timeline-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.06);
+    }
+    .timeline-item.active .timeline-card {
+        border-color: rgba(16, 185, 129, 0.3);
+        background: linear-gradient(to right, rgba(16, 185, 129, 0.02), rgba(255, 255, 255, 0.9));
+    }
+
+    @keyframes fade-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+@endpush
+
+@section('content')
+<div class="page-enter">
+
+    <div class="history-header">
+        <div class="header-mesh"></div>
+        <div class="history-header-content">
+            <a href="{{ route('admin.property.index') }}" class="btn btn-light rounded-pill px-4 mb-4 fw-bold shadow-sm">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back to Property Board
+            </a>
+            
+            <h1 class="display-5 fw-bold mb-2">Bed History</h1>
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-4 opacity-75">
+                    {{ $bed->room->floor->name }} &bull; Room {{ $bed->room->room_number }} &bull; Bed {{ $bed->bed_number }}
+                </div>
+                <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold">
+                    {{ ucfirst($bed->status) }}
+                </span>
+            </div>
         </div>
     </div>
+
+    @if($assignments->isEmpty())
+        <div class="text-center py-5">
+            <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                <i class="fa-solid fa-clock-rotate-left fs-1 text-muted"></i>
+            </div>
+            <h3 class="fw-bold text-muted">No History</h3>
+            <p class="text-muted">This bed has never been occupied.</p>
+        </div>
+    @else
+        <div class="timeline">
+            @foreach($assignments as $a)
+                <div class="timeline-item {{ $a->is_active ? 'active' : '' }}">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-card d-flex flex-wrap gap-4 align-items-center">
+                        <img src="{{ $a->student->photo_url }}" class="rounded-circle shadow-sm" style="width: 64px; height: 64px; object-fit: cover;">
+                        
+                        <div class="flex-grow-1">
+                            <h4 class="fw-bold mb-1">
+                                <a href="{{ route('admin.students.show', $a->student) }}" class="text-decoration-none text-dark">{{ $a->student->name }}</a>
+                                @if($a->is_active)
+                                    <span class="badge bg-success ms-2 rounded-pill">Currently Occupying</span>
+                                @endif
+                            </h4>
+                            <div class="text-muted small">
+                                <i class="fa-solid fa-phone me-1"></i> <x-mobile-link :mobile="$a->student->mobile" />
+                            </div>
+                        </div>
+                        
+                        <div class="bg-light rounded-3 p-3 text-center border">
+                            <div class="small text-muted text-uppercase fw-bold mb-1">Duration</div>
+                            <div class="fw-bold text-dark">{{ $a->durationInDays() }} Days</div>
+                            <div class="small text-muted mt-1">
+                                {{ $a->join_date->format('d M, Y') }} &mdash; 
+                                {{ optional($a->leave_date)->format('d M, Y') ?? 'Present' }}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    @endif
 </div>
 @endsection
-

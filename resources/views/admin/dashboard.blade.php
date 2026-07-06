@@ -244,7 +244,7 @@
             <div class="action-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
             <div class="fw-bold small">Collect Payment</div>
         </a>
-        <a href="{{ route('admin.assignments.index') }}" class="action-tile">
+        <a href="{{ route('admin.property.index') }}" class="action-tile">
             <div class="action-icon"><i class="fa-solid fa-bed"></i></div>
             <div class="fw-bold small">Assign Bed</div>
         </a>

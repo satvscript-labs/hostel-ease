@@ -138,7 +138,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             // --- Module 1: Property Board ---
             Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
             Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
-            Route::resource('rooms', RoomController::class)->except(['show']);
+            Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
             Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
             Route::patch('beds/{bed}/status', [BedController::class, 'updateStatus'])->name('beds.status');
 
@@ -154,12 +154,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::delete('students/{student}/documents/{document}', [StudentDocumentController::class, 'destroy'])
                 ->name('students.documents.destroy');
 
-            // --- Module 3: Bed Assignment ---
-            Route::get('assignments', [AssignmentController::class, 'index'])->name('assignments.index');
-            Route::get('assignments/create', [AssignmentController::class, 'create'])->name('assignments.create');
-            Route::post('assignments', [AssignmentController::class, 'store'])->name('assignments.store');
-            Route::patch('assignments/{assignment}/release', [AssignmentController::class, 'release'])->name('assignments.release');
-            Route::patch('assignments/{assignment}/transfer', [AssignmentController::class, 'transfer'])->name('assignments.transfer');
+            // --- Module 3: Property Board & Bed Assignments ---
+            Route::post('property/assign', [PropertyController::class, 'assign'])->name('property.assign');
+            Route::patch('property/assignments/{assignment}/release', [PropertyController::class, 'release'])->name('property.release');
+            Route::patch('property/assignments/{assignment}/transfer', [PropertyController::class, 'transfer'])->name('property.transfer');
 
 
             // --- Module 5: Finances (Invoices & Payments) ---

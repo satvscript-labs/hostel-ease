@@ -147,7 +147,6 @@
             @if($peopleActive)
             <div class="hsms-sub-menu">
                 <a class="nav-link sub-link {{ request()->routeIs('admin.students.*') ? 'active' : '' }}" href="{{ route('admin.students.index') }}">{{ __('Students') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.assignments.*') ? 'active' : '' }}" href="{{ route('admin.assignments.index') }}">{{ __('Bed Assignment') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.registrations.*') ? 'active' : '' }}" href="{{ route('admin.registrations.index') }}">{{ __('Registrations') }}</a>
             </div>
             @endif
