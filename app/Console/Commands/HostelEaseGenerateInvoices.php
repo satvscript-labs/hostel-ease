@@ -47,6 +47,13 @@ class HostelEaseGenerateInvoices extends Command
             $dueDate = null;
             $periodLabel = '';
 
+            $monthsToAdd = 1;
+            if ($student->fee_frequency === 'semester') {
+                $monthsToAdd = 6;
+            } elseif ($student->fee_frequency === 'yearly') {
+                $monthsToAdd = 12;
+            }
+
             if (!$lastInvoice) {
                 // Should have been generated on save, but just in case
                 $shouldGenerate = true;
@@ -54,13 +61,6 @@ class HostelEaseGenerateInvoices extends Command
                 $periodLabel = 'Initial';
             } else {
                 $lastDueDate = Carbon::parse($lastInvoice->due_date);
-                $monthsToAdd = 1;
-
-                if ($student->fee_frequency === 'semester') {
-                    $monthsToAdd = 6;
-                } elseif ($student->fee_frequency === 'yearly') {
-                    $monthsToAdd = 12;
-                }
 
                 $nextDueDate = $lastDueDate->copy()->addMonthsNoOverflow($monthsToAdd);
 
@@ -82,12 +82,16 @@ class HostelEaseGenerateInvoices extends Command
                     $title = "Yearly Fee ($periodLabel)";
                 }
 
+                $cycleEnd = $dueDate->copy()->addMonthsNoOverflow($monthsToAdd)->subDay();
+
                 $invoice = Invoice::create([
                     'hostel_id' => $student->hostel_id,
                     'student_id' => $student->id,
                     'type' => 'fee',
                     'title' => $title,
                     'amount' => $student->fee_amount,
+                    'billing_cycle_start' => $dueDate,
+                    'billing_cycle_end' => $cycleEnd,
                     'due_date' => $dueDate,
                     'status' => 'pending',
                 ]);

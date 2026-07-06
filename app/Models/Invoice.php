@@ -19,6 +19,8 @@ class Invoice extends Model
         'type', // 'fee', 'rent', 'ac', 'other'
         'title',
         'amount',
+        'billing_cycle_start',
+        'billing_cycle_end',
         'paid_amount',
         'balance', // Note: this is typically virtual in migration, or calculated
         'status',
@@ -34,6 +36,8 @@ class Invoice extends Model
             'amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'balance' => 'decimal:2',
+            'billing_cycle_start' => 'date',
+            'billing_cycle_end' => 'date',
             'due_date' => 'date',
             'promise_date' => 'date',
             'is_generated_by_system' => 'boolean',

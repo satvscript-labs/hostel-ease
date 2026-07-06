@@ -142,7 +142,74 @@ class StudentController extends Controller
             $qrSvg = null;
         }
 
-        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes'));
+        // Build Unified Timeline
+        $timeline = collect();
+
+        // 1. Bed Assignments
+        foreach ($student->assignments as $a) {
+            $timeline->push((object)[
+                'date' => $a->join_date,
+                'type' => 'assignment',
+                'title' => "Assigned to Room {$a->bed->room->room_number} / Bed {$a->bed->bed_number}",
+                'amount' => $a->fee_amount,
+                'status' => $a->is_active ? 'active' : 'past',
+                'icon' => 'bed',
+                'color' => 'primary'
+            ]);
+            if ($a->leave_date) {
+                $timeline->push((object)[
+                    'date' => $a->leave_date,
+                    'type' => 'unassignment',
+                    'title' => "Vacated Room {$a->bed->room->room_number} / Bed {$a->bed->bed_number}",
+                    'icon' => 'door-open',
+                    'color' => 'secondary'
+                ]);
+            }
+        }
+
+        // 2. Invoices
+        foreach ($invoices as $inv) {
+            $timeline->push((object)[
+                'date' => $inv->created_at,
+                'type' => 'invoice',
+                'title' => "Invoice Generated: {$inv->title}",
+                'amount' => $inv->amount,
+                'status' => $inv->status,
+                'icon' => 'file-invoice-dollar',
+                'color' => 'danger'
+            ]);
+        }
+
+        // 3. Payments
+        foreach ($student->payments as $pay) {
+            $title = "Payment Received";
+            $icon = 'money-bill-wave';
+            $color = 'success';
+            if ($pay->mode === 'credit_note') {
+                $title = "Credit Note Issued";
+                $icon = 'arrow-rotate-left';
+                $color = 'warning';
+            } elseif ($pay->mode === 'credit') {
+                $title = "Credit Auto-Applied";
+                $icon = 'wand-magic-sparkles';
+                $color = 'info';
+            }
+
+            $timeline->push((object)[
+                'date' => $pay->paid_on,
+                'type' => 'payment',
+                'title' => $title,
+                'amount' => $pay->amount,
+                'status' => 'paid',
+                'desc' => $pay->remarks ?? $pay->receipt_number,
+                'icon' => $icon,
+                'color' => $color
+            ]);
+        }
+
+        $timeline = $timeline->sortByDesc('date')->values();
+
+        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes', 'timeline'));
     }
 
     public function edit(Student $student): View
@@ -168,7 +235,19 @@ class StudentController extends Controller
             ->with('success', 'Student updated successfully.');
     }
 
-    public function updateFeeSettings(Request $request, Student $student): RedirectResponse
+    public function previewProration(Request $request, Student $student, \App\Services\ProrationService $prorationService)
+    {
+        $data = $request->validate([
+            'fee_frequency' => ['required', 'string', 'in:monthly,semester,yearly'],
+            'fee_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $preview = $prorationService->preview($student, $data['fee_amount'], $data['fee_frequency']);
+        
+        return response()->json($preview);
+    }
+
+    public function updateFeeSettings(Request $request, Student $student, \App\Services\ProrationService $prorationService): RedirectResponse
     {
         $data = $request->validate([
             'room_preference' => ['nullable', 'string', 'in:AC,Non-AC'],
@@ -177,18 +256,35 @@ class StudentController extends Controller
             'fee_amount' => ['required', 'numeric', 'min:0'],
         ]);
 
+        // If the student already has an invoice, we use ProrationService to handle the change
+        if ($student->invoices()->count() > 0) {
+            $prorationService->apply($student, $data);
+            return redirect()->route('admin.students.show', $student)
+                ->with('success', 'Plan changed and prorated invoice generated successfully.');
+        }
+
+        // Otherwise just update and generate initial
         $student->update($data);
         
-        // Generate initial invoice if no invoices exist and we have a joining date
         if ($student->join_date && $student->invoices()->count() === 0) {
             $monthYear = $student->join_date->format('M Y');
             $period = $data['fee_frequency'] === 'monthly' ? "Rent for $monthYear" : ucfirst($data['fee_frequency']) . " Fee";
             
+            $monthsToAdd = 1;
+            if ($data['fee_frequency'] === 'semester') {
+                $monthsToAdd = 6;
+            } elseif ($data['fee_frequency'] === 'yearly') {
+                $monthsToAdd = 12;
+            }
+            $cycleEnd = $student->join_date->copy()->addMonthsNoOverflow($monthsToAdd)->subDay();
+
             Invoice::create([
                 'student_id' => $student->id,
                 'type' => 'fee',
                 'title' => 'Initial ' . $period,
                 'amount' => $data['fee_amount'],
+                'billing_cycle_start' => $student->join_date,
+                'billing_cycle_end' => $cycleEnd,
                 'due_date' => $student->join_date,
                 'status' => 'pending',
             ]);

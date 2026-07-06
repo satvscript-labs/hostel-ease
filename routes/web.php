@@ -147,6 +147,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.update-fee-settings');
             Route::post('students/{student}/collect', [StudentController::class, 'collect'])->name('students.collect');
             Route::post('students/{student}/promise', [StudentController::class, 'promise'])->name('students.promise');
+            Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.fee-settings.update');
+            Route::get('students/{student}/prorate-preview', [StudentController::class, 'previewProration'])->name('students.prorate-preview');
             Route::post('students/{student}/documents', [StudentDocumentController::class, 'store'])
                 ->name('students.documents.store');
             Route::delete('students/{student}/documents/{document}', [StudentDocumentController::class, 'destroy'])

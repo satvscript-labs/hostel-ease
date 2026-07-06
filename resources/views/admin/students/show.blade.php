@@ -346,38 +346,43 @@
                 @endforelse
             </div>
 
-            <!-- TAB: History -->
+            <!-- TAB: Timeline & History -->
             <div class="he-tab-panel" :class="{ active: tab === 'history' }">
-                <h3 class="h6 fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left text-primary me-1"></i> Bed Assignment History</h3>
-
-                @forelse($student->assignments as $a)
-                    <div class="due-card">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                                <div class="fw-semibold" style="font-size: var(--he-text-sm);">
-                                    <i class="fa-solid fa-bed me-1 text-muted"></i>
-                                    Room {{ $a->bed->room->room_number }} / Bed {{ $a->bed->bed_number }}
-                                </div>
-                                <div style="font-size: var(--he-text-xs); color: var(--he-text-muted);" class="mt-1">
-                                    {{ $a->join_date->format('d M Y') }} → {{ optional($a->leave_date)->format('d M Y') ?? 'Present' }}
-                                    · {{ $a->durationInDays() }} days
-                                </div>
-                                <div style="font-size: var(--he-text-sm);" class="mt-1">
-                                    {{ hostelease_money($a->fee_amount) }}
-                                    <span class="text-muted">/ {{ $a->feeFrequencyLabel() }}</span>
+                <h3 class="h6 fw-bold mb-4"><i class="fa-solid fa-clock-rotate-left text-primary me-1"></i> Unified History Timeline</h3>
+                
+                <div class="timeline-container ps-2 ms-2" style="border-left: 2px solid var(--he-border-color);">
+                    @forelse($timeline as $event)
+                        <div class="timeline-item position-relative mb-4 ps-4">
+                            <div class="timeline-marker position-absolute bg-{{ $event->color }}-subtle text-{{ $event->color }} d-flex align-items-center justify-content-center" 
+                                 style="width: 32px; height: 32px; border-radius: 50%; left: -17px; top: 0; border: 2px solid #fff;">
+                                <i class="fa-solid fa-{{ $event->icon }} small"></i>
+                            </div>
+                            <div class="due-card py-2 px-3 m-0">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div>
+                                        <div class="fw-bold" style="font-size: var(--he-text-sm);">{{ $event->title }}</div>
+                                        <div class="mt-1" style="font-size: var(--he-text-xs); color: var(--he-text-muted);">
+                                            {{ \Carbon\Carbon::parse($event->date)->format('d M Y, h:i A') }}
+                                            @if(isset($event->desc)) · {{ $event->desc }} @endif
+                                        </div>
+                                    </div>
+                                    @if(isset($event->amount))
+                                        <div class="text-end">
+                                            <div class="fw-bold text-{{ $event->color }}">{{ hostelease_money($event->amount) }}</div>
+                                            <div style="font-size: var(--he-text-xs); text-transform:uppercase;" class="text-muted">{{ $event->status }}</div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
-                            <span class="badge-premium bg-{{ $a->is_active ? 'success' : 'secondary' }}-subtle text-{{ $a->is_active ? 'success' : 'secondary' }}">
-                                {{ $a->is_active ? 'Active' : 'Past' }}
-                            </span>
                         </div>
-                    </div>
-                @empty
-                    <div class="empty-state py-4">
-                        <i class="fa-solid fa-bed d-block"></i>
-                        <p>No bed assignments yet.</p>
-                    </div>
-                @endforelse
+                    @empty
+                        <div class="empty-state py-4 ps-4">
+                            <i class="fa-solid fa-clock d-block"></i>
+                            <p>No historical events recorded yet.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
 
                 @if($paymentSummary['last_payment'])
                 <h3 class="h6 fw-bold mt-4 mb-3"><i class="fa-solid fa-money-bill-wave text-success me-1"></i> Last Payment</h3>
@@ -488,19 +493,20 @@
     </div>
 </div>
 
-{{-- Fee Settings Modal --}}
+{{-- Fee Settings / Plan Change Modal --}}
 <div class="modal fade" id="feeSettingsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <form class="modal-content" method="POST" action="{{ route('admin.students.update-fee-settings', $student) }}" 
-              style="border-radius: var(--he-radius-lg); overflow: hidden;">
+        <form class="modal-content" method="POST" action="{{ route('admin.students.fee-settings.update', $student) }}" 
+              style="border-radius: var(--he-radius-lg); overflow: hidden;"
+              x-data="prorationPreview()">
             @csrf
             @method('PUT')
             <div class="modal-header">
-                <h5 class="modal-title fw-bold">Edit Fee Preferences</h5>
+                <h5 class="modal-title fw-bold">Change Room / Fee Plan</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-4">
+                <div class="row g-4 mb-4">
                     <div class="col-md-6">
                         <label class="form-label text-muted small fw-bold text-uppercase mb-1">Room Preference</label>
                         <select name="room_preference" class="form-select">
@@ -521,26 +527,96 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label text-muted small fw-bold text-uppercase mb-1">Fee Structure</label>
-                        <select name="fee_frequency" class="form-select" required>
+                        <select name="fee_frequency" class="form-select" x-model="frequency" @change="fetchPreview" required>
                             <option value="">Select structure</option>
-                            <option value="monthly" @selected($student->fee_frequency === 'monthly')>Monthly</option>
-                            <option value="semester" @selected($student->fee_frequency === 'semester')>Semester-wise</option>
-                            <option value="yearly" @selected($student->fee_frequency === 'yearly')>Yearly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="semester">Semester-wise</option>
+                            <option value="yearly">Yearly</option>
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">Fee Amount (₹)</label>
-                        <input type="number" name="fee_amount" class="form-control" value="{{ $student->fee_amount }}" min="0" step="0.01" required>
+                        <label class="form-label text-muted small fw-bold text-uppercase mb-1">New Fee Amount (₹)</label>
+                        <input type="number" name="fee_amount" class="form-control" x-model="amount" @change="fetchPreview" min="0" step="0.01" required>
                     </div>
+                </div>
+
+                {{-- Proration Preview Area --}}
+                <div x-show="preview" x-transition class="bg-light p-3 border rounded-3" style="display:none;">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fa-solid fa-calculator text-primary me-2"></i>
+                        <span class="fw-bold">Proration Calculation Preview</span>
+                        <div x-show="loading" class="spinner-border spinner-border-sm text-primary ms-3" role="status"></div>
+                    </div>
+                    <template x-if="preview && preview.has_active_cycle">
+                        <div class="small">
+                            <div class="d-flex justify-content-between text-muted mb-1">
+                                <span>Unused days from current plan (<span x-text="preview.days_unused"></span>/<span x-text="preview.days_total"></span>):</span>
+                                <span class="text-success">+₹<span x-text="preview.refund_credit"></span></span>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted mb-1">
+                                <span>Current credit balance:</span>
+                                <span>+₹<span x-text="preview.current_credit_balance"></span></span>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted mb-2 pb-2 border-bottom">
+                                <span>Cost of new <span x-text="preview.new_frequency"></span> plan starting today:</span>
+                                <span class="text-danger">-₹<span x-text="preview.new_invoice_amount"></span></span>
+                            </div>
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span>Action on Save:</span>
+                                <span>
+                                    <template x-if="preview.net_due > 0">
+                                        <span class="text-danger">Student will owe ₹<span x-text="preview.net_due"></span> (Invoice generated)</span>
+                                    </template>
+                                    <template x-if="preview.net_due == 0">
+                                        <span class="text-success">Paid by credit (New balance: ₹<span x-text="preview.projected_credit_balance"></span>)</span>
+                                    </template>
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="preview && !preview.has_active_cycle">
+                        <div class="small text-muted">
+                            <i class="fa-solid fa-circle-info me-1"></i> No active cycle to prorate. A new invoice for ₹<span x-text="preview.new_invoice_amount"></span> will be generated.
+                        </div>
+                    </template>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: var(--he-radius-sm);">Cancel</button>
-                <button type="submit" class="btn btn-premium px-4"><i class="fa-solid fa-save me-1"></i> Save Settings</button>
+                <button type="submit" class="btn btn-premium px-4" :disabled="loading"><i class="fa-solid fa-save me-1"></i> Confirm & Save</button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+function prorationPreview() {
+    return {
+        frequency: '{{ $student->fee_frequency }}',
+        amount: '{{ $student->fee_amount }}',
+        preview: null,
+        loading: false,
+        
+        init() {
+            this.fetchPreview();
+        },
+        
+        async fetchPreview() {
+            if (!this.frequency || !this.amount) return;
+            this.loading = true;
+            try {
+                const url = '{{ route('admin.students.prorate-preview', $student) }}' + `?fee_frequency=${this.frequency}&fee_amount=${this.amount}`;
+                const res = await fetch(url);
+                this.preview = await res.json();
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
 
 {{-- Upload document modal --}}
 <div class="modal fade" id="docModal" tabindex="-1">
