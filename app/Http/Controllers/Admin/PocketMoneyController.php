@@ -24,7 +24,7 @@ class PocketMoneyController extends Controller
             ->selectRaw("student_id, SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END) as bal")
             ->groupBy('student_id')->pluck('bal', 'student_id');
 
-        $students = Student::active()->orderBy('name')->get()->map(function ($s) use ($balances) {
+        $students = Student::with('activeAssignment.bed.room')->active()->orderBy('name')->get()->map(function ($s) use ($balances) {
             $s->pocket_balance = round((float) ($balances[$s->id] ?? 0), 2);
 
             return $s;
