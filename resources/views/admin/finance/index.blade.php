@@ -3,13 +3,7 @@
 @section('title', __('Finance Board'))
 
 @section('content')
-<div x-data="{ tab: '{{ request('tab', 'invoices') }}', search: '{{ request('search', '') }}', invoiceModalOpen: false }" 
-     @tab-changed.window="tab = $event.detail" class="page-enter"
-     x-init="$watch('tab', (val) => {
-         const url = new URL(window.location);
-         url.searchParams.set('tab', val);
-         window.history.replaceState({}, '', url);
-     })">
+<div x-data="financeBoard()" class="page-enter">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
@@ -85,40 +79,39 @@
         </button>
     </div>
 
-    <!-- Filter & Search Bar -->
+    <!-- Client-Side Live Search & Filter Bar -->
     <div class="mb-4">
-        <form action="{{ route('admin.finance.index') }}" method="GET" class="d-flex flex-wrap gap-2 align-items-center bg-white p-2 rounded-pill shadow-sm border border-light">
-            <input type="hidden" name="tab" x-model="tab">
-            <input type="hidden" name="sort" value="{{ $sort }}">
-            <input type="hidden" name="direction" value="{{ $direction }}">
+        <div class="d-flex flex-wrap gap-2 align-items-center bg-white p-2 rounded-pill shadow-sm border border-light">
             
             <div class="flex-grow-1 position-relative px-2">
                 <i class="fa-solid fa-search position-absolute text-muted" style="top: 50%; transform: translateY(-50%); left: 1rem;"></i>
-                <input type="text" name="search" x-model="search" class="form-control border-0 bg-transparent ps-5 shadow-none" placeholder="Search by student or receipt...">
+                <input type="text" x-model="search" class="form-control border-0 bg-transparent ps-5 shadow-none" placeholder="Search by student, receipt, or title...">
             </div>
 
             <div x-show="tab === 'invoices'" x-cloak class="border-start ps-3 me-2">
-                <select name="status" class="form-select border-0 bg-transparent text-secondary shadow-none" x-on:change="$el.form.submit()" style="cursor: pointer;">
+                <select x-model="status" class="form-select border-0 bg-transparent text-secondary shadow-none" style="cursor: pointer;">
                     <option value="">All Statuses</option>
-                    <option value="paid" {{ $status === 'paid' ? 'selected' : '' }}>Paid</option>
-                    <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Pending</option>
-                    <option value="partial" {{ $status === 'partial' ? 'selected' : '' }}>Partial</option>
+                    <option value="paid">Paid</option>
+                    <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
                 </select>
             </div>
             
-            @if($search || $status || $sort !== 'id')
-                <div class="pe-2">
-                    <a href="{{ route('admin.finance.index', ['tab' => request('tab', 'invoices')]) }}" class="btn btn-light rounded-pill btn-sm text-secondary px-3"><i class="fa-solid fa-xmark"></i> Clear</a>
-                </div>
-            @endif
-        </form>
+            <div class="pe-2" x-show="search !== '' || status !== ''" x-cloak>
+                <button type="button" @click="search = ''; status = ''" class="btn btn-light rounded-pill btn-sm text-secondary px-3">
+                    <i class="fa-solid fa-xmark"></i> Clear
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Invoices Tab -->
     <div x-show="tab === 'invoices'" x-cloak>
         <div class="d-flex flex-column gap-3">
             @forelse($invoices as $index => $invoice)
-            <div class="card border-0 shadow-sm rounded-4 animate-fade-up" style="animation-delay: {{ $index * 50 }}ms;">
+            <div class="card border-0 shadow-sm rounded-4 invoice-item" 
+                 x-show="matchesSearchInvoice('{{ addslashes(strtolower($invoice->student->name)) }}', '{{ $invoice->student->mobile }}', '{{ addslashes(strtolower($invoice->title)) }}', '{{ $invoice->status }}')"
+                 style="animation-delay: {{ min($index * 50, 500) }}ms;">
                 <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
                     <div class="d-flex align-items-center gap-3" style="min-width: 250px;">
                         <div class="avatar bg-light text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
@@ -173,24 +166,28 @@
                 <div class="empty-state">
                     <i class="fa-solid fa-file-invoice text-secondary fs-1 mb-3 opacity-25" style="font-size: 4rem !important;"></i>
                     <h4 class="fw-bold text-dark">No invoices found</h4>
-                    <div class="text-secondary">Try adjusting your search or filters.</div>
+                    <div class="text-secondary">Create a new invoice to get started.</div>
                 </div>
             </div>
             @endforelse
+
+            <div class="text-center py-5" x-show="noInvoiceResults" x-cloak>
+                <div class="empty-state">
+                    <i class="fa-solid fa-magnifying-glass text-secondary fs-1 mb-3 opacity-25" style="font-size: 4rem !important;"></i>
+                    <h4 class="fw-bold text-dark">No Matches</h4>
+                    <div class="text-secondary">No invoices match your search.</div>
+                </div>
+            </div>
         </div>
-        
-        @if($invoices->hasPages())
-        <div class="mt-4">
-            {{ $invoices->appends(['tab' => 'invoices', 'search' => request('search')])->links() }}
-        </div>
-        @endif
     </div>
 
     <!-- Transactions Tab -->
     <div x-show="tab === 'transactions'" x-cloak>
         <div class="d-flex flex-column gap-3">
             @forelse($payments as $index => $payment)
-            <div class="card border-0 shadow-sm rounded-4 animate-fade-up" style="animation-delay: {{ $index * 50 }}ms;">
+            <div class="card border-0 shadow-sm rounded-4 transaction-item"
+                 x-show="matchesSearchPayment('{{ addslashes(strtolower($payment->student->name)) }}', '{{ strtolower($payment->receipt_number) }}')"
+                 style="animation-delay: {{ min($index * 50, 500) }}ms;">
                 <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
                     <div class="d-flex align-items-center gap-3" style="min-width: 250px;">
                         <div class="avatar bg-success-subtle text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
@@ -226,22 +223,22 @@
                 <div class="empty-state">
                     <i class="fa-solid fa-money-bill-transfer text-secondary fs-1 mb-3 opacity-25" style="font-size: 4rem !important;"></i>
                     <h4 class="fw-bold text-dark">No transactions found</h4>
-                    <div class="text-secondary">Try adjusting your search criteria.</div>
+                    <div class="text-secondary">No payments have been recorded yet.</div>
                 </div>
             </div>
             @endforelse
+
+            <div class="text-center py-5" x-show="noPaymentResults" x-cloak>
+                <div class="empty-state">
+                    <i class="fa-solid fa-magnifying-glass text-secondary fs-1 mb-3 opacity-25" style="font-size: 4rem !important;"></i>
+                    <h4 class="fw-bold text-dark">No Matches</h4>
+                    <div class="text-secondary">No transactions match your search.</div>
+                </div>
+            </div>
         </div>
-        
-        @if($payments->hasPages())
-        <div class="mt-4">
-            {{ $payments->appends(['tab' => 'transactions', 'search' => request('search')])->links() }}
-        </div>
-        @endif
     </div>
 
-    </div>
-
-    <!-- Ultra-Premium Add Invoice Modal (Teleported) -->
+    <!-- Ultra-Premium Add Invoice Modal (Teleported inside x-data) -->
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="invoiceModalOpen" x-transition.opacity @click="invoiceModalOpen = false" x-cloak style="display: none;">
             
@@ -321,12 +318,69 @@
             </form>
         </div>
     </template>
+
 </div>
 
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    // Searchable Select Component
+    
+    // Main Finance Board Component
+    Alpine.data('financeBoard', () => ({
+        tab: '{{ request("tab", "invoices") }}',
+        search: '',
+        status: '',
+        invoiceModalOpen: false,
+        noInvoiceResults: false,
+        noPaymentResults: false,
+        
+        matchesSearchInvoice(name, mobile, title, statusValue) {
+            const q = this.search.toLowerCase().trim();
+            const filterStatus = this.status;
+            
+            if (filterStatus && filterStatus !== '' && statusValue !== filterStatus) return false;
+            
+            if (!q) return true;
+            return name.includes(q) || mobile.includes(q) || title.includes(q);
+        },
+        
+        matchesSearchPayment(name, receipt) {
+            const q = this.search.toLowerCase().trim();
+            if (!q) return true;
+            return name.includes(q) || receipt.includes(q);
+        },
+
+        init() {
+            this.$watch('search', () => this.checkNoResults());
+            this.$watch('status', () => this.checkNoResults());
+            this.$watch('tab', (val) => {
+                const url = new URL(window.location);
+                url.searchParams.set('tab', val);
+                window.history.replaceState({}, '', url);
+                this.checkNoResults();
+            });
+            // Initial check
+            setTimeout(() => this.checkNoResults(), 100);
+        },
+
+        checkNoResults() {
+            this.$nextTick(() => {
+                if(this.tab === 'invoices') {
+                    const items = this.$root.querySelectorAll('.invoice-item');
+                    let visible = 0;
+                    items.forEach(el => { if (el.style.display !== 'none') visible++; });
+                    this.noInvoiceResults = (visible === 0 && items.length > 0);
+                } else {
+                    const items = this.$root.querySelectorAll('.transaction-item');
+                    let visible = 0;
+                    items.forEach(el => { if (el.style.display !== 'none') visible++; });
+                    this.noPaymentResults = (visible === 0 && items.length > 0);
+                }
+            });
+        }
+    }));
+
+    // Searchable Select Component (for Modal)
     if (!Alpine.data('searchableSelect')) {
         Alpine.data('searchableSelect', (config) => ({
             open: false,
@@ -360,6 +414,15 @@ document.addEventListener('alpine:init', () => {
     }
 });
 </script>
+<style>
+    .invoice-item, .transaction-item {
+        animation: cascadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    @keyframes cascadeIn {
+        from { opacity: 0; transform: translateY(30px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+</style>
 @endpush
 
 @endsection

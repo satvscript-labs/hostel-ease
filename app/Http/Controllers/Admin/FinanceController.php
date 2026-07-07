@@ -54,8 +54,8 @@ class FinanceController extends Controller
             $invoicesQuery->where('status', $status);
         }
 
-        $invoices = $invoicesQuery->paginate(20, ['*'], 'invoices_page')->withQueryString();
-        $payments = $paymentsQuery->paginate(20, ['*'], 'payments_page')->withQueryString();
+        $invoices = $invoicesQuery->get();
+        $payments = $paymentsQuery->get();
 
         $paymentModes = PaymentMode::orderBy('name')->get();
 
