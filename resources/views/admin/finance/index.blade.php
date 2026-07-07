@@ -68,12 +68,12 @@
     <!-- Tabs -->
     <div class="he-tabs mb-4 border-bottom">
         <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative" 
-                :class="{ 'text-dark fw-bold': tab === 'invoices' }" @click="tab = 'invoices'">
+                :class="{ 'text-dark fw-bold': tab === 'invoices' }" @click="switchTab('invoices')">
             <i class="fa-solid fa-file-invoice me-1"></i> {{ __('Invoices & Dues') }}
             <div x-show="tab === 'invoices'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
         <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative" 
-                :class="{ 'text-dark fw-bold': tab === 'transactions' }" @click="tab = 'transactions'">
+                :class="{ 'text-dark fw-bold': tab === 'transactions' }" @click="switchTab('transactions')">
             <i class="fa-solid fa-money-bill-transfer me-1"></i> {{ __('Transactions') }}
             <div x-show="tab === 'transactions'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
@@ -106,7 +106,11 @@
     </div>
 
     <!-- Invoices Tab -->
-    <div x-show="tab === 'invoices'" x-cloak>
+    <div x-show="tab === 'invoices'" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         style="display: none;">
         <div class="d-flex flex-column gap-3">
             @forelse($invoices as $index => $invoice)
             <div class="card border-0 shadow-sm rounded-4 invoice-item" 
@@ -184,7 +188,11 @@
     </div>
 
     <!-- Transactions Tab -->
-    <div x-show="tab === 'transactions'" x-cloak>
+    <div x-show="tab === 'transactions'" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         style="display: none;">
         <div class="d-flex flex-column gap-3">
             @forelse($payments as $index => $payment)
             <div class="card border-0 shadow-sm rounded-4 transaction-item"
@@ -354,15 +362,20 @@ document.addEventListener('alpine:init', () => {
             return name.includes(q) || receipt.includes(q);
         },
 
+        switchTab(newTab) {
+            this.tab = '';
+            setTimeout(() => { 
+                this.tab = newTab; 
+                const url = new URL(window.location);
+                url.searchParams.set('tab', newTab);
+                window.history.replaceState({}, '', url);
+                this.checkNoResults();
+            }, 300);
+        },
+
         init() {
             this.$watch('search', () => this.checkNoResults());
             this.$watch('status', () => this.checkNoResults());
-            this.$watch('tab', (val) => {
-                const url = new URL(window.location);
-                url.searchParams.set('tab', val);
-                window.history.replaceState({}, '', url);
-                this.checkNoResults();
-            });
             // Initial check
             setTimeout(() => this.checkNoResults(), 100);
         },

@@ -91,7 +91,7 @@ class StaffController extends Controller
             'status' => ['required', 'array'],
             'status.*' => ['required', Rule::in(['present', 'absent', 'half_day', 'leave'])],
         ]);
-        $date = Carbon::parse($data['date'])->toDateString();
+        $date = Carbon::parse($data['date'])->startOfDay();
         foreach ($data['status'] as $staffId => $status) {
             StaffAttendance::updateOrCreate(
                 ['staff_id' => $staffId, 'date' => $date],
@@ -99,7 +99,7 @@ class StaffController extends Controller
             );
         }
 
-        return redirect()->route('admin.staff.index', ['tab' => 'attendance', 'date' => $date])->with('success', 'Attendance saved.');
+        return redirect()->route('admin.staff.index', ['tab' => 'attendance', 'date' => $date->toDateString()])->with('success', 'Attendance saved.');
     }
 
     public function paySalary(Request $request, Staff $staff): RedirectResponse
