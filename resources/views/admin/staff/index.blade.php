@@ -116,12 +116,16 @@
     </div>
 
     <!-- Tabs (Fluid switching) -->
-    <div class="he-tabs mb-4 stagger-3">
-        <button class="he-tab tactile-btn" :class="{ 'active': tab === 'directory' }" @click="switchTab('directory')">
+    <div class="he-tabs mb-4 stagger-3 border-bottom">
+        <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative tactile-btn" 
+                :class="{ 'text-dark fw-bold': tab === 'directory' }" @click="switchTab('directory')">
             <i class="fa-solid fa-address-book me-1"></i> {{ __('Directory & Payroll') }}
+            <div x-show="tab === 'directory'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
-        <button class="he-tab tactile-btn" :class="{ 'active': tab === 'attendance' }" @click="switchTab('attendance')">
+        <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative tactile-btn" 
+                :class="{ 'text-dark fw-bold': tab === 'attendance' }" @click="switchTab('attendance')">
             <i class="fa-solid fa-clipboard-user me-1"></i> {{ __('Attendance') }}
+            <div x-show="tab === 'attendance'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
     </div>
 

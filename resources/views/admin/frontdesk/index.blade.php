@@ -167,11 +167,22 @@
         70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
         100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
+
+    /* Staggered Fade Up Animations */
+    .stagger-1 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.1s both; }
+    .stagger-2 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.15s both; }
+    .stagger-3 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.2s both; }
+    .stagger-4 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.25s both; }
+    
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 </style>
 
 <div x-data="frontdesk()" class="page-enter">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3 stagger-1">
         <div>
             <h1 class="h3 fw-bold mb-1">{{ __('Front Desk') }}</h1>
             <p class="text-secondary mb-0">{{ __('Manage visitors, walk-ins, and student complaints.') }}</p>
@@ -187,22 +198,26 @@
     </div>
 
     <!-- Tabs -->
-    <div class="he-tabs mb-4">
-        <button class="he-tab" :class="{ 'active': tab === 'visitors' }" @click="tab = 'visitors'">
+    <div class="he-tabs mb-4 border-bottom stagger-2">
+        <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative tactile-btn" 
+                :class="{ 'text-dark fw-bold': tab === 'visitors' }" @click="switchTab('visitors')">
             <i class="fa-solid fa-door-open me-1"></i> {{ __('Visitors') }} 
             @if($insideCount > 0)
                 <span class="badge bg-danger rounded-pill ms-1">{{ $insideCount }}</span>
             @endif
+            <div x-show="tab === 'visitors'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
-        <button class="he-tab" :class="{ 'active': tab === 'complaints' }" @click="tab = 'complaints'">
+        <button class="he-tab bg-transparent border-0 py-3 px-4 fw-medium text-secondary position-relative tactile-btn" 
+                :class="{ 'text-dark fw-bold': tab === 'complaints' }" @click="switchTab('complaints')">
             <i class="fa-solid fa-headset me-1"></i> {{ __('Complaints') }}
             @if($complaintCounts['open'] > 0)
                 <span class="badge bg-danger rounded-pill ms-1">{{ $complaintCounts['open'] }}</span>
             @endif
+            <div x-show="tab === 'complaints'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
     </div>
 
-    <div class="mb-4">
+    <div class="mb-4 stagger-3">
         <div class="input-group input-group-lg">
             <span class="input-group-text bg-white border-end-0 text-muted px-4 rounded-start-pill"><i class="fa-solid fa-search"></i></span>
             <input type="text" x-model="search" class="form-control border-start-0 rounded-end-pill fs-6 bg-white" placeholder="Search records...">
@@ -210,8 +225,12 @@
     </div>
 
     <!-- ================= VISITORS TAB ================= -->
-    <div x-show="tab === 'visitors'" x-cloak>
-        <div class="row mb-4 align-items-stretch">
+    <div x-show="tab === 'visitors'" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         style="display: none;">
+        <div class="row mb-4 align-items-stretch stagger-4">
             <div class="col-12 col-md-4 mb-3 mb-md-0">
                 <div class="stat-card-glass stat-card-visitors h-100">
                     <div class="opacity-75 text-uppercase fw-bold small tracking-wider mb-1">Currently Inside</div>
@@ -232,7 +251,7 @@
 
         <div class="row">
             @forelse($visitors as $v)
-                <div class="col-12" x-show="search === '' || '{{ strtolower($v->name . ' ' . optional($v->student)->name) }}'.includes(search.toLowerCase())">
+                <div class="col-12" x-show="search === '' || '{{ strtolower($v->name . ' ' . optional($v->student)->name) }}'.includes(search.toLowerCase())" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
                     <div class="fd-list-item d-flex flex-wrap align-items-center {{ !$v->isInside() ? 'opacity-75' : '' }}">
                         <div class="col-12 col-md-3 mb-2 mb-md-0">
                             <div class="d-flex align-items-center gap-2">
@@ -288,8 +307,12 @@
     </div>
 
     <!-- ================= COMPLAINTS TAB ================= -->
-    <div x-show="tab === 'complaints'" x-cloak>
-        <div class="row g-3 mb-4">
+    <div x-show="tab === 'complaints'" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         style="display: none;">
+        <div class="row g-3 mb-4 stagger-4">
             <div class="col-12 col-md-4">
                 <div class="stat-card-glass stat-card-complaints-open h-100">
                     <div class="opacity-75 text-uppercase fw-bold small tracking-wider mb-1">Open Issues</div>
@@ -312,7 +335,7 @@
 
         <div class="row">
             @forelse($complaints as $c)
-                <div class="col-12 col-lg-6" x-show="search === '' || '{{ strtolower($c->title . ' ' . optional($c->student)->name) }}'.includes(search.toLowerCase())">
+                <div class="col-12 col-lg-6" x-show="search === '' || '{{ strtolower($c->title . ' ' . optional($c->student)->name) }}'.includes(search.toLowerCase())" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
                     <div class="fd-list-item d-flex flex-column h-100" style="margin-bottom: 1.5rem;">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
@@ -586,13 +609,18 @@ document.addEventListener('alpine:init', () => {
             this.complaintPanelOpen = false;
             document.body.style.overflow = '';
         },
-        init() {
-            this.$watch('tab', (val) => {
+        switchTab(newTab) {
+            this.tab = '';
+            setTimeout(() => {
+                this.tab = newTab;
                 this.search = ''; // reset search on tab switch
                 const url = new URL(window.location);
-                url.searchParams.set('tab', val);
+                url.searchParams.set('tab', newTab);
                 window.history.replaceState({}, '', url);
-            });
+            }, 300);
+        },
+        init() {
+            // Initial checks if needed
         }
     }));
 
