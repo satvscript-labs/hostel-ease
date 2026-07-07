@@ -221,12 +221,15 @@
                 <div class="small opacity-75">Select a floor to manage rooms</div>
             </div>
             
-            <div class="floor-list">
+            <div class="floor-list" x-sort="reorderFloors">
                 <template x-for="floor in floors" :key="floor.id">
-                    <div class="floor-item" :class="{'active': activeFloor && activeFloor.id === floor.id}" @click="selectFloor(floor)">
-                        <div>
-                            <div class="fw-bold fs-5" x-text="floor.name"></div>
-                            <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> Rooms</div>
+                    <div class="floor-item" :class="{'active': activeFloor && activeFloor.id === floor.id}" @click="selectFloor(floor)" x-sort:item="floor.id">
+                        <div class="d-flex align-items-center">
+                            <i class="fa-solid fa-grip-vertical text-muted opacity-50 me-3 fs-5" style="cursor: grab;"></i>
+                            <div>
+                                <div class="fw-bold fs-5" x-text="floor.name"></div>
+                                <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> Rooms</div>
+                            </div>
                         </div>
                         <button class="btn btn-sm btn-link text-danger p-0" @click.stop="deleteFloor(floor.id)" title="Delete Floor">
                             <i class="fa-solid fa-trash"></i>
@@ -425,6 +428,23 @@ document.addEventListener('alpine:init', () => {
             if (!this.activeFloor.rooms) {
                 this.activeFloor.rooms = [];
             }
+        },
+
+        reorderFloors(item, position) {
+            let draggedFloor = this.floors.find(f => f.id === item);
+            this.floors = this.floors.filter(f => f.id !== item);
+            this.floors.splice(position, 0, draggedFloor);
+            
+            let orderedIds = this.floors.map(f => f.id);
+            fetch('{{ route('admin.floors.reorder') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ ordered_ids: orderedIds })
+            }).catch(e => console.error(e));
         },
 
         startAddingFloor() {

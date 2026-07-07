@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AcBillController;
 use App\Http\Controllers\Admin\AssignmentController;
 use App\Http\Controllers\Admin\BedController;
 use App\Http\Controllers\Admin\ComplaintController;
@@ -137,6 +138,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
             // --- Module 1: Property Board ---
             Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
+            Route::post('floors/reorder', [FloorController::class, 'reorder'])->name('floors.reorder');
             Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
             Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
             Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
@@ -183,6 +185,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
             // --- Promise to pay (set on an unpaid obligation) ---
             Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
+
+            // --- Add-on: AC Bills ---
+            Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);
 
             // --- Add-on: Expense Management ---
             Route::get('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'index'])->name('expenses.index');

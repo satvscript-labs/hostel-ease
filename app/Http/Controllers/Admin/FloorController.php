@@ -26,6 +26,17 @@ class FloorController extends Controller
         return view('admin.builder.index', compact('floors'));
     }
 
+    public function reorder(Request $request)
+    {
+        $ids = $request->input('ordered_ids', []);
+        
+        foreach ($ids as $index => $id) {
+            Floor::where('id', $id)->where('hostel_id', auth()->user()->hostel_id)->update(['sort_order' => $index + 1]);
+        }
+        
+        return response()->json(['success' => true]);
+    }
+
     public function store(StoreFloorRequest $request)
     {
         $data = $request->validated();

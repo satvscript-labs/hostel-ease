@@ -173,6 +173,7 @@
                 <a class="nav-link sub-link {{ request()->routeIs('admin.finance.*') && request('tab') !== 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'invoices']) }}">{{ __('Invoices & Dues') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.finance.*') && request('tab') === 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'transactions']) }}">{{ __('Transactions') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.expenses.*') ? 'active' : '' }}" href="{{ route('admin.expenses.index') }}">{{ __('Expenses') }}</a>
+                <a class="nav-link sub-link {{ request()->routeIs('admin.ac-bills.*') ? 'active' : '' }}" href="{{ route('admin.ac-bills.index') }}">{{ __('AC Bills') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.pocket-money.*') ? 'active' : '' }}" href="{{ route('admin.pocket-money.index') }}">{{ __('Pocket Money') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.payment-modes.*') ? 'active' : '' }}" href="{{ route('admin.payment-modes.index') }}">{{ __('Payment Modes') }}</a>
             </div>
