@@ -13,7 +13,7 @@
     }
     body {
         background: #f1f5f9;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
         color: #1e293b;
     }
     .hero-banner {

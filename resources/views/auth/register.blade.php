@@ -10,13 +10,13 @@
     <!-- SEO -->
     <title>Sign Up · {{ config('app.name', 'HostelEase') }} SaaS</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
     
     <style>
         /* Ultra Premium Split Screen Login/Register */
-        body, html { height: 100%; margin: 0; font-family: 'Inter', sans-serif; background: #ffffff; }
+        body, html { height: 100%; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: #ffffff; }
         
         .split-layout {
             display: flex; min-height: 100vh; flex-direction: column;

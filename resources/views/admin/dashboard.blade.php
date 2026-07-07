@@ -408,8 +408,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    titleFont: { family: 'Inter', size: 13 },
-                    bodyFont: { family: 'Inter', size: 14, weight: 'bold' },
+                    titleFont: { family: 'Plus Jakarta Sans', size: 13 },
+                    bodyFont: { family: 'Plus Jakarta Sans', size: 14, weight: 'bold' },
                     padding: 12,
                     cornerRadius: 8,
                     displayColors: false,
@@ -425,14 +425,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     grid: { color: 'rgba(0,0,0,0.03)', drawBorder: false },
                     ticks: {
-                        font: { family: 'Inter', size: 12 },
+                        font: { family: 'Plus Jakarta Sans', size: 12 },
                         color: '#64748b',
                         callback: function(value) { return '₹' + (value/1000) + 'k'; }
                     }
                 },
                 x: {
                     grid: { display: false, drawBorder: false },
-                    ticks: { font: { family: 'Inter', size: 12 }, color: '#64748b' }
+                    ticks: { font: { family: 'Plus Jakarta Sans', size: 12 }, color: '#64748b' }
                 }
             },
             animation: {
