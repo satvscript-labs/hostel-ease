@@ -345,49 +345,74 @@
                          x-cloak class="tab-pane-transition">
                         <div class="row g-4">
                             <div class="col-md-6">
-                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity Details</h4>
-                                <div class="bg-light bg-opacity-50 rounded-4 p-3 border">
-                                    <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                                        <span class="text-muted fw-bold small text-uppercase">Aadhaar No.</span>
-                                        <span class="fw-bold">{{ $student->aadhaar ?? 'Not provided' }}</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between pb-2 mb-2 border-bottom">
-                                        <span class="text-muted fw-bold small text-uppercase">Join Date</span>
-                                        <span class="fw-bold">{{ optional($student->join_date)->format('d M Y') ?? '—' }}</span>
-                                    </div>
-                                    <div class="mt-2">
-                                        <div class="text-muted fw-bold small text-uppercase mb-1">Permanent Address</div>
-                                        <div class="fw-bold lh-sm text-dark">
-                                            {{ $student->address ?? 'Not provided' }}<br>
-                                            @if($student->city || $student->state)
-                                                {{ $student->city }}, {{ $student->state }}
-                                            @endif
+                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center text-dark"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity Details</h4>
+                                <div class="bg-white bg-opacity-75 rounded-4 p-4 border border-white shadow-sm position-relative overflow-hidden" style="backdrop-filter: blur(10px);">
+                                    <div class="position-relative z-1">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom border-light pb-3 mb-3">
+                                            <span class="text-muted fw-bold small text-uppercase"><i class="fa-solid fa-hashtag me-1"></i> Aadhaar No.</span>
+                                            <span class="fw-bold fs-6 text-dark font-monospace bg-light border px-2 py-1 rounded-2">{{ $student->aadhaar ? substr($student->aadhaar, 0, 4) . ' ' . substr($student->aadhaar, 4, 4) . ' ' . substr($student->aadhaar, 8, 4) : 'Not provided' }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center border-bottom border-light pb-3 mb-3">
+                                            <span class="text-muted fw-bold small text-uppercase"><i class="fa-solid fa-calendar-plus me-1"></i> Join Date</span>
+                                            <span class="fw-bold fs-6 text-dark">
+                                                @if($student->join_date)
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fs-6">{{ $student->join_date->format('d M Y') }}</span>
+                                                @else
+                                                    —
+                                                @endif
+                                            </span>
+                                        </div>
+                                        <div class="mt-2">
+                                            <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-location-dot me-1"></i> Permanent Address</div>
+                                            <div class="bg-light bg-opacity-50 rounded-3 p-3 text-dark fw-bold border border-light">
+                                                {{ $student->address ?? 'Not provided' }}<br>
+                                                @if($student->city || $student->state)
+                                                    <span class="text-muted">{{ $student->city }}, {{ $student->state }}</span>
+                                                @endif
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center"><i class="fa-solid fa-users text-primary me-2"></i> Family Contacts</h4>
-                                <div class="bg-light bg-opacity-50 rounded-4 p-3 border d-flex flex-column gap-3">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-person"></i></div>
-                                        <div>
-                                            <div class="text-muted small fw-bold text-uppercase">Father</div>
-                                            <div class="fw-bold"><x-mobile-link :mobile="$student->father_mobile" /></div>
+                                <h4 class="h5 fw-bold mb-3 d-flex align-items-center text-dark"><i class="fa-solid fa-users text-primary me-2"></i> Family Contacts</h4>
+                                <div class="bg-white bg-opacity-75 rounded-4 p-4 border border-white shadow-sm" style="backdrop-filter: blur(10px);">
+                                    <div class="d-flex flex-column gap-3">
+                                        <!-- Father -->
+                                        <div class="d-flex align-items-center gap-3 p-3 rounded-4 transition-hover border border-light bg-light bg-opacity-25">
+                                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 48px; height: 48px; font-size: 1.25rem;"><i class="fa-solid fa-person"></i></div>
+                                            <div class="flex-grow-1">
+                                                <div class="text-muted small fw-bold text-uppercase">Father</div>
+                                                <div class="fw-bold fs-6"><x-mobile-link :mobile="$student->father_mobile" /></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-person-dress"></i></div>
-                                        <div>
-                                            <div class="text-muted small fw-bold text-uppercase">Mother</div>
-                                            <div class="fw-bold"><x-mobile-link :mobile="$student->mother_mobile" /></div>
+                                        <!-- Mother -->
+                                        <div class="d-flex align-items-center gap-3 p-3 rounded-4 transition-hover border border-light bg-light bg-opacity-25">
+                                            <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-danger shadow-sm" style="width: 48px; height: 48px; font-size: 1.25rem;"><i class="fa-solid fa-person-dress"></i></div>
+                                            <div class="flex-grow-1">
+                                                <div class="text-muted small fw-bold text-uppercase">Mother</div>
+                                                <div class="fw-bold fs-6">
+                                                    @if($student->mother_mobile)
+                                                        <x-mobile-link :mobile="$student->mother_mobile" />
+                                                    @else
+                                                        <span class="text-muted fw-normal">Not provided</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm" style="width: 40px; height: 40px"><i class="fa-solid fa-shield-halved"></i></div>
-                                        <div>
-                                            <div class="text-muted small fw-bold text-uppercase">Guardian</div>
-                                            <div class="fw-bold"><x-mobile-link :mobile="$student->guardian_mobile" /></div>
+                                        <!-- Guardian -->
+                                        <div class="d-flex align-items-center gap-3 p-3 rounded-4 transition-hover border border-light bg-light bg-opacity-25">
+                                            <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-warning shadow-sm" style="width: 48px; height: 48px; font-size: 1.25rem;"><i class="fa-solid fa-shield-halved"></i></div>
+                                            <div class="flex-grow-1">
+                                                <div class="text-muted small fw-bold text-uppercase">Guardian</div>
+                                                <div class="fw-bold fs-6">
+                                                    @if($student->guardian_mobile)
+                                                        <x-mobile-link :mobile="$student->guardian_mobile" />
+                                                    @else
+                                                        <span class="text-muted fw-normal">Not provided</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

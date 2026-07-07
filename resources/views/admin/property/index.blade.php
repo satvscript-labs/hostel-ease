@@ -74,41 +74,48 @@
 
     /* The Blueprint Layout */
     .floor-section {
-        margin-bottom: 4rem;
+        margin-bottom: 3rem;
     }
-    .floor-title {
+    
+    .floor-header {
         display: flex;
         align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
+        background: rgba(252, 253, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 1rem 1.5rem;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        border: 1px solid rgba(0,0,0,0.03);
     }
-    .floor-title h2 { margin: 0; font-size: 1.5rem; font-weight: 800; color: var(--he-text-main); }
-    .floor-title::after {
-        content: ''; flex: 1; height: 1px;
-        background: linear-gradient(90deg, rgba(79, 70, 229, 0.2), transparent);
+    .floor-header-bar {
+        width: 6px;
+        height: 32px;
+        background: var(--he-primary);
+        border-radius: 10px;
+        margin-right: 1.25rem;
+    }
+    .floor-header h2 { 
+        margin: 0; 
+        font-size: 1.5rem; 
+        font-weight: 700; 
+        color: var(--he-text-main); 
     }
     
     .room-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 1.5rem;
     }
 
     .room-card {
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(24px);
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        border-radius: 1.5rem;
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.03);
+        border-radius: 1.25rem;
         padding: 1.25rem;
-        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
-        transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
         position: relative;
         overflow: hidden;
-    }
-    .room-card:hover {
-        transform: translateY(-4px) scale(1.01);
-        box-shadow: 0 15px 40px rgba(31, 38, 135, 0.1);
-        background: rgba(255, 255, 255, 0.9);
     }
     .room-card.dimmed {
         opacity: 0.3;
@@ -121,80 +128,128 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 1px dashed rgba(0,0,0,0.05);
+        margin-bottom: 1.25rem;
     }
-    .room-number { font-size: 1.25rem; font-weight: 800; color: var(--he-text-main); }
-    .room-type { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 0.25rem 0.75rem; border-radius: 50px; }
-    .room-type.ac { background: rgba(14, 165, 233, 0.1); color: #0ea5e9; }
-    .room-type.non-ac { background: rgba(100, 116, 139, 0.1); color: #64748b; }
+    .room-number { font-size: 1.25rem; font-weight: 700; color: var(--he-text-main); }
+    .room-type { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 0.35rem 0.85rem; border-radius: 50px; }
+    .room-type.ac { background: var(--he-primary); color: #ffffff; }
+    .room-type.non-ac { background: rgba(14, 165, 233, 0.1); color: var(--he-primary); }
 
     .bed-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
     }
 
-    /* Capsule Bed Tiles */
+    /* Bed Tiles */
     .bed-tile {
         position: relative;
-        padding: 0.5rem 1rem;
-        border-radius: 50px;
-        text-align: center;
+        padding: 0.75rem;
+        border-radius: 0.85rem;
         cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        border: 1px solid transparent;
-        display: inline-flex;
+        transition: all 0.2s ease;
+        display: flex;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 0.85rem;
+        gap: 0.75rem;
+        height: 60px;
     }
-    .bed-tile:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.08); z-index: 10; }
+    .bed-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.05); z-index: 10; }
 
     /* Empty Bed */
-    .bed-empty {
-        background: #f8fafc;
-        border: 1px dashed #cbd5e1;
-        color: #64748b;
+    .bed-tile.bed-empty {
+        background: rgba(16, 185, 129, 0.06);
+        border: 1px dashed rgba(16, 185, 129, 0.3);
+        color: #10b981;
+        justify-content: center;
     }
-    .bed-empty:hover {
-        background: #fff;
-        border: 1px solid var(--he-primary);
-        color: var(--he-primary);
+    .bed-tile.bed-empty:hover {
+        background: rgba(16, 185, 129, 0.12);
+        border-color: #10b981;
+    }
+    .bed-tile.bed-empty .bed-status-text {
+        font-weight: 700;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
     }
     
     /* Occupied Bed */
-    .bed-occupied {
-        background: white;
-        border: 1px solid rgba(0,0,0,0.05);
-        color: var(--he-text-main);
-        padding-left: 0.35rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    .bed-tile.bed-occupied {
+        background: rgba(239, 68, 68, 0.06);
+        border: 1px solid rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.01);
     }
-    .bed-occupied:hover {
-        border-color: rgba(79, 70, 229, 0.3);
+    .bed-tile.bed-occupied:hover {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: #ef4444;
+    }
+    .occupant-details {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        flex: 1;
+        min-width: 0;
+        text-align: left;
     }
     .occupant-name {
         font-weight: 700;
-        max-width: 80px;
+        font-size: 0.85rem;
+        color: #b91c1c;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.2;
+        width: 100%;
+    }
+    .bed-badge-row {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.2rem;
+    }
+    .bed-badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
     }
     .occupant-avatar {
-        width: 24px;
-        height: 24px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         object-fit: cover;
+        flex-shrink: 0;
+        border: 1.5px solid rgba(239, 68, 68, 0.25);
     }
 
     /* Maintenance */
-    .bed-maintenance { 
-        background: rgba(245, 158, 11, 0.1); 
-        color: #f59e0b; 
-        border-color: rgba(245, 158, 11, 0.2); 
-        cursor: not-allowed; 
+    .bed-tile.bed-maintenance { 
+        background: rgba(245, 158, 11, 0.06); 
+        color: #d97706; 
+        border: 1px dashed rgba(245, 158, 11, 0.3); 
+        cursor: not-allowed;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 0.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.01);
+    }
+    .bed-tile.bed-maintenance:hover {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: #f59e0b;
+    }
+    .bed-maintenance .maintenance-text {
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .bed-maintenance .maintenance-bed-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #b45309;
     }
 
     /* Spotlight Assign Modal */
@@ -218,38 +273,6 @@
     }
     .spotlight-item:hover { background: rgba(79, 70, 229, 0.1); }
     .spotlight-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-    
-    /* Segmented Floor Tabs (iOS style) */
-    .floor-tabs-container {
-        display: inline-flex;
-        background: rgba(241, 245, 249, 0.8);
-        padding: 0.35rem;
-        border-radius: 50px;
-        backdrop-filter: blur(10px);
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-        margin-bottom: 2rem;
-        max-width: 100%;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-    .floor-tabs-container::-webkit-scrollbar { display: none; }
-    .floor-tab {
-        padding: 0.75rem 1.5rem; 
-        background: transparent; 
-        border-radius: 50px; 
-        font-weight: 700; 
-        color: var(--he-text-muted);
-        border: none; 
-        cursor: pointer; 
-        white-space: nowrap; 
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .floor-tab:hover { color: var(--he-text-main); }
-    .floor-tab.active { 
-        background: white; 
-        color: var(--he-primary); 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
-    }
 
     /* Slide-over Panel (Alpine) */
     .slide-over-backdrop {
@@ -382,19 +405,17 @@
         </div>
     </div>
 
-    <!-- Floor Tabs -->
-    <div class="floor-tabs-container stagger">
-        @foreach($floors as $floor)
-        <button class="floor-tab" :class="{'active': activeFloorId === {{ $floor->id }}}" @click="activeFloorId = {{ $floor->id }}">
-            {{ $floor->name }}
-        </button>
-        @endforeach
-    </div>
-
     <!-- The Blueprint -->
-    <div class="stagger relative min-h-[400px]">
+    <div class="stagger relative">
         @foreach($floors as $floor)
-        <div class="floor-section" x-show="activeFloorId === {{ $floor->id }}" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0" x-cloak>
+        <div class="floor-section">
+            <div class="floor-header">
+                <div class="floor-header-bar"></div>
+                <h2>{{ $floor->name }}</h2>
+                <div class="ms-auto badge bg-light text-muted border border-light-subtle rounded-pill px-3 py-2 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+                    {{ $floor->rooms->count() }} ROOMS TOTAL
+                </div>
+            </div>
             
             <div class="room-grid">
                 @foreach($floor->rooms as $room)
@@ -402,23 +423,27 @@
                      :class="{ 'dimmed': !roomMatchesSearch('{{ $room->room_number }}', {{ json_encode($room->beds->map(fn($b) => $b->activeAssignment?->student->name)->filter()->values()) }}) }">
                     <div class="room-header">
                         <div class="room-number">Room {{ $room->room_number }}</div>
-                        <div class="room-type {{ $room->isAc() ? 'ac' : 'non-ac' }}">{{ $room->isAc() ? 'AC' : 'Non AC' }}</div>
+                        <div class="room-type {{ $room->isAc() ? 'ac' : 'non-ac' }}">{{ $room->isAc() ? 'AC ROOM' : 'NON AC' }}</div>
                     </div>
                     
                     <div class="bed-grid">
                         @foreach($room->beds as $bed)
-                            @if(in_array($bed->status, ['available', 'empty', 'maintenance', 'reserved']))
-                                <div class="bed-tile {{ $bed->status === 'maintenance' ? 'bed-maintenance' : ($bed->status === 'reserved' ? 'bed-reserved' : 'bed-empty') }}" 
+                            @if(in_array($bed->status, ['available', 'empty', 'reserved']))
+                                <div class="bed-tile bed-empty" 
                                      @click="openSpotlight('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
                                      title="Manage Bed">
-                                     @if($bed->status === 'maintenance')
-                                        <i class="fa-solid fa-wrench mb-1 text-warning"></i>
-                                     @elseif($bed->status === 'reserved')
-                                        <i class="fa-solid fa-bookmark mb-1 text-info"></i>
-                                     @else
-                                        <i class="fa-solid fa-plus mb-1 opacity-50"></i>
-                                     @endif
-                                    <div class="fw-bold">{{ $bed->bed_number }}</div>
+                                     <i class="fa-solid fa-circle-plus"></i>
+                                     <span class="bed-status-text">{{ $bed->bed_number }} AVAILABLE</span>
+                                </div>
+                            @elseif($bed->status === 'maintenance')
+                                <div class="bed-tile bed-maintenance" 
+                                     @click="openSpotlight('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
+                                     title="Manage Bed">
+                                     <div class="d-flex align-items-center gap-2">
+                                        <i class="fa-solid fa-wrench"></i>
+                                        <span class="maintenance-text">MAINTENANCE</span>
+                                     </div>
+                                     <span class="maintenance-bed-label">Bed {{ $bed->bed_number }}</span>
                                 </div>
                             @elseif($bed->status === 'occupied' && $bed->activeAssignment)
                                 @php 
@@ -437,9 +462,13 @@
                                          'duration' => $assignment->durationInDays(),
                                      ]) }})"
                                      title="{{ $student->name }}">
-                                    <img src="{{ $student->photo_url }}" class="occupant-avatar">
-                                    <div class="fw-bold">{{ $bed->bed_number }}</div>
-                                    <div class="occupant-name">{{ strtok($student->name, ' ') }}</div>
+                                    <img src="{{ $student->photo_url ?: 'https://ui-avatars.com/api/?name='.urlencode($student->name).'&background=fee2e2&color=ef4444' }}" class="occupant-avatar">
+                                    <div class="occupant-details">
+                                        <div class="occupant-name">{{ strtok($student->name, ' ') }}</div>
+                                        <div class="bed-badge-row">
+                                            <span class="bed-badge">{{ $bed->bed_number }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
                         @endforeach

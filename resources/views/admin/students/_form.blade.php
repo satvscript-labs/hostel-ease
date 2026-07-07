@@ -129,13 +129,13 @@
             <div class="row g-4">
                 <div class="col-12 col-md-6">
                     <label class="form-label fw-bold small">Full Name <span class="text-danger">*</span></label>
-                    <input type="text" name="name" class="form-control" value="{{ old('name', $student?->name) }}" required placeholder="Enter full name">
+                    <input type="text" name="name" class="form-control" value="{{ old('name', $student?->name) }}" required maxlength="150" placeholder="Enter full name">
                 </div>
                 <div class="col-12 col-sm-6 col-md-3">
                     <label class="form-label fw-bold small">Mobile <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10"
+                        <input type="tel" name="mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
                                value="{{ old('mobile', substr($student?->mobile ?? '', -10) ?: '') }}" required placeholder="9876543210">
                     </div>
                 </div>
@@ -158,7 +158,7 @@
                     <label class="form-label fw-bold small">Father's Mobile <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" required
+                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number" required
                                value="{{ old('father_mobile', substr($student?->father_mobile ?? '', -10) ?: '') }}" placeholder="10-digit mobile number">
                     </div>
                 </div>
@@ -166,7 +166,7 @@
                     <label class="form-label fw-bold small">Mother's Mobile</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="mother_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10"
+                        <input type="tel" name="mother_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
                                value="{{ old('mother_mobile', substr($student?->mother_mobile ?? '', -10) ?: '') }}" placeholder="Optional">
                     </div>
                 </div>
@@ -174,7 +174,7 @@
                     <label class="form-label fw-bold small">Guardian's Mobile</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="guardian_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10"
+                        <input type="tel" name="guardian_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
                                value="{{ old('guardian_mobile', substr($student?->guardian_mobile ?? '', -10) ?: '') }}" placeholder="Optional">
                     </div>
                 </div>
@@ -192,15 +192,15 @@
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label fw-bold small">City <span class="text-danger">*</span></label>
-                    <input type="text" name="city" class="form-control" required value="{{ old('city', $student?->city) }}" placeholder="City name">
+                    <input type="text" name="city" class="form-control" required maxlength="100" value="{{ old('city', $student?->city) }}" placeholder="City name">
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label fw-bold small">State <span class="text-danger">*</span></label>
-                    <input type="text" name="state" class="form-control" required value="{{ old('state', $student?->state) }}" placeholder="State name">
+                    <input type="text" name="state" class="form-control" required maxlength="100" value="{{ old('state', $student?->state) }}" placeholder="State name">
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-bold small">Full Address <span class="text-danger">*</span></label>
-                    <textarea name="address" class="form-control" rows="2" required placeholder="Street address, locality...">{{ old('address', $student?->address) }}</textarea>
+                    <textarea name="address" class="form-control" rows="2" required maxlength="500" placeholder="Street address, locality...">{{ old('address', $student?->address) }}</textarea>
                 </div>
             </div>
         </div>

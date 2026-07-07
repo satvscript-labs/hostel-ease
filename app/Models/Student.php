@@ -75,7 +75,7 @@ class Student extends Model
     {
         return $this->photo
             ? Storage::disk('public')->url($this->photo)
-            : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=2563eb&color=fff';
+            : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=C7D2FE&color=3730A3&bold=true&font-size=0.4&rounded=true';
     }
 
     public function getFormattedMobileAttribute(): ?string

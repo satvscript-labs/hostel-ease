@@ -110,11 +110,11 @@
         <div class="row g-3 mb-4">
             <div class="col-md-12">
                 <label class="form-label fw-bold small">Full name <span class="text-danger">*</span></label>
-                <input name="name" class="form-control" required value="{{ old('name') }}" placeholder="Enter your full name">
+                <input name="name" class="form-control" required maxlength="150" value="{{ old('name') }}" placeholder="Enter your full name">
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">Mobile <span class="text-danger">*</span></label>
-                <input name="mobile" class="form-control" inputmode="numeric" maxlength="10" required value="{{ old('mobile') }}" placeholder="10-digit mobile number">
+                <input name="mobile" class="form-control" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number" required value="{{ old('mobile') }}" placeholder="10-digit mobile number">
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">Occupation <span class="text-danger">*</span></label>
@@ -131,11 +131,11 @@
         <div class="row g-3 mb-4">
             <div class="col-md-6">
                 <label class="form-label fw-bold small">Father's mobile <span class="text-danger">*</span></label>
-                <input name="father_mobile" class="form-control" inputmode="numeric" maxlength="10" required value="{{ old('father_mobile') }}" placeholder="10-digit mobile number">
+                <input name="father_mobile" class="form-control" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number" required value="{{ old('father_mobile') }}" placeholder="10-digit mobile number">
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">Mother's mobile <span class="text-danger">*</span></label>
-                <input name="mother_mobile" class="form-control" inputmode="numeric" maxlength="10" required value="{{ old('mother_mobile') }}" placeholder="10-digit mobile number">
+                <input name="mother_mobile" class="form-control" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number" required value="{{ old('mother_mobile') }}" placeholder="10-digit mobile number">
             </div>
         </div>
 
@@ -147,15 +147,15 @@
             </div>
             <div class="col-md-12">
                 <label class="form-label fw-bold small">Full Address <span class="text-danger">*</span></label>
-                <textarea name="address" class="form-control" rows="2" required placeholder="Street address, locality...">{{ old('address') }}</textarea>
+                <textarea name="address" class="form-control" rows="2" required maxlength="500" placeholder="Street address, locality...">{{ old('address') }}</textarea>
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">City <span class="text-danger">*</span></label>
-                <input name="city" class="form-control" required value="{{ old('city') }}" placeholder="City name">
+                <input name="city" class="form-control" required maxlength="100" value="{{ old('city') }}" placeholder="City name">
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">State <span class="text-danger">*</span></label>
-                <input name="state" class="form-control" required value="{{ old('state') }}" placeholder="State name">
+                <input name="state" class="form-control" required maxlength="100" value="{{ old('state') }}" placeholder="State name">
             </div>
         </div>
 
