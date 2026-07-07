@@ -17,6 +17,36 @@
     <!-- Alpine.js for Liquid UI interactivty -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
+        /* Ultra Premium CSS Variables */
+        :root {
+            --he-primary: #4f46e5;
+            --he-primary-hover: #4338ca;
+            --he-primary-soft: rgba(79, 70, 229, 0.1);
+            
+            --he-accent: #9333ea;
+            --he-accent-hover: #7e22ce;
+            --he-accent-soft: rgba(147, 51, 234, 0.1);
+
+            --he-gradient-mesh: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --he-gradient-pop: linear-gradient(135deg, #4f46e5, #9333ea);
+
+            --he-success: #10b981;
+            --he-success-soft: #d1fae5;
+            --he-warning: #f59e0b;
+            --he-warning-soft: #fef3c7;
+            --he-danger: #ef4444;
+            --he-danger-soft: #fee2e2;
+            --he-info: #0ea5e9;
+            --he-info-soft: #e0f2fe;
+
+            --he-bg-canvas: #f8fafc;
+            --he-bg-surface: #ffffff;
+            
+            --he-text-main: #0f172a;
+            --he-text-muted: #64748b;
+            --he-text-inverse: #ffffff;
+        }
+
         /* Ultra Premium Topbar & Footer Styles */
         .hsms-topbar {
             position: sticky;

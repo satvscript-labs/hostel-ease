@@ -94,7 +94,7 @@
             
             <div class="flex-grow-1 position-relative px-2">
                 <i class="fa-solid fa-search position-absolute text-muted" style="top: 50%; transform: translateY(-50%); left: 1rem;"></i>
-                <input type="text" name="search" x-model="search" class="form-control border-0 bg-transparent ps-5 shadow-none" placeholder="Search by student or receipt..." x-on:input.debounce.600ms="$el.form.submit()">
+                <input type="text" name="search" x-model="search" class="form-control border-0 bg-transparent ps-5 shadow-none" placeholder="Search by student or receipt...">
             </div>
 
             <div x-show="tab === 'invoices'" x-cloak class="border-start ps-3 me-2">
@@ -239,88 +239,89 @@
         @endif
     </div>
 
-</div>
-
-<!-- Ultra-Premium Add Invoice Modal (Teleported) -->
-<template x-teleport="body">
-    <div class="custom-overlay-backdrop" x-show="invoiceModalOpen" x-transition.opacity @click="invoiceModalOpen = false" x-cloak style="display: none;">
-        
-        <form method="POST" action="{{ route('admin.invoices.store') }}" class="custom-overlay-modal" :class="{ 'is-open': invoiceModalOpen }" x-show="invoiceModalOpen" x-transition.opacity @click.stop style="display: none;">
-            @csrf
-            
-            <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0">New Invoice</h5>
-                <button type="button" class="btn-close" @click="invoiceModalOpen = false"></button>
-            </div>
-            
-            <div class="custom-overlay-body">
-                <!-- Searchable Select for Students -->
-                <div class="mb-4" x-data="searchableSelect({
-                    options: [
-                        @foreach($students as $student)
-                        { value: '{{ $student->id }}', label: '{{ addslashes($student->name) }} ({{ $student->mobile }})' },
-                        @endforeach
-                    ]
-                })">
-                    <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
-                    <input type="hidden" name="student_id" :value="value" required>
-                    <div class="position-relative">
-                        <button type="button" class="form-control bg-white text-start d-flex justify-content-between align-items-center shadow-sm" @click="open = !open">
-                            <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
-                            <i class="fa-solid fa-chevron-down text-muted small"></i>
-                        </button>
-                        
-                        <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
-                            <div class="p-2 border-bottom sticky-top bg-white">
-                                <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light border-0" placeholder="Search student...">
-                            </div>
-                            <div class="list-group list-group-flush">
-                                <template x-for="opt in filteredOptions" :key="opt.value">
-                                    <button type="button" class="list-group-item list-group-item-action py-2" @click="selectOption(opt.value)" x-text="opt.label"></button>
-                                </template>
-                                <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No students found</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row gx-3">
-                    <div class="col-md-6 mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Type <span class="text-danger">*</span></label>
-                        <select name="type" class="form-select bg-white shadow-sm" required>
-                            <option value="fee">Hostel Fee</option>
-                            <option value="rent">Monthly Rent</option>
-                            <option value="ac">AC Bill</option>
-                            <option value="other">Other/Fine</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
-                        <div class="input-group shadow-sm rounded">
-                            <span class="input-group-text bg-white border-end-0 border text-muted">₹</span>
-                            <input type="number" name="amount" class="form-control bg-white border-start-0 border" required min="1" step="0.01">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
-                    <input type="text" name="title" class="form-control bg-white shadow-sm" required placeholder="e.g. Broken chair fine">
-                </div>
-                
-                <div class="mb-2">
-                    <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date (Optional)</label>
-                    <input type="date" name="due_date" class="form-control bg-white shadow-sm">
-                </div>
-            </div>
-            
-            <div class="custom-overlay-footer">
-                <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="invoiceModalOpen = false">Cancel</button>
-                <button type="submit" class="btn rounded-pill px-5 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;">Create Invoice</button>
-            </div>
-        </form>
     </div>
-</template>
+
+    <!-- Ultra-Premium Add Invoice Modal (Teleported) -->
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="invoiceModalOpen" x-transition.opacity @click="invoiceModalOpen = false" x-cloak style="display: none;">
+            
+            <form method="POST" action="{{ route('admin.invoices.store') }}" class="custom-overlay-modal" :class="{ 'is-open': invoiceModalOpen }" x-show="invoiceModalOpen" x-transition.opacity @click.stop style="display: none;">
+                @csrf
+                
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">New Invoice</h5>
+                    <button type="button" class="btn-close" @click="invoiceModalOpen = false"></button>
+                </div>
+                
+                <div class="custom-overlay-body">
+                    <!-- Searchable Select for Students -->
+                    <div class="mb-4" x-data="searchableSelect({
+                        options: [
+                            @foreach($students as $student)
+                            { value: '{{ $student->id }}', label: '{{ addslashes($student->name) }} ({{ $student->mobile }})' },
+                            @endforeach
+                        ]
+                    })">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
+                        <input type="hidden" name="student_id" :value="value" required>
+                        <div class="position-relative">
+                            <button type="button" class="form-control bg-white text-start d-flex justify-content-between align-items-center shadow-sm" @click="open = !open">
+                                <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
+                                <i class="fa-solid fa-chevron-down text-muted small"></i>
+                            </button>
+                            
+                            <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
+                                <div class="p-2 border-bottom sticky-top bg-white">
+                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light border-0" placeholder="Search student...">
+                                </div>
+                                <div class="list-group list-group-flush">
+                                    <template x-for="opt in filteredOptions" :key="opt.value">
+                                        <button type="button" class="list-group-item list-group-item-action py-2" @click="selectOption(opt.value)" x-text="opt.label"></button>
+                                    </template>
+                                    <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No students found</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row gx-3">
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Type <span class="text-danger">*</span></label>
+                            <select name="type" class="form-select bg-white shadow-sm" required>
+                                <option value="fee">Hostel Fee</option>
+                                <option value="rent">Monthly Rent</option>
+                                <option value="ac">AC Bill</option>
+                                <option value="other">Other/Fine</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group shadow-sm rounded">
+                                <span class="input-group-text bg-white border-end-0 border text-muted">₹</span>
+                                <input type="number" name="amount" class="form-control bg-white border-start-0 border" required min="1" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control bg-white shadow-sm" required placeholder="e.g. Broken chair fine">
+                    </div>
+                    
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date (Optional)</label>
+                        <input type="date" name="due_date" class="form-control bg-white shadow-sm">
+                    </div>
+                </div>
+                
+                <div class="custom-overlay-footer">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="invoiceModalOpen = false">Cancel</button>
+                    <button type="submit" class="btn rounded-pill px-5 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;">Create Invoice</button>
+                </div>
+            </form>
+        </div>
+    </template>
+</div>
 
 @push('scripts')
 <script>
