@@ -17,7 +17,8 @@ class FrontDeskController extends Controller
         $visitors = Visitor::with('student')
             ->when($request->input('filter') === 'inside', fn ($q) => $q->inside())
             ->when($request->filled('date'), fn ($q) => $q->whereDate('check_in', $request->date('date')))
-            ->orderByDesc('check_in')
+            ->orderByRaw('check_out IS NOT NULL')
+            ->orderByDesc('updated_at')
             ->get();
         $insideCount = Visitor::inside()->count();
 

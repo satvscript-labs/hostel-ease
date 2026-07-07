@@ -23,7 +23,7 @@ class VisitorController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'mobile' => ['nullable', 'regex:/^\+91\d{10}$|^$/'],
+            'mobile' => ['nullable', 'regex:/^(\+91)?\d{10}$/'],
             'student_id' => ['nullable', Rule::exists('students', 'id')->where('hostel_id', \App\Support\Tenant::id())],
             'purpose' => ['nullable', 'string', 'max:150'],
             'id_proof' => ['nullable', 'string', 'max:100'],
