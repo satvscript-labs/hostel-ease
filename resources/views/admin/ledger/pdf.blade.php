@@ -60,7 +60,7 @@
             <tr>
                 <td>{{ $p->receipt_number }}</td>
                 <td>{{ $p->paid_on->format('d-m-Y') }}</td>
-                <td>{{ config('hostelease.payment_types.'.$p->payment_type) }}</td>
+                <td>{{ $p->credit_used > 0 ? '₹'.number_format($p->credit_used, 2) : '-' }}</td>
                 <td>{{ strtoupper($p->mode) }}</td>
                 <td>{{ $p->reference_number ?? '—' }}</td>
                 <td class="right">{{ hostelease_money($p->amount) }}</td>

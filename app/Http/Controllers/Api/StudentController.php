@@ -36,7 +36,7 @@ class StudentController extends Controller
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
-            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
+            'credit_used' => ['nullable', 'numeric', 'min:0'],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             'remarks' => ['nullable', 'string', 'max:500'],
@@ -84,8 +84,8 @@ class StudentController extends Controller
             $pay = min($remaining, $bal);
             $payment = $this->payments->record(array_merge($base, [
                 'amount' => round($pay, 2),
-                'payment_type' => $pay >= $bal ? 'full' : 'partial',
-            ]), $ob);
+                'credit_used' => 0,
+            ]));
             $firstPayment ??= $payment;
             $receipts[] = $payment->receipt_number;
             $remaining -= $pay;
@@ -95,7 +95,7 @@ class StudentController extends Controller
         if ($remaining > 0.001) {
             $payment = $this->payments->record(array_merge($base, [
                 'amount' => round($remaining, 2),
-                'payment_type' => 'advance',
+                'credit_used' => 0,
             ]));
             $firstPayment ??= $payment;
             $receipts[] = $payment->receipt_number;

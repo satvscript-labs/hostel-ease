@@ -18,7 +18,7 @@ class Payment extends Model
         'student_id',
         'receipt_number',
         'amount',
-        'payment_type', // 'full', 'partial', 'advance'
+        'credit_used',
         'mode', // 'cash', 'upi', 'cheque', etc.
         'reference_number',
         'paid_on',

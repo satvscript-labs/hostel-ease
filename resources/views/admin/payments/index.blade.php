@@ -41,6 +41,7 @@
             <table class="table table-hover align-middle mb-0" data-datatable>
                 <thead>
                     <tr><th>Receipt</th><th>Date</th><th>Student</th><th>Type</th><th>Mode</th><th>Ref.</th><th class="text-end">Amount</th><th class="text-end">Actions</th></tr>
+                    <tr><th>Receipt</th><th>Date</th><th>Student</th><th>Credit Used</th><th>Mode</th><th>Ref.</th><th class="text-end">Amount</th><th class="text-end">Actions</th></tr>
                 </thead>
                 <tbody>
                 @foreach($payments as $p)
@@ -48,7 +49,7 @@
                         <td class="fw-semibold">{{ $p->receipt_number }}</td>
                         <td>{{ $p->paid_on->format('d-m-Y') }}</td>
                         <td><a href="{{ route('admin.students.show', $p->student) }}" class="text-decoration-none">{{ $p->student->name }}</a></td>
-                        <td>{{ config('hostelease.payment_types.'.$p->payment_type) }}</td>
+                        <td>{{ $p->credit_used > 0 ? '₹'.number_format($p->credit_used, 2) : '-' }}</td>
                         <td><span class="badge bg-secondary-subtle text-secondary text-uppercase">{{ $p->mode }}</span></td>
                         <td>{{ $p->reference_number ?? '—' }}</td>
                         <td class="text-end fw-semibold">{{ hostelease_money($p->amount) }}</td>

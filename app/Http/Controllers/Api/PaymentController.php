@@ -38,15 +38,8 @@ class PaymentController extends Controller
      */
     public function modes(): JsonResponse
     {
-        $modes = PaymentMode::active()->ordered()->get()->map(fn ($m) => [
-            'code' => $m->code,
-            'name' => $m->name,
-            'requires_reference' => (bool) $m->requires_reference,
-        ]);
-
         return response()->json([
-            'modes' => $modes,
-            'payment_types' => config('hostelease.payment_types'),
+            'payment_modes' => PaymentMode::active()->ordered()->get(['name', 'code', 'requires_reference']),
         ]);
     }
 
@@ -77,7 +70,7 @@ class PaymentController extends Controller
         $data = $request->validate([
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())->whereNull('deleted_at')],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
-            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
+            'credit_used' => ['nullable', 'numeric', 'min:0'],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
             'reference_number' => [
                 Rule::requiredIf(fn () => (bool) optional(
@@ -123,7 +116,7 @@ class PaymentController extends Controller
                 'student' => $model->student?->name,
                 'student_mobile' => $model->student?->mobile,
                 'amount' => (float) $model->amount,
-                'payment_type' => $model->payment_type,
+                'credit_used' => $model->credit_used,
                 'mode' => $model->mode,
                 'reference_number' => $model->reference_number,
                 'paid_on' => $model->paid_on?->toDateString(),

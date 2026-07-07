@@ -17,8 +17,8 @@ class StorePaymentRequest extends FormRequest
     {
         return [
             'student_id' => ['required', Rule::exists('students', 'id')->where('hostel_id', Tenant::id())->whereNull('deleted_at')],
-            'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
-            'payment_type' => ['required', Rule::in(array_keys(config('hostelease.payment_types')))],
+            'amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
+            'credit_used' => ['nullable', 'numeric', 'min:0'],
             'mode' => ['required', Rule::in(\App\Models\PaymentMode::active()->pluck('code')->all())],
             // Modes flagged as requiring a reference must carry one.
             'reference_number' => [
@@ -31,6 +31,27 @@ class StorePaymentRequest extends FormRequest
             'remarks' => ['nullable', 'string', 'max:500'],
             // Optional obligation this payment settles (type:id). Resolved in the controller.
             'payable' => ['nullable', 'string', 'regex:/^(semester_fee|monthly_rent|ac_bill_student):\d+$/'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (\Illuminate\Validation\Validator $validator) {
+                $amount = (float) $this->input('amount', 0);
+                $creditUsed = (float) $this->input('credit_used', 0);
+
+                if ($amount + $creditUsed <= 0) {
+                    $validator->errors()->add('amount', 'The total payment amount (cash + credit) must be greater than zero.');
+                }
+
+                if ($creditUsed > 0 && $this->filled('student_id')) {
+                    $student = \App\Models\Student::find($this->input('student_id'));
+                    if ($student && $creditUsed > (float) $student->credit_balance) {
+                        $validator->errors()->add('credit_used', 'Cannot use more credit than the student has available (₹' . number_format($student->credit_balance, 2) . ').');
+                    }
+                }
+            }
         ];
     }
 

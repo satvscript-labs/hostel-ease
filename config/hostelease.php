@@ -72,12 +72,6 @@ return [
         'rtgs' => 'RTGS',
     ],
 
-    'payment_types' => [
-        'full' => 'Full Payment',
-        'partial' => 'Partial Payment',
-        'advance' => 'Advance Payment',
-    ],
-
     'payment_statuses' => [
         'paid' => 'Paid',
         'partial' => 'Partial',

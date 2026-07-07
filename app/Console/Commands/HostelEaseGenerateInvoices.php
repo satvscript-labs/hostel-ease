@@ -117,7 +117,6 @@ class HostelEaseGenerateInvoices extends Command
                             'student_id' => $student->id,
                             'hostel_id' => $student->hostel_id,
                             'amount' => $creditToApply,
-                            'payment_type' => 'full',
                             'mode' => 'credit', // We should ensure a 'credit' mode exists or just use a default string.
                             'reference_number' => 'Auto-applied Credit',
                             'paid_on' => now()->toDateString(),

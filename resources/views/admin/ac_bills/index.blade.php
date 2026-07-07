@@ -2,7 +2,7 @@
 @section('title', __('AC Bills'))
 
 @section('content')
-<div x-data="acBills()" class="page-enter">
+<div x-data="{ modalOpen: {{ $errors->any() ? 'true' : 'false' }} }" class="page-enter">
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
@@ -110,7 +110,7 @@
                 <div x-show="floorOpen" @click.outside="floorOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
                     <div class="list-group list-group-flush rounded-4 py-2">
                         <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-4 {{ !$filterFloor ? 'active bg-primary text-white fw-bold' : 'text-dark fw-medium' }}" @click="$refs.filterForm.floor.value=''; $refs.filterForm.submit()">
-                            <i class="fa-solid fa-building fa-fw me-2 {{ !$filterFloor ? '' : 'text-muted' }}"></i> All Floors
+                            <i class="fa-solid fa-layer-group fa-fw me-2 {{ !$filterFloor ? '' : 'text-muted' }}"></i> All Floors
                         </a>
                         @foreach($floors as $f)
                         <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-4 {{ $filterFloor == $f->id ? 'active bg-primary text-white fw-bold' : 'text-dark fw-medium' }}" @click="$refs.filterForm.floor.value='{{ $f->id }}'; $refs.filterForm.submit()">
@@ -200,6 +200,16 @@
                     <button type="button" class="btn-close" @click="modalOpen = false"></button>
                 </div>
                 
+                @if($errors->any())
+                <div class="alert alert-danger m-3 mb-0 border-0 shadow-sm rounded-3">
+                    <ul class="mb-0 small">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+                
                 <div class="custom-overlay-body" x-data="{
                     prev: 0,
                     curr: 0,
@@ -273,13 +283,6 @@
 </div>
 
 @push('scripts')
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('acBills', () => ({
-        modalOpen: false
-    }));
-});
-</script>
 <style>
     .ac-item {
         animation: cascadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;

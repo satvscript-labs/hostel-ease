@@ -295,21 +295,21 @@
                 <h3 class="h6 fw-bold mb-3 text-uppercase text-muted lh-1">Financial Overview</h3>
                 <div class="row g-3">
                     <div class="col-6 col-md-3">
-                        <div class="bg-light rounded-4 p-3 h-100 border border-light">
-                            <div class="text-muted small fw-bold text-uppercase mb-1">Total Billed</div>
-                            <div class="fs-4 fw-bold lh-1 text-dark mt-2">{{ hostelease_money($paymentSummary['total_billed'] ?? 0) }}</div>
+                        <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'bg-danger-subtle border-danger-subtle' : 'bg-light border-light' }} rounded-4 p-3 h-100 border">
+                            <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-muted' }} small fw-bold text-uppercase mb-1">Outstanding</div>
+                            <div class="fs-4 fw-bold lh-1 mt-2 {{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-dark' }}">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="bg-info-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-info-subtle">
+                            <div class="text-info-emphasis small fw-bold text-uppercase mb-1">Credits</div>
+                            <div class="fs-4 fw-bold lh-1 text-info-emphasis mt-2">{{ hostelease_money($student->credit_balance ?? 0) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="bg-success-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-success-subtle">
                             <div class="text-success small fw-bold text-uppercase mb-1">Total Paid</div>
                             <div class="fs-4 fw-bold lh-1 text-success mt-2">{{ hostelease_money($paymentSummary['total_paid'] ?? 0) }}</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'bg-danger-subtle border-danger-subtle' : 'bg-light border-light' }} rounded-4 p-3 h-100 border">
-                            <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-muted' }} small fw-bold text-uppercase mb-1">Outstanding</div>
-                            <div class="fs-4 fw-bold lh-1 mt-2 {{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-dark' }}">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
@@ -642,6 +642,7 @@
     <div class="modal fade" id="collectModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content" id="collectForm" method="POST"
+                  x-data="studentProfileCollectModal({{ $paymentSummary['outstanding'] ?? 0 }}, {{ $student->credit_balance ?? 0 }})"
                   action="{{ route('admin.students.collect', $student) }}"
                   data-collect-action="{{ route('admin.students.collect', $student) }}"
                   data-promise-action="{{ route('admin.students.promise', $student) }}"
@@ -668,55 +669,97 @@
 
                         {{-- Pay fields --}}
                         <div id="payFields">
-                            <div class="row mb-4 gx-3">
-                                <div class="col-6">
-                                    <div class="p-3 bg-danger-subtle rounded-4 text-center border border-danger-subtle">
-                                        <div class="text-danger small fw-bold text-uppercase mb-1">Outstanding</div>
-                                        <div class="fs-4 fw-bold text-danger lh-1">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
-                                    </div>
+                            <div class="bg-light rounded-4 p-3 mb-4 d-flex justify-content-between align-items-center border border-primary-subtle border-opacity-25">
+                                <div>
+                                    <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">Outstanding Balance</div>
+                                    <div class="fs-4 fw-bold text-dark">₹{{ number_format($paymentSummary['outstanding'] ?? 0, 2) }}</div>
                                 </div>
-                                <div class="col-6">
-                                    <div class="p-3 bg-success-subtle rounded-4 text-center border border-success-subtle">
-                                        <div class="text-success small fw-bold text-uppercase mb-1">Credit Balance</div>
-                                        <div class="fs-4 fw-bold text-success lh-1">{{ hostelease_money($student->credit_balance) }}</div>
-                                    </div>
+                                @if(($student->credit_balance ?? 0) > 0)
+                                <div class="text-end">
+                                    <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">Available Credit</div>
+                                    <div class="fs-5 fw-bold text-success">₹{{ number_format($student->credit_balance ?? 0, 2) }}</div>
                                 </div>
+                                @endif
                             </div>
-                            
+
                             <div class="mb-4">
-                                <label class="form-label fw-bold">Payment Amount (₹)</label>
-                                <input type="number" step="0.01" min="1" name="amount" id="collectAmount" class="form-control form-control-lg bg-light" required>
+                                <label class="form-label fw-bold text-dark mb-2">Total Amount to Pay (₹)</label>
+                                <div class="input-group input-group-lg border rounded-3 overflow-hidden bg-white" :class="{'border-primary shadow-sm': isFocused}">
+                                    <span class="input-group-text bg-white border-0 text-muted px-3"><i class="fa-solid fa-indian-rupee-sign"></i></span>
+                                    <input type="number" step="0.01" min="0.01" class="form-control border-0 ps-1 fw-bold fs-5 bg-white" 
+                                           x-model.number="totalPayment" id="collectAmount"
+                                           @focus="isFocused = true" @blur="isFocused = false" required>
+                                </div>
+                                <div class="form-text text-muted small mt-2"><i class="fa-solid fa-circle-info me-1"></i> Enter the total amount you want to settle.</div>
                             </div>
-                            
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <label class="form-label fw-bold small">Payment Type</label>
-                                    <select name="payment_type" class="form-select bg-light">
-                                        @foreach(config('hostelease.payment_types') as $k => $v)
-                                            <option value="{{ $k }}">{{ $v }}</option>
-                                        @endforeach
-                                    </select>
+
+                            <!-- Payment Breakdown Section -->
+                            <div class="bg-primary-subtle bg-opacity-10 border border-primary-subtle rounded-4 p-3 mb-4 position-relative">
+                                
+                                <h6 class="fw-bold mb-3 text-primary d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                        <i class="fa-solid fa-chart-pie"></i>
+                                    </div>
+                                    Payment Breakdown
+                                </h6>
+                                
+                                <div class="row g-3 position-relative z-1">
+                                    @if(($student->credit_balance ?? 0) > 0)
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold small text-muted">Pay from Credit Balance (₹)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white text-success border-success-subtle"><i class="fa-solid fa-wallet"></i></span>
+                                            <input type="number" step="0.01" min="0" :max="maxCreditAllowed" 
+                                                   class="form-control fw-bold text-success border-success-subtle" 
+                                                   x-model.number="creditUsed" 
+                                                   @input="validateCredit">
+                                            <button type="button" class="btn btn-outline-success text-uppercase fw-bold" style="font-size: 0.75rem;" @click="useMaxCredit">Max</button>
+                                        </div>
+                                        <input type="hidden" name="credit_used" :value="creditUsed">
+                                    </div>
+                                    @endif
+
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold small text-muted">Pay via Cash/Online (₹)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white text-dark"><i class="fa-solid fa-money-bill-wave"></i></span>
+                                            <input type="text" class="form-control fw-bold bg-white" :value="cashAmount.toFixed(2)" readonly>
+                                        </div>
+                                        <input type="hidden" name="amount" :value="cashAmount">
+                                    </div>
                                 </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold small">Mode</label>
-                                    <select name="mode" class="form-select bg-light" required>
+                            </div>
+
+                            <div x-show="cashAmount > 0" x-transition.duration.300ms class="row g-3 mb-4">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label fw-bold small">Payment Mode</label>
+                                    <select name="mode" class="form-select bg-light" x-model="selectedMode" @change="checkReference">
                                         @foreach($paymentModes as $m)
-                                            <option value="{{ $m->code }}">{{ $m->name }}</option>
+                                            <option value="{{ $m->code }}" data-req="{{ $m->requires_reference ? 1 : 0 }}">{{ $m->name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold small">Date</label>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label fw-bold small">Payment Date</label>
                                     <input type="date" name="paid_on" class="form-control bg-light" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
                                 </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold small">Reference No.</label>
-                                    <input type="text" name="reference_number" class="form-control bg-light" placeholder="Optional">
+                                <div class="col-12" x-show="requiresReference" x-transition>
+                                    <label class="form-label fw-bold small">Reference No. <span class="text-danger">*</span></label>
+                                    <input type="text" name="reference_number" x-ref="refInput" class="form-control bg-light" placeholder="e.g. UPI Txn ID, Check No.">
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold small">Remarks</label>
-                                    <input type="text" name="remarks" class="form-control bg-light" placeholder="Optional note">
-                                </div>
+                            </div>
+                            
+                            <!-- Fallback mode when 100% credit -->
+                            <template x-if="cashAmount <= 0">
+                                <input type="hidden" name="mode" value="{{ $paymentModes->first()?->code ?? 'cash' }}">
+                            </template>
+                            <template x-if="cashAmount <= 0">
+                                <input type="hidden" name="paid_on" value="{{ now()->toDateString() }}">
+                            </template>
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Remarks (Optional)</label>
+                                <input type="text" name="remarks" class="form-control bg-light" placeholder="Optional note">
                             </div>
                         </div>
 
@@ -927,8 +970,7 @@ function prorationPreview() {
 
 function openCollect(amount) {
     document.getElementById('collectTitle').textContent = 'Collect Payment';
-    const amt = document.getElementById('collectAmount');
-    if (amt) amt.value = amount > 0 ? amount : '';
+    // The Alpine state handles the amount initialization automatically
     const payRadio = document.getElementById('modePay');
     if (payRadio) { payRadio.checked = true; setCollectMode('pay'); }
 }
@@ -951,7 +993,85 @@ function setCollectMode(mode) {
     submit.innerHTML = promising ? '<i class="fa-solid fa-calendar-check me-2"></i>Save Promise' : '<i class="fa-solid fa-indian-rupee-sign me-2"></i>Collect Payment';
     submit.classList.toggle('btn-premium', !promising);
     submit.classList.toggle('btn-warning', promising);
+    
+    // For alpine component, if promising we should not enforce totalPayment > 0
+    // so we temporarily ignore it by just toggling disabled on the submit button directly
+    if (promising) {
+        submit.removeAttribute('x-bind:disabled');
+        submit.disabled = false;
+    } else {
+        submit.setAttribute('x-bind:disabled', 'totalPayment <= 0');
+    }
 }
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('studentProfileCollectModal', (initialBalance, creditBal) => ({
+        isFocused: false,
+        creditBalance: Number(creditBal) || 0,
+        outstandingBalance: Number(initialBalance) || 0,
+        
+        totalPayment: Number(initialBalance) > 0 ? Number(initialBalance) : 0,
+        creditUsed: 0,
+        
+        selectedMode: '{{ $paymentModes->first()?->code ?? 'cash' }}',
+        requiresReference: false,
+
+        init() {
+            this.checkReference();
+            if (this.creditBalance > 0 && this.totalPayment > 0) {
+                this.useMaxCredit();
+            }
+            this.$watch('totalPayment', value => {
+                let val = Number(value) || 0;
+                if (this.creditUsed > val) {
+                    this.creditUsed = val;
+                }
+            });
+        },
+
+        get maxCreditAllowed() {
+            return Math.min(this.creditBalance, Number(this.totalPayment) || 0);
+        },
+
+        get cashAmount() {
+            let cash = (Number(this.totalPayment) || 0) - (Number(this.creditUsed) || 0);
+            return Math.max(0, cash);
+        },
+
+        useMaxCredit() {
+            this.creditUsed = this.maxCreditAllowed;
+        },
+        
+        validateCredit() {
+            if (this.creditUsed > this.maxCreditAllowed) {
+                this.creditUsed = this.maxCreditAllowed;
+            }
+            if (this.creditUsed < 0 || isNaN(this.creditUsed)) {
+                this.creditUsed = 0;
+            }
+        },
+
+        checkReference() {
+            this.$nextTick(() => {
+                const select = this.$root.querySelector('select[name="mode"]');
+                if(select && select.options.length > 0) {
+                    const opt = select.options[select.selectedIndex];
+                    this.requiresReference = opt ? opt.dataset.req === '1' : false;
+                    
+                    const refInput = this.$refs.refInput;
+                    if(refInput) {
+                        if (this.requiresReference && this.cashAmount > 0) {
+                            refInput.setAttribute('required', 'required');
+                        } else {
+                            refInput.removeAttribute('required');
+                        }
+                    }
+                }
+            });
+        }
+    }));
+});
+
 </script>
 @endpush
 @endsection

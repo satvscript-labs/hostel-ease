@@ -48,7 +48,7 @@
     </tr></table>
 
     <table>
-        <tr class="row"><th>Payment Type</th><td class="right">{{ config('hostelease.payment_types.'.$payment->payment_type) }}</td></tr>
+        <tr class="row"><th>Credit Used</th><td class="right">{{ $payment->credit_used > 0 ? '₹'.number_format($payment->credit_used, 2) : '-' }}</td></tr>
         <tr class="row"><th>Mode</th><td class="right">{{ strtoupper($payment->mode) }}</td></tr>
         @if($payment->reference_number)
             <tr class="row"><th>Reference No.</th><td class="right">{{ $payment->reference_number }}</td></tr>

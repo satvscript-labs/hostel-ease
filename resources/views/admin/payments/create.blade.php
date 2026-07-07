@@ -44,12 +44,9 @@
                     <input type="date" name="paid_on" class="form-control" value="{{ old('paid_on', now()->toDateString()) }}" max="{{ now()->toDateString() }}" required>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Payment Type <span class="text-danger">*</span></label>
-                    <select name="payment_type" class="form-select" required>
-                        @foreach(config('hostelease.payment_types') as $k => $label)
-                            <option value="{{ $k }}" @selected(old('payment_type', 'full') === $k)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    <label class="form-label">Credit Used</label>
+                    <input type="number" step="0.01" min="0" name="credit_used" class="form-control" value="{{ old('credit_used', 0) }}">
+                    <div class="form-text">Specify amount to deduct from student's available credit balance.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Mode <span class="text-danger">*</span></label>

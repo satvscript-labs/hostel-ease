@@ -26,7 +26,7 @@ class PaymentService
             $payment = new Payment([
                 'student_id' => $data['student_id'],
                 'amount' => $data['amount'],
-                'payment_type' => $data['payment_type'] ?? 'full',
+                'credit_used' => $data['credit_used'] ?? 0,
                 'mode' => $data['mode'],
                 'reference_number' => $data['reference_number'] ?? null,
                 'paid_on' => $data['paid_on'] ?? now()->toDateString(),
@@ -37,8 +37,14 @@ class PaymentService
             $payment->receipt_number = $this->uniqueReceiptNumber($hostelId);
             $payment->save();
 
+            $student = Student::find($payment->student_id);
+            if ($student && $payment->credit_used > 0) {
+                $student->credit_balance = max(0, (float) $student->credit_balance - (float) $payment->credit_used);
+                $student->save();
+            }
+
             // Auto-allocate this payment to oldest unpaid invoices
-            $unallocated = (float) $payment->amount;
+            $unallocated = (float) $payment->amount + (float) $payment->credit_used;
             
             $invoices = Invoice::where('student_id', $payment->student_id)
                 ->where('status', '!=', 'paid')
@@ -66,7 +72,6 @@ class PaymentService
             }
 
             if ($unallocated > 0.001) {
-                $student = Student::find($payment->student_id);
                 if ($student) {
                     $student->credit_balance = (float) $student->credit_balance + $unallocated;
                     $student->save();
@@ -100,13 +105,18 @@ class PaymentService
                 $invoice->save();
             }
 
-            $unallocated = (float) $payment->amount - $totalApplied;
-            if ($unallocated > 0.001) {
-                $student = Student::find($payment->student_id);
-                if ($student) {
-                    $student->credit_balance = max(0, (float) $student->credit_balance - $unallocated);
-                    $student->save();
+            $unallocated = ((float) $payment->amount + (float) $payment->credit_used) - $totalApplied;
+            
+            $student = Student::find($payment->student_id);
+            if ($student) {
+                if ($payment->credit_used > 0) {
+                    $student->credit_balance = (float) $student->credit_balance + (float) $payment->credit_used;
                 }
+                
+                if ($unallocated > 0.001) {
+                    $student->credit_balance = max(0, (float) $student->credit_balance - $unallocated);
+                }
+                $student->save();
             }
 
             // Detach pivot records

@@ -26,7 +26,7 @@ class PaymentHistoryExport implements FromCollection, WithHeadings, WithMapping
         return [
             $payment->receipt_number,
             $payment->paid_on->format('d-m-Y'),
-            config('hostelease.payment_types.'.$payment->payment_type),
+            $payment->credit_used > 0 ? "Credit Used: " . number_format($payment->credit_used, 2) : '',
             strtoupper($payment->mode),
             $payment->reference_number,
             number_format((float) $payment->amount, 2),
