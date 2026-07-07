@@ -258,11 +258,12 @@
                 @csrf
                 
                 <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0">New Invoice</h5>
+                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i> New Invoice</h5>
                     <button type="button" class="btn-close" @click="invoiceModalOpen = false"></button>
                 </div>
                 
                 <div class="custom-overlay-body">
+                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Student Details</h6>
                     <!-- Searchable Select for Students -->
                     <div class="mb-4" x-data="searchableSelect({
                         options: [
@@ -274,14 +275,17 @@
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
                         <input type="hidden" name="student_id" :value="value" required>
                         <div class="position-relative">
-                            <button type="button" class="form-control bg-white text-start d-flex justify-content-between align-items-center shadow-sm" @click="open = !open">
+                            <button type="button" class="form-control bg-light text-start d-flex justify-content-between align-items-center" @click="open = !open">
                                 <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
-                                <i class="fa-solid fa-chevron-down text-muted small"></i>
+                                <div>
+                                    <i x-show="value" class="fa-solid fa-xmark text-muted small me-2 cursor-pointer" @click.stop="clearOption()" style="cursor:pointer;" title="Clear"></i>
+                                    <i class="fa-solid fa-chevron-down text-muted small"></i>
+                                </div>
                             </button>
                             
                             <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
                                 <div class="p-2 border-bottom sticky-top bg-white">
-                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light border-0" placeholder="Search student...">
+                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light" placeholder="Search student...">
                                 </div>
                                 <div class="list-group list-group-flush">
                                     <template x-for="opt in filteredOptions" :key="opt.value">
@@ -293,10 +297,13 @@
                         </div>
                     </div>
 
+                    <hr class="border-secondary opacity-10 my-4">
+                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Invoice Details</h6>
+
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Type <span class="text-danger">*</span></label>
-                            <select name="type" class="form-select bg-white shadow-sm" required>
+                            <select name="type" class="form-select bg-light" required>
                                 <option value="fee">Hostel Fee</option>
                                 <option value="rent">Monthly Rent</option>
                                 <option value="ac">AC Bill</option>
@@ -305,27 +312,27 @@
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
-                            <div class="input-group shadow-sm rounded">
-                                <span class="input-group-text bg-white border-end-0 border text-muted">₹</span>
-                                <input type="number" name="amount" class="form-control bg-white border-start-0 border" required min="1" step="0.01">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5" required min="1" step="0.01">
                             </div>
                         </div>
                     </div>
                     
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
-                        <input type="text" name="title" class="form-control bg-white shadow-sm" required placeholder="e.g. Broken chair fine">
+                        <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Broken chair fine">
                     </div>
                     
                     <div class="mb-2">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date (Optional)</label>
-                        <input type="date" name="due_date" class="form-control bg-white shadow-sm">
+                        <input type="date" name="due_date" class="form-control bg-light">
                     </div>
                 </div>
                 
-                <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="invoiceModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn rounded-pill px-5 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;">Create Invoice</button>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="invoiceModalOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i> Create Invoice</button>
                 </div>
             </form>
         </div>
@@ -419,6 +426,10 @@ document.addEventListener('alpine:init', () => {
             selectOption(val) {
                 this.value = val;
                 this.open = false;
+                this.search = '';
+            },
+            clearOption() {
+                this.value = '';
                 this.search = '';
             },
             init() {
