@@ -135,16 +135,16 @@
 <div x-data="paymentModes()" class="page-enter">
     
     <!-- Hero Banner -->
-    <div class="pm-hero">
+    <div class="pm-hero stagger-1">
         <h1 class="h3 fw-bold mb-1">Payment Modes</h1>
         <p class="mb-0 opacity-75">Configure the methods available for fee collection</p>
     </div>
 
     <!-- Grid -->
-    <div class="pm-grid">
+    <div class="pm-grid stagger-2">
         
         <!-- Quick Add Card (Triggers Form) -->
-        <div class="pm-card pm-card-add" x-show="!isAdding" @click="isAdding = true">
+        <div class="pm-card pm-card-add" x-show="!isAdding" @click="isAdding = true" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.05s both;">
             <i class="fa-solid fa-plus-circle"></i>
             <h5 class="fw-bold mb-0">Add New Mode</h5>
             <p class="small text-muted mt-1 text-center">Create a new payment method</p>
@@ -179,7 +179,7 @@
 
         <!-- Loop existing modes -->
         @forelse($modes as $m)
-        <div class="pm-card-wrapper" style="perspective: 1000px;">
+        <div class="pm-card-wrapper" style="perspective: 1000px; animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min(($loop->index + 1) * 0.05, 0.5) }}s both;">
             
             <!-- View State -->
             <div class="pm-card" x-show="editingId !== {{ $m->id }}">

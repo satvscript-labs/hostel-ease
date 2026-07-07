@@ -3,7 +3,7 @@
 @section('title', __('Finance Board'))
 
 @section('content')
-<div x-data="financeBoard()" class="page-enter">
+<div x-data="financeBoard()" @tab-changed.window="switchTab($event.detail, false)" class="page-enter">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
@@ -362,13 +362,16 @@ document.addEventListener('alpine:init', () => {
             return name.includes(q) || receipt.includes(q);
         },
 
-        switchTab(newTab) {
+        switchTab(newTab, updateUrl = true) {
             this.tab = '';
             setTimeout(() => { 
                 this.tab = newTab; 
-                const url = new URL(window.location);
-                url.searchParams.set('tab', newTab);
-                window.history.replaceState({}, '', url);
+                if (updateUrl) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('tab', newTab);
+                    window.history.replaceState({}, '', url);
+                    window.dispatchEvent(new CustomEvent('sync-sidebar-tab', { detail: newTab }));
+                }
                 this.checkNoResults();
             }, 300);
         },

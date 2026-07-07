@@ -113,7 +113,7 @@
 <div class="page-enter">
     
     <!-- Total Balance Widget -->
-    <div class="pm-total-widget">
+    <div class="pm-total-widget stagger-1">
         <div>
             <div class="pm-total-label">Total Pocket Money Held</div>
             <div class="pm-total-value">{{ hostelease_money($total) }}</div>
@@ -125,7 +125,7 @@
     </div>
 
     <!-- Student List -->
-    <div class="pm-list-card">
+    <div class="pm-list-card stagger-2">
         <div class="pm-list-header d-none d-md-flex row m-0">
             <div class="col-5">Student</div>
             <div class="col-3">Mobile</div>
@@ -135,7 +135,7 @@
         
         <div class="pm-list-body">
             @forelse($students as $s)
-            <div class="pm-list-item row m-0 align-items-center">
+            <div class="pm-list-item row m-0 align-items-center" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
                 
                 <!-- Student Info -->
                 <div class="col-12 col-md-5 d-flex align-items-center mb-3 mb-md-0 px-0">

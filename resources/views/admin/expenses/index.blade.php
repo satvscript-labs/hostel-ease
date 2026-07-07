@@ -4,7 +4,7 @@
 @section('content')
 <div x-data="{ search: '' }" class="page-enter">
 
-    <div class="d-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-4 stagger-1">
         <div>
             <h1 class="h3 mb-0">{{ __('Expenses & Outflows') }}</h1>
             <p class="text-secondary">{{ __('Manage your hostel expenses and view profit/loss.') }}</p>
@@ -17,7 +17,7 @@
     </div>
 
     <!-- Bento Stats -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4 stagger-2">
         <div class="col-md-4">
             <div class="card bg-success-subtle border-success-subtle h-100">
                 <div class="card-body">
@@ -45,7 +45,7 @@
     </div>
 
     <!-- Filters -->
-    <form method="GET" class="card card-premium mb-4">
+    <form method="GET" class="card card-premium mb-4 stagger-3">
         <div class="card-body row g-3">
             <div class="col-md-3">
                 <label class="form-label text-secondary small">From Date</label>
@@ -72,7 +72,7 @@
     </form>
 
     <!-- Expenses Table -->
-    <div class="card card-premium">
+    <div class="card card-premium stagger-4">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table mb-0 align-middle">
@@ -87,7 +87,7 @@
                     </thead>
                     <tbody>
                         @forelse($expenses as $expense)
-                        <tr x-show="search === '' || '{{ strtolower($expense->title . ' ' . $expense->paid_to) }}'.includes(search.toLowerCase())">
+                        <tr x-show="search === '' || '{{ strtolower($expense->title . ' ' . $expense->paid_to) }}'.includes(search.toLowerCase())" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
                             <td>
                                 <div class="fw-medium">{{ $expense->expense_date->format('d M Y') }}</div>
                                 <div class="text-secondary small">{{ $expense->mode }}</div>

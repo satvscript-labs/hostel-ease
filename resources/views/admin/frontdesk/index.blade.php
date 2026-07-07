@@ -180,7 +180,7 @@
     }
 </style>
 
-<div x-data="frontdesk()" class="page-enter">
+<div x-data="frontdesk()" @tab-changed.window="switchTab($event.detail, false)" class="page-enter">
 
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3 stagger-1">
         <div>
@@ -609,14 +609,17 @@ document.addEventListener('alpine:init', () => {
             this.complaintPanelOpen = false;
             document.body.style.overflow = '';
         },
-        switchTab(newTab) {
+        switchTab(newTab, updateUrl = true) {
             this.tab = '';
             setTimeout(() => {
                 this.tab = newTab;
                 this.search = ''; // reset search on tab switch
-                const url = new URL(window.location);
-                url.searchParams.set('tab', newTab);
-                window.history.replaceState({}, '', url);
+                if (updateUrl) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('tab', newTab);
+                    window.history.replaceState({}, '', url);
+                    window.dispatchEvent(new CustomEvent('sync-sidebar-tab', { detail: newTab }));
+                }
             }, 300);
         },
         init() {

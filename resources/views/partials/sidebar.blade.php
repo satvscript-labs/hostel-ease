@@ -254,6 +254,21 @@
                 // small delay to let CSS render
                 setTimeout(() => updateIndicator(menu, active, false), 50);
             }
+
+            // Listen for external tab sync requests (e.g. from Alpine components switching tabs)
+            window.addEventListener('sync-sidebar-tab', (e) => {
+                const newTab = e.detail;
+                const targetLink = Array.from(menu.querySelectorAll('.sub-link')).find(link => {
+                    const url = new URL(link.href, window.location.origin);
+                    return url.pathname === window.location.pathname && url.searchParams.get('tab') === newTab;
+                });
+                
+                if (targetLink && !targetLink.classList.contains('active')) {
+                    menu.querySelectorAll('.sub-link').forEach(sib => sib.classList.remove('active'));
+                    targetLink.classList.add('active');
+                    updateIndicator(menu, targetLink, true);
+                }
+            });
             
             // Handle clicks
             menu.querySelectorAll('.sub-link').forEach(link => {

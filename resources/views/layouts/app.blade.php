@@ -139,6 +139,17 @@
             font-weight: 600;
             color: #0f172a;
         }
+
+        /* Global Entry Animations */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-1 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.1s both; }
+        .stagger-2 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.15s both; }
+        .stagger-3 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.2s both; }
+        .stagger-4 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.25s both; }
+        .stagger-5 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.3s both; }
     </style>
     @stack('styles')
 </head>

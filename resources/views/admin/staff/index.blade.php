@@ -73,7 +73,7 @@
     .btn-check:checked + .att-secondary { background: var(--he-text-muted); color: white; box-shadow: 0 4px 15px rgba(100, 116, 139, 0.3); }
 </style>
 
-<div x-data="staffBoard()" @tab-changed.window="tab = $event.detail" class="page-enter">
+<div x-data="staffBoard()" @tab-changed.window="switchTab($event.detail, false)" class="page-enter">
 
     <div class="d-flex align-items-center justify-content-between mb-4 stagger-1">
         <div>
@@ -430,13 +430,16 @@
             staffModalOpen: false,
             salaryModalOpen: false,
             
-            switchTab(newTab) {
+            switchTab(newTab, updateUrl = true) {
                 this.tab = '';
                 setTimeout(() => { 
                     this.tab = newTab; 
-                    const url = new URL(window.location);
-                    url.searchParams.set('tab', newTab);
-                    window.history.replaceState({}, '', url);
+                    if (updateUrl) {
+                        const url = new URL(window.location);
+                        url.searchParams.set('tab', newTab);
+                        window.history.replaceState({}, '', url);
+                        window.dispatchEvent(new CustomEvent('sync-sidebar-tab', { detail: newTab }));
+                    }
                 }, 300);
             }
         }))
