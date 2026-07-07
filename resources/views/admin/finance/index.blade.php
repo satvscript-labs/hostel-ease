@@ -112,52 +112,54 @@
             <div class="card border-0 shadow-sm rounded-4 invoice-item" 
                  x-show="matchesSearchInvoice('{{ addslashes(strtolower($invoice->student->name)) }}', '{{ $invoice->student->mobile }}', '{{ addslashes(strtolower($invoice->title)) }}', '{{ $invoice->status }}')"
                  style="animation-delay: {{ min($index * 50, 500) }}ms;">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
-                    <div class="d-flex align-items-center gap-3" style="min-width: 250px;">
-                        <div class="avatar bg-light text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
-                            {{ substr($invoice->student->name, 0, 1) }}
+                <div class="card-body p-3 p-md-4">
+                    <div class="row align-items-center m-0 w-100">
+                        <div class="col-12 col-xl-3 d-flex align-items-center gap-3 mb-3 mb-xl-0 p-0">
+                            <div class="avatar bg-light text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+                                {{ substr($invoice->student->name, 0, 1) }}
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark lh-1 mb-1">{{ $invoice->student->name }}</div>
+                                <div class="text-muted small letter-spacing-1 lh-1">{{ $invoice->student->mobile }}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="fw-bold text-dark">{{ $invoice->student->name }}</div>
-                            <div class="text-muted small letter-spacing-1">{{ $invoice->student->mobile }}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="min-width: 150px;">
-                        <div class="text-dark fw-medium">{{ $invoice->title }}</div>
-                        <div class="text-muted small letter-spacing-1 text-uppercase">{{ $invoice->type }} &bull; {{ $invoice->created_at->format('d M Y') }}</div>
-                    </div>
-                    
-                    <div class="d-flex gap-4 align-items-center flex-grow-1 justify-content-end" style="font-feature-settings: 'tnum';">
-                        <div class="text-end">
-                            <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Amount</div>
-                            <div class="fw-bold">{{ hostelease_money($invoice->amount) }}</div>
-                        </div>
-                        <div class="text-end">
-                            <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Paid</div>
-                            <div class="text-success fw-bold">{{ hostelease_money($invoice->paid_amount) }}</div>
-                        </div>
-                        <div class="text-end">
-                            <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Balance</div>
-                            <div class="text-danger fw-bold">{{ hostelease_money($invoice->balance) }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex align-items-center gap-3 ms-md-4">
-                        @if($invoice->status === 'paid')
-                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">Paid</span>
-                        @elseif($invoice->status === 'partial')
-                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 py-2">Partial</span>
-                        @else
-                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2">Pending</span>
-                        @endif
                         
-                        <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" onsubmit="return confirm('Delete this invoice?');">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-light rounded-circle text-danger shadow-sm" style="width: 36px; height: 36px;">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
+                        <div class="col-12 col-md-4 col-xl-3 mb-3 mb-md-0 p-0">
+                            <div class="text-dark fw-bold lh-1 mb-1">{{ $invoice->title }}</div>
+                            <div class="text-muted small letter-spacing-1 text-uppercase lh-1">{{ $invoice->type }} &bull; {{ $invoice->created_at->format('d M Y') }}</div>
+                        </div>
+                        
+                        <div class="col-12 col-md-6 col-xl-4 d-flex gap-4 align-items-center justify-content-md-end mb-3 mb-md-0 p-0" style="font-feature-settings: 'tnum';">
+                            <div class="text-start text-md-end">
+                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Amount</div>
+                                <div class="fw-bold">{{ hostelease_money($invoice->amount) }}</div>
+                            </div>
+                            <div class="text-start text-md-end">
+                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Paid</div>
+                                <div class="text-success fw-bold">{{ hostelease_money($invoice->paid_amount) }}</div>
+                            </div>
+                            <div class="text-start text-md-end">
+                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1">Balance</div>
+                                <div class="text-danger fw-bold">{{ hostelease_money($invoice->balance) }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12 col-md-2 col-xl-2 d-flex align-items-center justify-content-md-end gap-3 p-0">
+                            @if($invoice->status === 'paid')
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">Paid</span>
+                            @elseif($invoice->status === 'partial')
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 py-2">Partial</span>
+                            @else
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2">Pending</span>
+                            @endif
+                            
+                            <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" onsubmit="return confirm('Delete this invoice?');">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-sm btn-light rounded-circle text-danger shadow-sm" style="width: 36px; height: 36px;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -188,33 +190,35 @@
             <div class="card border-0 shadow-sm rounded-4 transaction-item"
                  x-show="matchesSearchPayment('{{ addslashes(strtolower($payment->student->name)) }}', '{{ strtolower($payment->receipt_number) }}')"
                  style="animation-delay: {{ min($index * 50, 500) }}ms;">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
-                    <div class="d-flex align-items-center gap-3" style="min-width: 250px;">
-                        <div class="avatar bg-success-subtle text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
-                            <i class="fa-solid fa-arrow-down"></i>
+                <div class="card-body p-3 p-md-4">
+                    <div class="row align-items-center m-0 w-100">
+                        <div class="col-12 col-md-5 col-xl-3 d-flex align-items-center gap-3 mb-3 mb-md-0 p-0">
+                            <div class="avatar bg-success-subtle text-success fw-bold rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+                                <i class="fa-solid fa-arrow-down"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark lh-1 mb-1">{{ $payment->student->name }}</div>
+                                <div class="text-muted small letter-spacing-1 lh-1">Receipt: {{ $payment->receipt_number }}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="fw-bold text-dark">{{ $payment->student->name }}</div>
-                            <div class="text-muted small letter-spacing-1">Receipt: {{ $payment->receipt_number }}</div>
+                        
+                        <div class="col-6 col-md-3 col-xl-3 p-0">
+                            <div class="text-dark fw-bold text-uppercase lh-1 mb-1">{{ $payment->mode }}</div>
+                            <div class="text-muted small letter-spacing-1 lh-1">{{ $payment->paid_on->format('d M Y') }}</div>
                         </div>
-                    </div>
-                    
-                    <div style="min-width: 150px;">
-                        <div class="text-dark fw-medium text-uppercase">{{ $payment->mode }}</div>
-                        <div class="text-muted small letter-spacing-1">{{ $payment->paid_on->format('d M Y') }}</div>
-                    </div>
-                    
-                    <div class="text-end flex-grow-1" style="font-feature-settings: 'tnum';">
-                        <div class="text-success fw-bold h4 mb-0">+{{ hostelease_money($payment->amount) }}</div>
-                    </div>
-                    
-                    <div class="ms-md-4">
-                        <form action="{{ route('admin.payments.destroy', $payment) }}" method="POST" onsubmit="return confirm('Reverse this payment? This will restore invoice balances.');">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-light rounded-circle text-danger shadow-sm" style="width: 36px; height: 36px;" title="Reverse Transaction">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </form>
+                        
+                        <div class="col-6 col-md-3 col-xl-5 text-end p-0" style="font-feature-settings: 'tnum';">
+                            <div class="text-success fw-bold h4 mb-0">+{{ hostelease_money($payment->amount) }}</div>
+                        </div>
+                        
+                        <div class="col-12 col-md-1 col-xl-1 text-end mt-2 mt-md-0 p-0">
+                            <form action="{{ route('admin.payments.destroy', $payment) }}" method="POST" onsubmit="return confirm('Reverse this payment? This will restore invoice balances.');">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-sm btn-light rounded-circle text-danger shadow-sm" style="width: 36px; height: 36px;" title="Reverse Transaction">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>

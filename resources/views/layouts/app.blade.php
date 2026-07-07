@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -22,7 +23,7 @@
             --he-primary: #4f46e5;
             --he-primary-hover: #4338ca;
             --he-primary-soft: rgba(79, 70, 229, 0.1);
-            
+
             --he-accent: #9333ea;
             --he-accent-hover: #7e22ce;
             --he-accent-soft: rgba(147, 51, 234, 0.1);
@@ -41,10 +42,69 @@
 
             --he-bg-canvas: #f8fafc;
             --he-bg-surface: #ffffff;
-            
+
             --he-text-main: #0f172a;
             --he-text-muted: #64748b;
             --he-text-inverse: #ffffff;
+        }
+
+        /* Custom Overlay Modal Backdrop */
+        .custom-overlay-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        /* Custom Overlay Modal Window (Form itself) */
+        .custom-overlay-modal {
+            width: 100%;
+            max-width: 550px;
+            background: #fff;
+            border-radius: 1.25rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+            transform: scale(0.95);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .custom-overlay-modal.is-open {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .custom-overlay-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+
+        .custom-overlay-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex-grow: 1;
+            background: #fafafa;
+        }
+
+        .custom-overlay-footer {
+            padding: 1.25rem 1.5rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            background: #fff;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
         }
 
         /* Ultra Premium Topbar & Footer Styles */
@@ -60,19 +120,21 @@
             padding: 0.75rem 1.5rem;
             transition: all 0.3s ease;
         }
-        
+
         .premium-footer {
             background: #ffffff;
             border-top: 1px solid rgba(0, 0, 0, 0.05);
             padding: 1.5rem 0;
             margin-top: auto;
         }
+
         .premium-footer p {
             margin: 0;
             font-size: 0.8rem;
             letter-spacing: 0.03em;
             color: #64748b;
         }
+
         .premium-footer .signature {
             font-weight: 600;
             color: #0f172a;
@@ -80,6 +142,7 @@
     </style>
     @stack('styles')
 </head>
+
 <body>
     @include('partials.sidebar')
     <div class="hsms-backdrop" data-sidebar-backdrop></div>
@@ -93,7 +156,7 @@
 
         <footer class="premium-footer text-center">
             <p>&copy; {{ date('Y') }} <span class="fw-bold">{{ config('app.name') }}</span>. All rights reserved.</p>
-            <p class="mt-1">Powered by <span class="signature">SatvScript Solutions</span>.</p>
+            <p class="mt-1">Powered by <span class="signature">SatvScript</span>.</p>
         </footer>
     </div>
 
@@ -109,5 +172,5 @@
     </script>
     @stack('scripts')
 </body>
-</html>
 
+</html>
