@@ -335,7 +335,7 @@
 
         <div class="row">
             @forelse($complaints as $c)
-                <div class="col-12 col-lg-6" x-show="search === '' || '{{ strtolower($c->title . ' ' . optional($c->student)->name) }}'.includes(search.toLowerCase())" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
+                <div class="col-12 col-lg-6" x-data="{ open: false, currentStatus: '{{ $c->status }}' }" x-show="search === '' || '{{ strtolower($c->title . ' ' . optional($c->student)->name) }}'.includes(search.toLowerCase())" :style="`position: relative; z-index: ${open ? 50 : 1}; animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;`">
                     <div class="fd-list-item d-flex flex-column h-100" style="margin-bottom: 1.5rem;">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
@@ -370,7 +370,7 @@
                             </div>
 
                             <!-- Premium Inline Status Dropdown -->
-                            <div x-data="{ open: false, currentStatus: '{{ $c->status }}' }" class="position-relative">
+                            <div class="position-relative">
                                 <button type="button" @click="open = !open" @click.away="open = false" 
                                     class="btn btn-sm rounded-pill shadow-sm fw-bold px-3 d-flex align-items-center justify-content-between border" style="min-width: 140px;"
                                     :class="{

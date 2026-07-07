@@ -85,9 +85,23 @@ Whenever building a new page or widget, reach for these established premium patt
 6.  **Pill Search Bars:** Fully rounded corners (`border-radius: 50px`), transparent background by default, transitioning to a solid white background with a glowing primary border on focus.
 7.  **Circular Icon Actions:** `40x40px` circular buttons. On hover, background turns white and gains a soft shadow, lifting up.
 
+## 4. Reuse but do not reinvent (Standard Dropdowns)
+
+We have established ultra-premium Alpine-powered dropdowns to replace basic HTML `<select>` elements. ALWAYS reuse these patterns instead of basic `<select>`.
+
+1. **Inline Status Dropdown (Reference: Complaints Status):**
+   - **Usage:** For changing the status of an item directly from a card or list.
+   - **Style:** A pill-shaped button that reflects the color of the current status (`bg-{color}-subtle text-{color}`). Clicking it opens a floating, absolute-positioned list of buttons (`x-show`, `x-transition.opacity`, `z-index: 1050`) where the active option has a checkmark and bold text.
+   - **Z-Index Handling:** The parent wrapper MUST have `x-data="{ open: false }"` and adjust its `z-index` when open to prevent overlapping bugs with other cards.
+
+2. **Category / Filter Dropdown (Reference: Expenses Categories):**
+   - **Usage:** For filtering lists or selecting categories in a form/filter bar.
+   - **Style:** A sleek floating pill (`d-flex align-items-center gap-3`) with a soft-colored circular icon on the left, a small uppercase label, and the selected value. Clicking toggles a `min-width: 240px` dropdown menu containing `list-group-item` elements with active states.
+   - **Z-Index Handling:** The parent container must have `position-relative z-index: 100` to sit cleanly above list elements below it.
+
 ---
 
-## 4. Standard Overlay Modals & Dialogs
+## 5. Standard Overlay Modals & Dialogs
 
 Whenever implementing a modal/dialog in this codebase, use this exact style and markup structure. This design provides a premium, centered, scroll-safe overlay that escapes layout transform stacking contexts via Alpine's teleport mechanism.
 

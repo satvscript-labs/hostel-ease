@@ -393,6 +393,42 @@ class DemoHostelSeeder extends Seeder
             );
         }
 
+        // 6. Seed Staff Attendance for the last 5 days
+        $staffMembers = Staff::where('hostel_id', $hostel->id)->get();
+        foreach ($staffMembers as $s) {
+            for ($d = 1; $d <= 5; $d++) {
+                \App\Models\StaffAttendance::firstOrCreate([
+                    'hostel_id' => $hostel->id,
+                    'staff_id' => $s->id,
+                    'date' => now()->subDays($d)->toDateString(),
+                ], [
+                    'status' => (rand(1, 10) > 2) ? 'present' : 'absent',
+                    'notes' => (rand(1, 10) > 8) ? 'Arrived late' : null,
+                ]);
+            }
+        }
+
+        // 7. Seed Pocket Money Transactions
+        foreach (array_slice($students->all(), 0, 3) as $student) {
+            \App\Models\PocketMoneyTransaction::firstOrCreate([
+                'hostel_id' => $hostel->id,
+                'student_id' => $student->id,
+                'type' => 'deposit',
+                'amount' => 5000,
+                'note' => 'Initial deposit by parents',
+                'created_by' => $admin->id
+            ]);
+            
+            \App\Models\PocketMoneyTransaction::create([
+                'hostel_id' => $hostel->id,
+                'student_id' => $student->id,
+                'type' => 'withdraw',
+                'amount' => rand(100, 500),
+                'note' => 'Canteen expenses',
+                'created_by' => $admin->id
+            ]);
+        }
+
         $this->command->info('Demo hostel "Sunrise Boys Hostel" seeded — admin login +919876543210 / password');
     }
 }
