@@ -94,5 +94,10 @@ class Student extends Model
             ->where('status', 'active')
             ->whereBetween('leave_date', [now()->startOfDay(), now()->addDays($days)->endOfDay()]);
     }
+
+    public function securityDeposits()
+    {
+        return $this->hasMany(SecurityDeposit::class);
+    }
 }
 

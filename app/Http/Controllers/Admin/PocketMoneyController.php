@@ -51,9 +51,8 @@ class PocketMoneyController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if ($data['type'] === 'withdraw' && $data['amount'] > PocketMoneyTransaction::balanceFor($student->id)) {
-            return back()->with('error', 'Insufficient balance for this withdrawal.');
-        }
+        // Lending is now allowed — negative balances are permitted.
+        // The frontend shows a warning prompt before the user confirms.
 
         PocketMoneyTransaction::create($data + [
             'hostel_id' => Tenant::id(),

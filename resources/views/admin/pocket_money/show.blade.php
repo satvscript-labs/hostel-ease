@@ -126,7 +126,22 @@
     .bg-withdraw { background: #f59e0b; }
 </style>
 
-<div class="page-enter" x-data="{ tab: 'deposit' }">
+<div class="page-enter" x-data="{ tab: 'deposit', amount: 0, balance: {{ $balance }}, showLendingWarning: false, lendingConfirmed: false }">
+    <style>
+        .lending-warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 0.75rem;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1rem;
+            animation: fadeUp 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        .lending-warning .warning-icon {
+            color: #b45309;
+            font-size: 1.1rem;
+        }
+        .negative-balance { color: #ef4444 !important; }
+    </style>
     
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h1 class="h4 fw-bold mb-0">Pocket Money Manager</h1>
@@ -142,7 +157,7 @@
             <!-- Digital Wallet Card -->
             <div class="wallet-card mb-4">
                 <div class="wallet-label">Current Balance</div>
-                <div class="wallet-balance">{{ hostelease_money($balance) }}</div>
+                <div class="wallet-balance {{ $balance < 0 ? 'negative-balance' : '' }}">{{ hostelease_money($balance) }}</div>
                 <div class="wallet-owner">
                     <img src="{{ $student->photo_url }}" class="wallet-avatar" alt="Avatar">
                     <div>
@@ -172,7 +187,7 @@
                             <label class="form-label fw-bold small text-muted">Amount <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light fw-bold border-end-0">{{ config('hostelease.currency') }}</span>
-                                <input type="number" step="0.01" name="amount" class="form-control border-start-0 ps-0 fw-bold fs-5" placeholder="0.00" required>
+                                <input type="number" step="0.01" name="amount" class="form-control border-start-0 ps-0 fw-bold fs-5" placeholder="0.00" required x-model.number="amount" @input="showLendingWarning = (tab === 'withdraw' && amount > balance); lendingConfirmed = false;">
                             </div>
                         </div>
                         
@@ -181,9 +196,30 @@
                             <input type="text" name="note" class="form-control" placeholder="e.g. Monthly allowance, Medical expense...">
                         </div>
                         
-                        <button type="submit" class="btn w-100 rounded-pill py-2 fw-bold text-white fs-6 shadow-sm" :class="tab === 'deposit' ? 'bg-deposit' : 'bg-withdraw'">
+                        {{-- Lending Warning --}}
+                        <template x-if="showLendingWarning && tab === 'withdraw'">
+                            <div class="lending-warning">
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="fa-solid fa-triangle-exclamation warning-icon mt-1"></i>
+                                    <div>
+                                        <div class="fw-bold small text-dark">Lending Warning</div>
+                                        <div class="small" style="color: #92400e;">
+                                            This withdrawal of <strong x-text="'{{ config('hostelease.currency') }}' + amount.toFixed(2)"></strong> exceeds the current balance of <strong>{{ hostelease_money($balance) }}</strong>.
+                                            The student will have a negative balance (borrowing) of <strong x-text="'{{ config('hostelease.currency') }}' + (balance - amount).toFixed(2)"></strong>.
+                                        </div>
+                                        <label class="d-flex align-items-center gap-2 mt-2 small fw-bold cursor-pointer" style="color: #b45309;">
+                                            <input type="checkbox" x-model="lendingConfirmed" class="form-check-input m-0" style="border-color: #f59e0b;">
+                                            I understand, proceed with lending
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <button type="submit" class="btn w-100 rounded-pill py-2 fw-bold text-white fs-6 shadow-sm" :class="tab === 'deposit' ? 'bg-deposit' : 'bg-withdraw'" :disabled="showLendingWarning && !lendingConfirmed">
                             <span x-show="tab === 'deposit'"><i class="fa-solid fa-plus me-1"></i> Add Funds</span>
-                            <span x-show="tab === 'withdraw'"><i class="fa-solid fa-minus me-1"></i> Deduct Funds</span>
+                            <span x-show="tab === 'withdraw' && !showLendingWarning"><i class="fa-solid fa-minus me-1"></i> Deduct Funds</span>
+                            <span x-show="tab === 'withdraw' && showLendingWarning"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Lend Funds</span>
                         </button>
                     </form>
                 </div>

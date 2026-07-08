@@ -1,304 +1,571 @@
 @php($user = auth()->user())
-<aside class="hsms-sidebar">
-    <div class="d-flex align-items-center gap-2 px-3 py-3 border-bottom border-secondary-subtle">
-        <img src="{{ asset('hsms-icon.svg') }}" alt="HSMS" style="width:30px;height:30px;border-radius:7px">
-        <span class="brand fs-5">HSMS</span>
-        <button type="button" class="btn btn-sm btn-dark sidebar-close ms-auto" data-sidebar-close aria-label="Close menu">
+<aside class="hsms-sidebar" x-data="sidebarNav()" x-cloak>
+    {{-- ═══════════════════════════════════════════════════════════
+         HEADER — Brand Identity
+    ═══════════════════════════════════════════════════════════════ --}}
+    <div class="sidebar-brand">
+        <div class="brand-logo-wrap">
+            <img src="{{ asset('hsms-icon.svg') }}" alt="HSMS" class="brand-logo">
+            <div class="brand-glow"></div>
+        </div>
+        <div class="brand-text">
+            <span class="brand-name">HSMS</span>
+            <span class="brand-tagline">Hostel Management</span>
+        </div>
+        <button type="button" class="sidebar-close-btn d-lg-none" data-sidebar-close aria-label="Close menu">
             <i class="fa-solid fa-xmark"></i>
         </button>
     </div>
 
-    <style>
-        /* Smooth iOS Easing */
-        :root {
-            --ios-spring: cubic-bezier(0.25, 1, 0.5, 1);
-            --ios-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        /* Nav Link Base Micro-animations */
-        .hsms-sidebar .nav-link {
-            transition: all 0.3s var(--ios-spring);
-            border-radius: 0.5rem;
-            position: relative;
-        }
-
-        /* Icon Micro-animations */
-        .hsms-sidebar .nav-link i {
-            transition: transform 0.4s var(--ios-bounce), color 0.3s ease;
-        }
-        .hsms-sidebar .nav-link:hover i {
-            transform: scale(1.15) translateY(-1px);
-        }
-
-        /* Hover Effect for Main Links */
-        .hsms-sidebar .nav-link:hover {
-            transform: translateX(4px);
-            background-color: rgba(var(--bs-primary-rgb), 0.04);
-        }
-
-        /* Active Main Link */
-        .hsms-sidebar .nav-link.active.fw-bold {
-            background-color: rgba(var(--bs-primary-rgb), 0.08);
-            color: var(--bs-primary);
-        }
-        .hsms-sidebar .nav-link.active.fw-bold i {
-            color: var(--bs-primary);
-        }
-
-        /* Sub Menu Container */
-        .hsms-sub-menu { 
-            margin-top: 0.25rem; 
-            margin-bottom: 0.75rem; 
-            padding-bottom: 0.25rem; 
-            border-left: 2px solid rgba(var(--bs-secondary-rgb), 0.15); 
-            margin-left: 1.5rem; 
-            animation: slideDownFade 0.4s var(--ios-spring) forwards;
-            transform-origin: top;
-            position: relative;
-        }
-
-        /* Sub Menu Links */
-        .hsms-sidebar .sub-link { 
-            padding-left: 1.25rem; 
-            font-size: 0.9rem; 
-            color: var(--bs-secondary); 
-            position: relative;
-            margin-bottom: 0.15rem;
-            opacity: 0;
-            animation: slideInRight 0.4s var(--ios-spring) forwards;
-        }
-        
-        /* Staggered Animation for sub-links */
-        .hsms-sidebar .sub-link:nth-child(1) { animation-delay: 0.05s; }
-        .hsms-sidebar .sub-link:nth-child(2) { animation-delay: 0.1s; }
-        .hsms-sidebar .sub-link:nth-child(3) { animation-delay: 0.15s; }
-        .hsms-sidebar .sub-link:nth-child(4) { animation-delay: 0.2s; }
-        .hsms-sidebar .sub-link:nth-child(5) { animation-delay: 0.25s; }
-
-        /* Sub Link Hover & Active */
-        .hsms-sidebar .sub-link:hover { 
-            color: var(--bs-primary); 
-            background: transparent; 
-            transform: translateX(4px);
-        }
-        .hsms-sidebar .sub-link.active { 
-            color: var(--bs-primary); 
-            font-weight: 600; 
-        }
-        
-        /* Force override any global app.scss ::before rules */
-        .hsms-sidebar .sub-link.active::before {
-            display: none !important;
-            content: none !important;
-        }
-
-        .hsms-sub-menu .active-indicator {
-            position: absolute;
-            left: -2px;
-            width: 3px;
-            background: var(--bs-primary);
-            border-radius: 0 4px 4px 0;
-            transition: top 0.4s var(--ios-spring), height 0.4s var(--ios-spring);
-            z-index: 10;
-        }
-
-        /* Keyframes */
-        @keyframes slideDownFade {
-            from { opacity: 0; transform: scaleY(0.95); }
-            to { opacity: 1; transform: scaleY(1); }
-        }
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes popIn {
-            0% { transform: scaleY(0); }
-            100% { transform: scaleY(1); }
-        }
-    </style>
-
-    <nav class="nav flex-column flex-nowrap flex-grow-1 overflow-y-auto overflow-x-hidden py-2">
+    {{-- ═══════════════════════════════════════════════════════════
+         NAVIGATION LINKS
+    ═══════════════════════════════════════════════════════════════ --}}
+    <nav class="sidebar-nav" id="sidebar-nav">
         @if($user->isSuperAdmin())
-            <a class="nav-link {{ request()->routeIs('superadmin.dashboard') ? 'active' : '' }}" href="{{ route('superadmin.dashboard') }}">
-                <i class="fa-solid fa-gauge-high"></i> {{ __('Dashboard') }}
+            {{-- SuperAdmin Links --}}
+            <a class="sidebar-link {{ request()->routeIs('superadmin.dashboard') ? 'is-active' : '' }}" href="{{ route('superadmin.dashboard') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-gauge-high"></i></span>
+                <span class="sidebar-link-label">{{ __('Dashboard') }}</span>
             </a>
-            <a class="nav-link {{ request()->routeIs('superadmin.hostels.*') ? 'active' : '' }}" href="{{ route('superadmin.hostels.index') }}">
-                <i class="fa-solid fa-hotel"></i> {{ __('Hostels') }}
+            <a class="sidebar-link {{ request()->routeIs('superadmin.hostels.*') ? 'is-active' : '' }}" href="{{ route('superadmin.hostels.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-hotel"></i></span>
+                <span class="sidebar-link-label">{{ __('Hostels') }}</span>
             </a>
-            <a class="nav-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
-                <i class="fa-solid fa-receipt"></i> {{ __('Subscriptions') }}
+            <a class="sidebar-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'is-active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-receipt"></i></span>
+                <span class="sidebar-link-label">{{ __('Subscriptions') }}</span>
             </a>
-            <a class="nav-link {{ request()->routeIs('superadmin.activity') ? 'active' : '' }}" href="{{ route('superadmin.activity') }}"><i class="fa-solid fa-list-check"></i> {{ __('Activity Logs') }}</a>
-            <a class="nav-link {{ request()->routeIs('superadmin.backups.*') ? 'active' : '' }}" href="{{ route('superadmin.backups.index') }}"><i class="fa-solid fa-database"></i> {{ __('Backups') }}</a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.activity') ? 'is-active' : '' }}" href="{{ route('superadmin.activity') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-list-check"></i></span>
+                <span class="sidebar-link-label">{{ __('Activity Logs') }}</span>
+            </a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.backups.*') ? 'is-active' : '' }}" href="{{ route('superadmin.backups.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-database"></i></span>
+                <span class="sidebar-link-label">{{ __('Backups') }}</span>
+            </a>
         @else
-            <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
-                <i class="fa-solid fa-gauge-high"></i> <span class="ms-2">{{ __('Dashboard') }}</span>
-            </a>
-            
-            <a class="nav-link {{ request()->routeIs('admin.property.*') ? 'active' : '' }}" href="{{ route('admin.property.index') }}">
-                <i class="fa-solid fa-building"></i> <span class="ms-2">{{ __('Property Board') }}</span>
+            {{-- Admin / Staff Links --}}
+
+            {{-- Dashboard --}}
+            <a class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'is-active' : '' }}" href="{{ route('admin.dashboard') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-gauge-high"></i></span>
+                <span class="sidebar-link-label">{{ __('Dashboard') }}</span>
             </a>
 
-            <!-- People Menu -->
+            {{-- Property Board --}}
+            <a class="sidebar-link {{ request()->routeIs('admin.property.*') ? 'is-active' : '' }}" href="{{ route('admin.property.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-building"></i></span>
+                <span class="sidebar-link-label">{{ __('Property Board') }}</span>
+            </a>
+
+            {{-- People --}}
             @php($peopleActive = request()->routeIs('admin.students.*', 'admin.assignments.*', 'admin.registrations.*'))
-            <a class="nav-link {{ $peopleActive ? 'active fw-bold' : '' }}" href="{{ route('admin.students.index') }}">
-                <i class="fa-solid fa-users"></i> <span class="ms-2">{{ __('People') }}</span>
-            </a>
-            @if($peopleActive)
-            <div class="hsms-sub-menu">
-                <a class="nav-link sub-link {{ request()->routeIs('admin.students.*') ? 'active' : '' }}" href="{{ route('admin.students.index') }}">{{ __('Students') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.registrations.*') ? 'active' : '' }}" href="{{ route('admin.registrations.index') }}">{{ __('Registrations') }}</a>
+            <div class="sidebar-group" x-data="{ expanded: {{ $peopleActive ? 'true' : 'false' }} }">
+                <button class="sidebar-link" :class="{ 'is-active': {{ $peopleActive ? 'true' : 'false' }}, 'is-expanded': expanded }" @click="expanded = !expanded" type="button">
+                    <span class="sidebar-link-icon"><i class="fa-solid fa-users"></i></span>
+                    <span class="sidebar-link-label">{{ __('People') }}</span>
+                    <span class="sidebar-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+                </button>
+                <div class="sidebar-submenu" x-show="expanded" x-collapse.duration.350ms>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.students.*') ? 'is-active' : '' }}" href="{{ route('admin.students.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Students') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.registrations.*') ? 'is-active' : '' }}" href="{{ route('admin.registrations.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Registrations') }}
+                    </a>
+                </div>
             </div>
-            @endif
 
-            <!-- Front Desk Menu -->
+            {{-- Front Desk --}}
             @php($deskActive = request()->routeIs('admin.frontdesk.*', 'admin.visitors.*', 'admin.complaints.*'))
-            <a class="nav-link {{ $deskActive ? 'active fw-bold' : '' }}" href="{{ route('admin.frontdesk.index') }}">
-                <i class="fa-solid fa-bell-concierge"></i> <span class="ms-2">{{ __('Front Desk') }}</span>
-            </a>
-            @if($deskActive)
-            <div class="hsms-sub-menu">
-                <a class="nav-link sub-link {{ request()->routeIs('admin.frontdesk.*') && request('tab', 'visitors') === 'visitors' ? 'active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'visitors']) }}">{{ __('Visitors') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.frontdesk.*') && request('tab') === 'complaints' ? 'active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'complaints']) }}">{{ __('Complaints') }}</a>
+            <div class="sidebar-group" x-data="{ expanded: {{ $deskActive ? 'true' : 'false' }} }">
+                <button class="sidebar-link" :class="{ 'is-active': {{ $deskActive ? 'true' : 'false' }}, 'is-expanded': expanded }" @click="expanded = !expanded" type="button">
+                    <span class="sidebar-link-icon"><i class="fa-solid fa-bell-concierge"></i></span>
+                    <span class="sidebar-link-label">{{ __('Front Desk') }}</span>
+                    <span class="sidebar-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+                </button>
+                <div class="sidebar-submenu" x-show="expanded" x-collapse.duration.350ms>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.frontdesk.*') && request('tab', 'visitors') === 'visitors' ? 'is-active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'visitors']) }}">
+                        <span class="sublink-dot"></span>{{ __('Visitors') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.frontdesk.*') && request('tab') === 'complaints' ? 'is-active' : '' }}" href="{{ route('admin.frontdesk.index', ['tab' => 'complaints']) }}">
+                        <span class="sublink-dot"></span>{{ __('Complaints') }}
+                    </a>
+                </div>
             </div>
-            @endif
 
-            <!-- Finance Menu -->
-            @php($financeActive = request()->routeIs('admin.finance.*', 'admin.pocket-money.*', 'admin.payment-modes.*', 'admin.expenses.*'))
-            <a class="nav-link {{ $financeActive ? 'active fw-bold' : '' }}" href="{{ route('admin.finance.index') }}">
-                <i class="fa-solid fa-chart-pie"></i> <span class="ms-2">{{ __('Finance') }}</span>
-            </a>
-            @if($financeActive)
-            <div class="hsms-sub-menu">
-                <a class="nav-link sub-link {{ request()->routeIs('admin.finance.*') && request('tab') !== 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'invoices']) }}">{{ __('Invoices & Dues') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.finance.*') && request('tab') === 'transactions' ? 'active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'transactions']) }}">{{ __('Transactions') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.expenses.*') ? 'active' : '' }}" href="{{ route('admin.expenses.index') }}">{{ __('Expenses') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.ac-bills.*') ? 'active' : '' }}" href="{{ route('admin.ac-bills.index') }}">{{ __('AC Bills') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.pocket-money.*') ? 'active' : '' }}" href="{{ route('admin.pocket-money.index') }}">{{ __('Pocket Money') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.payment-modes.*') ? 'active' : '' }}" href="{{ route('admin.payment-modes.index') }}">{{ __('Payment Modes') }}</a>
+            {{-- Finance --}}
+            @php($financeActive = request()->routeIs('admin.finance.*', 'admin.pocket-money.*', 'admin.payment-modes.*', 'admin.expenses.*', 'admin.ac-bills.*', 'admin.security-deposits.*'))
+            <div class="sidebar-group" x-data="{ expanded: {{ $financeActive ? 'true' : 'false' }} }">
+                <button class="sidebar-link" :class="{ 'is-active': {{ $financeActive ? 'true' : 'false' }}, 'is-expanded': expanded }" @click="expanded = !expanded" type="button">
+                    <span class="sidebar-link-icon"><i class="fa-solid fa-chart-pie"></i></span>
+                    <span class="sidebar-link-label">{{ __('Finance') }}</span>
+                    <span class="sidebar-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+                </button>
+                <div class="sidebar-submenu" x-show="expanded" x-collapse.duration.350ms>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.finance.*') && request('tab') !== 'transactions' ? 'is-active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'invoices']) }}">
+                        <span class="sublink-dot"></span>{{ __('Invoices & Dues') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.finance.*') && request('tab') === 'transactions' ? 'is-active' : '' }}" href="{{ route('admin.finance.index', ['tab' => 'transactions']) }}">
+                        <span class="sublink-dot"></span>{{ __('Transactions') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.expenses.*') ? 'is-active' : '' }}" href="{{ route('admin.expenses.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Expenses') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.ac-bills.*') ? 'is-active' : '' }}" href="{{ route('admin.ac-bills.index') }}">
+                        <span class="sublink-dot"></span>{{ __('AC Bills') }}
+                    </a>
+                    @if(Route::has('admin.security-deposits.index'))
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.security-deposits.*') ? 'is-active' : '' }}" href="{{ route('admin.security-deposits.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Security Deposits') }}
+                    </a>
+                    @endif
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.pocket-money.*') ? 'is-active' : '' }}" href="{{ route('admin.pocket-money.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Pocket Money') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.payment-modes.*') ? 'is-active' : '' }}" href="{{ route('admin.payment-modes.index') }}">
+                        <span class="sublink-dot"></span>{{ __('Payment Modes') }}
+                    </a>
+                </div>
             </div>
-            @endif
-            
-            <!-- Operations Menu -->
+
+            {{-- Staff & Ops --}}
             @php($opsActive = request()->routeIs('admin.staff.*'))
-            <a class="nav-link {{ $opsActive ? 'active fw-bold' : '' }}" href="{{ route('admin.staff.index') }}">
-                <i class="fa-solid fa-briefcase"></i> <span class="ms-2">{{ __('Staff & Ops') }}</span>
-            </a>
-            @if($opsActive)
-            <div class="hsms-sub-menu">
-                <a class="nav-link sub-link {{ request()->routeIs('admin.staff.*') && request('tab', 'directory') === 'directory' ? 'active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'directory']) }}">{{ __('Staff Directory') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.staff.*') && request('tab') === 'attendance' ? 'active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'attendance']) }}">{{ __('Attendance') }}</a>
+            <div class="sidebar-group" x-data="{ expanded: {{ $opsActive ? 'true' : 'false' }} }">
+                <button class="sidebar-link" :class="{ 'is-active': {{ $opsActive ? 'true' : 'false' }}, 'is-expanded': expanded }" @click="expanded = !expanded" type="button">
+                    <span class="sidebar-link-icon"><i class="fa-solid fa-briefcase"></i></span>
+                    <span class="sidebar-link-label">{{ __('Staff & Ops') }}</span>
+                    <span class="sidebar-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+                </button>
+                <div class="sidebar-submenu" x-show="expanded" x-collapse.duration.350ms>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.staff.*') && request('tab', 'directory') === 'directory' ? 'is-active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'directory']) }}">
+                        <span class="sublink-dot"></span>{{ __('Staff Directory') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.staff.*') && request('tab') === 'attendance' ? 'is-active' : '' }}" href="{{ route('admin.staff.index', ['tab' => 'attendance']) }}">
+                        <span class="sublink-dot"></span>{{ __('Attendance') }}
+                    </a>
+                </div>
             </div>
-            @endif
 
-            <!-- Insights & Settings Menu -->
-            @php($settingsActive = request()->routeIs('admin.reports.*', 'admin.users.*', 'admin.branches.*'))
-            <a class="nav-link {{ $settingsActive ? 'active fw-bold' : '' }}" href="{{ route('admin.reports.index') }}">
-                <i class="fa-solid fa-gear"></i> <span class="ms-2">{{ __('Settings & Tools') }}</span>
+            {{-- Reports (Solo section) --}}
+            <a class="sidebar-link {{ request()->routeIs('admin.reports.*') ? 'is-active' : '' }}" href="{{ route('admin.reports.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="sidebar-link-label">{{ __('Reports') }}</span>
             </a>
-            @if($settingsActive)
-            <div class="hsms-sub-menu">
-                <a class="nav-link sub-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.index') }}">{{ __('Reports') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">{{ __('Users & Roles') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.branches.*') ? 'active' : '' }}" href="{{ route('admin.branches.index') }}">{{ __('Branches & Billing') }}</a>
-            </div>
-            @endif
         @endif
     </nav>
 
-    <div class="px-3 py-2 border-top border-secondary-subtle small text-secondary">
-        v1.0 · {{ $user->isSuperAdmin() ? 'Super Admin' : optional($user->hostel)->name }}
+    {{-- ═══════════════════════════════════════════════════════════
+         FOOTER — Settings Pinned to Bottom + User Info
+    ═══════════════════════════════════════════════════════════════ --}}
+    <div class="sidebar-footer">
+        <div class="sidebar-divider"></div>
+
+        @if(!$user->isSuperAdmin())
+        {{-- Settings (pinned to bottom) --}}
+        @php($settingsActive = request()->routeIs('admin.users.*', 'admin.branches.*'))
+        <a class="sidebar-link sidebar-settings-link {{ $settingsActive ? 'is-active' : '' }}" href="{{ route('admin.users.index') }}">
+            <span class="sidebar-link-icon"><i class="fa-solid fa-gear"></i></span>
+            <span class="sidebar-link-label">{{ __('Settings') }}</span>
+        </a>
+        @endif
+
+        {{-- User Card --}}
+        <div class="sidebar-user-card">
+            <div class="sidebar-user-avatar">
+                {{ strtoupper(substr($user->name, 0, 1)) }}
+            </div>
+            <div class="sidebar-user-info">
+                <span class="sidebar-user-name">{{ Str::limit($user->name, 16) }}</span>
+                <span class="sidebar-user-role">{{ $user->isSuperAdmin() ? 'Super Admin' : ucfirst(str_replace('_', ' ', $user->role)) }}</span>
+            </div>
+        </div>
     </div>
 </aside>
 
+{{-- ═══════════════════════════════════════════════════════════
+     SIDEBAR STYLES — Ultra Premium Design System
+═══════════════════════════════════════════════════════════════ --}}
+<style>
+    /* ─── Easing Tokens ───────────────────────────────────── */
+    :root {
+        --sb-spring: cubic-bezier(0.25, 1, 0.5, 1);
+        --sb-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+        --sb-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ─── Brand Header ────────────────────────────────────── */
+    .sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.25rem 1.15rem;
+        position: relative;
+    }
+    .sidebar-brand::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 1.15rem;
+        right: 1.15rem;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.15), transparent);
+    }
+    .brand-logo-wrap {
+        position: relative;
+        flex-shrink: 0;
+    }
+    .brand-logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        position: relative;
+        z-index: 1;
+    }
+    .brand-glow {
+        position: absolute;
+        inset: -3px;
+        border-radius: 13px;
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.4), rgba(147, 51, 234, 0.4));
+        filter: blur(6px);
+        opacity: 0.6;
+        animation: glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse {
+        0%, 100% { opacity: 0.4; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .brand-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+    .brand-name {
+        font-weight: 800;
+        font-size: 1.05rem;
+        color: #fff;
+        letter-spacing: 0.03em;
+    }
+    .brand-tagline {
+        font-size: 0.65rem;
+        color: rgba(148, 163, 184, 0.7);
+        letter-spacing: 0.04em;
+        font-weight: 500;
+    }
+    .sidebar-close-btn {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: none;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(148, 163, 184, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s var(--sb-smooth);
+    }
+    .sidebar-close-btn:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+    }
+
+    /* ─── Navigation Container ────────────────────────────── */
+    .sidebar-nav {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.5rem 0.65rem;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+    }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.4); }
+
+    /* ─── Sidebar Link (Main Items) ───────────────────────── */
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 0.75rem;
+        margin: 0.12rem 0;
+        border-radius: 0.6rem;
+        color: rgba(203, 213, 225, 0.85);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+        position: relative;
+        transition: all 0.25s var(--sb-spring);
+    }
+    .sidebar-link:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.06);
+        transform: translateX(3px);
+    }
+    .sidebar-link:hover .sidebar-link-icon {
+        transform: scale(1.12);
+    }
+    .sidebar-link:active {
+        transform: translateX(3px) scale(0.98);
+    }
+
+    /* ─── Active State ────────────────────────────────────── */
+    .sidebar-link.is-active {
+        color: #fff;
+        background: rgba(79, 70, 229, 0.18);
+    }
+    .sidebar-link.is-active::before {
+        content: '';
+        position: absolute;
+        left: -0.65rem;
+        top: 0.3rem;
+        bottom: 0.3rem;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: linear-gradient(180deg, #4f46e5, #7c3aed);
+        animation: indicatorSlideIn 0.4s var(--sb-bounce) forwards;
+    }
+    @keyframes indicatorSlideIn {
+        from { transform: scaleY(0); opacity: 0; }
+        to { transform: scaleY(1); opacity: 1; }
+    }
+
+    /* ─── Icon ────────────────────────────────────────────── */
+    .sidebar-link-icon {
+        width: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        opacity: 0.75;
+        transition: transform 0.35s var(--sb-bounce), opacity 0.2s ease;
+        flex-shrink: 0;
+    }
+    .sidebar-link.is-active .sidebar-link-icon { opacity: 1; }
+
+    /* ─── Chevron (Expandable Groups) ─────────────────────── */
+    .sidebar-chevron {
+        margin-left: auto;
+        font-size: 0.65rem;
+        opacity: 0.4;
+        transition: transform 0.3s var(--sb-spring), opacity 0.2s ease;
+    }
+    .sidebar-link.is-expanded .sidebar-chevron {
+        transform: rotate(90deg);
+        opacity: 0.7;
+    }
+
+    /* ─── Submenu ─────────────────────────────────────────── */
+    .sidebar-submenu {
+        margin-left: 1.35rem;
+        padding-left: 0.75rem;
+        border-left: 1.5px solid rgba(148, 163, 184, 0.1);
+        margin-bottom: 0.25rem;
+        position: relative;
+    }
+
+    .sidebar-sublink {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.65rem;
+        margin: 0.06rem 0;
+        border-radius: 0.5rem;
+        color: rgba(148, 163, 184, 0.75);
+        text-decoration: none;
+        font-size: 0.82rem;
+        font-weight: 500;
+        transition: all 0.25s var(--sb-spring);
+        position: relative;
+    }
+    .sidebar-sublink:hover {
+        color: #e2e8f0;
+        transform: translateX(4px);
+    }
+    .sidebar-sublink.is-active {
+        color: #a5b4fc;
+        font-weight: 600;
+    }
+    .sidebar-sublink.is-active .sublink-dot {
+        background: #818cf8;
+        box-shadow: 0 0 6px rgba(129, 140, 248, 0.5);
+        transform: scale(1.3);
+    }
+
+    /* ─── Sublink Dot ─────────────────────────────────────── */
+    .sublink-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(148, 163, 184, 0.35);
+        flex-shrink: 0;
+        transition: all 0.3s var(--sb-bounce);
+    }
+
+    /* ─── Footer ──────────────────────────────────────────── */
+    .sidebar-footer {
+        flex-shrink: 0;
+        padding: 0 0.65rem 0.75rem;
+    }
+    .sidebar-divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.12), transparent);
+        margin: 0.5rem 0.5rem 0.5rem;
+    }
+
+    /* ─── Settings Link (Bottom) ──────────────────────────── */
+    .sidebar-settings-link {
+        margin-bottom: 0.5rem !important;
+    }
+    .sidebar-settings-link .sidebar-link-icon i {
+        transition: transform 0.5s var(--sb-smooth);
+    }
+    .sidebar-settings-link:hover .sidebar-link-icon i {
+        transform: rotate(90deg) scale(1.1);
+    }
+
+    /* ─── User Card ───────────────────────────────────────── */
+    .sidebar-user-card {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.7rem;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        transition: all 0.25s var(--sb-smooth);
+    }
+    .sidebar-user-card:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+    .sidebar-user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    .sidebar-user-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.15;
+        min-width: 0;
+    }
+    .sidebar-user-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sidebar-user-role {
+        font-size: 0.68rem;
+        color: rgba(148, 163, 184, 0.65);
+        font-weight: 500;
+    }
+
+    /* ─── Entry Animations ────────────────────────────────── */
+    .sidebar-link,
+    .sidebar-sublink {
+        opacity: 0;
+        animation: sidebarFadeIn 0.5s var(--sb-spring) forwards;
+    }
+    @keyframes sidebarFadeIn {
+        from { opacity: 0; transform: translateX(-12px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    /* Stagger on page load */
+    .sidebar-nav > :nth-child(1) .sidebar-link,
+    .sidebar-nav > a:nth-child(1) { animation-delay: 0.03s; }
+    .sidebar-nav > :nth-child(2) .sidebar-link,
+    .sidebar-nav > a:nth-child(2) { animation-delay: 0.06s; }
+    .sidebar-nav > :nth-child(3) .sidebar-link,
+    .sidebar-nav > a:nth-child(3) { animation-delay: 0.09s; }
+    .sidebar-nav > :nth-child(4) .sidebar-link,
+    .sidebar-nav > a:nth-child(4) { animation-delay: 0.12s; }
+    .sidebar-nav > :nth-child(5) .sidebar-link,
+    .sidebar-nav > a:nth-child(5) { animation-delay: 0.15s; }
+    .sidebar-nav > :nth-child(6) .sidebar-link,
+    .sidebar-nav > a:nth-child(6) { animation-delay: 0.18s; }
+    .sidebar-nav > :nth-child(7) .sidebar-link,
+    .sidebar-nav > a:nth-child(7) { animation-delay: 0.21s; }
+    .sidebar-nav > :nth-child(8) .sidebar-link,
+    .sidebar-nav > a:nth-child(8) { animation-delay: 0.24s; }
+    .sidebar-nav > :nth-child(9) .sidebar-link,
+    .sidebar-nav > a:nth-child(9) { animation-delay: 0.27s; }
+
+    /* Sublink stagger */
+    .sidebar-submenu .sidebar-sublink:nth-child(1) { animation-delay: 0.05s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(2) { animation-delay: 0.1s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(3) { animation-delay: 0.15s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(4) { animation-delay: 0.18s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(5) { animation-delay: 0.21s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(6) { animation-delay: 0.24s; }
+    .sidebar-submenu .sidebar-sublink:nth-child(7) { animation-delay: 0.27s; }
+
+    .sidebar-footer { animation: sidebarFadeIn 0.5s var(--sb-spring) 0.35s forwards; opacity: 0; }
+</style>
+
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const updateIndicator = (menu, activeLink, animate = true) => {
-            let indicator = menu.querySelector('.active-indicator');
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.className = 'active-indicator';
-                if (!animate) indicator.style.transition = 'none';
-                menu.appendChild(indicator);
+    function sidebarNav() {
+        return {
+            init() {
+                // Handle sub-link clicks that switch tabs (SPA behavior)
+                this.$el.querySelectorAll('.sidebar-sublink').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        const url = new URL(link.href, window.location.origin);
+
+                        // SPA tab switch (same page, different tab)
+                        if (url.pathname === window.location.pathname && url.searchParams.has('tab')) {
+                            e.preventDefault();
+
+                            // Update active state
+                            const submenu = link.closest('.sidebar-submenu');
+                            submenu.querySelectorAll('.sidebar-sublink').forEach(s => s.classList.remove('is-active'));
+                            link.classList.add('is-active');
+
+                            // Push URL and dispatch tab-changed
+                            const newTab = url.searchParams.get('tab');
+                            window.history.pushState({}, '', link.href);
+                            window.dispatchEvent(new CustomEvent('tab-changed', { detail: newTab }));
+                        }
+                    });
+                });
+
+                // Listen for external tab sync events
+                window.addEventListener('sync-sidebar-tab', (e) => {
+                    const newTab = e.detail;
+                    this.$el.querySelectorAll('.sidebar-submenu').forEach(submenu => {
+                        const targetLink = Array.from(submenu.querySelectorAll('.sidebar-sublink')).find(link => {
+                            const u = new URL(link.href, window.location.origin);
+                            return u.pathname === window.location.pathname && u.searchParams.get('tab') === newTab;
+                        });
+                        if (targetLink && !targetLink.classList.contains('is-active')) {
+                            submenu.querySelectorAll('.sidebar-sublink').forEach(s => s.classList.remove('is-active'));
+                            targetLink.classList.add('is-active');
+                        }
+                    });
+                });
             }
-            if (animate) indicator.style.transition = 'top 0.4s cubic-bezier(0.25, 1, 0.5, 1), height 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
-            
-            // Calculate relative to the menu container
-            const linkRect = activeLink.getBoundingClientRect();
-            const menuRect = menu.getBoundingClientRect();
-            const relativeTop = linkRect.top - menuRect.top;
-            
-            indicator.style.top = (relativeTop + linkRect.height * 0.15) + 'px';
-            indicator.style.height = (linkRect.height * 0.7) + 'px';
         };
-
-        // Determine if we should skip cascade
-        const shouldSkipCascade = sessionStorage.getItem('hsms_skip_cascade') === 'true';
-        if (shouldSkipCascade) {
-            sessionStorage.removeItem('hsms_skip_cascade');
-        }
-
-        document.querySelectorAll('.hsms-sub-menu').forEach(menu => {
-            // Disable animations if returning from a cross-page sub-link click
-            if (shouldSkipCascade) {
-                menu.style.animation = 'none';
-                menu.querySelectorAll('.sub-link').forEach(link => {
-                    link.style.animation = 'none';
-                    link.style.opacity = '1';
-                    link.style.transform = 'none';
-                });
-            }
-
-            // Position indicator on load
-            const active = menu.querySelector('.sub-link.active');
-            if (active) {
-                // small delay to let CSS render
-                setTimeout(() => updateIndicator(menu, active, false), 50);
-            }
-
-            // Listen for external tab sync requests (e.g. from Alpine components switching tabs)
-            window.addEventListener('sync-sidebar-tab', (e) => {
-                const newTab = e.detail;
-                const targetLink = Array.from(menu.querySelectorAll('.sub-link')).find(link => {
-                    const url = new URL(link.href, window.location.origin);
-                    return url.pathname === window.location.pathname && url.searchParams.get('tab') === newTab;
-                });
-                
-                if (targetLink && !targetLink.classList.contains('active')) {
-                    menu.querySelectorAll('.sub-link').forEach(sib => sib.classList.remove('active'));
-                    targetLink.classList.add('active');
-                    updateIndicator(menu, targetLink, true);
-                }
-            });
-            
-            // Handle clicks
-            menu.querySelectorAll('.sub-link').forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (link.classList.contains('active')) return;
-
-                    // Animate indicator visually immediately
-                    menu.querySelectorAll('.sub-link').forEach(sib => sib.classList.remove('active'));
-                    link.classList.add('active');
-                    updateIndicator(menu, link, true);
-                    
-                    // Mark session to skip cascade on next load (for cross-page navigation)
-                    sessionStorage.setItem('hsms_skip_cascade', 'true');
-
-                    const url = new URL(link.href);
-                    if (url.pathname === window.location.pathname && url.searchParams.has('tab')) {
-                        // SPA Tab Navigation
-                        const newTab = url.searchParams.get('tab');
-                        window.history.pushState({}, '', link.href);
-                        window.dispatchEvent(new CustomEvent('tab-changed', { detail: newTab }));
-                    } else {
-                        // Cross-page navigation: wait for the smooth slide to finish, then navigate
-                        setTimeout(() => {
-                            window.location.href = link.href;
-                        }, 300);
-                    }
-                });
-            });
-        });
-    });
+    }
 </script>

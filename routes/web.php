@@ -171,6 +171,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             // --- Module 5: Finances (Invoices & Payments) ---
             Route::middleware('access:finance')->group(function () {
                 Route::get('finances', [FinanceController::class, 'index'])->name('finance.index');
+                Route::post('finances/generate-fee', [FinanceController::class, 'generateFee'])->name('finance.generate-fee');
                 
                 // Invoices
                 Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
@@ -201,6 +202,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::get('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'show'])->name('pocket-money.show');
                 Route::post('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'store'])->name('pocket-money.store');
                 Route::delete('pocket-money/{student}/tx/{transaction}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'destroy'])->name('pocket-money.destroy');
+                
+                // Security Deposits
+                Route::get('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'index'])->name('security-deposits.index');
+                Route::post('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'store'])->name('security-deposits.store');
+                Route::post('security-deposits/{securityDeposit}/refund', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'refund'])->name('security-deposits.refund');
             });
 
             // --- Module 9: Reports ---

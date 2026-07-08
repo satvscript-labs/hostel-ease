@@ -293,29 +293,36 @@
             <!-- Financial Bento -->
             <div class="premium-panel p-4">
                 <h3 class="h6 fw-bold mb-3 text-uppercase text-muted lh-1">Financial Overview</h3>
-                <div class="row g-3">
-                    <div class="col-6 col-md-3">
+                <div class="row g-3 row-cols-2 row-cols-xl-5">
+                    <div class="col">
                         <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'bg-danger-subtle border-danger-subtle' : 'bg-light border-light' }} rounded-4 p-3 h-100 border">
                             <div class="{{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-muted' }} small fw-bold text-uppercase mb-1">Outstanding</div>
                             <div class="fs-4 fw-bold lh-1 mt-2 {{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'text-danger' : 'text-dark' }}">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col">
                         <div class="bg-info-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-info-subtle">
                             <div class="text-info-emphasis small fw-bold text-uppercase mb-1">Credits</div>
                             <div class="fs-4 fw-bold lh-1 text-info-emphasis mt-2">{{ hostelease_money($student->credit_balance ?? 0) }}</div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col">
                         <div class="bg-success-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-success-subtle">
                             <div class="text-success small fw-bold text-uppercase mb-1">Total Paid</div>
                             <div class="fs-4 fw-bold lh-1 text-success mt-2">{{ hostelease_money($paymentSummary['total_paid'] ?? 0) }}</div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col">
                         <div class="bg-warning-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-warning-subtle">
                             <div class="text-warning-emphasis small fw-bold text-uppercase mb-1">Pocket Money</div>
                             <div class="fs-4 fw-bold lh-1 text-warning-emphasis mt-2">{{ hostelease_money($pocketBalance ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="bg-primary-subtle bg-opacity-50 rounded-4 p-3 h-100 border border-primary-subtle position-relative">
+                            <div class="text-primary-emphasis small fw-bold text-uppercase mb-1">Security Deposit</div>
+                            <div class="fs-4 fw-bold lh-1 text-primary-emphasis mt-2">{{ hostelease_money($student->securityDeposits()->where('status', 'collected')->sum('amount')) }}</div>
+                            <a href="{{ route('admin.security-deposits.index') }}" class="stretched-link" title="Manage Deposits"></a>
                         </div>
                     </div>
                 </div>

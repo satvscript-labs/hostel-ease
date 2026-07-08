@@ -34,7 +34,7 @@ body {
 /* ---------- Layout shell ---------- */
 .hsms-sidebar {
     width: var(--hsms-sidebar-width);
-    background: var(--hsms-sidebar-bg);
+    background: linear-gradient(180deg, #0f172a 0%, #111c33 100%);
     color: #cbd5e1;
     position: fixed;
     inset: 0 auto 0 0;
@@ -43,35 +43,6 @@ body {
     flex-direction: column;
     transition: transform .25s ease;
     will-change: transform;
-
-    .brand {
-        font-weight: 700;
-        color: #fff;
-        letter-spacing: .5px;
-    }
-
-    // Nav must be a single vertical column that scrolls up/down — never wrap
-    // into extra columns (which caused horizontal scrolling).
-    .nav {
-        flex-wrap: nowrap;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
-
-    .nav-link {
-        color: #cbd5e1;
-        border-radius: .5rem;
-        padding: .6rem .85rem;
-        margin: .12rem .6rem;
-        display: flex;
-        align-items: center;
-        gap: .65rem;
-        font-size: .925rem;
-
-        &:hover { background: var(--hsms-sidebar-accent); color: #fff; }
-        &.active { background: $primary; color: #fff; }
-        i, svg { width: 20px; text-align: center; }
-    }
 }
 
 .hsms-content {
@@ -81,11 +52,7 @@ body {
 }
 
 .hsms-topbar {
-    background: #fff;
-    border-bottom: 1px solid #e2e8f0;
-    position: sticky;
-    top: 0;
-    z-index: 1030;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 
 /* Backdrop behind the off-canvas sidebar on mobile */
@@ -100,8 +67,6 @@ body {
 }
 .hsms-backdrop.show { opacity: 1; visibility: visible; }
 
-.sidebar-close { display: none; }
-
 @media (max-width: 991.98px) {
     .hsms-sidebar {
         transform: translateX(-100%);
@@ -109,7 +74,6 @@ body {
     }
     .hsms-sidebar.show { transform: translateX(0); }
     .hsms-content { margin-left: 0; }
-    .sidebar-close { display: inline-flex; }
     /* Prevent background scroll while the drawer is open */
     body.sidebar-open { overflow: hidden; }
 }
@@ -273,23 +237,6 @@ body { color: #111827; -webkit-font-smoothing: antialiased; }
 
 .badge { font-weight: 600; border-radius: .5rem; padding: .42em .62em; }
 
-/* Sidebar: subtle gradient + active accent bar */
-.hsms-sidebar { background: linear-gradient(180deg, #0f172a 0%, #111c33 100%); }
-.hsms-sidebar .nav-link { font-weight: 500; }
-.hsms-sidebar .nav-link.active {
-    background: rgba(37, 99, 235, .18);
-    color: #fff;
-    position: relative;
-}
-.hsms-sidebar .nav-link.active:not(.sub-link)::before {
-    content: "";
-    position: absolute; left: -.6rem; top: .35rem; bottom: .35rem;
-    width: 3px; border-radius: 3px; background: $primary;
-}
-.hsms-sidebar .text-uppercase.small { letter-spacing: .08em; color: #64748b !important; }
-
-.hsms-topbar { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
-
 main h1 { font-weight: 800; letter-spacing: -.01em; }
 
 .stat-card { border: 1px solid #eef0f5; box-shadow: 0 1px 2px rgba(16, 24, 40, .05); }
@@ -348,32 +295,3 @@ main h1 { font-weight: 800; letter-spacing: -.01em; }
     .bento .bento-icon { width: 36px; height: 36px; font-size: .95rem; border-radius: 11px; }
 }
 
-/* ---------- Minimal sidebar + thin scrollbar ---------- */
-.hsms-sidebar .nav {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, .35) transparent;
-    padding-right: 2px;
-}
-.hsms-sidebar .nav::-webkit-scrollbar { width: 5px; }
-.hsms-sidebar .nav::-webkit-scrollbar-track { background: transparent; }
-.hsms-sidebar .nav::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .28); border-radius: 6px; }
-.hsms-sidebar .nav::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .55); }
-
-.hsms-sidebar .nav-link {
-    font-size: .875rem;
-    padding: .5rem .8rem;
-    margin: .08rem .55rem;
-    border-radius: .55rem;
-    font-weight: 500;
-}
-.hsms-sidebar .nav-link i, .hsms-sidebar .nav-link svg { font-size: .9rem; opacity: .8; }
-.hsms-sidebar .nav-link.active i, .hsms-sidebar .nav-link.active svg { opacity: 1; }
-.hsms-sidebar .text-uppercase.small {
-    font-size: .66rem !important;
-    letter-spacing: .1em;
-    color: #5b6678 !important;
-    margin-top: 1rem !important;
-    margin-bottom: .15rem !important;
-    padding-left: 1rem !important;
-}
-.hsms-sidebar .brand { font-size: 1.02rem; font-weight: 700; }

@@ -8,6 +8,8 @@ use App\Models\Student;
 use App\Models\StudentDocument;
 use App\Services\ActivityLogger;
 use App\Services\PaymentService;
+use App\Services\ImageService;
+use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,8 @@ class StudentController extends Controller
     public function __construct(
         protected ActivityLogger $logger,
         protected PaymentService $payments,
+        protected ImageService $imageService,
+        protected StorageService $storageService
     ) {
     }
 
@@ -256,7 +260,8 @@ class StudentController extends Controller
         $data = $this->validateStudent($request);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
         }
 
         $student = Student::create($data);
@@ -272,9 +277,10 @@ class StudentController extends Controller
 
         if ($request->hasFile('photo')) {
             if ($model->photo) {
-                Storage::disk('public')->delete($model->photo);
+                $this->storageService->delete($model->photo, 'public');
             }
-            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
         }
 
         $model->update($data);
@@ -324,7 +330,15 @@ class StudentController extends Controller
             'is_signed' => ['nullable', 'boolean'],
         ]);
 
-        $path = $request->file('file')->store("students/documents/{$model->id}", 'public');
+        $file = $request->file('file');
+        $directory = "students/documents/{$model->id}";
+        
+        if (str_starts_with($file->getMimeType(), 'image/')) {
+            $processed = $this->imageService->compressAndConvertToWebp($file, 1600, 1600, 80);
+            $path = $this->storageService->store($processed['content'], $directory, 'public', $processed['extension']);
+        } else {
+            $path = $this->storageService->store($file, $directory, 'public');
+        }
         $doc = $model->documents()->create([
             'hostel_id' => $model->hostel_id,
             'type' => $data['type'],
@@ -341,9 +355,12 @@ class StudentController extends Controller
     public function destroyDocument(int $student, int $document): JsonResponse
     {
         $model = Student::findOrFail($student);
-        $doc = StudentDocument::where('student_id', $model->id)->findOrFail($document);
-        Storage::disk('public')->delete($doc->file_path);
+        $doc = $model->documents()->findOrFail($document);
+
+        $this->storageService->delete($doc->file_path, 'public');
         $doc->delete();
+
+        $this->logger->log('document.delete', "Deleted document for {$model->name}", $model);
 
         return response()->json(['message' => 'Document deleted.']);
     }

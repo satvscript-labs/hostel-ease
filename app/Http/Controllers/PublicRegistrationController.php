@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Hostel;
 use App\Models\StudentRegistration;
+use App\Services\ImageService;
+use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -14,6 +16,10 @@ use Illuminate\Validation\Rule;
  */
 class PublicRegistrationController extends Controller
 {
+    public function __construct(
+        protected ImageService $imageService,
+        protected StorageService $storageService
+    ) {}
     public function show(string $token)
     {
         $hostel = Hostel::where('registration_token', $token)->firstOrFail();
@@ -48,7 +54,8 @@ class PublicRegistrationController extends Controller
         ]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('registrations/photos', 'public');
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'registrations/photos', 'public', $processed['extension']);
         }
 
         StudentRegistration::create($data + ['hostel_id' => $hostel->id, 'status' => 'pending']);

@@ -23,20 +23,91 @@ class DemoHostelSeeder extends Seeder
 {
     public function run(): void
     {
-        $hostel = Hostel::updateOrCreate(
+        // 1. Create the Owner first
+        $owner = User::updateOrCreate(
             ['mobile' => '+919876543210'],
             [
-                'name' => 'Sunrise Boys Hostel',
-                'owner_name' => 'Ramesh Patel',
-                'email' => 'sunrise@example.com',
-                'address' => 'Near University Road',
-                'city' => 'Ahmedabad',
-                'state' => 'Gujarat',
-                'subscription_start' => now()->subMonths(2),
-                'subscription_end' => now()->addMonths(10),
-                'status' => 'active',
+                'name' => 'Ramesh Patel',
+                'email' => 'sunrise.admin@example.com',
+                'password' => Hash::make('password'),
+                'role' => 'hostel_admin',
+                'is_active' => true,
             ]
         );
+
+        // 2. Create Branch 1: Sunrise Boys Hostel
+        $hostel1 = $this->createBranch([
+            'name' => 'Sunrise Boys Hostel',
+            'mobile' => '+919876543210',
+            'email' => 'sunrise@example.com',
+            'address' => 'Near University Road',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'status' => 'active',
+        ], $owner);
+
+        // 3. Create Branch 2: Sunrise Girls Hostel
+        $hostel2 = $this->createBranch([
+            'name' => 'Sunrise Girls Hostel',
+            'mobile' => '+919876543211',
+            'email' => 'sunrisegirls@example.com',
+            'address' => 'Navrangpura',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'status' => 'active',
+        ], $owner);
+
+        // 4. Create Sub-Users (Staff)
+        $manager1 = User::updateOrCreate(
+            ['mobile' => '+919876543001'],
+            [
+                'name' => 'Amit Manager (Boys)',
+                'email' => 'amit.manager@example.com',
+                'password' => Hash::make('password'),
+                'role' => 'manager',
+                'is_active' => true,
+            ]
+        );
+        $manager1->hostels()->sync([$hostel1->id]);
+
+        $manager2 = User::updateOrCreate(
+            ['mobile' => '+919876543002'],
+            [
+                'name' => 'Neha Manager (Girls)',
+                'email' => 'neha.manager@example.com',
+                'password' => Hash::make('password'),
+                'role' => 'manager',
+                'is_active' => true,
+            ]
+        );
+        $manager2->hostels()->sync([$hostel2->id]);
+
+        $accountant = User::updateOrCreate(
+            ['mobile' => '+919876543003'],
+            [
+                'name' => 'Rahul Accountant (Both)',
+                'email' => 'rahul.acc@example.com',
+                'password' => Hash::make('password'),
+                'role' => 'accountant',
+                'is_active' => true,
+            ]
+        );
+        $accountant->hostels()->sync([$hostel1->id, $hostel2->id]);
+
+        $this->command->info('Demo branches "Sunrise Boys Hostel" and "Sunrise Girls Hostel" seeded!');
+        $this->command->info('Owner login: +919876543210 / password');
+        $this->command->info('Manager 1 (Boys) login: +919876543001 / password');
+        $this->command->info('Manager 2 (Girls) login: +919876543002 / password');
+        $this->command->info('Accountant (Both) login: +919876543003 / password');
+    }
+
+    private function createBranch(array $data, User $owner): Hostel
+    {
+        $data['owner_name'] = $owner->name;
+        $data['subscription_start'] = now()->subMonths(2);
+        $data['subscription_end'] = now()->addMonths(10);
+
+        $hostel = Hostel::updateOrCreate(['mobile' => $data['mobile']], $data);
 
         Subscription::firstOrCreate(
             ['hostel_id' => $hostel->id, 'start_date' => $hostel->subscription_start],
@@ -46,27 +117,15 @@ class DemoHostelSeeder extends Seeder
                 'amount' => config('hostelease.subscription_amount', 5000),
                 'payment_status' => 'paid',
                 'payment_method' => 'upi',
-                'transaction_number' => 'TXN'.now()->timestamp,
+                'transaction_number' => 'TXN' . now()->timestamp . $hostel->id,
             ]
         );
 
-        $admin = User::updateOrCreate(
-            ['mobile' => '+919876543210'],
-            [
-                'hostel_id' => $hostel->id,
-                'name' => 'Ramesh Patel',
-                'email' => 'sunrise.admin@example.com',
-                'password' => Hash::make('password'),
-                'role' => 'hostel_admin',
-                'is_active' => true,
-            ]
-        );
-
-        $admin->hostels()->syncWithoutDetaching([$hostel->id]);
+        $owner->hostels()->syncWithoutDetaching([$hostel->id]);
         app(\App\Services\HostelService::class)->seedPaymentModes($hostel);
 
         // Floors -> Rooms -> Beds
-        $floorNames = ['Ground Floor', 'First Floor', 'Second Floor'];
+        $floorNames = ['Ground Floor', 'First Floor'];
         $studentPool = [];
 
         foreach ($floorNames as $i => $fname) {
@@ -75,13 +134,13 @@ class DemoHostelSeeder extends Seeder
                 ['sort_order' => $i]
             );
 
-            for ($r = 1; $r <= 3; $r++) {
-                $sharing = [2, 3, 4][$r - 1];
+            for ($r = 1; $r <= 2; $r++) {
+                $sharing = [2, 3][$r - 1];
                 $room = Room::firstOrCreate(
-                    ['hostel_id' => $hostel->id, 'room_number' => ($i + 1).'0'.$r],
+                    ['hostel_id' => $hostel->id, 'room_number' => ($i + 1) . '0' . $r],
                     [
                         'floor_id' => $floor->id,
-                        'room_type' => $r === 3 ? 'ac' : 'non_ac',
+                        'room_type' => $r === 2 ? 'ac' : 'non_ac',
                         'sharing' => $sharing,
                         'rent' => 4000 + ($sharing * 250),
                     ]
@@ -89,7 +148,7 @@ class DemoHostelSeeder extends Seeder
 
                 for ($b = 1; $b <= $sharing; $b++) {
                     $bed = Bed::firstOrCreate(
-                        ['hostel_id' => $hostel->id, 'room_id' => $room->id, 'bed_number' => 'B'.$b],
+                        ['hostel_id' => $hostel->id, 'room_id' => $room->id, 'bed_number' => 'B' . $b],
                         ['status' => 'empty']
                     );
                     $studentPool[] = ['bed' => $bed, 'room' => $room];
@@ -98,26 +157,29 @@ class DemoHostelSeeder extends Seeder
         }
 
         // Occupy ~60% of beds with demo students.
-        $names = ['Amit Shah', 'Vivek Joshi', 'Karan Mehta', 'Rahul Desai', 'Sahil Khan',
-            'Nikhil Rao', 'Arjun Nair', 'Deep Trivedi', 'Mohit Verma', 'Yash Gandhi'];
+        $names = ['Amit Shah', 'Vivek Joshi', 'Karan Mehta', 'Rahul Desai', 'Sahil Khan', 'Nikhil Rao'];
+        if (str_contains($hostel->name, 'Girls')) {
+            $names = ['Priya Patel', 'Riya Sharma', 'Anjali Desai', 'Neha Singh', 'Kavita Rao', 'Pooja Mehta'];
+        }
 
         $toOccupy = (int) ceil(count($studentPool) * 0.6);
         foreach (array_slice($studentPool, 0, $toOccupy) as $idx => $slot) {
+            $mobileSuffix = $hostel->id . str_pad((string) $idx, 2, '0', STR_PAD_LEFT);
             $student = Student::firstOrCreate(
-                ['hostel_id' => $hostel->id, 'mobile' => '90000000'.str_pad((string) $idx, 2, '0', STR_PAD_LEFT)],
+                ['hostel_id' => $hostel->id, 'mobile' => '900000' . $mobileSuffix],
                 [
                     'name' => $names[$idx % count($names)],
-                    'father_mobile' => '88000000'.str_pad((string) $idx, 2, '0', STR_PAD_LEFT),
-                    'occupation_type' => $idx % 4 === 0 ? 'working' : 'student',
+                    'father_mobile' => '880000' . $mobileSuffix,
+                    'occupation_type' => $idx % 2 === 0 ? 'working' : 'student',
                     'city' => 'Ahmedabad',
                     'state' => 'Gujarat',
                     'join_date' => now()->subDays(rand(10, 120)),
-                    'leave_date' => $idx % 5 === 0 ? now()->addDays(rand(3, 25)) : null,
+                    'leave_date' => null,
                     'status' => 'active',
                     'room_preference' => $slot['room']->room_type === 'ac' ? 'AC' : 'Non-AC',
                     'sharing_preference' => ['Single', 'Double', 'Triple', 'Quad'][$slot['room']->sharing - 1] ?? 'Single',
-                    'fee_amount' => $idx % 4 === 0 ? $slot['room']->rent : $slot['room']->rent * 6,
-                    'fee_frequency' => $idx % 4 === 0 ? 'monthly' : 'semester',
+                    'fee_amount' => $slot['room']->rent * ($idx % 2 === 0 ? 1 : 6),
+                    'fee_frequency' => $idx % 2 === 0 ? 'monthly' : 'semester',
                 ]
             );
 
@@ -131,7 +193,7 @@ class DemoHostelSeeder extends Seeder
 
             $slot['bed']->update(['status' => 'occupied']);
 
-            // Create a couple of demo invoices and payments
+            // Invoices and payments
             for ($m = 0; $m < 2; $m++) {
                 $monthDate = now()->subMonths($m)->startOfMonth();
                 $type = $student->occupation_type === 'working' ? 'rent' : 'fee';
@@ -150,7 +212,6 @@ class DemoHostelSeeder extends Seeder
                     ]
                 );
 
-                // Use PaymentService to process payment
                 app(\App\Services\PaymentService::class)->record([
                     'hostel_id' => $hostel->id,
                     'student_id' => $student->id,
@@ -158,278 +219,28 @@ class DemoHostelSeeder extends Seeder
                     'payment_type' => 'full',
                     'mode' => ['cash', 'upi'][$m % 2],
                     'paid_on' => $monthDate->copy()->addDays(6),
-                    'collected_by' => $admin->id,
+                    'collected_by' => $owner->id,
                     'reference_number' => "RCPT-{$hostel->id}-{$student->id}-{$m}",
                 ]);
             }
-        }
 
-        // --- Additional Dummy Data for Ramesh Patel's Sunrise Boys Hostel ---
-
-        // 1. Seed Staff members
-        $warden = Staff::updateOrCreate(
-            ['hostel_id' => $hostel->id, 'mobile' => '9888877777'],
-            [
-                'name' => 'Rajesh Sharma',
-                'designation' => 'Warden',
-                'monthly_salary' => 15000,
-                'join_date' => now()->subMonths(3)->toDateString(),
-                'address' => 'G-4, Sunrise Hostel Staff Quarters',
-                'is_active' => true,
-                'notes' => 'Manages day-to-day operations and student discipline'
-            ]
-        );
-
-        $cook = Staff::updateOrCreate(
-            ['hostel_id' => $hostel->id, 'mobile' => '9777766666'],
-            [
-                'name' => 'Manju Devi',
-                'designation' => 'Cook',
-                'monthly_salary' => 12000,
-                'join_date' => now()->subMonths(3)->toDateString(),
-                'address' => 'Navrangpura, Ahmedabad',
-                'is_active' => true,
-                'notes' => 'In charge of hostel mess and kitchen'
-            ]
-        );
-
-        $guard = Staff::updateOrCreate(
-            ['hostel_id' => $hostel->id, 'mobile' => '9666655555'],
-            [
-                'name' => 'Bahadur Singh',
-                'designation' => 'Security Guard',
-                'monthly_salary' => 10000,
-                'join_date' => now()->subMonths(2)->toDateString(),
-                'address' => 'Ranip, Ahmedabad',
-                'is_active' => true,
-                'notes' => 'Night shift security'
-            ]
-        );
-
-        // 2. Staff Salary Payments (Last 2 months)
-        for ($m = 1; $m <= 2; $m++) {
-            $salaryMonth = now()->subMonths($m)->startOfMonth();
-            
-            StaffSalaryPayment::firstOrCreate(
-                [
+            // Security Deposit for every other student
+            if ($idx % 2 === 0) {
+                \App\Models\SecurityDeposit::firstOrCreate([
                     'hostel_id' => $hostel->id,
-                    'staff_id' => $warden->id,
-                    'salary_month' => $salaryMonth->toDateString(),
-                ],
-                [
-                    'amount' => $warden->monthly_salary,
-                    'paid_on' => $salaryMonth->addDays(5)->toDateString(),
-                    'mode' => 'online',
-                    'reference_number' => 'REF-WRD-' . $salaryMonth->format('Ym'),
-                    'notes' => 'Salary paid on time'
-                ]
-            );
-
-            StaffSalaryPayment::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'staff_id' => $cook->id,
-                    'salary_month' => $salaryMonth->toDateString(),
-                ],
-                [
-                    'amount' => $cook->monthly_salary,
-                    'paid_on' => $salaryMonth->addDays(5)->toDateString(),
-                    'mode' => 'cash',
-                    'notes' => 'Salary paid in cash'
-                ]
-            );
-        }
-
-        // 3. Seed Expenses
-        Expense::firstOrCreate(
-            [
-                'hostel_id' => $hostel->id,
-                'title' => 'Electricity Bill - June 2026',
-                'expense_date' => now()->subDays(15)->toDateString(),
-            ],
-            [
-                'category' => 'electricity',
-                'amount' => 8500.00,
-                'paid_to' => 'Torrent Power Ltd',
-                'mode' => 'upi',
-                'reference_number' => 'TXN-ELEC-7391',
-                'notes' => 'Paid via GPay',
-                'recorded_by' => $admin->id
-            ]
-        );
-
-        Expense::firstOrCreate(
-            [
-                'hostel_id' => $hostel->id,
-                'title' => 'Mess Grocery Supplies',
-                'expense_date' => now()->subDays(5)->toDateString(),
-            ],
-            [
-                'category' => 'food',
-                'amount' => 4500.00,
-                'paid_to' => 'Patel Provision Store',
-                'mode' => 'cash',
-                'notes' => 'Vegetables and dairy items',
-                'recorded_by' => $admin->id
-            ]
-        );
-
-        Expense::firstOrCreate(
-            [
-                'hostel_id' => $hostel->id,
-                'title' => 'Fiber Internet Monthly Plan',
-                'expense_date' => now()->startOfMonth()->toDateString(),
-            ],
-            [
-                'category' => 'internet',
-                'amount' => 1500.00,
-                'paid_to' => 'Jio Fiber',
-                'mode' => 'upi',
-                'reference_number' => 'TXN-JIO-9922',
-                'notes' => '100 Mbps broadband',
-                'recorded_by' => $admin->id
-            ]
-        );
-
-        Expense::firstOrCreate(
-            [
-                'hostel_id' => $hostel->id,
-                'title' => 'Plumbing Repairs (Common Bathroom)',
-                'expense_date' => now()->subDays(20)->toDateString(),
-            ],
-            [
-                'category' => 'repairs',
-                'amount' => 1200.00,
-                'paid_to' => 'Vijay Plumber',
-                'mode' => 'cash',
-                'notes' => 'Fixed leaking flush valve',
-                'recorded_by' => $admin->id
-            ]
-        );
-
-        // 4. Seed Complaints (Get seeded student ids)
-        $students = Student::where('hostel_id', $hostel->id)->get();
-        if ($students->count() >= 3) {
-            Complaint::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'student_id' => $students[0]->id,
-                    'title' => 'WiFi disconnected in Room ' . Room::find(BedAssignment::where('student_id', $students[0]->id)->first()?->bed?->room_id)?->room_number,
-                ],
-                [
-                    'category' => 'internet',
-                    'description' => 'The WiFi signal is extremely weak and frequently disconnects since yesterday.',
-                    'priority' => 'medium',
-                    'status' => 'resolved',
-                    'resolution' => 'Replaced the Wi-Fi repeater in the corridor.',
-                    'resolved_at' => now()->subDays(2),
-                    'created_by' => $admin->id
-                ]
-            );
-
-            Complaint::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'student_id' => $students[1]->id,
-                    'title' => 'Ceiling fan speed issue',
-                ],
-                [
-                    'category' => 'room',
-                    'description' => 'The ceiling fan regulator is broken and runs only at speed 5.',
-                    'priority' => 'low',
-                    'status' => 'in_progress',
-                    'created_by' => $admin->id
-                ]
-            );
-
-            Complaint::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'student_id' => $students[2]->id,
-                    'title' => 'Clogged shower drain',
-                ],
-                [
-                    'category' => 'plumbing',
-                    'description' => 'The water drains very slowly in the shower area, causing waterlogging.',
-                    'priority' => 'high',
-                    'status' => 'open',
-                    'created_by' => $admin->id
-                ]
-            );
-        }
-
-        // 5. Seed Visitors
-        if ($students->count() >= 1) {
-            Visitor::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'student_id' => $students[0]->id,
-                    'name' => 'Suresh Shah',
-                ],
-                [
-                    'mobile' => '9444433322',
-                    'purpose' => 'Father visiting to deliver home food',
-                    'id_proof' => 'Aadhaar Card: 4839 2019 4839',
-                    'check_in' => now()->subDays(1)->setHour(10)->setMinute(0)->setSecond(0)->toDateTimeString(),
-                    'check_out' => now()->subDays(1)->setHour(13)->setMinute(30)->setSecond(0)->toDateTimeString(),
-                    'notes' => 'Checked out on time.'
-                ]
-            );
-
-            Visitor::firstOrCreate(
-                [
-                    'hostel_id' => $hostel->id,
-                    'student_id' => $students[1]->id,
-                    'name' => 'Deepak Joshi',
-                ],
-                [
-                    'mobile' => '9555544433',
-                    'purpose' => 'Friend visiting for combined study',
-                    'id_proof' => 'College ID Card: 2026-ENGG-93',
-                    'check_in' => now()->setHour(14)->setMinute(15)->setSecond(0)->toDateTimeString(),
-                    'check_out' => null, // Still inside
-                    'notes' => 'Allowed till evening 8 PM.'
-                ]
-            );
-        }
-
-        // 6. Seed Staff Attendance for the last 5 days
-        $staffMembers = Staff::where('hostel_id', $hostel->id)->get();
-        foreach ($staffMembers as $s) {
-            for ($d = 1; $d <= 5; $d++) {
-                \App\Models\StaffAttendance::firstOrCreate([
-                    'hostel_id' => $hostel->id,
-                    'staff_id' => $s->id,
-                    'date' => now()->subDays($d)->toDateString(),
+                    'student_id' => $student->id,
+                    'status' => 'collected',
                 ], [
-                    'status' => (rand(1, 10) > 2) ? 'present' : 'absent',
-                    'notes' => (rand(1, 10) > 8) ? 'Arrived late' : null,
+                    'amount' => 5000,
+                    'payment_mode_id' => \App\Models\PaymentMode::first()->id ?? 1,
+                    'receipt_number' => "SD-{$hostel->id}-{$student->id}",
+                    'collected_on' => $student->join_date,
+                    'created_by' => $owner->id,
                 ]);
             }
         }
 
-        // 7. Seed Pocket Money Transactions
-        foreach (array_slice($students->all(), 0, 3) as $student) {
-            \App\Models\PocketMoneyTransaction::firstOrCreate([
-                'hostel_id' => $hostel->id,
-                'student_id' => $student->id,
-                'type' => 'deposit',
-                'amount' => 5000,
-                'note' => 'Initial deposit by parents',
-                'created_by' => $admin->id
-            ]);
-            
-            \App\Models\PocketMoneyTransaction::create([
-                'hostel_id' => $hostel->id,
-                'student_id' => $student->id,
-                'type' => 'withdraw',
-                'amount' => rand(100, 500),
-                'note' => 'Canteen expenses',
-                'created_by' => $admin->id
-            ]);
-        }
-
-        $this->command->info('Demo hostel "Sunrise Boys Hostel" seeded — admin login +919876543210 / password');
+        return $hostel;
     }
 }
 

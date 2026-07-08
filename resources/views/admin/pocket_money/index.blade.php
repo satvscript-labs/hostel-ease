@@ -108,6 +108,11 @@
         color: #64748b;
         border: 1px solid #e2e8f0;
     }
+    .pm-balance-negative {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
 </style>
 
 <div class="page-enter">
@@ -163,7 +168,7 @@
                 <!-- Balance -->
                 <div class="col-6 col-md-2 text-md-center px-0 text-end text-md-start">
                     <div class="d-md-none small text-muted fw-bold mb-1">Balance</div>
-                    <span class="pm-balance-badge {{ $s->pocket_balance > 0 ? 'pm-balance-positive' : 'pm-balance-zero' }}">
+                    <span class="pm-balance-badge {{ $s->pocket_balance > 0 ? 'pm-balance-positive' : ($s->pocket_balance < 0 ? 'pm-balance-negative' : 'pm-balance-zero') }}">
                         {{ hostelease_money($s->pocket_balance) }}
                     </span>
                 </div>

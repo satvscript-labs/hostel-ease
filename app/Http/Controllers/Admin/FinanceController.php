@@ -8,7 +8,10 @@ use App\Models\Payment;
 use App\Models\Student;
 use App\Models\PaymentMode;
 use App\Models\PocketMoney;
+use App\Support\Tenant;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class FinanceController extends Controller
@@ -63,4 +66,47 @@ class FinanceController extends Controller
 
         return view('admin.finance.index', compact('invoices', 'payments', 'paymentModes', 'students', 'search', 'status', 'sort', 'direction'));
     }
+
+    /**
+     * Generate a fee invoice for a student (Semester / Yearly / Custom).
+     */
+    public function generateFee(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'student_id' => ['required', 'exists:students,id'],
+            'fee_type' => ['required', Rule::in(['semester', 'yearly', 'custom'])],
+            'title' => ['required', 'string', 'max:255'],
+            'amount' => ['nullable', 'numeric', 'min:1'],
+            'due_date' => ['nullable', 'date'],
+        ]);
+
+        $student = Student::with('activeAssignment.bed.room')->findOrFail($data['student_id']);
+
+        // Calculate amount based on fee type if not custom
+        if (empty($data['amount'])) {
+            $roomRent = optional(optional(optional($student->activeAssignment)->bed)->room)->rent ?? 0;
+            $data['amount'] = match ($data['fee_type']) {
+                'semester' => $roomRent * 6,
+                'yearly' => $roomRent * 12,
+                default => $roomRent,
+            };
+        }
+
+        if ($data['amount'] <= 0) {
+            return back()->with('error', 'Could not determine fee amount. The student may not have a room assignment or rent configured.');
+        }
+
+        $invoice = Invoice::create([
+            'hostel_id' => Tenant::id(),
+            'student_id' => $student->id,
+            'type' => 'fee',
+            'title' => $data['title'],
+            'amount' => $data['amount'],
+            'due_date' => $data['due_date'] ?? now()->addDays(15),
+            'billing_cycle' => $data['fee_type'],
+        ]);
+
+        return back()->with('success', "Fee invoice \"{$invoice->title}\" generated for {$student->name} — " . config('hostelease.currency') . number_format($invoice->amount, 2));
+    }
 }
+

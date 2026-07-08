@@ -10,9 +10,10 @@ use App\Models\Student;
 use App\Models\Invoice;
 use App\Services\ActivityLogger;
 use App\Services\PaymentService;
+use App\Services\ImageService;
+use App\Services\StorageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -21,6 +22,8 @@ class StudentController extends Controller
     public function __construct(
         protected ActivityLogger $logger,
         protected PaymentService $payments,
+        protected ImageService $imageService,
+        protected StorageService $storageService,
     ) {
     }
 
@@ -93,7 +96,8 @@ class StudentController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
         }
 
         $student = Student::create($data);
@@ -223,9 +227,10 @@ class StudentController extends Controller
 
         if ($request->hasFile('photo')) {
             if ($student->photo) {
-                Storage::disk('public')->delete($student->photo);
+                $this->storageService->delete($student->photo, 'public');
             }
-            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
         }
 
         $student->update($data);

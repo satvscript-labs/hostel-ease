@@ -1,119 +1,74 @@
 @php($user = auth()->user())
-<header class="hsms-topbar d-flex align-items-center gap-3">
-    <!-- Mobile Sidebar Toggle -->
-    <button class="btn btn-light rounded-circle shadow-sm d-lg-none d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;" data-sidebar-toggle type="button">
-        <i class="fa-solid fa-bars text-secondary"></i>
+<header class="hsms-topbar" x-data="{ searchOpen: false }">
+    {{-- Mobile Sidebar Toggle --}}
+    <button class="topbar-hamburger d-lg-none" data-sidebar-toggle type="button" aria-label="Toggle menu">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
     </button>
 
-    <!-- Global Search -->
-    <div class="flex-grow-1 position-relative" style="max-width: 400px;" data-search-url="{{ route('search') }}">
-        <div class="input-group search-group shadow-sm" style="border-radius: 50px; overflow: hidden; background: #f8fafc; border: 1px solid rgba(0,0,0,0.05); transition: all 0.3s ease;">
-            <span class="input-group-text bg-transparent border-0 pe-1">
-                <i class="fa-solid fa-magnifying-glass text-secondary"></i>
-            </span>
-            <input type="search" id="global-search" class="form-control bg-transparent border-0 shadow-none ps-2"
-                   placeholder="{{ $user->isSuperAdmin() ? __('Search hostels…') : __('Search students, rooms, beds…') }}"
-                   autocomplete="off" style="font-size: 0.9rem;">
-        </div>
-        <div id="search-results" class="dropdown-menu w-100 shadow-lg border-0 rounded-4 mt-2" style="max-height: 400px; overflow-y: auto;"></div>
+    {{-- Global Search --}}
+    <div class="topbar-search" :class="{ 'is-focused': searchOpen }" data-search-url="{{ route('search') }}">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="search" id="global-search" class="search-input"
+               placeholder="{{ $user->isSuperAdmin() ? __('Search hostels…') : __('Search students, rooms, beds…') }}"
+               autocomplete="off"
+               @focus="searchOpen = true" @blur="searchOpen = false">
+        <kbd class="search-kbd d-none d-md-inline-flex">⌘K</kbd>
     </div>
-    
-    <style>
-        .search-group:focus-within {
-            background: #ffffff !important;
-            border-color: var(--bs-primary) !important;
-            box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.1) !important;
-        }
-        .topbar-icon-btn {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: #f8fafc;
-            color: #64748b;
-            border: 1px solid transparent;
-            transition: all 0.2s ease;
-        }
-        .topbar-icon-btn:hover, .topbar-icon-btn[aria-expanded="true"] {
-            background: #ffffff;
-            color: var(--bs-primary);
-            border-color: rgba(var(--bs-primary-rgb), 0.2);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            transform: translateY(-1px);
-        }
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--bs-primary), #6366f1);
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-        .user-avatar:hover, .user-avatar[aria-expanded="true"] {
-            box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.15);
-        }
-    </style>
+    <div id="search-results" class="dropdown-menu w-100 shadow-lg border-0 rounded-4 mt-2" style="max-height: 400px; overflow-y: auto;"></div>
 
-    <!-- Right Side Actions -->
-    <div class="d-flex align-items-center gap-2 ms-auto">
+    {{-- Right Side Actions --}}
+    <div class="topbar-actions">
 
-        {{-- Branch switcher (multi-branch users) --}}
+        {{-- Branch Switcher --}}
         @php($branches = $user->hostels)
-            @if($branches->count() > 1)
-                @php($activeId = \App\Support\Tenant::id())
-                @php($activeBranch = $branches->firstWhere('id', $activeId))
-                <div class="dropdown">
-                    <button class="topbar-icon-btn" data-bs-toggle="dropdown" title="{{ __('Switch Branch') }}">
-                        <i class="fa-solid fa-code-branch"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 py-2">
-                        <li>
-                            <h6 class="dropdown-header text-uppercase small fw-bold text-primary">{{ __('Current Branch') }}</h6>
-                        </li>
-                        <li>
-                            <div class="px-3 py-1 fw-bold text-dark mb-2">{{ \Illuminate\Support\Str::limit(optional($activeBranch)->name ?? 'Branch', 20) }}</div>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        @foreach($branches as $b)
-                            @if($activeId != $b->id)
-                                <li>
-                                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ route('branch.switch', $b) }}">
-                                        <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
-                                            <i class="fa-solid fa-building text-secondary" style="font-size: 0.8rem;"></i>
-                                        </div>
-                                        {{ $b->name }}
-                                    </a>
-                                </li>
-                            @endif
-                        @endforeach
-                        @if($user->isHostelAdmin())
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-bold" href="{{ route('admin.branches.index') }}">
-                                <div class="bg-primary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
-                                    <i class="fa-solid fa-layer-group text-primary" style="font-size: 0.8rem;"></i>
-                                </div>
-                                {{ __('Manage Branches') }}
-                            </a>
-                        </li>
+        @if($branches->count() > 1)
+            @php($activeId = \App\Support\Tenant::id())
+            @php($activeBranch = $branches->firstWhere('id', $activeId))
+            <div class="dropdown">
+                <button class="topbar-action-btn" data-bs-toggle="dropdown" title="{{ __('Switch Branch') }}">
+                    <i class="fa-solid fa-code-branch"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 py-2">
+                    <li>
+                        <h6 class="dropdown-header text-uppercase small fw-bold text-primary">{{ __('Current Branch') }}</h6>
+                    </li>
+                    <li>
+                        <div class="px-3 py-1 fw-bold text-dark mb-2">{{ \Illuminate\Support\Str::limit(optional($activeBranch)->name ?? 'Branch', 20) }}</div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    @foreach($branches as $b)
+                        @if($activeId != $b->id)
+                            <li>
+                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ route('branch.switch', $b) }}">
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                        <i class="fa-solid fa-building text-secondary" style="font-size: 0.8rem;"></i>
+                                    </div>
+                                    {{ $b->name }}
+                                </a>
+                            </li>
                         @endif
-                    </ul>
-                </div>
-            @endif
+                    @endforeach
+                    @if($user->isHostelAdmin())
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-bold" href="{{ route('admin.branches.index') }}">
+                            <div class="bg-primary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                <i class="fa-solid fa-layer-group text-primary" style="font-size: 0.8rem;"></i>
+                            </div>
+                            {{ __('Manage Branches') }}
+                        </a>
+                    </li>
+                    @endif
+                </ul>
+            </div>
+        @endif
 
-        {{-- Language switcher --}}
+        {{-- Language Switcher --}}
         <div class="dropdown">
-            <button class="topbar-icon-btn" data-bs-toggle="dropdown" title="{{ __('Language') }}">
-                <span class="fw-bold" style="font-size: 0.85rem;">{{ strtoupper(app()->getLocale()) }}</span>
+            <button class="topbar-action-btn" data-bs-toggle="dropdown" title="{{ __('Language') }}">
+                <span class="lang-badge">{{ strtoupper(app()->getLocale()) }}</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 py-2">
                 @foreach(config('app.available_locales') as $code => $label)
@@ -128,12 +83,10 @@
 
         {{-- Notifications --}}
         <div class="dropdown">
-            <button class="topbar-icon-btn position-relative" title="{{ __('Notifications') }}" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+            <button class="topbar-action-btn position-relative" title="{{ __('Notifications') }}" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                 <i class="fa-regular fa-bell"></i>
                 @if(($navNotificationCount ?? 0) > 0)
-                    <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="margin-top: 5px; margin-left: -5px;">
-                        <span class="visually-hidden">New alerts</span>
-                    </span>
+                    <span class="notification-ping"></span>
                 @endif
             </button>
             <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-0 overflow-hidden" style="width: 340px;">
@@ -172,7 +125,7 @@
 
         {{-- User Profile --}}
         <div class="dropdown ms-1">
-            <div class="user-avatar" data-bs-toggle="dropdown" title="{{ $user->name }}">
+            <div class="topbar-avatar" data-bs-toggle="dropdown" title="{{ $user->name }}">
                 {{ strtoupper(substr($user->name, 0, 1)) }}
             </div>
             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-2" style="min-width: 240px;">
@@ -199,6 +152,190 @@
                 </li>
             </ul>
         </div>
-
     </div>
 </header>
+
+<style>
+    /* ─── Topbar Shell ────────────────────────────────────── */
+    .hsms-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.65rem 1.5rem;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: topbarSlideDown 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    }
+    @keyframes topbarSlideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Hamburger ───────────────────────────────────────── */
+    .topbar-hamburger {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        border-radius: 8px;
+        transition: background 0.2s ease;
+    }
+    .topbar-hamburger:hover { background: rgba(0, 0, 0, 0.04); }
+    .hamburger-line {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: #64748b;
+        border-radius: 2px;
+        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .topbar-hamburger:hover .hamburger-line { background: #0f172a; }
+
+    /* ─── Search Bar ──────────────────────────────────────── */
+    .topbar-search {
+        flex-grow: 1;
+        max-width: 420px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 10px;
+        background: #f1f5f9;
+        border: 1.5px solid transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .topbar-search.is-focused {
+        background: #fff;
+        border-color: var(--he-primary, #4f46e5);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+    }
+    .search-icon {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+        transition: color 0.2s ease;
+    }
+    .topbar-search.is-focused .search-icon { color: var(--he-primary, #4f46e5); }
+    .search-input {
+        border: none;
+        background: transparent;
+        outline: none;
+        flex: 1;
+        font-size: 0.85rem;
+        color: #0f172a;
+        font-weight: 500;
+    }
+    .search-input::placeholder { color: #94a3b8; font-weight: 400; }
+    .search-kbd {
+        background: #e2e8f0;
+        color: #64748b;
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 0.15rem 0.4rem;
+        border-radius: 5px;
+        font-family: inherit;
+        line-height: 1.3;
+    }
+
+    /* ─── Actions Row ─────────────────────────────────────── */
+    .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-left: auto;
+    }
+
+    /* ─── Action Button ───────────────────────────────────── */
+    .topbar-action-btn {
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: transparent;
+        color: #64748b;
+        border: 1.5px solid transparent;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+        position: relative;
+    }
+    .topbar-action-btn:hover,
+    .topbar-action-btn[aria-expanded="true"] {
+        background: #f1f5f9;
+        color: var(--he-primary, #4f46e5);
+        border-color: rgba(79, 70, 229, 0.1);
+        transform: translateY(-1px);
+    }
+    .topbar-action-btn:active {
+        transform: translateY(0) scale(0.95);
+    }
+
+    /* ─── Language Badge ──────────────────────────────────── */
+    .lang-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    /* ─── Notification Ping ───────────────────────────────── */
+    .notification-ping {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+        border: 2px solid #fff;
+        animation: pingPulse 2s ease-in-out infinite;
+    }
+    @keyframes pingPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.3); opacity: 0.7; }
+    }
+
+    /* ─── User Avatar ─────────────────────────────────────── */
+    .topbar-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .topbar-avatar:hover,
+    .topbar-avatar[aria-expanded="true"] {
+        border-color: rgba(79, 70, 229, 0.25);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        transform: translateY(-1px);
+    }
+
+    /* ─── Topbar Mobile Responsive ────────────────────────── */
+    @media (max-width: 575.98px) {
+        .hsms-topbar { flex-wrap: wrap; row-gap: 0.5rem; padding: 0.6rem 1rem; }
+        .topbar-search { order: 3; max-width: 100% !important; flex: 0 0 100%; }
+        .search-kbd { display: none !important; }
+    }
+</style>
