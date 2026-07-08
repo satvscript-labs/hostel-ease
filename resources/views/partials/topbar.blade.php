@@ -96,6 +96,15 @@
                                 </li>
                             @endif
                         @endforeach
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-bold" href="{{ route('admin.branches.index') }}">
+                                <div class="bg-primary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                    <i class="fa-solid fa-layer-group text-primary" style="font-size: 0.8rem;"></i>
+                                </div>
+                                {{ __('Manage Branches') }}
+                            </a>
+                        </li>
                     </ul>
                 </div>
             @endif

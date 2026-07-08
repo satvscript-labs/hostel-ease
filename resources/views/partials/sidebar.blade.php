@@ -192,7 +192,7 @@
             @endif
 
             <!-- Insights & Settings Menu -->
-            @php($settingsActive = request()->routeIs('admin.reports.*', 'admin.users.*', 'admin.billing'))
+            @php($settingsActive = request()->routeIs('admin.reports.*', 'admin.users.*', 'admin.branches.*'))
             <a class="nav-link {{ $settingsActive ? 'active fw-bold' : '' }}" href="{{ route('admin.reports.index') }}">
                 <i class="fa-solid fa-gear"></i> <span class="ms-2">{{ __('Settings & Tools') }}</span>
             </a>
@@ -200,7 +200,7 @@
             <div class="hsms-sub-menu">
                 <a class="nav-link sub-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.index') }}">{{ __('Reports') }}</a>
                 <a class="nav-link sub-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">{{ __('Users & Roles') }}</a>
-                <a class="nav-link sub-link {{ request()->routeIs('admin.billing') ? 'active' : '' }}" href="{{ route('admin.billing') }}">{{ __('Subscription') }}</a>
+                <a class="nav-link sub-link {{ request()->routeIs('admin.branches.*') ? 'active' : '' }}" href="{{ route('admin.branches.index') }}">{{ __('Branches & Billing') }}</a>
             </div>
             @endif
         @endif
