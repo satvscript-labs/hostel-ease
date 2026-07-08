@@ -21,37 +21,7 @@ class UserController extends Controller
     {
     }
 
-    public function index(): View
-    {
-        try {
-            // Include hostels relation to display assigned branches
-            $users = User::with('hostels')->where('hostel_id', Tenant::id())
-                ->whereIn('role', array_keys(config('hostelease.staff_roles')))
-                ->orderBy('name')->get();
-        } catch (\Exception $e) {
-            $users = collect();
-        }
 
-        try {
-            $roles = Role::all();
-        } catch (\Exception $e) {
-            $roles = collect();
-        }
-
-        try {
-            $branches = \App\Models\Hostel::whereIn('id', auth()->user()->accessibleHostelIds())->orderBy('name')->get();
-        } catch (\Exception $e) {
-            $branches = collect();
-        }
-
-        return view('admin.users.index', [
-            'users' => $users,
-            'roles' => config('hostelease.staff_roles'),
-            'access' => config('hostelease.role_access'),
-            'allRoles' => $roles,
-            'branches' => $branches,
-        ]);
-    }
 
     public function store(Request $request): RedirectResponse
     {
@@ -79,7 +49,7 @@ class UserController extends Controller
         $user->hostels()->sync($data['branches']);
         $this->logger->log('user.create', "Added {$data['role']} {$user->name}", $user);
 
-        return back()->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
+        return back()->with('active_tab', 'users')->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
             ->with('success', 'User created — share the login below.');
     }
 
@@ -101,7 +71,7 @@ class UserController extends Controller
 
         $user->hostels()->sync($data['branches']);
 
-        return back()->with('success', 'User updated.');
+        return back()->with('active_tab', 'users')->with('success', 'User updated.');
     }
 
     public function resetPassword(User $user): RedirectResponse
@@ -110,7 +80,7 @@ class UserController extends Controller
         $password = Str::upper(Str::random(3)).random_int(10000, 99999);
         $user->update(['password' => Hash::make($password)]);
 
-        return back()->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
+        return back()->with('active_tab', 'users')->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
             ->with('success', 'Password reset — share the new login below.');
     }
 
@@ -119,7 +89,7 @@ class UserController extends Controller
         $this->authorizeUser($user);
         $user->delete();
 
-        return back()->with('success', 'User removed.');
+        return back()->with('active_tab', 'users')->with('success', 'User removed.');
     }
 
     protected function authorizeUser(User $user): void

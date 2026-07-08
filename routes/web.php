@@ -91,7 +91,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     // Branch Management & Subscriptions (hostel owner). Deliberately OUTSIDE the
     // subscription.active gate so an expired owner can still reach the pay page and manage branches.
     Route::middleware('role:hostel_admin')->prefix('admin')->name('admin.')->group(function () {
-        Route::get('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'index'])->name('branches.index');
+        Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
         Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
         Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
         Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
@@ -207,6 +207,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::get('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'index'])->name('security-deposits.index');
                 Route::post('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'store'])->name('security-deposits.store');
                 Route::post('security-deposits/{securityDeposit}/refund', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'refund'])->name('security-deposits.refund');
+                Route::post('security-deposits/{securityDeposit}/revert-refund', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'revertRefund'])->name('security-deposits.revert-refund');
             });
 
             // --- Module 9: Reports ---
@@ -236,7 +237,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
             // --- New module: Users & roles (sub-users) ---
             Route::middleware('access:users')->group(function () {
-                Route::get('users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
                 Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
                 Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
                 Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');

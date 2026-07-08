@@ -77,20 +77,19 @@ class SecurityDepositController extends Controller
                 $paymentAmount = min($invoice->balance, $remainingDeduction);
                 
                 if ($paymentAmount > 0) {
-                    $invoice->payments()->create([
+                    $payment = $invoice->payments()->create([
                         'student_id' => $invoice->student_id,
                         'hostel_id' => Tenant::id(),
                         'amount' => $paymentAmount,
                         'paid_on' => today(),
-                        'payment_mode_id' => $securityDeposit->payment_mode_id,
+                        'mode' => $securityDeposit->paymentMode?->code ?? 'cash',
                         'receipt_number' => 'REF-' . $securityDeposit->receipt_number . '-' . time(),
-                        'note' => 'Deducted from Security Deposit',
-                        'created_by' => $request->user()->id,
-                    ]);
+                        'remarks' => 'Deducted from Security Deposit',
+                        'collected_by' => $request->user()->id,
+                    ], ['amount' => $paymentAmount]);
 
                     $invoice->paid_amount += $paymentAmount;
-                    $invoice->balance -= $paymentAmount;
-                    $invoice->status = $invoice->balance <= 0 ? 'paid' : 'partial';
+                    $invoice->recalculate();
                     $invoice->save();
 
                     $remainingDeduction -= $paymentAmount;
@@ -107,5 +106,29 @@ class SecurityDepositController extends Controller
         ]);
 
         return back()->with('success', 'Security deposit refunded successfully.');
+    }
+
+    public function revertRefund(Request $request, SecurityDeposit $securityDeposit, \App\Services\PaymentService $paymentService)
+    {
+        if ($securityDeposit->status !== 'refunded') {
+            return back()->with('error', 'Deposit is not currently refunded.');
+        }
+
+        // Find payments associated with this refund (by receipt prefix)
+        $payments = \App\Models\Payment::where('receipt_number', 'like', 'REF-' . $securityDeposit->receipt_number . '-%')->get();
+
+        foreach ($payments as $payment) {
+            $paymentService->reverse($payment);
+        }
+
+        $securityDeposit->update([
+            'status' => 'collected',
+            'refunded_on' => null,
+            'refunded_amount' => 0,
+            'deducted_amount' => 0,
+            'refund_note' => null,
+        ]);
+
+        return back()->with('success', 'Refund reverted successfully. Pending dues and deposit status have been fully restored.');
     }
 }

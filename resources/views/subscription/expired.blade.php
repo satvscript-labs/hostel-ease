@@ -19,7 +19,7 @@
             <p class="mb-4"><strong>SatvScript Support:</strong> support@satvscript.com</p>
             <div class="d-flex gap-2 justify-content-center">
                 @if(auth()->user()?->isHostelAdmin())
-                    <a href="{{ route('admin.branches.index') }}" class="btn btn-primary"><i class="fa-solid fa-credit-card me-1"></i> Manage Subscriptions</a>
+                    <a href="{{ route('admin.settings.index', ['tab' => 'branches']) }}" class="btn btn-primary"><i class="fa-solid fa-credit-card me-1"></i> Manage Subscriptions</a>
                 @endif
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf

@@ -28,22 +28,7 @@ class BranchManagerController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
-    {
-        $owner = $request->user();
-        
-        // Load branches explicitly belonging to this user
-        // Using accessibleHostelIds to ensure we catch primary and pivots
-        $branches = Hostel::whereIn('id', $owner->accessibleHostelIds())->get();
 
-        return view('admin.branches.index', [
-            'owner' => $owner,
-            'branches' => $branches,
-            'razorpayEnabled' => $this->razorpay->isConfigured(),
-            'monthlyPrice' => $this->billing->unitPrice('monthly'),
-            'yearlyPrice' => $this->billing->unitPrice('yearly'),
-        ]);
-    }
 
     public function store(Request $request): RedirectResponse
     {
@@ -79,7 +64,7 @@ class BranchManagerController extends Controller
 
         $this->logger->log('branch.created', "New branch created: {$branch->name}");
 
-        return redirect()->route('admin.branches.index')->with('success', 'Branch created successfully! Your 14-day free trial has started.');
+        return redirect()->route('admin.settings.index')->with('active_tab', 'branches')->with('success', 'Branch created successfully! Your 14-day free trial has started.');
     }
 
     public function createOrder(Request $request): JsonResponse
@@ -181,7 +166,7 @@ class BranchManagerController extends Controller
 
         return response()->json([
             'message' => 'Payment successful — branch subscription activated.',
-            'redirect' => route('admin.branches.index'),
+            'redirect' => route('admin.settings.index') . '?tab=branches',
         ]);
     }
 }

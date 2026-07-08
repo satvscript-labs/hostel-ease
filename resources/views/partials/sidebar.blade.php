@@ -163,8 +163,8 @@
 
         @if(!$user->isSuperAdmin())
         {{-- Settings (pinned to bottom) --}}
-        @php($settingsActive = request()->routeIs('admin.users.*', 'admin.branches.*'))
-        <a class="sidebar-link sidebar-settings-link {{ $settingsActive ? 'is-active' : '' }}" href="{{ route('admin.users.index') }}">
+        @php($settingsActive = request()->routeIs('admin.settings.*', 'admin.users.*', 'admin.branches.*'))
+        <a class="sidebar-link sidebar-settings-link {{ $settingsActive ? 'is-active' : '' }}" href="{{ route('admin.settings.index') }}">
             <span class="sidebar-link-icon"><i class="fa-solid fa-gear"></i></span>
             <span class="sidebar-link-label">{{ __('Settings') }}</span>
         </a>

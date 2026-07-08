@@ -87,7 +87,15 @@
                                     <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> Refund / Deduct
                                 </button>
                                 @else
-                                <span class="text-muted small"><i class="fa-solid fa-check"></i> Processed</span>
+                                <div class="d-flex justify-content-end align-items-center gap-2">
+                                    <span class="text-muted small fw-bold"><i class="fa-solid fa-check text-success"></i> Processed</span>
+                                    <form action="{{ route('admin.security-deposits.revert-refund', $deposit) }}" method="POST" class="d-inline" data-confirm="Are you sure you want to revert this refund? Any dues deducted will be reinstated.">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-white text-danger border shadow-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Revert Refund">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </form>
+                                </div>
                                 @endif
                             </td>
                         </tr>
