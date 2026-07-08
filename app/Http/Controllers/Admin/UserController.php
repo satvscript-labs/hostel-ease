@@ -24,7 +24,8 @@ class UserController extends Controller
     public function index(): View
     {
         try {
-            $users = User::where('hostel_id', Tenant::id())
+            // Include hostels relation to display assigned branches
+            $users = User::with('hostels')->where('hostel_id', Tenant::id())
                 ->whereIn('role', array_keys(config('hostelease.staff_roles')))
                 ->orderBy('name')->get();
         } catch (\Exception $e) {
@@ -38,7 +39,7 @@ class UserController extends Controller
         }
 
         try {
-            $branches = Branch::where('hostel_id', Tenant::id())->where('is_active', true)->get();
+            $branches = \App\Models\Hostel::whereIn('id', auth()->user()->accessibleHostelIds())->orderBy('name')->get();
         } catch (\Exception $e) {
             $branches = collect();
         }
@@ -58,8 +59,8 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'regex:/^\+91\d{10}$|^\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
-            'role_id' => ['nullable', 'exists:roles,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
+            'branches' => ['required', 'array', 'min:1'],
+            'branches.*' => ['integer', 'exists:hostels,id'],
         ]);
 
         $digits = substr(preg_replace('/\D+/', '', $data['mobile']), -10);
@@ -72,11 +73,10 @@ class UserController extends Controller
             'mobile' => $mobile,
             'password' => Hash::make($password),
             'role' => $data['role'],
-            'role_id' => $data['role_id'],
-            'branch_id' => $data['branch_id'] ?? Branch::where('hostel_id', Tenant::id())->first()?->id,
             'is_active' => true,
         ]);
-        $user->hostels()->syncWithoutDetaching([Tenant::id()]);
+        
+        $user->hostels()->sync($data['branches']);
         $this->logger->log('user.create', "Added {$data['role']} {$user->name}", $user);
 
         return back()->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
@@ -89,17 +89,17 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
-            'role_id' => ['nullable', 'exists:roles,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
+            'branches' => ['required', 'array', 'min:1'],
+            'branches.*' => ['integer', 'exists:hostels,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
         $user->update([
             'name' => $data['name'],
             'role' => $data['role'],
-            'role_id' => $data['role_id'],
-            'branch_id' => $data['branch_id'],
             'is_active' => $request->boolean('is_active'),
         ]);
+
+        $user->hostels()->sync($data['branches']);
 
         return back()->with('success', 'User updated.');
     }

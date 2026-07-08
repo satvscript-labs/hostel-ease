@@ -118,13 +118,13 @@
             </div>
         </div>
 
-        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
+        <div x-data="adminManager()" class="card stat-card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
                         <i class="fa-solid fa-user-shield text-primary"></i> Admins
                     </h2>
-                    <button class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-medium" data-bs-toggle="modal" data-bs-target="#addAdminModal">
+                    <button class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-medium" @click="openModal()">
                         <i class="fa-solid fa-plus me-1"></i> Add Admin
                     </button>
                 </div>
@@ -153,7 +153,14 @@
                                             </div>
                                             <div>
                                                 <div class="fw-semibold text-dark lh-1 mb-1">{{ $a->name }}</div>
-                                                <div class="small text-muted lh-1"><x-mobile-link :mobile="$a->mobile" /></div>
+                                                <div class="small text-muted lh-1 mb-1"><x-mobile-link :mobile="$a->mobile" /></div>
+                                                @if($a->hostels->where('id', '!=', $hostel->id)->isNotEmpty())
+                                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                                        @foreach($a->hostels->where('id', '!=', $hostel->id) as $assignedBranch)
+                                                            <span class="badge bg-light border text-secondary rounded-pill" style="font-size: 0.65rem;">{{ $assignedBranch->name }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>
@@ -247,42 +254,112 @@
     </div>
 </div>
 
-<!-- Add Admin Modal -->
-<div class="modal fade" id="addAdminModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold text-dark">Add Admin for {{ $hostel->name }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form action="{{ route('superadmin.admins.store') }}" method="POST">
-                @csrf
-                <input type="hidden" name="hostel_id" value="{{ $hostel->id }}">
-                <div class="modal-body">
-                    <p class="text-muted small mb-4">This will create a new administrator account specifically for this hostel. A password will be auto-generated.</p>
+    <!-- Alpine Premium Modal -->
+    <template x-teleport="body">
+        <div x-show="isModalOpen" class="custom-overlay-backdrop" style="display: none;" x-transition.opacity.duration.300ms x-cloak>
+            <div x-show="isModalOpen" @click.away="closeModal()" class="custom-overlay-modal is-open" x-transition.scale.95.duration.300ms>
+                <form action="{{ route('superadmin.admins.store') }}" method="POST" class="d-flex flex-column h-100 mb-0">
+                    @csrf
+                    <input type="hidden" name="hostel_id" value="{{ $hostel->id }}">
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark small">Full Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control form-control-lg bg-light" required placeholder="e.g. Ramesh Patel">
+                    <div class="custom-overlay-header">
+                        <h5 class="fw-bold mb-0 text-dark">Add Admin for {{ $hostel->name }}</h5>
+                        <button type="button" @click="closeModal()" class="btn-close shadow-none"></button>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark small">Mobile Number <span class="text-danger">*</span></label>
-                        <input type="text" name="mobile" class="form-control form-control-lg bg-light" required pattern="\d{10}" title="10-digit mobile number" placeholder="10-digit number">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark small">Email Address (Optional)</label>
-                        <input type="email" name="email" class="form-control form-control-lg bg-light" placeholder="admin@example.com">
-                    </div>
-                </div>
-                <div class="modal-footer border-top-0 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4 fw-medium" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-medium shadow-sm">Create Admin</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
+                    <div class="custom-overlay-body">
+                        <p class="text-muted small mb-4">This will create a new administrator account. A password will be auto-generated.</p>
+                        
+                        <div class="row g-4">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold text-secondary small text-uppercase">Full Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control form-control-lg bg-light border-0" required placeholder="e.g. Ramesh Patel">
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label fw-semibold text-secondary small text-uppercase">Mobile Number <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light border-0 text-muted">+91</span>
+                                    <input type="tel" name="mobile" maxlength="10" inputmode="numeric" class="form-control bg-light border-0" required placeholder="9876543210">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label fw-semibold text-secondary small text-uppercase">Email Address (Optional)</label>
+                                <input type="email" name="email" class="form-control form-control-lg bg-light border-0" placeholder="admin@example.com">
+                            </div>
+                            
+                            <!-- Premium Multi-Branch Checkbox Tiles -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1 mb-3">Assigned Branches <span class="text-muted text-lowercase fw-normal">(Optional)</span></label>
+                                <div class="row g-3">
+                                    @forelse($branches as $b)
+                                        <div class="col-sm-6">
+                                            <label class="w-100 cursor-pointer h-100 m-0">
+                                                <input type="checkbox" name="branches[]" value="{{ $b->id }}" class="d-none peer-checkbox">
+                                                <div class="card bg-light border-0 rounded-4 transition-all h-100 checkbox-tile">
+                                                    <div class="card-body p-3 d-flex align-items-center gap-3">
+                                                        <div class="check-circle rounded-circle border d-flex align-items-center justify-content-center bg-white text-white flex-shrink-0" style="width: 24px; height: 24px; transition: all 0.2s;">
+                                                            <i class="fa-solid fa-check" style="font-size: 0.7rem;"></i>
+                                                        </div>
+                                                        <span class="fw-semibold text-dark lh-sm" style="font-size: 0.9rem;">{{ $b->name }}</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    @empty
+                                        <div class="col-12 text-muted small">No active branches found.</div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="custom-overlay-footer">
+                        <button type="button" @click="closeModal()" class="btn btn-light rounded-pill px-4 fw-medium">Cancel</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 shadow-sm fw-semibold">
+                            <i class="fa-solid fa-check me-2"></i> Create Admin
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </template>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('adminManager', () => ({
+            isModalOpen: false,
+            openModal() {
+                this.isModalOpen = true;
+                document.body.style.overflow = 'hidden';
+            },
+            closeModal() {
+                this.isModalOpen = false;
+                document.body.style.overflow = '';
+            }
+        }));
+    });
+</script>
+<style>
+    /* Premium Checkbox Tile Styles */
+    .peer-checkbox:checked + .checkbox-tile {
+        background-color: var(--bs-primary-bg-subtle) !important;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        transform: translateY(-2px);
+    }
+    .peer-checkbox:checked + .checkbox-tile .check-circle {
+        background-color: var(--bs-primary) !important;
+        border-color: var(--bs-primary) !important;
+    }
+    .checkbox-tile:hover {
+        background-color: #f1f5f9;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+@endpush

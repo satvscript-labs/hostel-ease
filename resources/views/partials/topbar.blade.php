@@ -66,9 +66,8 @@
     <!-- Right Side Actions -->
     <div class="d-flex align-items-center gap-2 ms-auto">
 
-        {{-- Branch switcher (multi-branch hostel admins) --}}
-        @if($user->isHostelAdmin())
-            @php($branches = $user->hostels)
+        {{-- Branch switcher (multi-branch users) --}}
+        @php($branches = $user->hostels)
             @if($branches->count() > 1)
                 @php($activeId = \App\Support\Tenant::id())
                 @php($activeBranch = $branches->firstWhere('id', $activeId))
@@ -96,6 +95,7 @@
                                 </li>
                             @endif
                         @endforeach
+                        @if($user->isHostelAdmin())
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-bold" href="{{ route('admin.branches.index') }}">
@@ -105,10 +105,10 @@
                                 {{ __('Manage Branches') }}
                             </a>
                         </li>
+                        @endif
                     </ul>
                 </div>
             @endif
-        @endif
 
         {{-- Language switcher --}}
         <div class="dropdown">

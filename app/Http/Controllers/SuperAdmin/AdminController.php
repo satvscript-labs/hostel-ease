@@ -29,6 +29,8 @@ class AdminController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'digits:10', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
             'email' => ['nullable', 'email', 'max:150'],
+            'branches' => ['nullable', 'array'],
+            'branches.*' => ['integer', 'exists:hostels,id'],
         ]);
 
         $password = str(str()->random(4))->upper()->toString() . random_int(1000, 9999);
@@ -43,7 +45,9 @@ class AdminController extends Controller
             'is_active' => true,
         ]);
 
-        $admin->hostels()->syncWithoutDetaching([$data['hostel_id']]);
+        $ids = collect($data['branches'] ?? [])->push($data['hostel_id'])->filter()->unique()->all();
+        $admin->hostels()->sync($ids);
+        
         $this->logger->log('admin.create', "Added admin {$admin->name}", $admin);
 
         return back()

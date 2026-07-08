@@ -133,102 +133,108 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     | Hostel Admin area (requires an active subscription)
     |----------------------------------------------------------------------
     */
-    Route::middleware(['role:hostel_admin', 'subscription.active'])
+    Route::middleware(['role:staff', 'subscription.active'])
         ->prefix('admin')->name('admin.')->group(function () {
             Route::get('dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
             // --- Module 1: Property Board ---
-            Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
-            Route::post('floors/reorder', [FloorController::class, 'reorder'])->name('floors.reorder');
-            Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
-            Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
-            Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
-            Route::patch('beds/{bed}/status', [BedController::class, 'updateStatus'])->name('beds.status');
+            Route::middleware('access:property')->group(function () {
+                Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
+                Route::post('floors/reorder', [FloorController::class, 'reorder'])->name('floors.reorder');
+                Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
+                Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
+                Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
+                Route::patch('beds/{bed}/status', [BedController::class, 'updateStatus'])->name('beds.status');
+                Route::post('property/assign', [PropertyController::class, 'assign'])->name('property.assign');
+                Route::patch('property/assignments/{assignment}/release', [PropertyController::class, 'release'])->name('property.release');
+                Route::patch('property/assignments/{assignment}/transfer', [PropertyController::class, 'transfer'])->name('property.transfer');
+            });
 
             // --- Module 2: Students ---
-            Route::resource('students', StudentController::class);
-            Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.update-fee-settings');
-            Route::post('students/{student}/collect', [StudentController::class, 'collect'])->name('students.collect');
-            Route::post('students/{student}/promise', [StudentController::class, 'promise'])->name('students.promise');
-            Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.fee-settings.update');
-            Route::get('students/{student}/prorate-preview', [StudentController::class, 'previewProration'])->name('students.prorate-preview');
-            Route::post('students/{student}/documents', [StudentDocumentController::class, 'store'])
-                ->name('students.documents.store');
-            Route::delete('students/{student}/documents/{document}', [StudentDocumentController::class, 'destroy'])
-                ->name('students.documents.destroy');
-
-            // --- Module 3: Property Board & Bed Assignments ---
-            Route::post('property/assign', [PropertyController::class, 'assign'])->name('property.assign');
-            Route::patch('property/assignments/{assignment}/release', [PropertyController::class, 'release'])->name('property.release');
-            Route::patch('property/assignments/{assignment}/transfer', [PropertyController::class, 'transfer'])->name('property.transfer');
-
+            Route::middleware('access:students')->group(function () {
+                Route::resource('students', StudentController::class);
+                Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.update-fee-settings');
+                Route::post('students/{student}/collect', [StudentController::class, 'collect'])->name('students.collect');
+                Route::post('students/{student}/promise', [StudentController::class, 'promise'])->name('students.promise');
+                Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.fee-settings.update');
+                Route::get('students/{student}/prorate-preview', [StudentController::class, 'previewProration'])->name('students.prorate-preview');
+                Route::post('students/{student}/documents', [StudentDocumentController::class, 'store'])->name('students.documents.store');
+                Route::delete('students/{student}/documents/{document}', [StudentDocumentController::class, 'destroy'])->name('students.documents.destroy');
+                
+                // Student self-registrations
+                Route::get('registrations', [\App\Http\Controllers\Admin\RegistrationController::class, 'index'])->name('registrations.index');
+                Route::post('registrations/regenerate', [\App\Http\Controllers\Admin\RegistrationController::class, 'regenerate'])->name('registrations.regenerate');
+                Route::post('registrations/{registration}/approve', [\App\Http\Controllers\Admin\RegistrationController::class, 'approve'])->name('registrations.approve');
+                Route::post('registrations/{registration}/reject', [\App\Http\Controllers\Admin\RegistrationController::class, 'reject'])->name('registrations.reject');
+            });
 
             // --- Module 5: Finances (Invoices & Payments) ---
-            Route::get('finances', [FinanceController::class, 'index'])->name('finance.index');
-            
-            // Invoices
-            Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
-            Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+            Route::middleware('access:finance')->group(function () {
+                Route::get('finances', [FinanceController::class, 'index'])->name('finance.index');
+                
+                // Invoices
+                Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+                Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
 
-            // Payments (View, delete, receipt actions)
-            Route::get('payments/{payment}/pdf', [PaymentController::class, 'pdf'])->name('payments.pdf');
-            Route::post('payments/{payment}/whatsapp', [PaymentController::class, 'whatsapp'])->name('payments.whatsapp');
-            Route::post('payments/{payment}/email', [PaymentController::class, 'email'])->name('payments.email');
-            Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+                // Payments (View, delete, receipt actions)
+                Route::get('payments/{payment}/pdf', [PaymentController::class, 'pdf'])->name('payments.pdf');
+                Route::post('payments/{payment}/whatsapp', [PaymentController::class, 'whatsapp'])->name('payments.whatsapp');
+                Route::post('payments/{payment}/email', [PaymentController::class, 'email'])->name('payments.email');
+                Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+
+                // Payment modes
+                Route::resource('payment-modes', PaymentModeController::class)->only(['index', 'store', 'update', 'destroy']);
+
+                // Promise to pay
+                Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
+
+                // AC Bills
+                Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);
+
+                // Expense Management
+                Route::get('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'index'])->name('expenses.index');
+                Route::post('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'store'])->name('expenses.store');
+                Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+                
+                // Pocket money
+                Route::get('pocket-money', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'index'])->name('pocket-money.index');
+                Route::get('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'show'])->name('pocket-money.show');
+                Route::post('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'store'])->name('pocket-money.store');
+                Route::delete('pocket-money/{student}/tx/{transaction}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'destroy'])->name('pocket-money.destroy');
+            });
 
             // --- Module 9: Reports ---
-            Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
-            Route::get('reports/{type}', [ReportController::class, 'show'])->name('reports.show');
-
-            // --- Payment modes (manageable) ---
-            Route::resource('payment-modes', PaymentModeController::class)
-                ->only(['index', 'store', 'update', 'destroy']);
-
-            // --- Promise to pay (set on an unpaid obligation) ---
-            Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
-
-            // --- Add-on: AC Bills ---
-            Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);
-
-            // --- Add-on: Expense Management ---
-            Route::get('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'index'])->name('expenses.index');
-            Route::post('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'store'])->name('expenses.store');
-            Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+            Route::middleware('access:reports')->group(function () {
+                Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+                Route::get('reports/{type}', [ReportController::class, 'show'])->name('reports.show');
+            });
 
             // --- Add-on: Front Desk (Visitors & Complaints) ---
-            Route::get('frontdesk', [\App\Http\Controllers\Admin\FrontDeskController::class, 'index'])->name('frontdesk.index');
-
-            Route::post('visitors', [VisitorController::class, 'store'])->name('visitors.store');
-            Route::patch('visitors/{visitor}/checkout', [VisitorController::class, 'checkout'])->name('visitors.checkout');
-            Route::delete('visitors/{visitor}', [VisitorController::class, 'destroy'])->name('visitors.destroy');
-
-            Route::post('complaints', [ComplaintController::class, 'store'])->name('complaints.store');
-            Route::patch('complaints/{complaint}', [ComplaintController::class, 'update'])->name('complaints.update');
-            Route::delete('complaints/{complaint}', [ComplaintController::class, 'destroy'])->name('complaints.destroy');
+            Route::middleware('access:people')->group(function () {
+                Route::get('frontdesk', [\App\Http\Controllers\Admin\FrontDeskController::class, 'index'])->name('frontdesk.index');
+                Route::post('visitors', [VisitorController::class, 'store'])->name('visitors.store');
+                Route::patch('visitors/{visitor}/checkout', [VisitorController::class, 'checkout'])->name('visitors.checkout');
+                Route::delete('visitors/{visitor}', [VisitorController::class, 'destroy'])->name('visitors.destroy');
+                Route::post('complaints', [ComplaintController::class, 'store'])->name('complaints.store');
+                Route::patch('complaints/{complaint}', [ComplaintController::class, 'update'])->name('complaints.update');
+                Route::delete('complaints/{complaint}', [ComplaintController::class, 'destroy'])->name('complaints.destroy');
+            });
 
             // --- New module: Staff (salary + attendance) ---
-            Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
-            Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show']);
-            Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
-            Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])->name('staff.salary.destroy');
-
-            // --- New module: Pocket money ---
-            Route::get('pocket-money', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'index'])->name('pocket-money.index');
-            Route::get('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'show'])->name('pocket-money.show');
-            Route::post('pocket-money/{student}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'store'])->name('pocket-money.store');
-            Route::delete('pocket-money/{student}/tx/{transaction}', [\App\Http\Controllers\Admin\PocketMoneyController::class, 'destroy'])->name('pocket-money.destroy');
+            Route::middleware('access:staff')->group(function () {
+                Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
+                Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show']);
+                Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
+                Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])->name('staff.salary.destroy');
+            });
 
             // --- New module: Users & roles (sub-users) ---
-            Route::get('users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
-            Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
-            Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
-            Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');
-            Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
-
-            // --- New module: Student self-registrations (link/QR + approvals) ---
-            Route::get('registrations', [\App\Http\Controllers\Admin\RegistrationController::class, 'index'])->name('registrations.index');
-            Route::post('registrations/regenerate', [\App\Http\Controllers\Admin\RegistrationController::class, 'regenerate'])->name('registrations.regenerate');
-            Route::post('registrations/{registration}/approve', [\App\Http\Controllers\Admin\RegistrationController::class, 'approve'])->name('registrations.approve');
-            Route::post('registrations/{registration}/reject', [\App\Http\Controllers\Admin\RegistrationController::class, 'reject'])->name('registrations.reject');
+            Route::middleware('access:users')->group(function () {
+                Route::get('users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
+                Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
+                Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
+                Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');
+                Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
+            });
         });
 });

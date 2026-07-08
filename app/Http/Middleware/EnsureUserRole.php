@@ -19,8 +19,21 @@ class EnsureUserRole
             abort(403, 'Your account is inactive.');
         }
 
-        if (! empty($roles) && ! in_array($user->role, $roles, true)) {
-            abort(403, 'You are not authorised to access this area.');
+        if (! empty($roles)) {
+            $allowed = false;
+            foreach ($roles as $r) {
+                if ($r === 'staff' && method_exists($user, 'isHostelStaff') && $user->isHostelStaff()) {
+                    $allowed = true;
+                    break;
+                }
+                if ($user->role === $r) {
+                    $allowed = true;
+                    break;
+                }
+            }
+            if (! $allowed) {
+                return redirect()->back()->with('error', 'You are not authorised to access this area.');
+            }
         }
 
         return $next($request);

@@ -76,9 +76,14 @@ class HostelController extends Controller
     public function show(Hostel $hostel): View
     {
         $hostel->loadCount('students', 'rooms', 'beds')
-            ->load(['admins', 'subscriptions' => fn ($q) => $q->latest('end_date')]);
+            ->load(['admins.hostels', 'subscriptions' => fn ($q) => $q->latest('end_date')]);
 
-        return view('superadmin.hostels.show', compact('hostel'));
+        $ownerAdmin = \App\Models\User::where('mobile', $hostel->mobile)->where('role', 'hostel_admin')->first();
+        $branches = $ownerAdmin 
+            ? \App\Models\Hostel::whereIn('id', $ownerAdmin->accessibleHostelIds())->orderBy('name')->get() 
+            : collect([$hostel]);
+
+        return view('superadmin.hostels.show', compact('hostel', 'branches'));
     }
 
 
