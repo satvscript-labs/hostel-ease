@@ -54,10 +54,10 @@ Route::post('register/{token}', [\App\Http\Controllers\PublicRegistrationControl
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'show'])->name('login');
-    Route::post('login', [LoginController::class, 'login'])->name('login.attempt');
+    Route::post('login', [LoginController::class, 'login'])->middleware('throttle:6,1')->name('login.attempt');
     
     Route::get('register', [RegisterController::class, 'show'])->name('register');
-    Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
+    Route::post('register', [RegisterController::class, 'register'])->middleware('throttle:6,1')->name('register.attempt');
 });
 
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
@@ -67,7 +67,7 @@ Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->n
 | Authenticated (tenant-aware)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'tenant'])->group(function () {
+Route::middleware(['auth', 'tenant', 'no-cache'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::view('subscription/expired', 'subscription.expired')->name('subscription.expired');

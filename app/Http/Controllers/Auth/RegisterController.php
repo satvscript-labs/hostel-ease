@@ -29,9 +29,18 @@ class RegisterController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'hostel_name' => ['required', 'string', 'max:255'],
-            'mobile' => ['required', 'string', 'size:10', 'unique:users,mobile'],
+            'mobile' => ['required', 'string', 'size:10'],
             'password' => ['required', 'string', 'min:6'],
         ]);
+
+        $mobile = '+91' . preg_replace('/\D+/', '', $request->mobile);
+        $mobile = substr($mobile, 0, 3) . substr($mobile, -10);
+
+        if (User::where('mobile', $mobile)->exists()) {
+            throw ValidationException::withMessages([
+                'mobile' => 'This mobile number is already registered.',
+            ]);
+        }
 
         try {
             DB::beginTransaction();
@@ -40,7 +49,7 @@ class RegisterController extends Controller
             $hostel = Hostel::create([
                 'name' => $request->hostel_name,
                 'owner_name' => $request->name,
-                'mobile' => $request->mobile,
+                'mobile' => $mobile,
                 'status' => 'active',
                 'subscription_start' => now(),
                 'subscription_end' => now()->addDays(14), // 14-day free trial
@@ -49,7 +58,7 @@ class RegisterController extends Controller
             // 2. Create the Owner User
             $user = User::create([
                 'name' => $request->name,
-                'mobile' => $request->mobile,
+                'mobile' => $mobile,
                 'password' => Hash::make($request->password),
                 'role' => 'hostel_admin',
                 'hostel_id' => $hostel->id,

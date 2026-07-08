@@ -16,12 +16,8 @@ class LoginController extends Controller
     {
     }
 
-    public function show(): View|RedirectResponse
+    public function show(): View
     {
-        if (Auth::check()) {
-            return redirect()->route('dashboard');
-        }
-
         return view('auth.login');
     }
 
@@ -32,35 +28,26 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        // Login username is the mobile number (normalize to +91 format for db lookup).
         $mobile = preg_replace('/\D+/', '', $credentials['mobile']);
-        $mobile = substr($mobile, -10);
-        $mobile = '+91' . $mobile;
+        $mobile = '+91' . substr($mobile, -10);
 
-        if (! Auth::attempt(['mobile' => $mobile, 'password' => $credentials['password']], $request->boolean('remember'))) {
-            throw ValidationException::withMessages([
-                'mobile' => __('These credentials do not match our records, or your account is inactive.'),
-            ]);
+        if (Auth::attempt(['mobile' => $mobile, 'password' => $credentials['password'], 'is_active' => true], $request->boolean('remember'))) {
+            $request->session()->regenerate();
+
+            $user = Auth::user();
+            $user->forceFill([
+                'last_login_at' => now(),
+                'last_login_ip' => $request->ip(),
+            ])->save();
+
+            $this->logger->log('login', 'User logged in');
+
+            return redirect()->intended(route('dashboard'));
         }
 
-        if (! Auth::user()?->is_active) {
-            Auth::logout();
-            throw ValidationException::withMessages([
-                'mobile' => __('Your account has been deactivated. Please contact support.'),
-            ]);
-        }
-
-        $request->session()->regenerate();
-
-        $user = Auth::user();
-        $user->forceFill([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-        ])->save();
-
-        $this->logger->log('login', 'User logged in');
-
-        return redirect()->intended(route('dashboard'));
+        return back()->withErrors([
+            'mobile' => __('These credentials do not match our records, or your account is inactive.'),
+        ])->onlyInput('mobile');
     }
 
     public function logout(Request $request): RedirectResponse

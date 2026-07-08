@@ -179,6 +179,13 @@
                 <p class="text-muted">Enter your credentials to access your dashboard.</p>
             </div>
             
+            @if(session('error'))
+                <div class="alert alert-danger bg-danger-subtle text-danger-emphasis border-0 rounded-3 mb-4 d-flex align-items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <div>{{ session('error') }}</div>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger bg-danger-subtle text-danger-emphasis border-0 rounded-3 mb-4 d-flex align-items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-circle-exclamation"></i>

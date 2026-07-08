@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.tenant' => ApiTenant::class,
             'access' => CheckAccess::class,
             'subscription.active' => EnsureActiveSubscription::class,
+            'no-cache' => \App\Http\Middleware\PreventBackHistory::class,
         ]);
 
         // Append locale + activity logging AFTER the session is started.
@@ -36,7 +37,12 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             LogActivity::class,
         ]);
+
+        $middleware->redirectGuestsTo('/login');
+        $middleware->redirectUsersTo('/dashboard');
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->renderable(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            return redirect()->route('login')->with('error', 'Your session has expired. Please log in again.');
+        });
     })->create();
