@@ -33,13 +33,15 @@ class StoreHostelRequest extends FormRequest
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'gst_number' => ['nullable', 'string', 'max:20'],
-            'subscription_start' => ['required', 'date'],
-            'subscription_end' => ['required', 'date', 'after:subscription_start'],
             'status' => ['required', Rule::in(array_keys(config('hostelease.hostel_status')))],
-            // Subscription (create only)
+            // Update only
+            'subscription_start' => [$this->isMethod('put') ? 'required' : 'nullable', 'date'],
+            'subscription_end' => [$this->isMethod('put') ? 'required' : 'nullable', 'date', 'after:subscription_start'],
+            // Creation only
+            'plan' => [$this->isMethod('post') ? 'required' : 'nullable', Rule::in(['yearly', 'monthly', 'trial'])],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'payment_status' => ['nullable', Rule::in(['paid', 'pending', 'failed'])],
-            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
         ];
     }

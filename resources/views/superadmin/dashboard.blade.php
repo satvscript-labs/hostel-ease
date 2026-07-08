@@ -1,9 +1,37 @@
 @extends('layouts.app')
 @section('title', 'Superadmin Dashboard')
 
+@push('styles')
+<style>
+    /* Premium Dashboard Aesthetic */
+    .stat-card {
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(0,0,0,0.05);
+        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.04) !important;
+    }
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+    }
+</style>
+@endpush
+
 @php
     $cards = [
-        ['label' => 'Total Hostels', 'value' => $stats['total_hostels'], 'icon' => 'fa-hotel', 'bg' => 'primary', 'desc' => 'Active branches managed'],
+        ['label' => 'Total Hostels', 'value' => $stats['total_hostels'], 'icon' => 'fa-hotel', 'bg' => 'primary', 'desc' => 'Total branches managed'],
         ['label' => 'Active Hostels', 'value' => $stats['active_hostels'], 'icon' => 'fa-circle-check', 'bg' => 'success', 'desc' => 'Paying subscriptions'],
         ['label' => 'Due Renewals', 'value' => $stats['due_renewals'], 'icon' => 'fa-bell', 'bg' => 'warning', 'desc' => 'Expiring within 30 days'],
         ['label' => 'Total Students', 'value' => $stats['total_students'], 'icon' => 'fa-users', 'bg' => 'info', 'desc' => 'Across all hostels'],
@@ -83,7 +111,7 @@
     </div>
 </div>
 
-<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-5">
     <div class="card-body p-0">
         <div class="p-4 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center">
             <h5 class="fw-bold mb-0 text-dark">Upcoming Renewals (30 days)</h5>
@@ -91,7 +119,7 @@
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">
                     <tr>
                         <th class="py-3 px-4 text-muted fw-semibold border-0">Hostel Branch</th>
                         <th class="py-3 px-4 text-muted fw-semibold border-0">Owner</th>
@@ -104,16 +132,16 @@
                 @forelse($upcomingRenewals as $h)
                     <tr>
                         <td class="px-4 py-3 fw-bold text-dark">{{ $h->name }}</td>
-                        <td class="px-4 py-3 fw-medium text-muted">{{ $h->owner_name }}</td>
+                        <td class="px-4 py-3 fw-medium text-secondary">{{ $h->owner_name }}</td>
                         <td class="px-4 py-3 text-dark fw-medium">{{ optional($h->subscription_end)->format('d M Y') }}</td>
                         <td class="px-4 py-3">
-                            <span class="badge bg-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }} border border-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3">
+                            <span class="badge bg-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }} border border-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3 py-1">
                                 {{ $h->daysUntilExpiry() }} days
                             </span>
                         </td>
                         <td class="px-4 py-3 text-end">
-                            <a href="{{ route('superadmin.hostels.show', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="View Tenant">
-                                <i class="fa-solid fa-arrow-right text-primary"></i>
+                            <a href="{{ route('superadmin.subscriptions.index') }}" class="btn btn-sm btn-light text-primary rounded-pill fw-semibold px-3 shadow-sm" title="Manage Subscription">
+                                Renew
                             </a>
                         </td>
                     </tr>

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Hostel;
 use App\Models\Subscription;
-use App\Models\User;
 use App\Services\ActivityLogger;
-use App\Services\SubscriptionBillingService;
+use App\Services\BranchBillingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,33 +15,24 @@ use Illuminate\View\View;
 class SubscriptionController extends Controller
 {
     public function __construct(
-        protected SubscriptionBillingService $billing,
+        protected BranchBillingService $billing,
         protected ActivityLogger $logger,
     ) {
     }
 
     public function index(Request $request): View
     {
-        // Per-account (owner) billing overview. A "branch" is a hostel; an
-        // account is a hostel_admin owner and every branch they hold.
-        $accounts = User::where('role', 'hostel_admin')
-            ->orderBy('name')
+        // List all branches for per-branch billing
+        $branches = Hostel::orderBy('name')
             ->get()
-            ->map(function (User $owner) {
-                $branches = $this->billing->branchCount($owner);
-                $free = $this->billing->freeBranches($branches);
-                $payable = max(0, $branches - $free);
-                $end = $this->billing->currentEnd($owner);
-
+            ->map(function (Hostel $branch) {
+                $end = $branch->subscription_end;
                 return [
-                    'owner' => $owner,
-                    'branches' => $branches,
-                    'free' => $free,
-                    'payable' => $payable,
-                    'yearly' => $payable * $this->billing->unitPrice('yearly'),
-                    'monthly' => $payable * $this->billing->unitPrice('monthly'),
+                    'branch' => $branch,
+                    'yearly' => $this->billing->unitPrice('yearly'),
+                    'monthly' => $this->billing->unitPrice('monthly'),
                     'end' => $end,
-                    'active' => $end && ! $end->isPast(),
+                    'active' => $branch->isActive(),
                 ];
             })
             ->values();
@@ -54,17 +45,15 @@ class SubscriptionController extends Controller
         $summary = [
             'total' => (float) Subscription::where('payment_status', 'paid')->sum('amount'),
             'pending' => (float) Subscription::where('payment_status', 'pending')->sum('amount'),
-            'active_accounts' => $accounts->where('active', true)->count(),
-            'expired_accounts' => $accounts->where('active', false)->count(),
+            'active_branches' => $branches->where('active', true)->count(),
+            'expired_branches' => $branches->where('active', false)->count(),
         ];
 
-        // Flat map (owner_id => pricing) for the modal's auto-calc JavaScript.
-        $accountsJson = $accounts->mapWithKeys(fn ($a) => [
-            $a['owner']->id => [
-                'yearly' => $a['yearly'],
-                'monthly' => $a['monthly'],
-                'payable' => $a['payable'],
-                'branches' => $a['branches'],
+        // Flat map (branch_id => pricing) for the modal's auto-calc JavaScript.
+        $branchesJson = $branches->mapWithKeys(fn ($b) => [
+            $b['branch']->id => [
+                'yearly' => $b['yearly'],
+                'monthly' => $b['monthly'],
             ],
         ]);
 
@@ -82,15 +71,15 @@ class SubscriptionController extends Controller
             ],
         ]);
 
-        return view('superadmin.subscriptions.index', compact('accounts', 'subscriptions', 'summary', 'accountsJson', 'subsJson'));
+        return view('superadmin.subscriptions.index', compact('branches', 'subscriptions', 'summary', 'branchesJson', 'subsJson'));
     }
 
-    /** Record an offline (cash/UPI/cheque) renewal for a whole account. */
+    /** Record an offline (cash/UPI/cheque) renewal for a specific branch. */
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'owner_id' => ['required', 'exists:users,id'],
-            'period' => ['required', Rule::in(['yearly', 'monthly'])],
+            'branch_id' => ['required', 'exists:hostels,id'],
+            'period' => ['required', Rule::in(['yearly', 'monthly', 'trial'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_status' => ['required', Rule::in(['paid', 'pending', 'failed'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
@@ -98,9 +87,9 @@ class SubscriptionController extends Controller
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $owner = User::where('role', 'hostel_admin')->findOrFail($data['owner_id']);
+        $branch = Hostel::findOrFail($data['branch_id']);
 
-        $subscription = $this->billing->renewOwner($owner, $data['period'], [
+        $subscription = $this->billing->renewBranch($branch, $data['period'], [
             'amount' => $data['amount'],
             'payment_status' => $data['payment_status'],
             'payment_method' => $data['payment_method'] ?? null,
@@ -110,20 +99,20 @@ class SubscriptionController extends Controller
 
         $this->logger->log(
             'subscription.create',
-            "Account renewal for {$owner->name} ({$data['period']}) — ".hostelease_money($data['amount']),
+            "Branch renewal for {$branch->name} ({$data['period']}) — ".hostelease_money($data['amount']),
             $subscription,
         );
 
-        $verb = $data['payment_status'] === 'paid' ? 'recorded and all branches extended' : 'recorded';
+        $verb = $data['payment_status'] === 'paid' ? 'recorded and branch activated' : 'recorded';
 
-        return back()->with('success', "Subscription {$verb} — {$owner->name} until {$subscription->end_date->format('d M Y')}.");
+        return back()->with('success', "Subscription {$verb} — {$branch->name} valid until {$subscription->end_date->format('d M Y')}.");
     }
 
     /** Edit an existing subscription record (amount, method, dates, status…). */
     public function update(Request $request, Subscription $subscription): RedirectResponse
     {
         $data = $request->validate([
-            'plan' => ['required', Rule::in(['yearly', 'monthly'])],
+            'plan' => ['required', Rule::in(['yearly', 'monthly', 'trial'])],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after:start_date'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -135,9 +124,9 @@ class SubscriptionController extends Controller
 
         $subscription->update($data);
 
-        // Accepting/keeping it paid extends the owner's branches to this date.
+        // Accepting/keeping it paid extends the branch to this date.
         if ($data['payment_status'] === 'paid') {
-            $this->billing->syncBranchesToSubscription($subscription->fresh());
+            $this->billing->syncBranchToSubscription($subscription->fresh());
         }
 
         $this->logger->log('subscription.update', "Edited subscription #{$subscription->id} ({$data['payment_status']})", $subscription);
@@ -145,16 +134,15 @@ class SubscriptionController extends Controller
         return back()->with('success', 'Subscription record updated.');
     }
 
-    /** One-click accept a pending offline payment: mark paid + extend branches. */
+    /** One-click accept a pending offline payment: mark paid + extend branch. */
     public function accept(Subscription $subscription): RedirectResponse
     {
         $subscription->update(['payment_status' => 'paid']);
-        $this->billing->syncBranchesToSubscription($subscription->fresh());
+        $this->billing->syncBranchToSubscription($subscription->fresh());
 
-        $owner = $this->billing->ownerFor($subscription);
-        $this->logger->log('subscription.paid', 'Accepted payment '.hostelease_money($subscription->amount).($owner ? " · {$owner->name}" : ''), $subscription);
+        $this->logger->log('subscription.paid', 'Accepted payment '.hostelease_money($subscription->amount)." · {$subscription->hostel->name}", $subscription);
 
-        return back()->with('success', 'Payment accepted — all branches extended to '.$subscription->end_date->format('d M Y').'.');
+        return back()->with('success', 'Payment accepted — branch extended to '.$subscription->end_date->format('d M Y').'.');
     }
 
     public function destroy(Subscription $subscription): RedirectResponse
@@ -164,4 +152,3 @@ class SubscriptionController extends Controller
         return back()->with('success', 'Subscription record removed.');
     }
 }
-

@@ -97,15 +97,12 @@ return [
     'subscription_amount' => (float) env('hostelease_SUBSCRIPTION_AMOUNT', 5000),
 
     /*
-    | Account-level subscription pricing. Billing is per OWNER (account), not
-    | per branch payment: one payment covers every branch the owner holds.
-    | Discount rule: for every `free_per` branches, one branch is free — i.e.
-    | free branches = floor(total / free_per), payable = total - free.
+    | Branch-level subscription pricing. 
+    | Billing is handled individually per branch.
     */
     'subscription_pricing' => [
         'yearly' => (float) env('hostelease_PRICE_YEARLY', 10000),
         'monthly' => (float) env('hostelease_PRICE_MONTHLY', 1000),
-        'free_per' => (int) env('hostelease_FREE_PER_BRANCHES', 3),
     ],
 
     // Path to the mysqldump binary (XAMPP: D:\xampp\mysql\bin\mysqldump.exe).

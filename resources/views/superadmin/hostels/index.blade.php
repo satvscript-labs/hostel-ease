@@ -2,17 +2,18 @@
 @section('title', 'Hostels')
 
 @section('content')
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Hostels</h1>
-        <p class="text-muted mb-0 small">Manage all tenant branches and their statuses.</p>
+<div x-data="hostelsManager()">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Hostels</h1>
+            <p class="text-muted mb-0 small">Manage all tenant branches and their statuses.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" @click="createModalOpen = true" class="btn btn-primary shadow-sm rounded-pill px-4">
+                <i class="fa-solid fa-plus me-2"></i> Add Hostel
+            </button>
+        </div>
     </div>
-    <div class="d-flex gap-2">
-        <a href="{{ route('superadmin.hostels.create') }}" class="btn btn-primary shadow-sm rounded-pill px-4">
-            <i class="fa-solid fa-plus me-2"></i> Add Hostel
-        </a>
-    </div>
-</div>
 
 <div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
     <div class="card-body p-0">
@@ -83,9 +84,9 @@
                             <a href="{{ route('superadmin.hostels.show', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="View Profile">
                                 <i class="fa-regular fa-eye text-primary"></i>
                             </a>
-                            <a href="{{ route('superadmin.hostels.edit', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Edit Hostel">
+                            <button type="button" @click="openEditModal({{ $h->id }})" class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Edit Hostel">
                                 <i class="fa-regular fa-pen-to-square text-secondary"></i>
-                            </a>
+                            </button>
                             <form action="{{ route('superadmin.hostels.destroy', $h) }}" method="POST" class="d-inline" data-confirm="Delete {{ $h->name }}? This removes its admins and data.">
                                 @csrf @method('DELETE')
                                 <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="Delete">
@@ -104,5 +105,9 @@
             </div>
         @endif
     </div>
+</div>
+
+@include('superadmin.hostels.modals')
+
 </div>
 @endsection

@@ -25,12 +25,29 @@ class HostelController extends Controller
             ->orderByDesc('created_at')
             ->paginate(15);
 
-        return view('superadmin.hostels.index', compact('hostels'));
-    }
+        $hostelsJson = collect($hostels->items())->mapWithKeys(fn ($h) => [
+            $h->id => [
+                'name' => $h->name,
+                'owner_name' => $h->owner_name,
+                'mobile' => $h->mobile,
+                'email' => $h->email,
+                'address' => $h->address,
+                'city' => $h->city,
+                'state' => $h->state,
+                'gst_number' => $h->gst_number,
+                'subscription_start' => optional($h->subscription_start)->format('Y-m-d'),
+                'subscription_end' => optional($h->subscription_end)->format('Y-m-d'),
+                'status' => $h->status,
+            ],
+        ]);
+        
+        $pricingJson = [
+            'yearly' => config('hostelease.subscription_pricing.yearly', 10000),
+            'monthly' => config('hostelease.subscription_pricing.monthly', 1000),
+            'trial' => 0,
+        ];
 
-    public function create(): View
-    {
-        return view('superadmin.hostels.create');
+        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson'));
     }
 
     public function store(StoreHostelRequest $request): RedirectResponse
@@ -64,10 +81,7 @@ class HostelController extends Controller
         return view('superadmin.hostels.show', compact('hostel'));
     }
 
-    public function edit(Hostel $hostel): View
-    {
-        return view('superadmin.hostels.edit', compact('hostel'));
-    }
+
 
     public function update(StoreHostelRequest $request, Hostel $hostel): RedirectResponse
     {

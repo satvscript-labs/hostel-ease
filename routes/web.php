@@ -67,7 +67,7 @@ Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->n
 | Authenticated (tenant-aware)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'tenant', 'no-cache'])->group(function () {
+Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::view('subscription/expired', 'subscription.expired')->name('subscription.expired');
@@ -88,12 +88,13 @@ Route::middleware(['auth', 'tenant', 'no-cache'])->group(function () {
     // Switch active branch (multi-branch hostel admins)
     Route::get('branch/{hostel}/switch', [BranchController::class, 'switch'])->name('branch.switch');
 
-    // Account billing / renewal (hostel owner). Deliberately OUTSIDE the
-    // subscription.active gate so an expired owner can still reach the pay page.
+    // Branch Management & Subscriptions (hostel owner). Deliberately OUTSIDE the
+    // subscription.active gate so an expired owner can still reach the pay page and manage branches.
     Route::middleware('role:hostel_admin')->prefix('admin')->name('admin.')->group(function () {
-        Route::get('billing', [\App\Http\Controllers\Admin\BillingController::class, 'show'])->name('billing');
-        Route::post('billing/order', [\App\Http\Controllers\Admin\BillingController::class, 'createOrder'])->name('billing.order');
-        Route::post('billing/verify', [\App\Http\Controllers\Admin\BillingController::class, 'verify'])->name('billing.verify');
+        Route::get('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'index'])->name('branches.index');
+        Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
+        Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
+        Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
     });
 
     /*

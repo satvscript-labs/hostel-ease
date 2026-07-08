@@ -22,6 +22,8 @@ class HostelService
     public function provision(array $data): array
     {
         return DB::transaction(function () use ($data) {
+            $quote = app(\App\Services\BranchBillingService::class)->quote(new Hostel(), $data['plan'] ?? 'yearly');
+
             $hostel = Hostel::create([
                 'name' => $data['name'],
                 'owner_name' => $data['owner_name'],
@@ -31,8 +33,8 @@ class HostelService
                 'city' => $data['city'] ?? null,
                 'state' => $data['state'] ?? null,
                 'gst_number' => $data['gst_number'] ?? null,
-                'subscription_start' => $data['subscription_start'],
-                'subscription_end' => $data['subscription_end'],
+                'subscription_start' => $quote['start'],
+                'subscription_end' => $quote['end'],
                 'status' => $data['status'] ?? 'active',
             ]);
 
@@ -67,45 +69,19 @@ class HostelService
 
             $this->seedPaymentModes($hostel);
 
-            $this->createSubscription($hostel, [
-                'start_date' => $data['subscription_start'],
-                'end_date' => $data['subscription_end'],
-                'amount' => $data['amount'] ?? config('hostelease.subscription_amount'),
+            app(\App\Services\BranchBillingService::class)->renewBranch($hostel, $data['plan'] ?? 'yearly', [
+                'amount' => $data['amount'] ?? null,
                 'payment_status' => $data['payment_status'] ?? 'pending',
                 'payment_method' => $data['payment_method'] ?? null,
                 'transaction_number' => $data['transaction_number'] ?? null,
+                'remarks' => 'Initial Branch Setup',
             ]);
 
             return ['hostel' => $hostel, 'admin' => $admin, 'password' => $password];
         });
     }
 
-    /**
-     * Record a subscription and extend the hostel's coverage.
-     */
-    public function createSubscription(Hostel $hostel, array $data): Subscription
-    {
-        $subscription = Subscription::create([
-            'hostel_id' => $hostel->id,
-            'plan' => $data['plan'] ?? '1_year',
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'],
-            'amount' => $data['amount'],
-            'payment_status' => $data['payment_status'] ?? 'pending',
-            'payment_method' => $data['payment_method'] ?? null,
-            'transaction_number' => $data['transaction_number'] ?? null,
-            'remarks' => $data['remarks'] ?? null,
-        ]);
 
-        // Move the hostel's coverage window forward and reactivate it.
-        $hostel->update([
-            'subscription_start' => $hostel->subscription_start ?? $data['start_date'],
-            'subscription_end' => Carbon::parse($data['end_date']),
-            'status' => 'active',
-        ]);
-
-        return $subscription;
-    }
 
     /**
      * Seed the four default payment modes for a new hostel.
