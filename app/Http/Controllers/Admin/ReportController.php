@@ -19,7 +19,6 @@ class ReportController extends Controller
         'income' => ['Income by Mode', true],
         'occupancy' => ['Occupancy', false],
         'pending' => ['Pending Fees', false],
-        'ac' => ['AC Bills', true],
         'expenses' => ['Expenses by Category', true],
         'expense_monthly' => ['Expenses by Month', true],
     ];
@@ -48,7 +47,6 @@ class ReportController extends Controller
             'income' => $this->reports->incomeByMode($from, $to),
             'occupancy' => $this->reports->occupancy(),
             'pending' => $this->reports->pendingFees(),
-            'ac' => $this->reports->acReport($from, $to),
             'expenses' => $this->reports->expensesByCategory($from, $to),
             'expense_monthly' => $this->reports->expensesByMonth($from, $to),
         };

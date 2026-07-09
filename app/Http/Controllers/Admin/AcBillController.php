@@ -29,12 +29,15 @@ class AcBillController extends Controller
         
         $bills = $billsQuery->latest('bill_month')->get();
             
-        $rooms = Room::whereHas('beds.activeAssignment.student')
+        $rooms = Room::where('room_type', 'ac')
+            ->whereHas('beds.activeAssignment.student')
             ->with('beds.activeAssignment.student')
             ->get();
             
         $floors = \App\Models\Floor::ordered()->get();
         
+        $lastBill = AcBill::latest('id')->first();
+        $defaultUnitPrice = $lastBill ? $lastBill->unit_price : 12.0;
         // Fetch latest reading for each room
         $latestReadings = AcBill::select('room_id', 'current_reading')
             ->whereIn('id', function ($query) {
@@ -55,7 +58,7 @@ class AcBillController extends Controller
             'due' => $bills->sum('total_amount') - $bills->sum('collected'),
         ];
         
-        return view('admin.ac_bills.index', compact('bills', 'rooms', 'summary', 'filterMonth', 'filterFloor', 'floors', 'latestReadings'));
+        return view('admin.ac_bills.index', compact('bills', 'rooms', 'summary', 'filterMonth', 'filterFloor', 'floors', 'latestReadings', 'defaultUnitPrice'));
     }
 
     public function store(Request $request)
@@ -79,6 +82,8 @@ class AcBillController extends Controller
         $totalUnits = $data['current_reading'] - $data['previous_reading'];
         $totalAmount = $totalUnits * $data['unit_price'];
         $splitAmount = round($totalAmount / $students->count(), 2);
+
+
 
         DB::transaction(function () use ($data, $room, $students, $totalUnits, $totalAmount, $splitAmount) {
             $acBill = AcBill::create([

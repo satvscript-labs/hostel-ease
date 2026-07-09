@@ -6,15 +6,13 @@
         'collection' => 'fa-hand-holding-dollar', 
         'income'     => 'fa-chart-line',
         'occupancy'  => 'fa-chart-pie', 
-        'pending'    => 'fa-hourglass-half', 
-        'ac'         => 'fa-snowflake'
+        'pending'    => 'fa-hourglass-half'
     ];
     $descriptions = [
         'collection' => __('Track daily and monthly fee collections.'),
         'income'     => __('Analyze total revenue and income streams.'),
         'occupancy'  => __('View real-time bed and room utilization.'),
-        'pending'    => __('Monitor outstanding dues and pending payments.'),
-        'ac'         => __('Track AC usage and related charges.')
+        'pending'    => __('Monitor outstanding dues and pending payments.')
     ];
 @endphp
 

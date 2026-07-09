@@ -100,6 +100,11 @@ class StudentController extends Controller
             $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
         }
 
+        if ($request->hasFile('aadhaar_file')) {
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/documents', 'public', $processed['extension']);
+        }
+
         $student = Student::create($data);
         $this->logger->log('student.create', "Added student {$student->name}", $student);
 
@@ -231,6 +236,14 @@ class StudentController extends Controller
             }
             $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
             $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
+        }
+
+        if ($request->hasFile('aadhaar_file')) {
+            if ($student->aadhaar_file) {
+                $this->storageService->delete($student->aadhaar_file, 'public');
+            }
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/documents', 'public', $processed['extension']);
         }
 
         $student->update($data);

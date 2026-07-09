@@ -111,7 +111,8 @@
     .timeline-icon {
         position: absolute;
         left: -2.35rem;
-        top: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
         width: 32px; height: 32px;
         border-radius: 50%;
         display: flex;
@@ -122,8 +123,10 @@
         border: 3px solid #fff;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .bg-deposit { background: #10b981; }
-    .bg-withdraw { background: #f59e0b; }
+    .bg-deposit { background: #10b981; transition: all 0.2s; }
+    .bg-deposit:hover { background: #059669; }
+    .bg-withdraw { background: #f59e0b; transition: all 0.2s; }
+    .bg-withdraw:hover { background: #d97706; }
 </style>
 
 <div class="page-enter" x-data="{ tab: 'deposit', amount: 0, balance: {{ $balance }}, showLendingWarning: false, lendingConfirmed: false }">

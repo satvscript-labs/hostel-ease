@@ -26,7 +26,6 @@
         border: var(--he-border);
         border-radius: 1.5rem;
         box-shadow: var(--he-shadow-premium);
-        overflow: hidden;
     }
     .form-control, .form-select {
         background-color: #f8fafc !important;
@@ -102,6 +101,21 @@
             <p class="text-muted small fw-bold mb-0">JPG, PNG · max 2MB</p>
         </div>
 
+        <div class="premium-panel p-4 text-center mt-0">
+            <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">Aadhaar Card <span class="text-danger">*</span></h3>
+            <label class="photo-upload-wrap mb-3 d-block mx-auto" style="border-radius: 10px;">
+                <img src="{{ $student?->aadhaar_file ? Storage::disk('public')->url($student->aadhaar_file) : 'https://ui-avatars.com/api/?name=Doc&background=f1f5f9&color=94a3b8' }}" id="aadhaarPreview" alt="Aadhaar">
+                <div class="upload-overlay" style="border-radius: 6px;">
+                    <div class="text-center">
+                        <i class="fa-solid fa-file-arrow-up fs-4 mb-1"></i>
+                        <div class="small fw-bold">Upload</div>
+                    </div>
+                </div>
+                <input type="file" name="aadhaar_file" accept="image/*" class="d-none" onchange="document.getElementById('aadhaarPreview').src=window.URL.createObjectURL(this.files[0])" {{ $student?->aadhaar_file ? '' : 'required' }}>
+            </label>
+            <p class="text-muted small fw-bold mb-0">JPG, PNG · max 4MB</p>
+        </div>
+
         <div class="premium-panel p-4">
             <h3 class="h6 fw-bold mb-3 text-uppercase text-muted">Actions</h3>
             <button type="submit" class="btn btn-premium w-100 rounded-pill fw-bold shadow-sm mb-3 py-2">
@@ -121,7 +135,7 @@
     </div>
 
     <!-- RIGHT COLUMN: Form Data -->
-    <div class="d-flex flex-column gap-4">
+    <div class="d-flex flex-column gap-4" x-data="{ occupation: '{{ old('occupation_type', $student?->occupation_type ?? '') }}', occDropdown: false }">
         
         <!-- Personal Details -->
         <div class="premium-panel p-4 p-md-5">
@@ -141,11 +155,34 @@
                 </div>
                 <div class="col-12 col-sm-6 col-md-3">
                     <label class="form-label fw-bold small">Occupation <span class="text-danger">*</span></label>
-                    <select name="occupation_type" class="form-select" required>
-                        @foreach(config('hostelease.occupation_types') as $k => $label)
-                            <option value="{{ $k }}" @selected(old('occupation_type', $student?->occupation_type) === $k)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    <input type="hidden" name="occupation_type" :value="occupation">
+                    
+                    <div class="position-relative">
+                        <div class="d-flex align-items-center justify-content-between form-control bg-light" @click="occDropdown = !occDropdown" style="cursor: pointer;">
+                            <span class="fw-semibold text-dark" x-text="occupation ? document.querySelector(`[data-occ='${occupation}']`).innerText : 'Select...'"></span>
+                            <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': occDropdown}"></i>
+                        </div>
+                        
+                        <div x-show="occDropdown" @click.outside="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
+                            <div class="list-group list-group-flush rounded-4 py-2">
+                                @foreach(config('hostelease.occupation_types') as $k => $label)
+                                <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium" data-occ="{{ $k }}" :class="occupation === '{{ $k }}' ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="occupation = '{{ $k }}'; occDropdown = false;">
+                                    {{ $label }}
+                                </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-12 col-md-6" x-show="occupation === 'student'" x-transition x-cloak>
+                    <label class="form-label fw-bold small">College / University <span class="text-danger">*</span></label>
+                    <input type="text" name="college" class="form-control" maxlength="255" value="{{ old('college', $student?->college) }}" placeholder="e.g. ABC College" :required="occupation === 'student'">
+                </div>
+                
+                <div class="col-12 col-md-6" x-show="occupation === 'student'" x-transition x-cloak>
+                    <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
+                    <input type="text" name="field_of_study" class="form-control" maxlength="255" value="{{ old('field_of_study', $student?->field_of_study) }}" placeholder="e.g. B.Tech Computer Science" :required="occupation === 'student'">
                 </div>
             </div>
         </div>

@@ -210,27 +210,48 @@
                 </div>
                 @endif
                 
-                <div class="custom-overlay-body" x-data="{
-                    prev: 0,
-                    curr: 0,
-                    rate: 0,
-                    roomId: '',
-                    latestReadings: {{ json_encode($latestReadings) }},
-                    updateReading() {
-                        this.prev = this.latestReadings[this.roomId] || 0;
-                    },
-                    get units() { return Math.max(0, this.curr - this.prev); },
-                    get amount() { return this.units * this.rate; }
-                }">
+                    <div class="custom-overlay-body" x-data="{
+                        prev: 0,
+                        curr: 0,
+                        rate: {{ $defaultUnitPrice }},
+                        roomId: '',
+                        roomDropdown: false,
+                        latestReadings: {{ json_encode($latestReadings) }},
+                        updateReading() {
+                            this.prev = this.latestReadings[this.roomId] || 0;
+                        },
+                        get units() { return Math.max(0, this.curr - this.prev); },
+                        get amount() { return this.units * this.rate; }
+                    }">
                     
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Select Room <span class="text-danger">*</span></label>
-                        <select name="room_id" class="form-select bg-light" required x-model="roomId" @change="updateReading()">
-                            <option value="">Choose a room with students...</option>
-                            @foreach($rooms as $room)
-                            <option value="{{ $room->id }}">Room {{ $room->room_number }} ({{ $room->beds->map->activeAssignment->filter()->count() }} students)</option>
-                            @endforeach
-                        </select>
+                        <input type="hidden" name="room_id" :value="roomId">
+                        
+                        <div class="position-relative">
+                            <div class="d-flex align-items-center justify-content-between form-control bg-light" @click="roomDropdown = !roomDropdown" style="cursor: pointer; height: 3rem;">
+                                <span class="fw-semibold text-dark" x-html="roomId ? document.querySelector(`[data-room='${roomId}']`).dataset.label : 'Choose a room with students...'"></span>
+                                <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': roomDropdown}"></i>
+                            </div>
+                            
+                            <!-- Invisible Backdrop to intercept clicks -->
+                            <div x-show="roomDropdown" @click="roomDropdown = false" class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1040; display: none;"></div>
+                            
+                            <div x-show="roomDropdown" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050; max-height: 250px; overflow-y: auto;">
+                                <div class="list-group list-group-flush rounded-4 py-2">
+                                    <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium text-muted" @click="roomId = ''; updateReading(); roomDropdown = false;">
+                                        <i class="fa-solid fa-times-circle me-2 opacity-50"></i> Clear Selection
+                                    </a>
+                                    @foreach($rooms as $room)
+                                    @php $studentsCount = $room->beds->map->activeAssignment->filter()->count(); @endphp
+                                    <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium d-flex align-items-center justify-content-between" data-room="{{ $room->id }}" data-label='<i class="fa-solid fa-snowflake text-info me-2"></i> Room {{ $room->room_number }} <span class="text-muted small ms-1">({{ $studentsCount }} students)</span>' :class="roomId === '{{ $room->id }}' ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="roomId = '{{ $room->id }}'; updateReading(); roomDropdown = false;">
+                                        <span><i class="fa-solid fa-snowflake me-2" :class="roomId === '{{ $room->id }}' ? 'text-white' : 'text-info'"></i> Room {{ $room->room_number }}</span>
+                                        <span class="small" :class="roomId === '{{ $room->id }}' ? 'text-white opacity-75' : 'text-muted'">{{ $studentsCount }} students</span>
+                                    </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-4">

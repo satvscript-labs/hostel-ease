@@ -267,11 +267,9 @@
 {{-- Edit Staff Modal (Teleported) --}}
 <template x-teleport="body">
     <div class="custom-overlay-backdrop" x-show="editModalOpen" x-transition.opacity.duration.300ms @click="editModalOpen = false" x-cloak style="display: none;">
-        <div class="custom-overlay-modal" :class="{ 'is-open': editModalOpen }" @click.stop x-show="editModalOpen" x-transition.opacity style="display: none;">
-            
-            <form method="POST" action="{{ route('admin.staff.update', $staff) }}">
-                @csrf
-                @method('PUT')
+        <form method="POST" action="{{ route('admin.staff.update', $staff) }}" enctype="multipart/form-data" class="custom-overlay-modal" :class="{ 'is-open': editModalOpen }" @click.stop x-show="editModalOpen" x-transition.opacity style="display: none;">
+            @csrf
+            @method('PUT')
                 
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-user-pen text-primary me-2"></i>Edit Staff Profile</h5>
@@ -289,11 +287,15 @@
                             <input type="text" name="designation" class="form-control bg-light border-0 shadow-none" value="{{ $staff->designation }}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mobile</label>
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mobile <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0 text-muted fw-bold">+91</span>
-                                <input type="tel" name="mobile" maxlength="10" class="form-control bg-light border-0 shadow-none" value="{{ str_replace('+91', '', $staff->mobile) }}">
+                                <input type="tel" name="mobile" maxlength="10" minlength="10" pattern="\d{10}" required class="form-control bg-light border-0 shadow-none" value="{{ str_replace('+91', '', $staff->mobile) }}">
                             </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Aadhaar Number <span class="text-danger">*</span></label>
+                            <input type="text" name="aadhaar_number" class="form-control bg-light border-0 shadow-none" inputmode="numeric" maxlength="12" pattern="\d{12}" required placeholder="12-digit number" value="{{ $staff->aadhaar_number }}">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Monthly Salary <span class="text-danger">*</span></label>
@@ -306,9 +308,27 @@
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Join Date</label>
                             <input type="date" name="join_date" class="form-control bg-light border-0 shadow-none" value="{{ optional($staff->join_date)->format('Y-m-d') }}">
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Aadhaar Card File</label>
+                            <div class="input-group">
+                                <input type="file" name="aadhaar_file" accept="image/*" class="form-control bg-light border-0 shadow-none">
+                            </div>
+                            @if($staff->aadhaar_file)
+                                <div class="small mt-1"><a href="{{ Storage::disk('public')->url($staff->aadhaar_file) }}" target="_blank" class="text-primary text-decoration-none">View Current Aadhaar</a></div>
+                            @endif
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Photo (Optional)</label>
+                            <div class="input-group">
+                                <input type="file" name="photo" accept="image/*" class="form-control bg-light border-0 shadow-none">
+                            </div>
+                            @if($staff->photo)
+                                <div class="small mt-1"><a href="{{ Storage::disk('public')->url($staff->photo) }}" target="_blank" class="text-primary text-decoration-none">View Current Photo</a></div>
+                            @endif
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Address</label>
-                            <input type="text" name="address" class="form-control bg-light border-0 shadow-none" value="{{ $staff->address }}">
+                            <input type="text" name="address" class="form-control bg-light border-0 shadow-none" placeholder="Full residential address" value="{{ $staff->address }}">
                         </div>
                         <div class="col-12">
                             <div class="card bg-primary bg-opacity-10 border-0 rounded-4">
@@ -330,8 +350,7 @@
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="editModalOpen = false">Cancel</button>
                     <button type="submit" class="btn btn-dark fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-save me-2"></i> Update Profile</button>
                 </div>
-            </form>
-        </div>
+        </form>
     </div>
 </template>
 

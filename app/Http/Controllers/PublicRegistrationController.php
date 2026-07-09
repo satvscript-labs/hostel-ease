@@ -49,8 +49,11 @@ class PublicRegistrationController extends Controller
             'city' => ['required', 'string', 'max:100'],
             'state' => ['required', 'string', 'max:100'],
             'occupation_type' => ['required', Rule::in(array_keys(config('hostelease.occupation_types')))],
+            'college' => ['nullable', 'required_if:occupation_type,student', 'string', 'max:255'],
+            'field_of_study' => ['nullable', 'required_if:occupation_type,student', 'string', 'max:255'],
             'joining_date' => ['required', 'date'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'aadhaar_file' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
 
         if ($request->hasFile('photo')) {

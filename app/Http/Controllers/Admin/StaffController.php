@@ -16,8 +16,11 @@ use Illuminate\View\View;
 
 class StaffController extends Controller
 {
-    public function __construct(protected ActivityLogger $logger)
-    {
+    public function __construct(
+        protected ActivityLogger $logger,
+        protected \App\Services\ImageService $imageService,
+        protected \App\Services\StorageService $storageService
+    ) {
     }
 
     public function index(Request $request): View
@@ -49,14 +52,44 @@ class StaffController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Staff::create($this->validateStaff($request));
+        $data = $this->validateStaff($request);
+
+        if ($request->hasFile('photo')) {
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'staff/photos', 'public', $processed['extension']);
+        }
+
+        if ($request->hasFile('aadhaar_file')) {
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'staff/documents', 'public', $processed['extension']);
+        }
+
+        Staff::create($data);
 
         return back()->with('success', 'Staff added.');
     }
 
     public function update(Request $request, Staff $staff): RedirectResponse
     {
-        $staff->update($this->validateStaff($request));
+        $data = $this->validateStaff($request, $staff);
+
+        if ($request->hasFile('photo')) {
+            if ($staff->photo) {
+                $this->storageService->delete($staff->photo, 'public');
+            }
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
+            $data['photo'] = $this->storageService->store($processed['content'], 'staff/photos', 'public', $processed['extension']);
+        }
+
+        if ($request->hasFile('aadhaar_file')) {
+            if ($staff->aadhaar_file) {
+                $this->storageService->delete($staff->aadhaar_file, 'public');
+            }
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'staff/documents', 'public', $processed['extension']);
+        }
+
+        $staff->update($data);
 
         return back()->with('success', 'Staff updated.');
     }
@@ -132,7 +165,7 @@ class StaffController extends Controller
         return back()->with('success', 'Salary entry removed.');
     }
 
-    protected function validateStaff(Request $request): array
+    protected function validateStaff(Request $request, ?Staff $staff = null): array
     {
         // Normalize mobile to +91 format
         if ($request->has('mobile') && !blank($request->mobile)) {
@@ -140,10 +173,17 @@ class StaffController extends Controller
             $request->merge(['mobile' => '+91' . $digits]);
         }
 
+        if ($request->has('aadhaar_number') && !blank($request->aadhaar_number)) {
+            $request->merge(['aadhaar_number' => preg_replace('/\D+/', '', $request->aadhaar_number)]);
+        }
+
         return $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'designation' => ['nullable', 'string', 'max:100'],
-            'mobile' => ['nullable', 'regex:/^\+91\d{10}$/'],
+            'mobile' => ['required', 'regex:/^\+91\d{10}$/'],
+            'aadhaar_number' => ['required', 'digits:12'],
+            'aadhaar_file' => [$staff ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'monthly_salary' => ['required', 'numeric', 'min:0', 'max:9999999'],
             'join_date' => ['nullable', 'date'],
             'address' => ['nullable', 'string', 'max:255'],

@@ -6,6 +6,7 @@
   <title>Student Registration — {{ $hostel->name }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     :root {
         --he-primary: #4f46e5;
@@ -107,7 +108,7 @@
         @csrf
         
         <div class="section-title text-primary"><i class="fa-solid fa-user"></i> Personal Details</div>
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-4" x-data="{ occupation: '{{ old('occupation_type') }}' }">
             <div class="col-md-12">
                 <label class="form-label fw-bold small">Full name <span class="text-danger">*</span></label>
                 <input name="name" class="form-control" required maxlength="150" value="{{ old('name') }}" placeholder="Enter your full name">
@@ -118,12 +119,21 @@
             </div>
             <div class="col-md-6">
                 <label class="form-label fw-bold small">Occupation <span class="text-danger">*</span></label>
-                <select name="occupation_type" class="form-select" required>
+                <select name="occupation_type" class="form-select" x-model="occupation" required>
                     <option value="">Select your occupation</option>
                     @foreach(config('hostelease.occupation_types') as $k => $v)
-                    <option value="{{ $k }}" @selected(old('occupation_type')===$k)>{{ $v }}</option>
+                    <option value="{{ $k }}">{{ $v }}</option>
                     @endforeach
                 </select>
+            </div>
+            
+            <div class="col-md-6" x-show="occupation === 'student'" x-transition style="display: none;">
+                <label class="form-label fw-bold small">College / University <span class="text-danger">*</span></label>
+                <input name="college" class="form-control" maxlength="255" value="{{ old('college') }}" placeholder="e.g. ABC College" :required="occupation === 'student'">
+            </div>
+            <div class="col-md-6" x-show="occupation === 'student'" x-transition style="display: none;">
+                <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
+                <input name="field_of_study" class="form-control" maxlength="255" value="{{ old('field_of_study') }}" placeholder="e.g. B.Tech Computer Science" :required="occupation === 'student'">
             </div>
         </div>
 
@@ -169,6 +179,10 @@
                 </div>
             </div>
             <div class="col-md-12 mt-4">
+                <label class="form-label fw-bold small">Aadhaar Card <span class="text-danger">*</span></label>
+                <input type="file" name="aadhaar_file" class="form-control" accept="image/*" required>
+            </div>
+            <div class="col-md-12 mt-3">
                 <label class="form-label fw-bold small">Profile Photo <span class="text-muted fw-normal">(Optional)</span></label>
                 <input type="file" name="photo" class="form-control" accept="image/*">
             </div>

@@ -16,6 +16,7 @@ class Staff extends Model
     protected $fillable = [
         'hostel_id', 'name', 'designation', 'mobile',
         'monthly_salary', 'join_date', 'address', 'is_active', 'notes',
+        'aadhaar_number', 'aadhaar_file', 'photo',
     ];
 
     protected function casts(): array

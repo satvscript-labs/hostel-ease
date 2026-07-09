@@ -288,33 +288,35 @@
 {{-- Add Staff Modal (Teleported) --}}
 <template x-teleport="body">
     <div class="custom-overlay-backdrop" x-show="staffModalOpen" x-transition.opacity.duration.300ms @click="staffModalOpen = false" x-cloak style="display: none;">
-        <div class="custom-overlay-modal" :class="{ 'is-open': staffModalOpen }" @click.stop x-show="staffModalOpen" x-transition.opacity style="display: none;">
+        <form id="staffForm" method="POST" action="{{ route('admin.staff.store') }}" enctype="multipart/form-data" class="custom-overlay-modal" :class="{ 'is-open': staffModalOpen }" @click.stop x-show="staffModalOpen" x-transition.opacity style="display: none;">
+            @csrf
+            <input type="hidden" name="_method" id="staffMethod" value="POST">
             
-            <form id="staffForm" method="POST" action="{{ route('admin.staff.store') }}">
-                @csrf
-                <input type="hidden" name="_method" id="staffMethod" value="POST">
-                
-                <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-user-plus text-primary me-2"></i><span id="staffTitle">Add Staff</span></h5>
-                    <button type="button" class="btn-close shadow-none tactile-btn" @click="staffModalOpen = false"></button>
-                </div>
-                
-                <div class="custom-overlay-body">
-                    <div class="row g-4">
+            <div class="custom-overlay-header">
+                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-user-plus text-primary me-2"></i><span id="staffTitle">Add Staff</span></h5>
+                <button type="button" class="btn-close shadow-none tactile-btn" @click="staffModalOpen = false"></button>
+            </div>
+            
+            <div class="custom-overlay-body">
+                <div class="row g-4">
                         <div class="col-md-12">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" id="st_name" class="form-control form-control-lg bg-light border-0 shadow-none" required placeholder="e.g. John Doe">
+                            <input type="text" name="name" id="st_name" class="form-control bg-light border-0 shadow-none" required placeholder="e.g. John Doe">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Designation</label>
                             <input type="text" name="designation" id="st_designation" class="form-control bg-light border-0 shadow-none" placeholder="Cook, Guard…">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mobile</label>
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mobile <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0 text-muted fw-bold">+91</span>
-                                <input type="tel" name="mobile" id="st_mobile" maxlength="10" class="form-control bg-light border-0 shadow-none" placeholder="10-digit number">
+                                <input type="tel" name="mobile" id="st_mobile" maxlength="10" minlength="10" pattern="\d{10}" class="form-control bg-light border-0 shadow-none" required placeholder="10-digit number">
                             </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Aadhaar Number <span class="text-danger">*</span></label>
+                            <input type="text" name="aadhaar_number" id="st_aadhaar_number" class="form-control bg-light border-0 shadow-none" maxlength="12" pattern="\d{12}" required placeholder="12-digit number">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Monthly Salary <span class="text-danger">*</span></label>
@@ -326,6 +328,14 @@
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Join Date</label>
                             <input type="date" name="join_date" id="st_join" class="form-control bg-light border-0 shadow-none">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Aadhaar Card File <span class="text-danger">*</span></label>
+                            <input type="file" name="aadhaar_file" id="st_aadhaar_file" class="form-control bg-light border-0 shadow-none" accept="image/*" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Photo (Optional)</label>
+                            <input type="file" name="photo" id="st_photo" class="form-control bg-light border-0 shadow-none" accept="image/*">
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Address</label>
@@ -351,8 +361,7 @@
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="staffModalOpen = false">Cancel</button>
                     <button type="submit" class="btn btn-dark fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-save me-2"></i> Save Details</button>
                 </div>
-            </form>
-        </div>
+        </form>
     </div>
 </template>
 
