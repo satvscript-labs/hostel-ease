@@ -1,4 +1,4 @@
-// HSMS — Blue theme built on Bootstrap 5
+// Hostel Ease — Blue theme built on Bootstrap 5
 $primary: #2563eb;
 $secondary: #64748b;
 $success: #22c55e;
@@ -22,9 +22,9 @@ $font-family-sans-serif: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe U
 @import "premium";
 
 :root {
-    --hsms-sidebar-width: 260px;
-    --hsms-sidebar-bg: #0f172a;
-    --hsms-sidebar-accent: #1e293b;
+    --he-sidebar-width: 260px;
+    --he-sidebar-bg: #0f172a;
+    --he-sidebar-accent: #1e293b;
 }
 
 body {
@@ -32,8 +32,8 @@ body {
 }
 
 /* ---------- Layout shell ---------- */
-.hsms-sidebar {
-    width: var(--hsms-sidebar-width);
+.he-sidebar {
+    width: var(--he-sidebar-width);
     background: linear-gradient(180deg, #0f172a 0%, #111c33 100%);
     color: #cbd5e1;
     position: fixed;
@@ -45,18 +45,18 @@ body {
     will-change: transform;
 }
 
-.hsms-content {
-    margin-left: var(--hsms-sidebar-width);
+.he-content {
+    margin-left: var(--he-sidebar-width);
     min-height: 100vh;
     transition: margin .25s ease;
 }
 
-.hsms-topbar {
+.he-topbar {
     box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 
 /* Backdrop behind the off-canvas sidebar on mobile */
-.hsms-backdrop {
+.he-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, .5);
@@ -65,22 +65,22 @@ body {
     visibility: hidden;
     transition: opacity .25s ease;
 }
-.hsms-backdrop.show { opacity: 1; visibility: visible; }
+.he-backdrop.show { opacity: 1; visibility: visible; }
 
 @media (max-width: 991.98px) {
-    .hsms-sidebar {
+    .he-sidebar {
         transform: translateX(-100%);
         box-shadow: 0 0 40px rgba(0, 0, 0, .35);
     }
-    .hsms-sidebar.show { transform: translateX(0); }
-    .hsms-content { margin-left: 0; }
+    .he-sidebar.show { transform: translateX(0); }
+    .he-content { margin-left: 0; }
     /* Prevent background scroll while the drawer is open */
     body.sidebar-open { overflow: hidden; }
 }
 
 @media (min-width: 992px) {
     /* Desktop: sidebar is always visible, never a drawer */
-    .hsms-backdrop { display: none !important; }
+    .he-backdrop { display: none !important; }
 }
 
 /* ---------- Dashboard cards ---------- */
@@ -176,8 +176,8 @@ body {
     .btn { --bs-btn-padding-x: .6rem; }
 
     /* Topbar: keep search usable, let items wrap */
-    .hsms-topbar { flex-wrap: wrap; row-gap: .5rem; }
-    .hsms-topbar .flex-grow-1 { order: 3; max-width: 100% !important; flex: 0 0 100%; }
+    .he-topbar { flex-wrap: wrap; row-gap: .5rem; }
+    .he-topbar .flex-grow-1 { order: 3; max-width: 100% !important; flex: 0 0 100%; }
 
     /* Modals flush to bottom feel */
     .modal-dialog { margin: .5rem; }

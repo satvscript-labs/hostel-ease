@@ -36,8 +36,8 @@ return [
     ],
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'no-reply@hsms.satvscript.com'),
-        'name' => env('MAIL_FROM_NAME', 'HSMS'),
+        'address' => env('MAIL_FROM_ADDRESS', 'no-reply@hostel-ease.satvscript.com'),
+        'name' => env('MAIL_FROM_NAME', 'Hostel Ease'),
     ],
 
 ];

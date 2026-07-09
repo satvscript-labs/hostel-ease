@@ -1,5 +1,5 @@
-// HSMS PWA service worker — network-first with offline fallback.
-const CACHE = 'hsms-v1';
+// Hostel Ease PWA service worker — network-first with offline fallback.
+const CACHE = 'hostel-ease-v1';
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {

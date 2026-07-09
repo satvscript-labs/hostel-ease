@@ -49,7 +49,7 @@ class Bed extends Model
 
     public function statusColor(): string
     {
-        return config("hsms.bed_statuses.{$this->status}.color", '#9ca3af');
+        return config("hostelease.bed_statuses.{$this->status}.color", '#9ca3af');
     }
 
     public function scopeStatus($query, string $status)

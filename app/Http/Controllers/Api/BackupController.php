@@ -37,7 +37,7 @@ class BackupController extends Controller
         // BelongsToHostel models are auto-scoped to the active hostel.
         $data = [
             'meta' => [
-                'app' => 'HSMS',
+                'app' => 'Hostel Ease',
                 'format_version' => 1,
                 'hostel_id' => $hid,
                 'generated_at' => now()->toIso8601String(),
@@ -71,7 +71,7 @@ class BackupController extends Controller
         $data['meta']['counts'] = $counts;
 
         return response()->json($data, 200, [
-            'Content-Disposition' => 'attachment; filename="hsms-backup.json"',
+            'Content-Disposition' => 'attachment; filename="hostel-ease-backup.json"',
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
 }

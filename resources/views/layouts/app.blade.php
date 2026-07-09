@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#2563eb">
-    <link rel="icon" href="{{ asset('hsms-icon.svg') }}" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="{{ asset('hsms-icon.svg') }}">
+    <link rel="icon" href="{{ asset('hostel-ease-icon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('hostel-ease-icon.svg') }}">
     <link rel="manifest" href="/manifest.webmanifest">
     <title>@yield('title', 'Dashboard') · {{ config('app.name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -110,7 +110,7 @@
         }
 
         /* Ultra Premium Topbar & Footer Styles */
-        .hsms-topbar {
+        .he-topbar {
             position: sticky;
             top: 0;
             z-index: 1020;
@@ -158,9 +158,9 @@
 
 <body>
     @include('partials.sidebar')
-    <div class="hsms-backdrop" data-sidebar-backdrop></div>
+    <div class="he-backdrop" data-sidebar-backdrop></div>
 
-    <div class="hsms-content d-flex flex-column">
+    <div class="he-content d-flex flex-column">
         @include('partials.topbar')
 
         <main class="flex-grow-1 p-3 p-lg-4">
@@ -182,6 +182,15 @@
             'type' => session('success') ? 'success' : (session('warning') ? 'warning' : (session('error') ? 'error' : null)),
             'message' => session('success') ?? session('warning') ?? session('error'),
         ]);
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
     </script>
     @stack('scripts')
 </body>

@@ -24,7 +24,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'hsms'), '_').'_session'
+        Str::slug(env('APP_NAME', 'hostel-ease'), '_').'_session'
     ),
 
     'path' => env('SESSION_PATH', '/'),

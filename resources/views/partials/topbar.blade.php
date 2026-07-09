@@ -1,5 +1,5 @@
 @php($user = auth()->user())
-<header class="hsms-topbar" x-data="{ searchOpen: false }">
+<header class="he-topbar" x-data="{ searchOpen: false }">
     {{-- Mobile Sidebar Toggle --}}
     <button class="topbar-hamburger d-lg-none" data-sidebar-toggle type="button" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
@@ -157,7 +157,7 @@
 
 <style>
     /* ─── Topbar Shell ────────────────────────────────────── */
-    .hsms-topbar {
+    .he-topbar {
         position: sticky;
         top: 0;
         z-index: 1020;
@@ -334,7 +334,7 @@
 
     /* ─── Topbar Mobile Responsive ────────────────────────── */
     @media (max-width: 575.98px) {
-        .hsms-topbar { flex-wrap: wrap; row-gap: 0.5rem; padding: 0.6rem 1rem; }
+        .he-topbar { flex-wrap: wrap; row-gap: 0.5rem; padding: 0.6rem 1rem; }
         .topbar-search { order: 3; max-width: 100% !important; flex: 0 0 100%; }
         .search-kbd { display: none !important; }
     }
