@@ -4,7 +4,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | HSMS Application Settings
+    | Hostel Ease Application Settings
     |--------------------------------------------------------------------------
     | Central configuration for the Hostel Management SaaS domain logic.
     */

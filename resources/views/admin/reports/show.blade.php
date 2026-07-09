@@ -3,7 +3,7 @@
 
 @push('styles')
 <style>
-    @media print { .hsms-sidebar,.hsms-topbar,footer,.no-print{display:none!important} .hsms-content{margin-left:0!important} }
+    @media print { .he-sidebar,.he-topbar,footer,.no-print{display:none!important} .he-content{margin-left:0!important} }
     .report-table thead th {
         text-transform: uppercase;
         font-size: 0.75rem;

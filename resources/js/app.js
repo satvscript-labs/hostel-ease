@@ -15,7 +15,7 @@ window.Chart = Chart;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Off-canvas sidebar (mobile): toggle + backdrop + body lock + auto-close
-    const sidebar = document.querySelector('.hsms-sidebar');
+    const sidebar = document.querySelector('.he-sidebar');
     const backdrop = document.querySelector('[data-sidebar-backdrop]');
     const openSidebar = () => {
         sidebar?.classList.add('show');

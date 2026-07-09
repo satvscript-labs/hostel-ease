@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum stateful API guard for SPA / PWA requests.
         $middleware->statefulApi();
 
-        // Named middleware aliases used across HSMS routes.
+        // Named middleware aliases used across hostel ease routes.
         $middleware->alias([
             'role' => EnsureUserRole::class,
             'tenant' => SetTenant::class,

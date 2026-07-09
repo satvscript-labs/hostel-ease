@@ -54,7 +54,7 @@ class DashboardController extends Controller
             'monthly_income' => (float) Payment::whereBetween('paid_on', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
             'pending_fees' => $pendingDues,
             'unresolved_complaints' => $unresolvedComplaints,
-            'visitors_today' => Visitor::whereDate('visit_date', now()->toDateString())->count(),
+            'visitors_today' => Visitor::whereDate('check_in', now()->toDateString())->count(),
             'expenses_month' => (float) Expense::whereBetween('expense_date', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
             'occupancy_pct' => $totalBeds > 0 ? round(($occupiedBeds / $totalBeds) * 100, 1) : 0,
         ];
