@@ -22,7 +22,7 @@
     <meta property="og:title" content="HostelEase — The Ultimate Hostel Management SaaS Platform">
     <meta property="og:description"
         content="Manage your hostel, dorm, or PG effortlessly with HostelEase. Automate billing, track live bed occupancy, and manage students all from one stunning dashboard.">
-    <meta property="og:image" content="{{ asset('hsms-icon.svg') }}">
+    <meta property="og:image" content="{{ asset('hostel-ease-icon.svg') }}">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
@@ -30,12 +30,12 @@
     <meta property="twitter:title" content="HostelEase — The Ultimate Hostel Management SaaS Platform">
     <meta property="twitter:description"
         content="Manage your hostel, dorm, or PG effortlessly with HostelEase. Automate billing, track live bed occupancy, and manage students all from one stunning dashboard.">
-    <meta property="twitter:image" content="{{ asset('hsms-icon.svg') }}">
+    <meta property="twitter:image" content="{{ asset('hostel-ease-icon.svg') }}">
 
     <!-- Icons & Manifest -->
     <meta name="theme-color" content="#0f172a">
-    <link rel="icon" href="{{ asset('hsms-icon.svg') }}" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="{{ asset('hsms-icon.svg') }}">
+    <link rel="icon" href="{{ asset('hostel-ease-icon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('hostel-ease-icon.svg') }}">
     <link rel="manifest" href="/manifest.webmanifest">
 
     <!-- Fonts & CSS -->
@@ -226,7 +226,7 @@
     <nav class="navbar-glass">
         <div class="d-flex justify-content-between align-items-center w-100">
             <a href="/" class="d-flex align-items-center gap-2 text-decoration-none">
-                <img src="{{ asset('hsms-icon.svg') }}" alt="Logo" style="height: 32px;">
+                <img src="{{ asset('hostel-ease-icon.svg') }}" alt="Logo" style="height: 32px;">
                 <span
                     class="fs-5 fw-bold text-white tracking-tight d-none d-sm-block">{{ config('app.name', 'HostelEase') }}</span>
             </a>
@@ -494,7 +494,7 @@
     <footer class="footer text-center">
         <div class="container">
             <div class="d-flex justify-content-center align-items-center gap-2 mb-4">
-                <img src="{{ asset('hsms-icon.svg') }}" alt="Logo"
+                <img src="{{ asset('hostel-ease-icon.svg') }}" alt="Logo"
                     style="height: 32px; filter: grayscale(1) brightness(2);">
                 <span class="fs-4 fw-bold text-white">{{ config('app.name', 'HostelEase') }}</span>
             </div>

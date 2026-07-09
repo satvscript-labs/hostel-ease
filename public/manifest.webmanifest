@@ -1,6 +1,6 @@
 {
-    "name": "HSMS — Hostel Management System",
-    "short_name": "HSMS",
+    "name": "Hostel Ease — Hostel Management System",
+    "short_name": "Hostel Ease",
     "description": "Multi-tenant hostel & PG management SaaS.",
     "start_url": "/dashboard",
     "scope": "/",
