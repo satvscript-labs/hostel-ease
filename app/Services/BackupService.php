@@ -28,7 +28,7 @@ class BackupService
      */
     public function create(): string
     {
-        $filename = 'hsms-'.Carbon::now()->format('Y-m-d_His').'.sql';
+        $filename = 'hostel-ease-'.Carbon::now()->format('Y-m-d_His').'.sql';
         $path = $this->directory().DIRECTORY_SEPARATOR.$filename;
 
         $binary = config('hostelease.dump_binary', env('DB_DUMP_BINARY', 'mysqldump'));
@@ -84,7 +84,7 @@ class BackupService
     public function path(string $filename): ?string
     {
         // Prevent path traversal — only plain backup filenames are allowed.
-        if (! preg_match('/^hsms-[\w\-]+\.sql$/', $filename)) {
+        if (! preg_match('/^hostel-ease-[\w\-]+\.sql$/', $filename)) {
             return null;
         }
 

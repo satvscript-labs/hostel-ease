@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#2563eb">
-    <link rel="icon" href="{{ asset('hsms-icon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('hostel-ease-icon.svg') }}" type="image/svg+xml">
     
     <!-- SEO -->
     <title>Login · {{ config('app.name', 'HostelEase') }} SaaS</title>
@@ -170,7 +170,7 @@
         <!-- Left Side: Login Form -->
         <div class="form-side">
             <div class="d-flex align-items-center gap-2 mb-5 pb-3">
-                <img src="{{ asset('hsms-icon.svg') }}" alt="Logo" style="height: 36px;">
+                <img src="{{ asset('hostel-ease-icon.svg') }}" alt="Logo" style="height: 36px;">
                 <span class="fs-4 fw-bold text-dark tracking-tight">{{ config('app.name', 'HostelEase') }}</span>
             </div>
             

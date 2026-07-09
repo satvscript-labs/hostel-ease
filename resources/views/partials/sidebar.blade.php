@@ -1,15 +1,15 @@
 @php($user = auth()->user())
-<aside class="hsms-sidebar" x-data="sidebarNav()" x-cloak>
+<aside class="he-sidebar" x-data="sidebarNav()" x-cloak>
     {{-- ═══════════════════════════════════════════════════════════
          HEADER — Brand Identity
     ═══════════════════════════════════════════════════════════════ --}}
     <div class="sidebar-brand">
         <div class="brand-logo-wrap">
-            <img src="{{ asset('hsms-icon.svg') }}" alt="HSMS" class="brand-logo">
+            <img src="{{ asset('hostel-ease-icon.svg') }}" alt="Hostel Ease" class="brand-logo">
             <div class="brand-glow"></div>
         </div>
         <div class="brand-text">
-            <span class="brand-name">HSMS</span>
+            <span class="brand-name">Hostel Ease</span>
             <span class="brand-tagline">Hostel Management</span>
         </div>
         <button type="button" class="sidebar-close-btn d-lg-none" data-sidebar-close aria-label="Close menu">

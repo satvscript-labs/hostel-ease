@@ -2,7 +2,7 @@
 
 return [
 
-    'name' => env('APP_NAME', 'HSMS'),
+    'name' => env('APP_NAME', 'Hostel Ease'),
 
     'env' => env('APP_ENV', 'production'),
 

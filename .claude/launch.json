@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "hsms",
+      "name": "hostel-ease",
       "runtimeExecutable": "D:\\xampp\\php\\php.exe",
       "runtimeArgs": ["artisan", "serve", "--host=127.0.0.1", "--port=8001"],
       "port": 8001
