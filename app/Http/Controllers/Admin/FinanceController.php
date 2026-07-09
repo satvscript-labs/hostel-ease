@@ -62,9 +62,16 @@ class FinanceController extends Controller
 
         $paymentModes = PaymentMode::orderBy('name')->get();
 
-        $students = Student::active()->orderBy('name')->get(['id', 'name', 'mobile']);
+        $students = Student::active()->orderBy('name')->whereIn('fee_frequency', ['semester', 'yearly'])->get(['id', 'name', 'mobile', 'fee_frequency']);
 
-        return view('admin.finance.index', compact('invoices', 'payments', 'paymentModes', 'students', 'search', 'status', 'sort', 'direction'));
+        $studentsJson = $students->map(fn($s) => [
+            'id'     => $s->id,
+            'name'   => $s->name,
+            'mobile' => $s->mobile,
+            'freq'   => $s->fee_frequency,
+        ])->values();
+
+        return view('admin.finance.index', compact('invoices', 'payments', 'paymentModes', 'students', 'studentsJson', 'search', 'status', 'sort', 'direction'));
     }
 
     /**

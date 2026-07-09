@@ -50,7 +50,17 @@ class PropertyController extends Controller
         $unassignedStudents = Student::where('status', 'active')
             ->whereDoesntHave('activeAssignment')
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'name', 'mobile', 'photo', 'fee_amount', 'fee_frequency', 'room_preference', 'sharing_preference'])
+            ->map(fn($s) => [
+                'id'                    => $s->id,
+                'name'                  => $s->name,
+                'mobile'                => $s->mobile,
+                'photo_url'             => $s->photo_url,
+                'fee_settings_save_url' => route('admin.students.fee-settings.update', $s),
+                'needs_fee_setup'       => empty($s->fee_amount) || empty($s->fee_frequency),
+                'has_fee_amount'        => !empty($s->fee_amount),
+                'has_fee_frequency'     => !empty($s->fee_frequency),
+            ]);
 
         return view('admin.property.index', compact(
             'floors',

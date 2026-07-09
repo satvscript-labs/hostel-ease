@@ -253,11 +253,52 @@
         </div>
     </div>
 
-    <!-- Ultra-Premium Generate Fee Modal (Teleported inside x-data) -->
+    <!-- Ultra-Premium Generate Fee Modal -->
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="feeModalOpen" x-transition.opacity @click="feeModalOpen = false" x-cloak style="display: none;">
             
-            <form method="POST" action="{{ route('admin.finance.generate-fee') }}" class="custom-overlay-modal" :class="{ 'is-open': feeModalOpen }" x-show="feeModalOpen" x-transition.opacity @click.stop style="display: none;">
+            <form method="POST" action="{{ route('admin.finance.generate-fee') }}" class="custom-overlay-modal" :class="{ 'is-open': feeModalOpen }" x-show="feeModalOpen" x-transition.opacity @click.stop style="display: none;"
+                x-data="{
+                    feeType: '',
+                    feeTypeDropdown: false,
+                    studentDropdown: false,
+                    studentId: '',
+                    studentName: '',
+                    studentSearch: '',
+                    allStudents: {{ Js::from($studentsJson) }},
+                    feeTypes: [
+                        { value: 'semester', label: 'Semester Fee', sub: '6× monthly rent', icon: 'fa-solid fa-calendar-days', color: 'text-primary', bg: 'bg-primary-subtle' },
+                        { value: 'yearly',   label: 'Yearly Fee',   sub: '12× monthly rent', icon: 'fa-solid fa-calendar-check', color: 'text-success', bg: 'bg-success-subtle' },
+                        { value: 'custom',   label: 'Custom Fee',   sub: 'Set amount manually', icon: 'fa-solid fa-pen-to-square', color: 'text-warning', bg: 'bg-warning-subtle' },
+                    ],
+                    get selectedFeeType() { return this.feeTypes.find(f => f.value === this.feeType); },
+                    get filteredStudents() {
+                        let pool = this.feeType && this.feeType !== 'custom'
+                            ? this.allStudents.filter(s => s.freq === this.feeType)
+                            : this.allStudents;
+                        if (this.studentSearch.trim()) {
+                            const q = this.studentSearch.toLowerCase();
+                            pool = pool.filter(s => s.name.toLowerCase().includes(q) || s.mobile.includes(q));
+                        }
+                        return pool;
+                    },
+                    selectFeeType(val) {
+                        if (this.feeType !== val) {
+                            this.studentId = '';
+                            this.studentName = '';
+                        }
+                        this.feeType = val;
+                        this.feeTypeDropdown = false;
+                    },
+                    selectStudent(s) {
+                        this.studentId = s.id;
+                        this.studentName = s.name + ' · ' + s.mobile;
+                        this.studentDropdown = false;
+                        this.studentSearch = '';
+                    },
+                    clearStudent() { this.studentId = ''; this.studentName = ''; }
+                }"
+            >
                 @csrf
                 
                 <div class="custom-overlay-header">
@@ -273,71 +314,122 @@
                         </div>
                     </div>
 
-                    <!-- Searchable Select for Students -->
-                    <div class="mb-4" x-data="searchableSelect({
-                        options: [
-                            @foreach($students as $student)
-                            { value: '{{ $student->id }}', label: '{{ addslashes($student->name) }} ({{ $student->mobile }})' },
-                            @endforeach
-                        ]
-                    })">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
-                        <input type="hidden" name="student_id" :value="value" required>
+                    {{-- Step 1: Fee Type (pick first so student list can filter) --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Fee Type <span class="text-danger">*</span></label>
+                        <input type="hidden" name="fee_type" :value="feeType" required>
+
                         <div class="position-relative">
-                            <button type="button" class="form-control bg-light text-start d-flex justify-content-between align-items-center" @click="open = !open">
-                                <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
-                                <div>
-                                    <i x-show="value" class="fa-solid fa-xmark text-muted small me-2 cursor-pointer" @click.stop="clearOption()" style="cursor:pointer;" title="Clear"></i>
-                                    <i class="fa-solid fa-chevron-down text-muted small"></i>
-                                </div>
-                            </button>
-                            
-                            <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
-                                <div class="p-2 border-bottom sticky-top bg-white">
-                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light" placeholder="Search student...">
-                                </div>
-                                <div class="list-group list-group-flush">
-                                    <template x-for="opt in filteredOptions" :key="opt.value">
-                                        <button type="button" class="list-group-item list-group-item-action py-2" @click="selectOption(opt.value)" x-text="opt.label"></button>
+                            <div class="d-flex align-items-center justify-content-between form-control bg-light" @click="feeTypeDropdown = !feeTypeDropdown" style="cursor: pointer; height: 3.25rem;">
+                                <template x-if="selectedFeeType">
+                                    <span class="d-flex align-items-center gap-2 fw-semibold text-dark">
+                                        <span :class="[selectedFeeType.bg, selectedFeeType.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:28px;height:28px;flex-shrink:0;">
+                                            <i :class="selectedFeeType.icon" class="small"></i>
+                                        </span>
+                                        <span x-text="selectedFeeType.label"></span>
+                                        <span class="text-muted small fw-normal" x-text="'— ' + selectedFeeType.sub"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!selectedFeeType">
+                                    <span class="text-muted">Choose fee type first...</span>
+                                </template>
+                                <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': feeTypeDropdown}"></i>
+                            </div>
+
+                            <div x-show="feeTypeDropdown" @click.outside="feeTypeDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display:none; z-index:1050;">
+                                <div class="list-group list-group-flush rounded-4 py-2">
+                                    <template x-for="ft in feeTypes" :key="ft.value">
+                                        <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-3 px-4 d-flex align-items-center gap-3" :class="feeType === ft.value ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="selectFeeType(ft.value)">
+                                            <span :class="feeType === ft.value ? 'bg-white text-primary' : [ft.bg, ft.color]" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;">
+                                                <i :class="ft.icon"></i>
+                                            </span>
+                                            <div>
+                                                <div class="fw-bold" x-text="ft.label"></div>
+                                                <div class="small" :class="feeType === ft.value ? 'text-white opacity-75' : 'text-muted'" x-text="ft.sub"></div>
+                                            </div>
+                                        </a>
                                     </template>
-                                    <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No students found</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="row gx-3">
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Fee Type <span class="text-danger">*</span></label>
-                            <select name="fee_type" class="form-select bg-light" required>
-                                <option value="semester">Semester Fee (6x Rent)</option>
-                                <option value="yearly">Yearly Fee (12x Rent)</option>
-                                <option value="custom">Custom Auto Fee</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount Override</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
-                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5" min="1" step="0.01" placeholder="Auto">
+                    {{-- Step 2: Student (filters based on fee type) --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                            Student <span class="text-danger">*</span>
+                            <template x-if="feeType && feeType !== 'custom'">
+                                <span class="badge bg-primary-subtle text-primary fw-semibold ms-2 rounded-pill text-lowercase" x-text="feeType + ' students only'"></span>
+                            </template>
+                        </label>
+                        <input type="hidden" name="student_id" :value="studentId" required>
+
+                        <div class="position-relative">
+                            <div class="d-flex align-items-center justify-content-between form-control bg-light" @click="studentDropdown = !studentDropdown" style="cursor: pointer; height: 3.25rem;">
+                                <span class="fw-semibold text-dark" :class="{'text-muted fw-normal': !studentId}" x-text="studentId ? studentName : 'Choose a student...'"></span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <i x-show="studentId" class="fa-solid fa-xmark text-muted small" @click.stop="clearStudent()" style="cursor:pointer;" title="Clear"></i>
+                                    <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': studentDropdown}"></i>
+                                </div>
+                            </div>
+
+                            {{-- Invisible backdrop --}}
+                            <div x-show="studentDropdown" @click="studentDropdown = false" class="position-fixed top-0 start-0 w-100 h-100" style="z-index:1040; display:none;"></div>
+
+                            <div x-show="studentDropdown" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display:none; z-index:1050; max-height:280px; overflow-y:auto;">
+                                <div class="p-2 border-bottom sticky-top bg-white">
+                                    <input type="text" x-model="studentSearch" @click.stop class="form-control form-control-sm bg-light" placeholder="Search name or mobile..." x-ref="studentSearchInput">
+                                </div>
+                                <div class="list-group list-group-flush py-1">
+                                    <template x-if="filteredStudents.length === 0">
+                                        <div class="p-3 text-center text-muted small">
+                                            <i class="fa-solid fa-user-slash me-1 opacity-50"></i>
+                                            <span x-text="feeType && feeType !== 'custom' ? 'No ' + feeType + ' students found' : 'No students found'"></span>
+                                        </div>
+                                    </template>
+                                    <template x-for="s in filteredStudents" :key="s.id">
+                                        <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 d-flex align-items-center gap-3" :class="studentId == s.id ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="selectStudent(s)">
+                                            <div :class="studentId == s.id ? 'bg-white text-primary' : (s.freq === 'semester' ? 'bg-primary-subtle text-primary' : 'bg-success-subtle text-success')" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold" style="width:34px;height:34px;font-size:0.75rem;" x-text="s.name.charAt(0).toUpperCase()"></div>
+                                            <div class="flex-grow-1 min-width-0">
+                                                <div class="fw-semibold lh-sm" x-text="s.name"></div>
+                                                <div class="small" :class="studentId == s.id ? 'text-white opacity-75' : 'text-muted'" x-text="s.mobile"></div>
+                                            </div>
+                                            <span class="badge rounded-pill small flex-shrink-0" :class="studentId == s.id ? 'bg-white text-primary' : (s.freq === 'semester' ? 'bg-primary-subtle text-primary' : 'bg-success-subtle text-success')" x-text="s.freq"></span>
+                                        </a>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
-                        <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Fall Semester Fee">
+
+                    <hr class="border-secondary opacity-10 my-4">
+                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Fee Details</h6>
+
+                    <div class="row gx-3">
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount Override <span class="text-muted fw-normal">(optional)</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                                <input type="number" name="amount" class="form-control bg-light" min="1" step="0.01" placeholder="Auto">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date</label>
+                            <input type="date" name="due_date" class="form-control bg-light">
+                        </div>
                     </div>
                     
                     <div class="mb-2">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date</label>
-                        <input type="date" name="due_date" class="form-control bg-light">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Fall Semester Fee">
                     </div>
                 </div>
                 
                 <div class="custom-overlay-footer bg-light">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="feeModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-wand-magic-sparkles me-2"></i> Generate Fee</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :disabled="!feeType || !studentId">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i> Generate Fee
+                    </button>
                 </div>
             </form>
         </div>

@@ -502,7 +502,14 @@
                                         <div class="fw-bold fs-5" x-text="student.name"></div>
                                         <div class="small text-muted" x-text="student.mobile"></div>
                                     </div>
-                                    <div class="ms-auto text-primary opacity-50"><i class="fa-solid fa-arrow-right"></i></div>
+                                    <div class="ms-auto d-flex align-items-center gap-2">
+                                        <template x-if="student.needs_fee_setup">
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill small fw-bold" title="Fee settings incomplete">
+                                                <i class="fa-solid fa-triangle-exclamation me-1"></i>Setup Required
+                                            </span>
+                                        </template>
+                                        <i class="fa-solid fa-arrow-right text-primary opacity-50"></i>
+                                    </div>
                                 </div>
                             </template>
                             <div x-show="filteredStudents.length === 0" class="p-5 text-center text-muted">
@@ -546,6 +553,155 @@
         <input type="hidden" name="bed_id" x-model="spotlight.bedId">
         <input type="hidden" name="student_id" x-model="spotlight.studentId">
     </form>
+
+    <!-- Fee Settings Guard Modal (inline — NOT teleported, to preserve Alpine scope) -->
+    <div x-show="feeGuard.open" x-cloak x-transition.opacity
+         class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="z-index: 3000; background: rgba(15,23,42,0.65); backdrop-filter: blur(8px);">
+
+        <form :action="feeGuard.saveUrl" method="POST" @submit.prevent="submitFeeGuard($event)"
+              @click.stop
+              class="bg-white rounded-4 shadow-lg p-0 overflow-hidden"
+              style="width: 100%; max-width: 480px; margin: 1rem;">
+            @csrf
+            @method('PUT')
+
+            {{-- Header --}}
+            <div class="px-4 py-3 border-bottom d-flex align-items-center gap-3" style="background: linear-gradient(135deg, #fef9c3, #fef3c7);">
+                <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width:40px;height:40px;">
+                    <i class="fa-solid fa-triangle-exclamation text-white"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark fs-6 mb-0">Fee Setup Required</div>
+                    <div class="text-muted small">
+                        Set <strong x-text="feeGuard.studentName"></strong>'s fee details before assigning a bed.
+                    </div>
+                </div>
+                <button type="button" class="btn-close ms-auto" @click="feeGuard.open = false"></button>
+            </div>
+
+            {{-- Body --}}
+            <div class="p-4"
+                 x-data="{
+                     feeFreq: '',
+                     feeFreqOpen: false,
+                     roomPref: '',
+                     roomPrefOpen: false,
+                     feeFreqOpts: [
+                         { value: 'monthly',  label: 'Monthly',       icon: 'fa-solid fa-calendar-day',   color: 'text-info',    bg: 'bg-info-subtle' },
+                         { value: 'semester', label: 'Semester-wise', icon: 'fa-solid fa-calendar-days',  color: 'text-primary', bg: 'bg-primary-subtle' },
+                         { value: 'yearly',   label: 'Yearly',        icon: 'fa-solid fa-calendar-check', color: 'text-success', bg: 'bg-success-subtle' },
+                     ],
+                     roomPrefOpts: [
+                         { value: 'AC',     label: 'AC Room',     icon: 'fa-solid fa-snowflake', color: 'text-info',    bg: 'bg-info-subtle' },
+                         { value: 'Non-AC', label: 'Non-AC Room', icon: 'fa-solid fa-fan',       color: 'text-warning', bg: 'bg-warning-subtle' },
+                     ],
+                     get selectedFeeFreq()  { return this.feeFreqOpts.find(o => o.value === this.feeFreq); },
+                     get selectedRoomPref() { return this.roomPrefOpts.find(o => o.value === this.roomPref); },
+                 }">
+
+                <div class="row g-3 mb-4">
+                    {{-- Fee Structure (always shown — mandatory) --}}
+                    <div class="col-12" x-show="!feeGuard.hasFeeFrequency">
+                        <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">
+                            Fee Structure <span class="text-danger">*</span>
+                        </label>
+                        <input type="hidden" name="fee_frequency" :value="feeFreq">
+                        <div class="position-relative">
+                            <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2 bg-light"
+                                 @click="feeFreqOpen = !feeFreqOpen" style="cursor:pointer; min-height:2.6rem;">
+                                <template x-if="selectedFeeFreq">
+                                    <span class="d-flex align-items-center gap-2 small fw-semibold">
+                                        <span :class="[selectedFeeFreq.bg, selectedFeeFreq.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:24px;height:24px;flex-shrink:0;font-size:.7rem;"><i :class="selectedFeeFreq.icon"></i></span>
+                                        <span x-text="selectedFeeFreq.label"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!selectedFeeFreq"><span class="text-muted small">Select billing cycle...</span></template>
+                                <i class="fa-solid fa-chevron-down text-muted small" :class="{'fa-chevron-up': feeFreqOpen}"></i>
+                            </div>
+                            <div x-show="feeFreqOpen" @click.outside="feeFreqOpen=false" x-transition.opacity.duration.150ms
+                                 class="position-absolute bg-white border rounded-3 shadow mt-1 w-100" style="z-index:4000;">
+                                <template x-for="o in feeFreqOpts" :key="o.value">
+                                    <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold"
+                                         :class="feeFreq===o.value?'bg-primary text-white':'text-dark'"
+                                         style="cursor:pointer;"
+                                         @click="feeFreq=o.value;feeFreqOpen=false;">
+                                        <span :class="feeFreq===o.value?'bg-white':o.bg"
+                                              class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                              style="width:24px;height:24px;font-size:.7rem;"
+                                              :style="feeFreq===o.value?'color:var(--he-primary)':''">
+                                            <i :class="o.icon"></i>
+                                        </span>
+                                        <span x-text="o.label"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Fee Amount (always shown — mandatory) --}}
+                    <div class="col-12" x-show="!feeGuard.hasFeeAmount">
+                        <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">
+                            Monthly Fee Amount <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light fw-bold">₹</span>
+                            <input type="number" name="fee_amount" class="form-control bg-light" min="1" step="0.01" placeholder="e.g. 5000">
+                        </div>
+                    </div>
+
+                    {{-- Room Preference (optional) --}}
+                    <div class="col-12">
+                        <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">
+                            Room Preference <span class="text-muted fw-normal">(optional)</span>
+                        </label>
+                        <input type="hidden" name="room_preference" :value="roomPref">
+                        <div class="position-relative">
+                            <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2 bg-light"
+                                 @click="roomPrefOpen = !roomPrefOpen" style="cursor:pointer; min-height:2.6rem;">
+                                <template x-if="selectedRoomPref">
+                                    <span class="d-flex align-items-center gap-2 small fw-semibold">
+                                        <span :class="[selectedRoomPref.bg, selectedRoomPref.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:24px;height:24px;flex-shrink:0;font-size:.7rem;"><i :class="selectedRoomPref.icon"></i></span>
+                                        <span x-text="selectedRoomPref.label"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!selectedRoomPref"><span class="text-muted small">Skip or select...</span></template>
+                                <i class="fa-solid fa-chevron-down text-muted small" :class="{'fa-chevron-up': roomPrefOpen}"></i>
+                            </div>
+                            <div x-show="roomPrefOpen" @click.outside="roomPrefOpen=false" x-transition.opacity.duration.150ms
+                                 class="position-absolute bg-white border rounded-3 shadow mt-1 w-100" style="z-index:4000;">
+                                <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold text-muted"
+                                     style="cursor:pointer;" @click="roomPref='';roomPrefOpen=false;">
+                                    <i class="fa-solid fa-times-circle opacity-50 me-1"></i> Skip (no preference)
+                                </div>
+                                <template x-for="o in roomPrefOpts" :key="o.value">
+                                    <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold"
+                                         :class="roomPref===o.value?'bg-primary text-white':'text-dark'"
+                                         style="cursor:pointer;"
+                                         @click="roomPref=o.value;roomPrefOpen=false;">
+                                        <span :class="roomPref===o.value?'bg-white':o.bg"
+                                              class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                              style="width:24px;height:24px;font-size:.7rem;"
+                                              :style="roomPref===o.value?'color:var(--he-primary)':''">
+                                            <i :class="o.icon"></i>
+                                        </span>
+                                        <span x-text="o.label"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold" @click="feeGuard.open = false">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-semibold shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> Save & Assign Bed
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
 
     <!-- Hidden Form for Status Update -->
     <form id="statusForm" :action="'/admin/beds/' + spotlight.bedId + '/status'" method="POST" class="d-none">
@@ -766,8 +922,42 @@ document.addEventListener('alpine:init', () => {
             this.spotlight.open = true;
         },
 
+        feeGuard: {
+            open: false,
+            studentId: '',
+            studentName: '',
+            saveUrl: '',
+            hasFeeFrequency: false,
+            hasFeeAmount: false,
+        },
+
         confirmAssignment(student) {
-            this.spotlight.studentId = student.id;
+            if (student.needs_fee_setup) {
+                // Block and show fee settings guard modal
+                this.feeGuard.studentId  = student.id;
+                this.feeGuard.studentName = student.name;
+                this.feeGuard.saveUrl    = student.fee_settings_save_url;
+                this.feeGuard.hasFeeFrequency = student.has_fee_frequency;
+                this.feeGuard.hasFeeAmount    = student.has_fee_amount;
+                this.spotlight.studentId = student.id;
+                this.feeGuard.open = true;
+            } else {
+                this.spotlight.studentId = student.id;
+                this.$nextTick(() => {
+                    document.getElementById('assignForm').submit();
+                });
+            }
+        },
+
+        async submitFeeGuard(event) {
+            const form = event.target;
+            const data = new FormData(form);
+            try {
+                await fetch(form.action, { method: 'POST', body: data, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            } catch(e) {
+                console.error('Fee settings save failed', e);
+            }
+            this.feeGuard.open = false;
             this.$nextTick(() => {
                 document.getElementById('assignForm').submit();
             });

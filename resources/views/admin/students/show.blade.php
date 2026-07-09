@@ -884,39 +884,121 @@
                     <h5 class="modal-title fw-bold fs-4">Change Fee & Room Plan</h5>
                     <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="row g-4 mb-4">
+                <div class="modal-body p-4"
+                     x-data="{
+                        roomPrefOpen: false,
+                        sharingPrefOpen: false,
+                        feeFreqOpen: false,
+                        roomPref: '{{ $student->room_preference }}',
+                        sharingPref: '{{ $student->sharing_preference }}',
+                        feeFreqOpts: [
+                            { value: 'monthly',  label: 'Monthly',       icon: 'fa-solid fa-calendar-day',   color: 'text-info',    bg: 'bg-info-subtle' },
+                            { value: 'semester', label: 'Semester-wise', icon: 'fa-solid fa-calendar-days',  color: 'text-primary', bg: 'bg-primary-subtle' },
+                            { value: 'yearly',   label: 'Yearly',        icon: 'fa-solid fa-calendar-check', color: 'text-success', bg: 'bg-success-subtle' },
+                        ],
+                        roomPrefOpts: [
+                            { value: 'AC',     label: 'AC Room',     icon: 'fa-solid fa-snowflake', color: 'text-info',    bg: 'bg-info-subtle' },
+                            { value: 'Non-AC', label: 'Non-AC Room', icon: 'fa-solid fa-fan',       color: 'text-warning', bg: 'bg-warning-subtle' },
+                        ],
+                        sharingPrefOpts: [
+                            { value: 'Single', label: 'Single',  icon: 'fa-solid fa-user',       color: 'text-primary', bg: 'bg-primary-subtle' },
+                            { value: 'Double', label: 'Double',  icon: 'fa-solid fa-user-group',  color: 'text-success', bg: 'bg-success-subtle' },
+                            { value: 'Triple', label: 'Triple',  icon: 'fa-solid fa-users',       color: 'text-info',    bg: 'bg-info-subtle' },
+                            { value: 'Quad',   label: 'Quad',    icon: 'fa-solid fa-users-line',  color: 'text-warning', bg: 'bg-warning-subtle' },
+                        ],
+                        get selectedRoomPref()   { return this.roomPrefOpts.find(o => o.value === this.roomPref); },
+                        get selectedSharingPref(){ return this.sharingPrefOpts.find(o => o.value === this.sharingPref); },
+                        get selectedFeeFreq()    { return this.feeFreqOpts.find(o => o.value === frequency); },
+                     }">
+                    <div class="row g-3 mb-4">
+
+                        {{-- Room Preference --}}
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Room Preference</label>
-                            <select name="room_preference" class="form-select bg-light">
-                                <option value="">Select preference</option>
-                                <option value="AC" @selected($student->room_preference === 'AC')>AC Room</option>
-                                <option value="Non-AC" @selected($student->room_preference === 'Non-AC')>Non-AC Room</option>
-                            </select>
+                            <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">Room Preference</label>
+                            <input type="hidden" name="room_preference" :value="roomPref">
+                            <div class="position-relative">
+                                <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2 bg-light" @click="roomPrefOpen = !roomPrefOpen" style="cursor:pointer; min-height:2.6rem;">
+                                    <template x-if="selectedRoomPref">
+                                        <span class="d-flex align-items-center gap-2 small fw-semibold">
+                                            <span :class="[selectedRoomPref.bg, selectedRoomPref.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:24px;height:24px;flex-shrink:0;font-size:.7rem;"><i :class="selectedRoomPref.icon"></i></span>
+                                            <span x-text="selectedRoomPref.label"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!selectedRoomPref"><span class="text-muted small">Select preference...</span></template>
+                                    <i class="fa-solid fa-chevron-down text-muted small" :class="{'fa-chevron-up': roomPrefOpen}"></i>
+                                </div>
+                                <div x-show="roomPrefOpen" @click.outside="roomPrefOpen=false" x-transition.opacity.duration.150ms class="position-absolute bg-white border rounded-3 shadow mt-1 w-100" style="z-index:1060;">
+                                    <template x-for="o in roomPrefOpts" :key="o.value">
+                                        <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold" :class="roomPref===o.value?'bg-primary text-white':'text-dark'" style="cursor:pointer;" @click="roomPref=o.value;roomPrefOpen=false;">
+                                            <span :class="roomPref===o.value?'bg-white':o.bg" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:24px;height:24px;font-size:.7rem;" :style="roomPref===o.value?'color:var(--he-primary)':''"><i :class="o.icon"></i></span>
+                                            <span x-text="o.label"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
+
+                        {{-- Sharing Preference --}}
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Sharing Preference</label>
-                            <select name="sharing_preference" class="form-select bg-light">
-                                <option value="">Select sharing</option>
-                                <option value="Single" @selected($student->sharing_preference === 'Single')>Single Occupancy</option>
-                                <option value="Double" @selected($student->sharing_preference === 'Double')>Double Sharing</option>
-                                <option value="Triple" @selected($student->sharing_preference === 'Triple')>Triple Sharing</option>
-                                <option value="Quad" @selected($student->sharing_preference === 'Quad')>Quad Sharing</option>
-                            </select>
+                            <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">Sharing Preference</label>
+                            <input type="hidden" name="sharing_preference" :value="sharingPref">
+                            <div class="position-relative">
+                                <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2 bg-light" @click="sharingPrefOpen = !sharingPrefOpen" style="cursor:pointer; min-height:2.6rem;">
+                                    <template x-if="selectedSharingPref">
+                                        <span class="d-flex align-items-center gap-2 small fw-semibold">
+                                            <span :class="[selectedSharingPref.bg, selectedSharingPref.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:24px;height:24px;flex-shrink:0;font-size:.7rem;"><i :class="selectedSharingPref.icon"></i></span>
+                                            <span x-text="selectedSharingPref.label"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!selectedSharingPref"><span class="text-muted small">Select sharing...</span></template>
+                                    <i class="fa-solid fa-chevron-down text-muted small" :class="{'fa-chevron-up': sharingPrefOpen}"></i>
+                                </div>
+                                <div x-show="sharingPrefOpen" @click.outside="sharingPrefOpen=false" x-transition.opacity.duration.150ms class="position-absolute bg-white border rounded-3 shadow mt-1 w-100" style="z-index:1060;">
+                                    <template x-for="o in sharingPrefOpts" :key="o.value">
+                                        <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold" :class="sharingPref===o.value?'bg-primary text-white':'text-dark'" style="cursor:pointer;" @click="sharingPref=o.value;sharingPrefOpen=false;">
+                                            <span :class="sharingPref===o.value?'bg-white':o.bg" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:24px;height:24px;font-size:.7rem;" :style="sharingPref===o.value?'color:var(--he-primary)':''"><i :class="o.icon"></i></span>
+                                            <span x-text="o.label"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
+
+                        {{-- Fee Structure --}}
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Fee Structure</label>
-                            <select name="fee_frequency" class="form-select bg-light" x-model="frequency" @change="fetchPreview" required>
-                                <option value="">Select structure</option>
-                                <option value="monthly">Monthly</option>
-                                <option value="semester">Semester-wise</option>
-                                <option value="yearly">Yearly</option>
-                            </select>
+                            <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">Fee Structure</label>
+                            <input type="hidden" name="fee_frequency" :value="frequency" required>
+                            <div class="position-relative">
+                                <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2 bg-light" @click="feeFreqOpen = !feeFreqOpen; $nextTick(() => fetchPreview())" style="cursor:pointer; min-height:2.6rem;">
+                                    <template x-if="selectedFeeFreq">
+                                        <span class="d-flex align-items-center gap-2 small fw-semibold">
+                                            <span :class="[selectedFeeFreq.bg, selectedFeeFreq.color, 'rounded-circle d-flex align-items-center justify-content-center']" style="width:24px;height:24px;flex-shrink:0;font-size:.7rem;"><i :class="selectedFeeFreq.icon"></i></span>
+                                            <span x-text="selectedFeeFreq.label"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!selectedFeeFreq"><span class="text-muted small">Select structure...</span></template>
+                                    <i class="fa-solid fa-chevron-down text-muted small" :class="{'fa-chevron-up': feeFreqOpen}"></i>
+                                </div>
+                                <div x-show="feeFreqOpen" @click.outside="feeFreqOpen=false" x-transition.opacity.duration.150ms class="position-absolute bg-white border rounded-3 shadow mt-1 w-100" style="z-index:1060;">
+                                    <template x-for="o in feeFreqOpts" :key="o.value">
+                                        <div class="d-flex align-items-center gap-2 px-3 py-2 small fw-semibold" :class="frequency===o.value?'bg-primary text-white':'text-dark'" style="cursor:pointer;" @click="frequency=o.value;feeFreqOpen=false;fetchPreview();">
+                                            <span :class="frequency===o.value?'bg-white':o.bg" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:24px;height:24px;font-size:.7rem;" :style="frequency===o.value?'color:var(--he-primary)':''"><i :class="o.icon"></i></span>
+                                            <span x-text="o.label"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
+
+                        {{-- Fee Amount --}}
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">New Fee Amount (₹)</label>
-                            <input type="number" name="fee_amount" class="form-control bg-light" x-model="amount" @change="fetchPreview" min="0" step="0.01" required>
+                            <label class="form-label fw-bold small text-uppercase mb-1" style="letter-spacing:.5px;">New Fee Amount (₹)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light fw-bold">₹</span>
+                                <input type="number" name="fee_amount" class="form-control bg-light" x-model="amount" @change="fetchPreview" min="0" step="0.01" required placeholder="e.g. 5000">
+                            </div>
                         </div>
+
                     </div>
 
                     {{-- Proration Preview Area --}}
