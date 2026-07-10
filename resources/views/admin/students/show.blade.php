@@ -838,12 +838,8 @@
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Document Type</label>
-                        <select name="type" class="form-select bg-light" required>
-                            <option value="aadhaar">Aadhaar</option>
-                            <option value="photo">Photo / ID</option>
-                            <option value="agreement">Rental Agreement</option>
-                            <option value="other">Other Document</option>
-                        </select>
+                        <x-he-select name="type" icon="file-lines" :submit="false" :selected="'aadhaar'"
+                            :options="['aadhaar' => 'Aadhaar', 'photo' => 'Photo / ID', 'agreement' => 'Rental Agreement', 'other' => 'Other Document']" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Title (optional)</label>
@@ -888,21 +884,15 @@
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             <label class="form-label fw-bold small">Room Preference</label>
-                            <select name="room_preference" class="form-select bg-light">
-                                <option value="">Select preference</option>
-                                <option value="AC" @selected($student->room_preference === 'AC')>AC Room</option>
-                                <option value="Non-AC" @selected($student->room_preference === 'Non-AC')>Non-AC Room</option>
-                            </select>
+                            <x-he-select name="room_preference" icon="door-closed" :submit="false"
+                                :selected="$student->room_preference"
+                                :options="['' => 'Select preference', 'AC' => 'AC Room', 'Non-AC' => 'Non-AC Room']" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small">Sharing Preference</label>
-                            <select name="sharing_preference" class="form-select bg-light">
-                                <option value="">Select sharing</option>
-                                <option value="Single" @selected($student->sharing_preference === 'Single')>Single Occupancy</option>
-                                <option value="Double" @selected($student->sharing_preference === 'Double')>Double Sharing</option>
-                                <option value="Triple" @selected($student->sharing_preference === 'Triple')>Triple Sharing</option>
-                                <option value="Quad" @selected($student->sharing_preference === 'Quad')>Quad Sharing</option>
-                            </select>
+                            <x-he-select name="sharing_preference" icon="users" :submit="false"
+                                :selected="$student->sharing_preference"
+                                :options="['' => 'Select sharing', 'Single' => 'Single Occupancy', 'Double' => 'Double Sharing', 'Triple' => 'Triple Sharing', 'Quad' => 'Quad Sharing']" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small">Fee Structure</label>

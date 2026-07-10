@@ -256,10 +256,9 @@
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label fw-bold small">Status <span class="text-danger">*</span></label>
-                    <select name="status" class="form-select" required>
-                        <option value="active" @selected(old('status', $student?->status ?? 'active') === 'active')>Active</option>
-                        <option value="left" @selected(old('status', $student?->status) === 'left')>Left</option>
-                    </select>
+                    <x-he-select name="status" icon="toggle-on" :submit="false"
+                        :selected="old('status', $student?->status ?? 'active')"
+                        :options="['active' => 'Active', 'left' => 'Left']" />
                 </div>
             </div>
         </div>

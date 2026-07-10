@@ -16,6 +16,7 @@ class SecurityDepositController extends Controller
     public function index()
     {
         $deposits = SecurityDeposit::with(['student', 'paymentMode', 'creator'])
+            ->whereHas('student')
             ->latest('collected_on')
             ->get();
 

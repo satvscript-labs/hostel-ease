@@ -56,11 +56,8 @@
                 @if($type === 'collection')
                 <div class="col-12 col-md-3">
                     <label class="form-label small fw-semibold text-muted text-uppercase">{{ __('Group By') }}</label>
-                    <select name="period" class="form-select form-select-lg bg-light border-0">
-                        @foreach(['daily'=>'Daily','weekly'=>'Weekly','monthly'=>'Monthly','yearly'=>'Yearly'] as $k=>$v)
-                            <option value="{{ $k }}" @selected($period===$k)>{{ $v }}</option>
-                        @endforeach
-                    </select>
+                    <x-he-select name="period" icon="chart-column" :submit="false" :selected="$period"
+                        :options="['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'yearly' => 'Yearly']" />
                 </div>
                 @endif
                 <div class="col-12 col-md-4">

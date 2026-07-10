@@ -6,10 +6,8 @@
 
 <form method="GET" class="row g-2 mb-3">
     <div class="col-6 col-md-3">
-        <select name="hostel" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">All hostels</option>
-            @foreach($hostels as $h)<option value="{{ $h->id }}" @selected(request('hostel')==$h->id)>{{ $h->name }}</option>@endforeach
-        </select>
+        <x-he-select name="hostel" icon="building" :selected="request('hostel', '')"
+            :options="['' => 'All hostels'] + $hostels->pluck('name', 'id')->all()" />
     </div>
     <div class="col-6 col-md-3">
         <input type="text" name="action" value="{{ request('action') }}" class="form-control form-control-sm" placeholder="Action (e.g. payment, login)">

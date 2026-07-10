@@ -222,11 +222,9 @@
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Category <span class="text-danger">*</span></label>
-                            <select name="category" class="form-select bg-light" required>
-                                @foreach(config('hostelease.expense_categories') as $k=>$l)
-                                    <option value="{{ $k }}">{{ $l }}</option>
-                                @endforeach
-                            </select>
+                            <x-he-select name="category" icon="tags" :submit="false"
+                                :selected="array_key_first(config('hostelease.expense_categories'))"
+                                :options="config('hostelease.expense_categories')" />
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Date <span class="text-danger">*</span></label>
@@ -249,11 +247,9 @@
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Payment Mode</label>
-                            <select name="mode" class="form-select bg-light">
-                                @foreach(config('hostelease.payment_modes') as $k=>$l)
-                                    <option value="{{ $k }}">{{ $l }}</option>
-                                @endforeach
-                            </select>
+                            <x-he-select name="mode" icon="wallet" :submit="false"
+                                :selected="array_key_first(config('hostelease.payment_modes'))"
+                                :options="config('hostelease.payment_modes')" />
                         </div>
                     </div>
 

@@ -38,7 +38,7 @@
         </div>
         <!-- Total Collected (Glass Tile) -->
         <div class="col-md-4">
-            <div class="card glass-tile h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
+            <div class="card h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">Total Collected</div>
@@ -53,7 +53,7 @@
         </div>
         <!-- Total Invoices (Glass Tile) -->
         <div class="col-md-4">
-            <div class="card glass-tile h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
+            <div class="card h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">Total Invoices</div>
@@ -114,11 +114,10 @@
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          style="display: none;">
-        <div class="d-flex flex-column gap-3">
+        <div class="d-flex flex-column gap-3 stagger">
             @forelse($invoices as $index => $invoice)
-            <div class="card border-0 shadow-sm rounded-4 invoice-item" 
-                 x-show="matchesSearchInvoice('{{ addslashes(strtolower($invoice->student->name)) }}', '{{ $invoice->student->mobile }}', '{{ addslashes(strtolower($invoice->title)) }}', '{{ $invoice->status }}')"
-                 style="animation-delay: {{ min($index * 50, 500) }}ms;">
+            <div class="card border-0 shadow-sm rounded-4 invoice-item"
+                 x-show="matchesSearchInvoice('{{ addslashes(strtolower($invoice->student->name)) }}', '{{ $invoice->student->mobile }}', '{{ addslashes(strtolower($invoice->title)) }}', '{{ $invoice->status }}')">
                 <div class="card-body p-3 p-md-4">
                     <div class="row align-items-center m-0 w-100">
                         <div class="col-12 col-xl-3 d-flex align-items-center gap-3 mb-3 mb-xl-0 p-0">
@@ -196,11 +195,10 @@
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          style="display: none;">
-        <div class="d-flex flex-column gap-3">
+        <div class="d-flex flex-column gap-3 stagger">
             @forelse($payments as $index => $payment)
             <div class="card border-0 shadow-sm rounded-4 transaction-item"
-                 x-show="matchesSearchPayment('{{ addslashes(strtolower($payment->student->name)) }}', '{{ strtolower($payment->receipt_number) }}')"
-                 style="animation-delay: {{ min($index * 50, 500) }}ms;">
+                 x-show="matchesSearchPayment('{{ addslashes(strtolower($payment->student->name)) }}', '{{ strtolower($payment->receipt_number) }}')">
                 <div class="card-body p-3 p-md-4">
                     <div class="row align-items-center m-0 w-100">
                         <div class="col-12 col-md-5 col-xl-3 d-flex align-items-center gap-3 mb-3 mb-md-0 p-0">
@@ -309,11 +307,9 @@
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Fee Type <span class="text-danger">*</span></label>
-                            <select name="fee_type" class="form-select bg-light" required>
-                                <option value="semester">Semester Fee (6x Rent)</option>
-                                <option value="yearly">Yearly Fee (12x Rent)</option>
-                                <option value="custom">Custom Auto Fee</option>
-                            </select>
+                            <x-he-select name="fee_type" icon="wand-magic-sparkles" :submit="false"
+                                :selected="'semester'"
+                                :options="['semester' => 'Semester Fee (6x Rent)', 'yearly' => 'Yearly Fee (12x Rent)', 'custom' => 'Custom Auto Fee']" />
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount Override</label>
@@ -396,12 +392,8 @@
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Type <span class="text-danger">*</span></label>
-                            <select name="type" class="form-select bg-light" required>
-                                <option value="fee">Hostel Fee</option>
-                                <option value="rent">Monthly Rent</option>
-                                <option value="ac">AC Bill</option>
-                                <option value="other">Other/Fine</option>
-                            </select>
+                            <x-he-select name="type" icon="tags" :submit="false" :selected="'fee'"
+                                :options="['fee' => 'Hostel Fee', 'rent' => 'Monthly Rent', 'ac' => 'AC Bill', 'other' => 'Other/Fine']" />
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
@@ -539,15 +531,6 @@ document.addEventListener('alpine:init', () => {
     }
 });
 </script>
-<style>
-    .invoice-item, .transaction-item {
-        animation: cascadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
-    }
-    @keyframes cascadeIn {
-        from { opacity: 0; transform: translateY(30px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-</style>
 @endpush
 
 @endsection

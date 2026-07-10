@@ -4,24 +4,31 @@
  */
 
 :root {
-    /* Primary (Deep Navy/Indigo) */
-    --he-primary: #1e1b4b;
-    --he-primary-soft: rgba(30, 27, 75, 0.05);
-    --he-primary-hover: #312e81;
+    /* Primary (Vibrant Indigo) — the one canonical palette. Do not redeclare
+       these anywhere else (they used to be duplicated, with different
+       values, in an inline <style> in layouts/app.blade.php — that block
+       is gone; this file is now the single source). */
+    --he-primary: #4f46e5;
+    --he-primary-hover: #4338ca;
+    --he-primary-soft: rgba(79, 70, 229, 0.1);
 
-    /* Accent (Teal/Amber) */
-    --he-accent: #0f766e;
-    --he-accent-hover: #0d9488;
-    --he-accent-soft: rgba(15, 118, 110, 0.1);
+    /* Accent (Neon Purple) */
+    --he-accent: #9333ea;
+    --he-accent-hover: #7e22ce;
+    --he-accent-soft: rgba(147, 51, 234, 0.1);
+
+    /* Gradients (Hero Mesh cards, etc.) */
+    --he-gradient-mesh: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    --he-gradient-pop: linear-gradient(135deg, #4f46e5, #9333ea);
 
     /* Semantic */
-    --he-success: #16a34a;
-    --he-success-soft: #dcfce7;
+    --he-success: #10b981;
+    --he-success-soft: #d1fae5;
     --he-warning: #f59e0b;
     --he-warning-soft: #fef3c7;
-    --he-danger: #dc2626;
+    --he-danger: #ef4444;
     --he-danger-soft: #fee2e2;
-    --he-info: #0284c7;
+    --he-info: #0ea5e9;
     --he-info-soft: #e0f2fe;
 
     /* Surface & Background */
@@ -34,6 +41,14 @@
     --he-text-muted: #64748b;
     --he-text-inverse: #ffffff;
 
+    /* Typography scale — microcopy/labels use xs (uppercase, tracked),
+       body/table text uses sm/base, emphasized numbers use lg/xl. */
+    --he-text-xs: 0.7rem;
+    --he-text-sm: 0.875rem;
+    --he-text-base: 1rem;
+    --he-text-lg: 1.125rem;
+    --he-text-xl: 1.5rem;
+
     /* Shadows */
     --he-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --he-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -45,7 +60,7 @@
     --he-radius-md: 10px;
     --he-radius-lg: 16px;
     --he-radius-full: 9999px;
-    
+
     /* Easing */
     --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -75,7 +90,21 @@ body {
 .stagger > *:nth-child(5) { animation-delay: 0.25s; }
 .stagger > *:nth-child(n+6) { animation-delay: 0.3s; }
 
+/* Manual per-element stagger for cases where items aren't direct children
+   of one `.stagger` wrapper (e.g. conditionally-rendered blocks). Prefer
+   `.stagger` on the wrapper by default — only reach for these when it
+   genuinely doesn't fit. */
+.stagger-1 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.1s both; }
+.stagger-2 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.15s both; }
+.stagger-3 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.2s both; }
+.stagger-4 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.25s both; }
+.stagger-5 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.3s both; }
+
 @keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
     to {
         opacity: 1;
         transform: translateY(0);
@@ -132,6 +161,50 @@ body {
 .btn-premium:disabled {
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* Glass Tile (hover-lift white card utility — for rich/custom card
+   layouts that don't fit .bento-card's fixed icon+value+label shape,
+   e.g. a staff profile card or a table wrapper) */
+.glass-tile {
+    background: var(--he-bg-surface);
+    border: 1px solid rgba(0, 0, 0, 0.02);
+    transition: transform 0.4s var(--ease-out-expo), box-shadow 0.4s var(--ease-out-expo);
+}
+.glass-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--he-shadow-md) !important;
+}
+
+/* Tactile press feedback — put on any clickable element (button, card,
+   tab) that should visibly "push" on click. Same everywhere, always. */
+.tactile-btn {
+    transition: transform 0.2s var(--ease-out-expo), background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.tactile-btn:active {
+    transform: scale(0.97);
+}
+
+/* Glowing icon badge — a colored circular icon with a soft blurred glow
+   behind it, matching its own background color. Works standalone or
+   inside .glass-tile (glow intensifies on the tile's hover). */
+.tile-icon-wrapper {
+    position: relative;
+    z-index: 2;
+}
+.tile-icon-wrapper::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    filter: blur(12px);
+    opacity: 0.6;
+    z-index: -1;
+    border-radius: inherit;
+    transition: opacity 0.4s ease;
+}
+.glass-tile:hover .tile-icon-wrapper::after {
+    opacity: 0.9;
 }
 
 /* Interactive Cards */
@@ -248,34 +321,45 @@ body {
     color: var(--he-text-muted);
 }
 
-/* --- Bento Dashboard (Reusable) --- */
+/* --- Bento Dashboard (Reusable — the one canonical stat-tile pattern.
+   Use <x-he-stat-tile> instead of hand-writing this markup.) ---
+   Works as a plain card on its own, or aligned to a uniform row-height
+   grid when wrapped in `.bento` (dashboards mixing stat tiles + charts). */
 .bento {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 134px;
+    grid-auto-flow: row dense;
+    gap: 1rem;
 }
 .bento-card {
     background: var(--he-bg-surface);
     border-radius: var(--he-radius-lg);
-    padding: 1.25rem;
+    padding: 1.1rem 1.2rem;
     box-shadow: var(--he-shadow-sm);
-    border: 1px solid rgba(0,0,0,0.04);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    overflow: hidden;
     transition: all 0.25s var(--ease-out-expo);
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
 }
 .bento-card:hover {
     box-shadow: var(--he-shadow-md);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
 }
 .bento-card.hero {
-    background: linear-gradient(135deg, var(--he-primary) 0%, var(--he-primary-hover) 100%);
+    background: var(--he-gradient-pop);
     color: var(--he-text-inverse);
 }
 .bento-card.hero .bento-value { color: #fff; }
+.bento-card.hero .bento-label { color: rgba(255, 255, 255, 0.8); }
 .bento-card.c2 { grid-column: span 2; }
-@media (max-width: 575.98px) {
-    .bento-card.c2 { grid-column: span 1; }
-    .bento { grid-template-columns: repeat(2, 1fr); }
-}
+.bento-card.r2 { grid-row: span 2; }
+.bento-card canvas { flex: 1 1 auto; min-height: 0; }
+.bento-card .bento-list { overflow-y: auto; margin: 0; }
+
 .bento-icon {
     width: 42px;
     height: 42px;
@@ -287,7 +371,7 @@ body {
     flex-shrink: 0;
 }
 .bento-value {
-    font-size: 1.5rem;
+    font-size: var(--he-text-xl);
     font-weight: 700;
     line-height: 1.2;
     color: var(--he-text-main);
@@ -296,6 +380,18 @@ body {
     font-size: var(--he-text-sm);
     color: var(--he-text-muted);
     margin-top: 0.15rem;
+}
+
+@media (max-width: 991.98px) {
+    .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 126px; }
+    .bento-card.c2 { grid-column: span 2; }
+}
+@media (max-width: 575.98px) {
+    .bento { grid-template-columns: repeat(2, 1fr); gap: 0.7rem; grid-auto-rows: 110px; }
+    .bento-card.c2 { grid-column: span 1; }
+    .bento-card { padding: 0.85rem 0.9rem; border-radius: var(--he-radius-md); }
+    .bento-icon { width: 36px; height: 36px; font-size: 0.95rem; border-radius: 11px; }
+    .bento-value { font-size: 1.3rem; }
 }
 
 /* --- Premium Tabs (Profile page) --- */
@@ -544,6 +640,124 @@ body {
     box-shadow: var(--he-shadow-sm);
 }
 
+/* --- Premium Select (replaces raw <select> — see <x-he-select>) ---
+   Two variants via modifier class:
+     .he-select--status  → inline status pill (color reflects current value)
+     .he-select--filter  → category/filter pill (icon + uppercase label + value)
+   Parent needs x-data="{ open: false }" and gets .is-open toggled for z-index. */
+.he-select-wrap {
+    position: relative;
+    z-index: 1;
+}
+.he-select-wrap.is-open {
+    z-index: 1050;
+}
+.he-select-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--he-radius-full);
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s var(--ease-out-expo);
+}
+.he-select-trigger:active {
+    transform: scale(0.97);
+}
+.he-select-trigger.he-select--filter {
+    background: var(--he-bg-surface);
+    border-color: rgba(0, 0, 0, 0.08);
+    padding: 0.5rem 0.875rem;
+}
+.he-select-trigger.he-select--filter:hover {
+    border-color: var(--he-primary);
+}
+.he-select-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--he-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--he-primary-soft);
+    color: var(--he-primary);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+.he-select-label {
+    font-size: var(--he-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--he-text-muted);
+    font-weight: 600;
+}
+.he-select-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    z-index: 1050;
+    min-width: 220px;
+    background: var(--he-bg-surface);
+    border-radius: var(--he-radius-md);
+    box-shadow: var(--he-shadow-lg);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    padding: 0.375rem;
+}
+.he-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--he-radius-sm);
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: var(--he-text-sm);
+    color: var(--he-text-main);
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out-expo);
+}
+.he-select-option:hover {
+    background: var(--he-bg-surface-raised);
+}
+.he-select-option.active {
+    font-weight: 600;
+    color: var(--he-primary);
+}
+
+/* --- Gradient Stat Card (colored-by-context hero tile — distinct from
+   .bento-card, used when a stat needs to read as "this color = this
+   meaning" at a glance, e.g. visitor count, complaint counts by status) --- */
+.stat-card-glass {
+    border-radius: var(--he-radius-lg);
+    padding: 1.5rem;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--he-shadow-lg);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: none;
+}
+.stat-card-glass::after {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+}
+.stat-card-visitors { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); }
+.stat-card-complaints-open { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); }
+.stat-card-complaints-prog { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.stat-card-complaints-res { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+
 /* --- Empty State --- */
 .empty-state {
     text-align: center;
@@ -605,6 +819,97 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
     gap: 0.5rem;
+}
+
+/* ====================================================================
+   Chrome — Topbar, Footer, Overlay Modal
+   (moved here from an inline <style> in layouts/app.blade.php so there
+   is exactly one place these are declared)
+   ==================================================================== */
+
+.he-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.premium-footer {
+    background: var(--he-bg-surface);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem 0;
+    margin-top: auto;
+}
+.premium-footer p {
+    margin: 0;
+    font-size: var(--he-text-sm);
+    letter-spacing: 0.03em;
+    color: var(--he-text-muted);
+}
+.premium-footer .signature {
+    font-weight: 600;
+    color: var(--he-text-main);
+}
+
+/* Standard Overlay Modal — see .agents/ui_design_guidelines.md §5 for the
+   full markup spec. Always wrap in <template x-teleport="body">. Use the
+   <x-he-modal> component instead of hand-copying this markup. */
+.custom-overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.custom-overlay-modal {
+    width: 100%;
+    max-width: 550px;
+    background: var(--he-bg-surface);
+    border-radius: var(--he-radius-lg);
+    box-shadow: var(--he-shadow-float);
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    transform: scale(0.95);
+    opacity: 0;
+    transition: all 0.3s var(--ease-out-expo);
+    overflow: hidden;
+}
+.custom-overlay-modal.is-open {
+    transform: scale(1);
+    opacity: 1;
+}
+.custom-overlay-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--he-bg-surface);
+}
+.custom-overlay-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex-grow: 1;
+    background: #fafafa;
+}
+.custom-overlay-footer {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    background: var(--he-bg-surface);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
 }
 
 /* Reduced Motion */

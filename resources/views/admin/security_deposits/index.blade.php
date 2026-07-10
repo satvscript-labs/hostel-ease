@@ -58,8 +58,12 @@
                         @forelse($deposits as $deposit)
                         <tr>
                             <td class="ps-4 py-3">
+                                @if($deposit->student)
                                 <div class="fw-bold text-dark">{{ $deposit->student->name }}</div>
                                 <div class="text-muted small">{{ $deposit->student->mobile }}</div>
+                                @else
+                                <div class="fw-bold text-dark text-muted">— Student Deleted —</div>
+                                @endif
                             </td>
                             <td class="py-3">
                                 <div class="fw-bold">{{ $deposit->receipt_number }}</div>
@@ -143,11 +147,9 @@
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Payment Mode <span class="text-danger">*</span></label>
-                            <select name="payment_mode_id" class="form-select bg-light fw-semibold" required>
-                                @foreach($paymentModes as $mode)
-                                <option value="{{ $mode->id }}">{{ $mode->name }}</option>
-                                @endforeach
-                            </select>
+                            <x-he-select name="payment_mode_id" icon="wallet" :submit="false"
+                                :selected="optional($paymentModes->first())->id"
+                                :options="$paymentModes->pluck('name', 'id')->all()" />
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Collection Date <span class="text-danger">*</span></label>
