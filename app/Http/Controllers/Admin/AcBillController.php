@@ -19,6 +19,8 @@ class AcBillController extends Controller
         $to = $filterMonth->copy()->endOfMonth();
 
         $billsQuery = AcBill::with('room.floor')
+            ->withCount('invoices as shares_count')
+            ->withSum('invoices as collected', 'paid_amount')
             ->whereBetween('bill_month', [$from->format('Y-m-d'), $to->format('Y-m-d')]);
             
         if ($filterFloor) {
@@ -46,11 +48,8 @@ class AcBillController extends Controller
             ->get()
             ->pluck('current_reading', 'room_id');
             
-        $bills->each(function ($bill) {
-            $billInvoices = Invoice::where('type', 'ac')->where('title', 'like', "%AC Bill #{$bill->id} -%")->get();
-            $bill->shares_count = $billInvoices->count();
-            $bill->collected = $billInvoices->sum('paid_amount');
-        });
+        // withSum() leaves collected null when a bill has zero invoices.
+        $bills->each(fn ($bill) => $bill->collected = (float) ($bill->collected ?? 0));
 
         $summary = [
             'billed' => $bills->sum('total_amount'),
@@ -104,6 +103,7 @@ class AcBillController extends Controller
                     'hostel_id' => $room->hostel_id,
                     'student_id' => $student->id,
                     'type' => 'ac',
+                    'ac_bill_id' => $acBill->id,
                     'title' => $title,
                     'amount' => $splitAmount,
                     'status' => 'pending',
@@ -117,9 +117,7 @@ class AcBillController extends Controller
 
     public function destroy(AcBill $acBill)
     {
-        $invoices = Invoice::where('type', 'ac')
-            ->where('title', 'like', "%AC Bill #{$acBill->id} -%")
-            ->get();
+        $invoices = $acBill->invoices;
 
         if ($invoices->where('paid_amount', '>', 0)->isNotEmpty()) {
             return back()->with('error', 'Cannot delete this AC Bill because some students have already made payments.');

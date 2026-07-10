@@ -7,8 +7,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Blocks hostel admins whose hostel subscription has lapsed or been
- * suspended. Super Admins bypass this check.
+ * Blocks any hostel login (owner or staff sub-user) whose active branch's
+ * subscription has lapsed or been suspended. Super Admins bypass this check.
  */
 class EnsureActiveSubscription
 {
@@ -16,7 +16,7 @@ class EnsureActiveSubscription
     {
         $user = $request->user();
 
-        if ($user && $user->isHostelAdmin()) {
+        if ($user && $user->isHostelStaff()) {
             // Check the subscription of the ACTIVE branch (not just the primary).
             $hostel = \App\Support\Tenant::id()
                 ? \App\Models\Hostel::find(\App\Support\Tenant::id())

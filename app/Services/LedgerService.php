@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\Student;
 
 /**
- * Aggregates a student's financial position across every obligation type
- * (semester fees, monthly rent, AC bills) and their payments.
+ * Aggregates a student's financial position from their unified invoices
+ * (fee, rent, ac, other) and payments.
  */
 class LedgerService
 {
@@ -15,14 +15,8 @@ class LedgerService
      */
     public function totalsFor(Student $student): array
     {
-        $billed = (float) $student->semesterFees()->sum('total_fee')
-            + (float) $student->monthlyRents()->sum('amount')
-            + (float) $student->acBillShares()->sum('amount');
-
-        $outstanding = (float) $student->semesterFees()->sum('balance')
-            + (float) $student->monthlyRents()->sum('balance')
-            + (float) ($student->acBillShares()->sum('amount') - $student->acBillShares()->sum('paid_amount'));
-
+        $billed = (float) $student->invoices()->sum('amount');
+        $outstanding = (float) $student->invoices()->where('status', '!=', 'paid')->sum('balance');
         $paid = (float) $student->payments()->sum('amount');
 
         return [
@@ -37,41 +31,17 @@ class LedgerService
      */
     public function obligations(Student $student): \Illuminate\Support\Collection
     {
-        $rows = collect();
-
-        foreach ($student->semesterFees as $f) {
-            $rows->push([
-                'date' => $f->due_date,
-                'particular' => "Semester {$f->semester} Fee",
-                'amount' => (float) $f->total_fee,
-                'paid' => (float) $f->paid_amount,
-                'balance' => (float) $f->balance,
-                'status' => $f->status,
-            ]);
-        }
-
-        foreach ($student->monthlyRents as $r) {
-            $rows->push([
-                'date' => $r->rent_month,
-                'particular' => 'Rent · '.$r->rent_month->format('M Y'),
-                'amount' => (float) $r->amount,
-                'paid' => (float) $r->paid_amount,
-                'balance' => (float) $r->balance,
-                'status' => $r->status,
-            ]);
-        }
-
-        foreach ($student->acBillShares as $a) {
-            $rows->push([
-                'date' => $a->created_at,
-                'particular' => 'AC Bill',
-                'amount' => (float) $a->amount,
-                'paid' => (float) $a->paid_amount,
-                'balance' => (float) $a->amount - (float) $a->paid_amount,
-                'status' => $a->status,
-            ]);
-        }
-
-        return $rows->sortBy('date')->values();
+        return $student->invoices()
+            ->get()
+            ->map(fn ($invoice) => [
+                'date' => $invoice->due_date ?? $invoice->created_at,
+                'particular' => $invoice->title,
+                'amount' => (float) $invoice->amount,
+                'paid' => (float) $invoice->paid_amount,
+                'balance' => (float) $invoice->balance,
+                'status' => $invoice->status,
+            ])
+            ->sortBy('date')
+            ->values();
     }
 }

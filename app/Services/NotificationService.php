@@ -2,11 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\AcBillStudent;
 use App\Models\Hostel;
-use App\Models\MonthlyRent;
+use App\Models\Invoice;
 use App\Models\Notification;
-use App\Models\SemesterFee;
 use App\Models\Student;
 use App\Models\StudentDocument;
 use App\Support\Tenant;
@@ -74,15 +72,13 @@ class NotificationService
         $this->toggle($leaving > 0, $hostel->id, 'leaving_soon', 'leaving7',
             'Students leaving soon', "{$leaving} student(s) leaving within 7 days.", 'warning');
 
-        // Pending fees (semester + monthly rent)
-        $feeDue = (float) SemesterFee::where('status', '!=', 'paid')->sum('balance')
-            + (float) MonthlyRent::where('status', '!=', 'paid')->sum('balance');
+        // Pending fees (fee + rent + other invoices, excluding AC)
+        $feeDue = (float) Invoice::where('type', '!=', 'ac')->where('status', '!=', 'paid')->sum('balance');
         $this->toggle($feeDue > 0, $hostel->id, 'fee_pending', 'fees',
             'Pending fees', hostelease_money($feeDue).' outstanding across students.', 'warning');
 
         // Pending AC bills
-        $acDue = (float) (AcBillStudent::where('status', '!=', 'paid')->sum('amount')
-            - AcBillStudent::where('status', '!=', 'paid')->sum('paid_amount'));
+        $acDue = (float) Invoice::where('type', 'ac')->where('status', '!=', 'paid')->sum('balance');
         $this->toggle($acDue > 0, $hostel->id, 'ac_pending', 'ac',
             'Pending AC bills', hostelease_money($acDue).' AC dues outstanding.', 'info');
 
@@ -121,13 +117,11 @@ class NotificationService
     protected function promisesDueCount(): int
     {
         $today = now()->toDateString();
-        $due = fn ($q) => $q->whereNotNull('promise_date')
-            ->whereDate('promise_date', '<=', $today)
-            ->where('status', '!=', 'paid');
 
-        return SemesterFee::where($due)->count()
-            + MonthlyRent::where($due)->count()
-            + AcBillStudent::where($due)->count();
+        return Invoice::whereNotNull('promise_date')
+            ->whereDate('promise_date', '<=', $today)
+            ->where('status', '!=', 'paid')
+            ->count();
     }
 
     protected function toggle(bool $condition, ?int $hostelId, string $type, string $sig, string $title, string $message, string $level): void

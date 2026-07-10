@@ -35,7 +35,7 @@ class StudentController extends Controller
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
-            'credit_used' => ['nullable', 'numeric', 'min:0'],
+            'credit_used' => ['nullable', 'numeric', 'min:0', 'max:'.(float) $student->credit_balance],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             'remarks' => ['nullable', 'string', 'max:500'],

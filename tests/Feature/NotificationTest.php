@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Hostel;
+use App\Models\Invoice;
 use App\Models\Notification;
-use App\Models\SemesterFee;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -22,8 +22,8 @@ class NotificationTest extends TestCase
         Tenant::set($hostel->id);
         $student = Student::create(['hostel_id' => $hostel->id, 'name' => 'A', 'mobile' => '9000000001',
             'occupation_type' => 'student', 'status' => 'active']);
-        $fee = SemesterFee::create(['hostel_id' => $hostel->id, 'student_id' => $student->id, 'semester' => 1,
-            'total_fee' => 10000, 'paid_amount' => 0, 'balance' => 10000, 'status' => 'pending']);
+        $invoice = Invoice::create(['hostel_id' => $hostel->id, 'student_id' => $student->id, 'type' => 'fee',
+            'title' => 'Semester 1 Fee', 'amount' => 10000, 'paid_amount' => 0, 'status' => 'pending']);
         Tenant::clear();
 
         $service = app(NotificationService::class);
@@ -36,7 +36,7 @@ class NotificationTest extends TestCase
         $this->assertSame(1, Notification::where('type', 'fee_pending')->count());
 
         // Resolve the balance → alert clears.
-        $fee->update(['paid_amount' => 10000, 'balance' => 0, 'status' => 'paid']);
+        $invoice->update(['paid_amount' => 10000, 'status' => 'paid']);
         $service->generateForHostel($hostel);
         $this->assertSame(0, Notification::where('type', 'fee_pending')->whereNull('read_at')->count());
     }

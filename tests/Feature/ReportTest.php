@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Hostel;
+use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\SemesterFee;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ReportService;
@@ -32,12 +32,12 @@ class ReportTest extends TestCase
             'occupation_type' => 'student', 'status' => 'active']);
 
         Payment::create(['hostel_id' => $this->hostel->id, 'student_id' => $student->id, 'receipt_number' => 'R1',
-            'amount' => 3000, 'payment_type' => 'full', 'mode' => 'cash', 'paid_on' => now()]);
+            'amount' => 3000, 'mode' => 'cash', 'paid_on' => now()]);
         Payment::create(['hostel_id' => $this->hostel->id, 'student_id' => $student->id, 'receipt_number' => 'R2',
-            'amount' => 2000, 'payment_type' => 'full', 'mode' => 'upi', 'paid_on' => now()]);
+            'amount' => 2000, 'mode' => 'upi', 'paid_on' => now()]);
         // Outside the range — must be excluded.
         Payment::create(['hostel_id' => $this->hostel->id, 'student_id' => $student->id, 'receipt_number' => 'R3',
-            'amount' => 9999, 'payment_type' => 'full', 'mode' => 'cash', 'paid_on' => now()->subYear()]);
+            'amount' => 9999, 'mode' => 'cash', 'paid_on' => now()->subYear()]);
 
         $data = app(ReportService::class)->collection('monthly', now()->startOfMonth(), now()->endOfDay());
 
@@ -51,10 +51,10 @@ class ReportTest extends TestCase
         $clear = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Clear', 'mobile' => '9000000003',
             'occupation_type' => 'student', 'status' => 'active']);
 
-        SemesterFee::create(['hostel_id' => $this->hostel->id, 'student_id' => $owing->id, 'semester' => 1,
-            'total_fee' => 10000, 'paid_amount' => 2000, 'balance' => 8000, 'status' => 'partial']);
-        SemesterFee::create(['hostel_id' => $this->hostel->id, 'student_id' => $clear->id, 'semester' => 1,
-            'total_fee' => 5000, 'paid_amount' => 5000, 'balance' => 0, 'status' => 'paid']);
+        Invoice::create(['hostel_id' => $this->hostel->id, 'student_id' => $owing->id, 'type' => 'fee',
+            'title' => 'Semester 1 Fee', 'amount' => 10000, 'paid_amount' => 2000, 'status' => 'partial']);
+        Invoice::create(['hostel_id' => $this->hostel->id, 'student_id' => $clear->id, 'type' => 'fee',
+            'title' => 'Semester 1 Fee', 'amount' => 5000, 'paid_amount' => 5000, 'status' => 'paid']);
 
         $data = app(ReportService::class)->pendingFees();
 

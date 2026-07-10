@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\FloorController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentModeController;
-use App\Http\Controllers\Admin\PromiseController;
 use App\Http\Controllers\Admin\PropertyController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoomController;
@@ -185,9 +184,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
                 // Payment modes
                 Route::resource('payment-modes', PaymentModeController::class)->only(['index', 'store', 'update', 'destroy']);
-
-                // Promise to pay
-                Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
 
                 // AC Bills
                 Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);
