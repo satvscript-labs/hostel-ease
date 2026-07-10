@@ -673,6 +673,16 @@ body {
 .he-select-trigger.he-select--filter:hover {
     border-color: var(--he-primary);
 }
+/* Compact — same height/radius/padding as a native .form-select, just
+   rendered as a button so the premium dropdown menu still opens under it.
+   Use inside dense forms/modals where the filter-pill trigger is too tall. */
+.he-select-trigger.he-select--compact {
+    border-radius: var(--bs-border-radius, 0.375rem);
+    width: 100%;
+}
+.he-select-trigger.he-select--compact:hover {
+    border-color: var(--he-primary);
+}
 .he-select-icon {
     width: 28px;
     height: 28px;

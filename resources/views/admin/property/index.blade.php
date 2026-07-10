@@ -547,6 +547,57 @@
         <input type="hidden" name="student_id" x-model="spotlight.studentId">
     </form>
 
+    <!-- Fee Plan Gate — shown before assignment when the picked student has
+         no fee_amount/fee_frequency set yet. Saving completes straight into
+         the bed assignment, no second click. -->
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="feeGate.open" x-transition.opacity @click="feeGate.open = false" x-cloak style="display: none;">
+            <form x-ref="feeGateForm" @submit.prevent="saveFeeGate()" class="custom-overlay-modal" :class="{ 'is-open': feeGate.open }" x-show="feeGate.open" x-transition.opacity @click.stop style="display: none; max-width: 420px;">
+                <div class="custom-overlay-header py-3">
+                    <div>
+                        <h6 class="fw-bold mb-0">Set Fee Plan</h6>
+                        <div class="small text-muted" x-text="feeGate.student ? feeGate.student.name : ''"></div>
+                    </div>
+                    <button type="button" class="btn-close" @click="feeGate.open = false"></button>
+                </div>
+                <div class="custom-overlay-body py-3">
+                    <p class="small text-muted mb-3">No fee plan set for this student yet — set it to complete the assignment.</p>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Room Preference</label>
+                            <x-he-select name="room_preference" compact x-ref="feeGateRoom" placeholder="Any"
+                                :options="['' => 'Any', 'AC' => 'AC', 'Non-AC' => 'Non-AC']" :submit="false" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Sharing</label>
+                            <x-he-select name="sharing_preference" compact x-ref="feeGateSharing" placeholder="Any"
+                                :options="['' => 'Any', 'Single' => 'Single', 'Double' => 'Double', 'Triple' => 'Triple', 'Quad' => 'Quad']" :submit="false" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Fee Structure <span class="text-danger">*</span></label>
+                            <x-he-select name="fee_frequency" compact x-ref="feeGateFreq" placeholder="Select"
+                                :options="['monthly' => 'Monthly', 'semester' => 'Semester', 'yearly' => 'Yearly']" :submit="false" />
+                            <div class="text-danger small mt-1" x-show="feeGate.errors.fee_frequency" x-text="feeGate.errors.fee_frequency && feeGate.errors.fee_frequency[0]"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Amount (₹) <span class="text-danger">*</span></label>
+                            <input type="number" name="fee_amount" x-ref="feeGateAmount" class="form-control form-control-sm" min="0" step="0.01" placeholder="0.00">
+                            <div class="text-danger small mt-1" x-show="feeGate.errors.fee_amount" x-text="feeGate.errors.fee_amount && feeGate.errors.fee_amount[0]"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="custom-overlay-footer py-2">
+                    <button type="button" class="btn btn-sm btn-light border fw-semibold rounded-pill px-3" @click="feeGate.open = false">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-semibold rounded-pill px-3 shadow-sm" :disabled="feeGate.saving">
+                        <span x-show="!feeGate.saving"><i class="fa-solid fa-check me-1"></i> Save &amp; Assign</span>
+                        <span x-show="feeGate.saving"><i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </template>
+
     <!-- Hidden Form for Status Update -->
     <form id="statusForm" :action="'/admin/beds/' + spotlight.bedId + '/status'" method="POST" class="d-none">
         @csrf @method('PATCH')
@@ -731,10 +782,17 @@ document.addEventListener('alpine:init', () => {
         },
 
         panels: {
-            details: { 
-                open: false, bedId: '', room: '', bed: '', 
-                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '' } 
+            details: {
+                open: false, bedId: '', room: '', bed: '',
+                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '' }
             }
+        },
+
+        feeGate: {
+            open: false,
+            student: null,
+            saving: false,
+            errors: {},
         },
         
         get filteredStudents() {
@@ -767,10 +825,82 @@ document.addEventListener('alpine:init', () => {
         },
 
         confirmAssignment(student) {
+            if (!student.fee_amount || !student.fee_frequency) {
+                this.openFeeGate(student);
+                return;
+            }
             this.spotlight.studentId = student.id;
             this.$nextTick(() => {
                 document.getElementById('assignForm').submit();
             });
+        },
+
+        openFeeGate(student) {
+            this.feeGate.student = student;
+            this.feeGate.errors = {};
+            this.feeGate.saving = false;
+            this.feeGate.open = true;
+
+            this.$nextTick(() => {
+                const prefill = (ref, val) => {
+                    const el = this.$refs[ref];
+                    if (!el) return;
+                    const data = Alpine.$data(el);
+                    data.value = val || '';
+                    data.label = (val && data.opts[val]) ? data.opts[val].label : el.querySelector('.he-select-trigger')?.textContent.trim();
+                };
+                prefill('feeGateRoom', student.room_preference);
+                prefill('feeGateSharing', student.sharing_preference);
+                prefill('feeGateFreq', student.fee_frequency);
+                if (this.$refs.feeGateAmount) this.$refs.feeGateAmount.value = student.fee_amount || '';
+            });
+        },
+
+        async saveFeeGate() {
+            this.feeGate.saving = true;
+            this.feeGate.errors = {};
+
+            const fd = new FormData(this.$refs.feeGateForm);
+            const payload = {
+                room_preference: fd.get('room_preference') || '',
+                sharing_preference: fd.get('sharing_preference') || '',
+                fee_frequency: fd.get('fee_frequency') || '',
+                fee_amount: fd.get('fee_amount') || '',
+            };
+
+            try {
+                const res = await fetch(`/admin/students/${this.feeGate.student.id}/fee-settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (res.status === 422) {
+                    const data = await res.json();
+                    this.feeGate.errors = data.errors || {};
+                    this.feeGate.saving = false;
+                    return;
+                }
+                if (!res.ok) throw new Error('Save failed');
+
+                // Keep the in-memory student record in sync, then complete the assignment.
+                const s = this.feeGate.student;
+                s.fee_amount = payload.fee_amount;
+                s.fee_frequency = payload.fee_frequency;
+                s.room_preference = payload.room_preference;
+                s.sharing_preference = payload.sharing_preference;
+
+                this.feeGate.open = false;
+                this.spotlight.studentId = s.id;
+                this.$nextTick(() => document.getElementById('assignForm').submit());
+            } catch (e) {
+                console.error(e);
+                this.feeGate.saving = false;
+            }
         },
 
         markBedStatus(status) {

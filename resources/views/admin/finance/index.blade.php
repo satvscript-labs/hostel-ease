@@ -11,10 +11,10 @@
             <p class="text-secondary">{{ __('Manage invoices, due balances, and transactions in one place.') }}</p>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm text-primary border" @click="feeModalOpen = true">
+            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm text-primary border" @click="invoiceType = 'fee'; chargeModalOpen = true">
                 <i class="fa-solid fa-wand-magic-sparkles me-1"></i> {{ __('Generate Fee') }}
             </button>
-            <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;" @click="invoiceModalOpen = true">
+            <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;" @click="invoiceType = 'other'; chargeModalOpen = true">
                 <i class="fa-solid fa-plus me-1"></i> {{ __('New Invoice') }}
             </button>
         </div>
@@ -251,173 +251,88 @@
         </div>
     </div>
 
-    <!-- Ultra-Premium Generate Fee Modal (Teleported inside x-data) -->
+    {{-- Unified Charge Modal — one dynamic form covering both "Generate Fee"
+         (auto-calculated from room rent) and "New Invoice" (manual amount,
+         any type). Submits to whichever backend endpoint fits the selected
+         type; both stay exactly as they were, this is a frontend merge. --}}
+    @php
+        $studentOptions = $students->mapWithKeys(fn ($s) => [$s->id => "{$s->name} ({$s->mobile})"]);
+    @endphp
     <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="feeModalOpen" x-transition.opacity @click="feeModalOpen = false" x-cloak style="display: none;">
-            
-            <form method="POST" action="{{ route('admin.finance.generate-fee') }}" class="custom-overlay-modal" :class="{ 'is-open': feeModalOpen }" x-show="feeModalOpen" x-transition.opacity @click.stop style="display: none;">
+        <div class="custom-overlay-backdrop" x-show="chargeModalOpen" x-transition.opacity @click="chargeModalOpen = false" x-cloak style="display: none;">
+
+            <form method="POST" :action="invoiceType === 'fee' ? '{{ route('admin.finance.generate-fee') }}' : '{{ route('admin.invoices.store') }}'" class="custom-overlay-modal" :class="{ 'is-open': chargeModalOpen }" x-show="chargeModalOpen" x-transition.opacity @click.stop style="display: none;">
                 @csrf
-                
+                <input type="hidden" name="type" :value="invoiceType">
+
                 <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i> Generate Fee</h5>
-                    <button type="button" class="btn-close" @click="feeModalOpen = false"></button>
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid" :class="invoiceType === 'fee' ? 'fa-wand-magic-sparkles' : 'fa-file-invoice-dollar'" style="color: var(--he-primary);"></i>
+                        <span x-text="invoiceType === 'fee' ? 'Generate Fee' : 'New Invoice'" class="ms-1"></span>
+                    </h5>
+                    <button type="button" class="btn-close" @click="chargeModalOpen = false"></button>
                 </div>
-                
+
                 <div class="custom-overlay-body">
-                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start">
+                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start" x-show="invoiceType === 'fee'" x-cloak>
                         <i class="fa-solid fa-circle-info fs-5 mt-1"></i>
                         <div class="small">
-                            <strong>Automated Fee Generation:</strong> The system will automatically calculate the fee amount based on the student's current room assignment. If you specify a custom amount, the auto-calculation will be bypassed.
+                            <strong>Automated Fee Generation:</strong> The system will automatically calculate the fee amount based on the student's current room assignment. Specify a custom amount to override.
                         </div>
                     </div>
 
-                    <!-- Searchable Select for Students -->
-                    <div class="mb-4" x-data="searchableSelect({
-                        options: [
-                            @foreach($students as $student)
-                            { value: '{{ $student->id }}', label: '{{ addslashes($student->name) }} ({{ $student->mobile }})' },
-                            @endforeach
-                        ]
-                    })">
+                    <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
-                        <input type="hidden" name="student_id" :value="value" required>
-                        <div class="position-relative">
-                            <button type="button" class="form-control bg-light text-start d-flex justify-content-between align-items-center" @click="open = !open">
-                                <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
-                                <div>
-                                    <i x-show="value" class="fa-solid fa-xmark text-muted small me-2 cursor-pointer" @click.stop="clearOption()" style="cursor:pointer;" title="Clear"></i>
-                                    <i class="fa-solid fa-chevron-down text-muted small"></i>
-                                </div>
-                            </button>
-                            
-                            <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
-                                <div class="p-2 border-bottom sticky-top bg-white">
-                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light" placeholder="Search student...">
-                                </div>
-                                <div class="list-group list-group-flush">
-                                    <template x-for="opt in filteredOptions" :key="opt.value">
-                                        <button type="button" class="list-group-item list-group-item-action py-2" @click="selectOption(opt.value)" x-text="opt.label"></button>
-                                    </template>
-                                    <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No students found</div>
-                                </div>
-                            </div>
+                        <x-he-select name="student_id" searchable compact placeholder="Search a student..."
+                            :options="$studentOptions" :submit="false" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Charge Type <span class="text-danger">*</span></label>
+                        <div class="chip-group">
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'fee' }" @click="invoiceType = 'fee'">Hostel Fee</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'rent' }" @click="invoiceType = 'rent'">Monthly Rent</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'ac' }" @click="invoiceType = 'ac'">AC Bill</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'other' }" @click="invoiceType = 'other'">Other / Fine</button>
                         </div>
                     </div>
 
                     <div class="row gx-3">
-                        <div class="col-md-6 mb-4">
+                        <div class="col-md-6 mb-4" x-show="invoiceType === 'fee'" x-cloak>
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Fee Type <span class="text-danger">*</span></label>
-                            <x-he-select name="fee_type" icon="wand-magic-sparkles" :submit="false"
-                                :selected="'semester'"
+                            <x-he-select name="fee_type" compact :submit="false" :selected="'semester'"
                                 :options="['semester' => 'Semester Fee (6x Rent)', 'yearly' => 'Yearly Fee (12x Rent)', 'custom' => 'Custom Auto Fee']" />
                         </div>
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount Override</label>
+                        <div :class="invoiceType === 'fee' ? 'col-md-6' : 'col-12'" class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                                <span x-text="invoiceType === 'fee' ? 'Amount Override' : 'Amount'"></span>
+                                <span class="text-danger" x-show="invoiceType !== 'fee'">*</span>
+                            </label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light text-muted fw-bold">₹</span>
-                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5" min="1" step="0.01" placeholder="Auto">
+                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5"
+                                    :required="invoiceType !== 'fee'" min="1" step="0.01" :placeholder="invoiceType === 'fee' ? 'Auto' : ''">
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
                         <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Fall Semester Fee">
                     </div>
-                    
+
                     <div class="mb-2">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date</label>
                         <input type="date" name="due_date" class="form-control bg-light">
                     </div>
                 </div>
-                
+
                 <div class="custom-overlay-footer bg-light">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="feeModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-wand-magic-sparkles me-2"></i> Generate Fee</button>
-                </div>
-            </form>
-        </div>
-    </template>
-
-    <!-- Ultra-Premium Add Invoice Modal (Teleported inside x-data) -->
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="invoiceModalOpen" x-transition.opacity @click="invoiceModalOpen = false" x-cloak style="display: none;">
-            
-            <form method="POST" action="{{ route('admin.invoices.store') }}" class="custom-overlay-modal" :class="{ 'is-open': invoiceModalOpen }" x-show="invoiceModalOpen" x-transition.opacity @click.stop style="display: none;">
-                @csrf
-                
-                <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i> New Invoice</h5>
-                    <button type="button" class="btn-close" @click="invoiceModalOpen = false"></button>
-                </div>
-                
-                <div class="custom-overlay-body">
-                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Student Details</h6>
-                    <!-- Searchable Select for Students -->
-                    <div class="mb-4" x-data="searchableSelect({
-                        options: [
-                            @foreach($students as $student)
-                            { value: '{{ $student->id }}', label: '{{ addslashes($student->name) }} ({{ $student->mobile }})' },
-                            @endforeach
-                        ]
-                    })">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
-                        <input type="hidden" name="student_id" :value="value" required>
-                        <div class="position-relative">
-                            <button type="button" class="form-control bg-light text-start d-flex justify-content-between align-items-center" @click="open = !open">
-                                <span x-text="selectedLabel" :class="{'text-muted': !value}"></span>
-                                <div>
-                                    <i x-show="value" class="fa-solid fa-xmark text-muted small me-2 cursor-pointer" @click.stop="clearOption()" style="cursor:pointer;" title="Clear"></i>
-                                    <i class="fa-solid fa-chevron-down text-muted small"></i>
-                                </div>
-                            </button>
-                            
-                            <div x-show="open" @click.outside="open = false" class="position-absolute w-100 bg-white border rounded shadow mt-1 z-3" style="max-height: 250px; overflow-y: auto; display: none;" x-transition>
-                                <div class="p-2 border-bottom sticky-top bg-white">
-                                    <input type="text" x-model="search" x-ref="searchInput" class="form-control form-control-sm bg-light" placeholder="Search student...">
-                                </div>
-                                <div class="list-group list-group-flush">
-                                    <template x-for="opt in filteredOptions" :key="opt.value">
-                                        <button type="button" class="list-group-item list-group-item-action py-2" @click="selectOption(opt.value)" x-text="opt.label"></button>
-                                    </template>
-                                    <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No students found</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="border-secondary opacity-10 my-4">
-                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Invoice Details</h6>
-
-                    <div class="row gx-3">
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Type <span class="text-danger">*</span></label>
-                            <x-he-select name="type" icon="tags" :submit="false" :selected="'fee'"
-                                :options="['fee' => 'Hostel Fee', 'rent' => 'Monthly Rent', 'ac' => 'AC Bill', 'other' => 'Other/Fine']" />
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
-                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5" required min="1" step="0.01">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
-                        <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Broken chair fine">
-                    </div>
-                    
-                    <div class="mb-2">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date (Optional)</label>
-                        <input type="date" name="due_date" class="form-control bg-light">
-                    </div>
-                </div>
-                
-                <div class="custom-overlay-footer bg-light">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="invoiceModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i> Create Invoice</button>
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="chargeModalOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                        <i class="fa-solid fa-check me-2"></i>
+                        <span x-text="invoiceType === 'fee' ? 'Generate Fee' : 'Create Invoice'"></span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -434,8 +349,8 @@ document.addEventListener('alpine:init', () => {
         tab: '{{ request("tab", "invoices") }}',
         search: '',
         status: '',
-        invoiceModalOpen: false,
-        feeModalOpen: false,
+        chargeModalOpen: false,
+        invoiceType: 'fee',
         noInvoiceResults: false,
         noPaymentResults: false,
         
@@ -492,43 +407,6 @@ document.addEventListener('alpine:init', () => {
             });
         }
     }));
-
-    // Searchable Select Component (for Modal)
-    if (!Alpine.data('searchableSelect')) {
-        Alpine.data('searchableSelect', (config) => ({
-            open: false,
-            search: '',
-            value: '',
-            options: config.options,
-            
-            get filteredOptions() {
-                if (this.search === '') return this.options;
-                return this.options.filter(opt => opt.label.toLowerCase().includes(this.search.toLowerCase()));
-            },
-            get selectedLabel() {
-                const selected = this.options.find(opt => opt.value == this.value);
-                return selected ? selected.label : '— Select —';
-            },
-            selectOption(val) {
-                this.value = val;
-                this.open = false;
-                this.search = '';
-            },
-            clearOption() {
-                this.value = '';
-                this.search = '';
-            },
-            init() {
-                this.$watch('open', val => {
-                    if(val) {
-                        this.$nextTick(() => { this.$refs.searchInput.focus(); });
-                    } else {
-                        this.search = '';
-                    }
-                });
-            }
-        }));
-    }
 });
 </script>
 @endpush

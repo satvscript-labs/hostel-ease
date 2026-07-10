@@ -64,4 +64,49 @@ class StudentTest extends TestCase
         $this->assertSame(1, Student::count());
         $this->assertSame('My Student', Student::first()->name);
     }
+
+    public function test_fee_settings_update_returns_json_when_requested(): void
+    {
+        // Matches the Property Board's fee-plan gate, which fetch()es this
+        // endpoint with an XHR (Accept: application/json) instead of a
+        // normal form submission.
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Gate Test',
+            'mobile' => '9222222222', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $this->actingAs($this->admin)->putJson(route('admin.students.fee-settings.update', $student), [
+            'fee_frequency' => 'monthly',
+            'fee_amount' => 6000,
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $student->refresh();
+        $this->assertSame('monthly', $student->fee_frequency);
+        $this->assertEquals(6000, (float) $student->fee_amount);
+    }
+
+    public function test_fee_settings_update_returns_json_validation_errors(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Gate Test 2',
+            'mobile' => '9333333333', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $this->actingAs($this->admin)->putJson(route('admin.students.fee-settings.update', $student), [
+            'fee_frequency' => 'monthly',
+            // fee_amount omitted — required.
+        ])->assertStatus(422)->assertJsonValidationErrors('fee_amount');
+
+        $student->refresh();
+        $this->assertNull($student->fee_frequency);
+    }
+
+    public function test_fee_settings_update_still_redirects_for_normal_form_submission(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Gate Test 3',
+            'mobile' => '9444444444', 'occupation_type' => 'student', 'status' => 'active']);
+
+        // Matches the existing "Change Fee & Room Plan" modal on the student
+        // profile, which still submits as a normal (non-AJAX) form.
+        $this->actingAs($this->admin)->put(route('admin.students.fee-settings.update', $student), [
+            'fee_frequency' => 'yearly',
+            'fee_amount' => 50000,
+        ])->assertRedirect(route('admin.students.show', $student));
+    }
 }

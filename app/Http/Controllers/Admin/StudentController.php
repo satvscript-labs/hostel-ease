@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\PaymentService;
 use App\Services\ImageService;
 use App\Services\StorageService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -265,7 +266,7 @@ class StudentController extends Controller
         return response()->json($preview);
     }
 
-    public function updateFeeSettings(Request $request, Student $student, \App\Services\ProrationService $prorationService): RedirectResponse
+    public function updateFeeSettings(Request $request, Student $student, \App\Services\ProrationService $prorationService): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'room_preference' => ['nullable', 'string', 'in:AC,Non-AC'],
@@ -277,6 +278,11 @@ class StudentController extends Controller
         // If the student already has an invoice, we use ProrationService to handle the change
         if ($student->invoices()->count() > 0) {
             $prorationService->apply($student, $data);
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true]);
+            }
+
             return redirect()->route('admin.students.show', $student)
                 ->with('success', 'Plan changed and prorated invoice generated successfully.');
         }
@@ -309,6 +315,10 @@ class StudentController extends Controller
         }
 
         $this->logger->log('student.fee_settings', "Updated fee settings for {$student->name}", $student);
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Fee settings updated successfully.');
