@@ -683,6 +683,46 @@ body {
     font-weight: 700;
 }
 
+/* --- Sharing save button — appears only once the stepper's value diverges
+   from what's actually saved, so a value change is a deliberate, single
+   request (click) rather than an implicit one fired on every +/- tap. */
+.sharing-save-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--he-primary);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out-expo);
+    box-shadow: 0 2px 10px rgba(79, 70, 229, 0.25);
+}
+.sharing-save-btn:hover {
+    transform: scale(1.08);
+}
+.sharing-save-btn:active {
+    transform: scale(0.92);
+}
+.sharing-save-btn:disabled {
+    cursor: wait;
+    opacity: 0.85;
+}
+.sharing-save-btn.is-saved {
+    background: #10b981;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+}
+@keyframes he-save-pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.sharing-save-btn.is-saved i {
+    animation: he-save-pop 0.35s var(--ease-out-expo);
+}
+
 /* --- Premium Select (replaces raw <select> — see <x-he-select>) ---
    Two variants via modifier class:
      .he-select--status  → inline status pill (color reflects current value)

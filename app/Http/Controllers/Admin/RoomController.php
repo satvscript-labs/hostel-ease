@@ -10,6 +10,7 @@ use App\Services\ActivityLogger;
 use App\Services\BedGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class RoomController extends Controller
@@ -47,9 +48,12 @@ class RoomController extends Controller
 
     public function store(StoreRoomRequest $request)
     {
-        $room = Room::create($request->validated());
+        [$room, $result] = DB::transaction(function () use ($request) {
+            $room = Room::create($request->validated());
 
-        $result = $this->bedGenerator->sync($room);
+            return [$room, $this->bedGenerator->sync($room)];
+        });
+
         $this->logger->log('room.create', "Created room {$room->room_number} ({$result['created']} beds)", $room);
 
         if ($request->wantsJson()) {
@@ -73,9 +77,16 @@ class RoomController extends Controller
 
     public function update(StoreRoomRequest $request, Room $room)
     {
-        $room->update($request->validated());
+        // Atomic: if bed sync fails partway (e.g. a concurrent request already
+        // claimed a bed number), the room's own sharing/type change rolls back
+        // with it — otherwise the room record can end up reporting a sharing
+        // count its actual beds don't match.
+        $result = DB::transaction(function () use ($request, $room) {
+            $room->update($request->validated());
 
-        $result = $this->bedGenerator->sync($room);
+            return $this->bedGenerator->sync($room);
+        });
+
         $this->logger->log('room.update', "Updated room {$room->room_number}", $room);
 
         if ($request->wantsJson()) {

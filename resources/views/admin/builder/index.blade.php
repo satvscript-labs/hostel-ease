@@ -282,7 +282,7 @@
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
                                 </div>
-                                
+
                                 <div class="mb-4">
                                     <div class="text-muted small fw-bold text-uppercase mb-2">Room Type</div>
                                     <div class="smart-toggle">
@@ -290,13 +290,24 @@
                                         <div class="smart-toggle-btn" :class="{'active': room.room_type === 'non_ac'}" @click="room.room_type = 'non_ac'; updateRoomDebounced(room)">Non-AC</div>
                                     </div>
                                 </div>
-                                
+
                                 <div>
                                     <div class="text-muted small fw-bold text-uppercase mb-2">Sharing Capacity</div>
-                                    <div class="sharing-control">
-                                        <button class="sharing-btn" @click="if(room.sharing > 1) { room.sharing--; updateRoomDebounced(room); }"><i class="fa-solid fa-minus"></i></button>
-                                        <div class="fw-bold fs-5 mx-2" style="width: 20px; text-align: center;" x-text="room.sharing"></div>
-                                        <button class="sharing-btn" @click="if(room.sharing < maxSharing) { room.sharing++; updateRoomDebounced(room); }"><i class="fa-solid fa-plus"></i></button>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="sharing-control">
+                                            <button class="sharing-btn" @click="room._pendingSharing = Math.max(1, (room._pendingSharing ?? room.sharing) - 1)"><i class="fa-solid fa-minus"></i></button>
+                                            <div class="fw-bold fs-5 mx-2" style="width: 20px; text-align: center;" x-text="room._pendingSharing ?? room.sharing"></div>
+                                            <button class="sharing-btn" @click="room._pendingSharing = Math.min(maxSharing, (room._pendingSharing ?? room.sharing) + 1)"><i class="fa-solid fa-plus"></i></button>
+                                        </div>
+                                        <button type="button" class="sharing-save-btn"
+                                                x-show="(room._pendingSharing ?? room.sharing) !== room.sharing || room._justSaved"
+                                                x-transition.opacity
+                                                :class="{ 'is-saved': room._justSaved }"
+                                                :disabled="room._savingSharing"
+                                                :title="room._justSaved ? 'Saved' : 'Save sharing capacity'"
+                                                @click="saveSharing(room)">
+                                            <i class="fa-solid" :class="room._savingSharing ? 'fa-spinner fa-spin' : (room._justSaved ? 'fa-check' : 'fa-floppy-disk')" style="font-size: 0.75rem;"></i>
+                                        </button>
                                     </div>
                                 </div>
                                 
@@ -426,6 +437,21 @@ document.addEventListener('alpine:init', () => {
         newFloorName: '',
         isLoading: false,
         maxSharing: initialMaxSharing,
+
+        // Eagerly give every room its per-card UI state so Alpine tracks
+        // these props from the first render. Adding them lazily inside an
+        // async callback leaves the button's :disabled/spinner bindings
+        // un-tracked, so the spinner never clears when the save resolves.
+        init() {
+            this.floors.forEach(f => (f.rooms || []).forEach(r => this.normalizeRoom(r)));
+        },
+
+        normalizeRoom(room) {
+            if (room._pendingSharing === undefined) room._pendingSharing = room.sharing;
+            if (room._savingSharing === undefined) room._savingSharing = false;
+            if (room._justSaved === undefined) room._justSaved = false;
+            return room;
+        },
 
         alertModal: {
             show: false,
@@ -641,7 +667,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    this.activeFloor.rooms.push(data.room);
+                    this.activeFloor.rooms.push(this.normalizeRoom(data.room));
                 } else {
                     this.showAlert(data.message || 'Error adding room.', 'Error', 'error');
                 }
@@ -650,7 +676,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         updateRoomDebounceTimers: {},
-        
+        roomUpdateInFlight: {},
+
         updateRoomDebounced(room) {
             if (this.updateRoomDebounceTimers[room.id]) {
                 clearTimeout(this.updateRoomDebounceTimers[room.id]);
@@ -661,7 +688,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         async updateRoom(room) {
+            // Prevent concurrent updates to the same room (SQLite race condition).
+            if (this.roomUpdateInFlight[room.id]) return;
+
             this.isLoading = true;
+            this.roomUpdateInFlight[room.id] = true;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
             try {
                 const res = await fetch(`/admin/rooms/${room.id}`, {
                     method: 'PUT',
@@ -671,7 +706,8 @@ document.addEventListener('alpine:init', () => {
                         room_number: room.room_number,
                         room_type: room.room_type,
                         sharing: room.sharing
-                    })
+                    }),
+                    signal: controller.signal,
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -680,8 +716,52 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     this.showAlert(data.message || 'Validation error', 'Warning', 'warning');
                 }
-            } catch (e) { console.error(e); }
-            this.isLoading = false;
+            } catch (e) {
+                console.error(e);
+                if (e.name === 'AbortError') {
+                    this.showAlert('Save timed out — the server took too long to respond.', 'Error', 'error');
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                this.isLoading = false;
+                this.roomUpdateInFlight[room.id] = false;
+            }
+        },
+
+        async saveSharing(room) {
+            // Explicit save — the stepper only edits room._pendingSharing, so
+            // one request fires per click regardless of how many +/- taps.
+            if (room._savingSharing) return;
+
+            const target = room._pendingSharing ?? room.sharing;
+            room._savingSharing = true;
+
+            try {
+                const res = await fetch(`/admin/rooms/${room.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({
+                        floor_id: room.floor_id,
+                        room_number: room.room_number,
+                        room_type: room.room_type,
+                        sharing: target
+                    }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    Object.assign(room, data.room);
+                    room._pendingSharing = room.sharing;
+                    room._justSaved = true;
+                    setTimeout(() => { room._justSaved = false; }, 1200);
+                } else {
+                    this.showAlert(data.message || 'Could not save sharing capacity.', 'Warning', 'warning');
+                }
+            } catch (e) {
+                console.error(e);
+                this.showAlert('Could not save sharing capacity — please try again.', 'Error', 'error');
+            } finally {
+                room._savingSharing = false;
+            }
         },
 
         deleteRoom(id) {
