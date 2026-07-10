@@ -11,10 +11,7 @@
             <p class="text-secondary">{{ __('Manage invoices, due balances, and transactions in one place.') }}</p>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm text-primary border" @click="invoiceType = 'fee'; chargeModalOpen = true">
-                <i class="fa-solid fa-wand-magic-sparkles me-1"></i> {{ __('Generate Fee') }}
-            </button>
-            <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;" @click="invoiceType = 'other'; chargeModalOpen = true">
+            <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm" style="background: var(--he-primary); color: #fff;" @click="openModal()">
                 <i class="fa-solid fa-plus me-1"></i> {{ __('New Invoice') }}
             </button>
         </div>
@@ -251,85 +248,141 @@
         </div>
     </div>
 
-    {{-- Unified Charge Modal — one dynamic form covering both "Generate Fee"
-         (auto-calculated from room rent) and "New Invoice" (manual amount,
-         any type). Submits to whichever backend endpoint fits the selected
-         type; both stay exactly as they were, this is a frontend merge. --}}
-    @php
-        $studentOptions = $students->mapWithKeys(fn ($s) => [$s->id => "{$s->name} ({$s->mobile})"]);
-    @endphp
+    {{-- Unified "New Invoice" modal. One cohesive flow: pick a charge type,
+         and for Hostel Fee pick a fee type that filters the inline student
+         picker by fee_frequency (null-frequency students show in every filter),
+         auto-filling the amount from the chosen student's fee_amount. Submits
+         to generate-fee for fees and invoices.store for everything else —
+         both backend endpoints stay exactly as they are. --}}
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="chargeModalOpen" x-transition.opacity @click="chargeModalOpen = false" x-cloak style="display: none;">
 
-            <form method="POST" :action="invoiceType === 'fee' ? '{{ route('admin.finance.generate-fee') }}' : '{{ route('admin.invoices.store') }}'" class="custom-overlay-modal" :class="{ 'is-open': chargeModalOpen }" x-show="chargeModalOpen" x-transition.opacity @click.stop style="display: none;">
+            <form method="POST" :action="invoiceType === 'fee' ? '{{ route('admin.finance.generate-fee') }}' : '{{ route('admin.invoices.store') }}'" class="custom-overlay-modal" :class="{ 'is-open': chargeModalOpen }" x-show="chargeModalOpen" x-transition.opacity @click.stop @submit="onSubmit" style="display: none;">
                 @csrf
                 <input type="hidden" name="type" :value="invoiceType">
+                <input type="hidden" name="student_id" :value="studentId">
+                <input type="hidden" name="fee_type" :value="feeType" x-show="invoiceType === 'fee'">
 
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0">
-                        <i class="fa-solid" :class="invoiceType === 'fee' ? 'fa-wand-magic-sparkles' : 'fa-file-invoice-dollar'" style="color: var(--he-primary);"></i>
-                        <span x-text="invoiceType === 'fee' ? 'Generate Fee' : 'New Invoice'" class="ms-1"></span>
+                        <i class="fa-solid fa-file-invoice-dollar" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">New Invoice</span>
                     </h5>
                     <button type="button" class="btn-close" @click="chargeModalOpen = false"></button>
                 </div>
 
                 <div class="custom-overlay-body">
-                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start" x-show="invoiceType === 'fee'" x-cloak>
-                        <i class="fa-solid fa-circle-info fs-5 mt-1"></i>
-                        <div class="small">
-                            <strong>Automated Fee Generation:</strong> The system will automatically calculate the fee amount based on the student's current room assignment. Specify a custom amount to override.
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Student <span class="text-danger">*</span></label>
-                        <x-he-select name="student_id" searchable compact placeholder="Search a student..."
-                            :options="$studentOptions" :submit="false" />
-                    </div>
-
+                    {{-- Charge Type --}}
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Charge Type <span class="text-danger">*</span></label>
                         <div class="chip-group">
-                            <button type="button" class="chip" :class="{ active: invoiceType === 'fee' }" @click="invoiceType = 'fee'">Hostel Fee</button>
-                            <button type="button" class="chip" :class="{ active: invoiceType === 'rent' }" @click="invoiceType = 'rent'">Monthly Rent</button>
-                            <button type="button" class="chip" :class="{ active: invoiceType === 'ac' }" @click="invoiceType = 'ac'">AC Bill</button>
-                            <button type="button" class="chip" :class="{ active: invoiceType === 'other' }" @click="invoiceType = 'other'">Other / Fine</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'fee' }" @click="setChargeType('fee')">Hostel Fee</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'rent' }" @click="setChargeType('rent')">Monthly Rent</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'ac' }" @click="setChargeType('ac')">AC Bill</button>
+                            <button type="button" class="chip" :class="{ active: invoiceType === 'other' }" @click="setChargeType('other')">Other / Fine</button>
                         </div>
                     </div>
 
-                    <div class="row gx-3">
-                        <div class="col-md-6 mb-4" x-show="invoiceType === 'fee'" x-cloak>
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Fee Type <span class="text-danger">*</span></label>
-                            <x-he-select name="fee_type" compact :submit="false" :selected="'semester'"
-                                :options="['semester' => 'Semester Fee (6x Rent)', 'yearly' => 'Yearly Fee (12x Rent)', 'custom' => 'Custom Auto Fee']" />
+                    {{-- Fee Type (fee charge only) — drives the student filter --}}
+                    <div class="mb-4" x-show="invoiceType === 'fee'" x-cloak>
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Fee Type <span class="text-danger">*</span></label>
+                        <div class="chip-group">
+                            <button type="button" class="chip" :class="{ active: feeType === 'semester' }" @click="setFeeType('semester')">Semester <span class="opacity-75">· 6× rent</span></button>
+                            <button type="button" class="chip" :class="{ active: feeType === 'yearly' }" @click="setFeeType('yearly')">Yearly <span class="opacity-75">· 12× rent</span></button>
+                            <button type="button" class="chip" :class="{ active: feeType === 'custom' }" @click="setFeeType('custom')">Custom</button>
                         </div>
-                        <div :class="invoiceType === 'fee' ? 'col-md-6' : 'col-12'" class="mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">
-                                <span x-text="invoiceType === 'fee' ? 'Amount Override' : 'Amount'"></span>
-                                <span class="text-danger" x-show="invoiceType !== 'fee'">*</span>
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
-                                <input type="number" name="amount" class="form-control bg-light fw-bold text-dark fs-5"
-                                    :required="invoiceType !== 'fee'" min="1" step="0.01" :placeholder="invoiceType === 'fee' ? 'Auto' : ''">
+                    </div>
+
+                    {{-- Student inline picker --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-flex align-items-center gap-2 mb-2">
+                            <span>Student <span class="text-danger">*</span></span>
+                            <span class="badge rounded-pill" style="background: var(--he-primary-soft); color: var(--he-primary);"
+                                  x-show="invoiceType === 'fee' && feeType" x-cloak x-text="feeTypeLabel + ' students only'"></span>
+                        </label>
+
+                        <div class="he-picker" :class="{ 'is-open': pickerOpen }" @click.outside="pickerOpen = false">
+                            <button type="button" class="he-picker-trigger" @click="togglePicker()" :disabled="invoiceType === 'fee' && !feeType">
+                                <template x-if="selectedStudent">
+                                    <span class="d-flex align-items-center gap-2 text-truncate">
+                                        <span class="he-picker-avatar" style="width: 28px; height: 28px; font-size: 0.8rem;" x-text="selectedStudent.name.charAt(0).toUpperCase()"></span>
+                                        <span class="fw-semibold text-dark text-truncate" x-text="selectedStudent.name"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!selectedStudent">
+                                    <span class="text-muted" x-text="(invoiceType === 'fee' && !feeType) ? 'Select fee type first' : 'Choose a student…'"></span>
+                                </template>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+
+                            <div class="he-picker-panel" x-show="pickerOpen" x-transition.opacity x-cloak style="display: none;">
+                                <div class="he-picker-search">
+                                    <input type="text" x-model="studentSearch" x-ref="studentSearch"
+                                           class="form-control form-control-sm bg-light border-0" placeholder="Search name or mobile…">
+                                </div>
+                                <div class="he-picker-list">
+                                    <template x-for="s in filteredStudents" :key="s.id">
+                                        <button type="button" class="he-picker-option" @click="selectStudent(s)">
+                                            <span class="he-picker-avatar" x-text="s.name.charAt(0).toUpperCase()"></span>
+                                            <span class="flex-grow-1" style="min-width: 0;">
+                                                <span class="d-block fw-bold text-dark text-truncate" x-text="s.name"></span>
+                                                <span class="d-block small text-muted text-truncate" x-text="s.mobile"></span>
+                                            </span>
+                                            <span class="badge rounded-pill flex-shrink-0"
+                                                  :class="s.fee_frequency ? 'text-bg-light border' : 'bg-secondary-subtle text-secondary'"
+                                                  x-text="s.fee_frequency || 'no plan'"></span>
+                                        </button>
+                                    </template>
+                                    <div class="he-picker-empty" x-show="filteredStudents.length === 0">
+                                        <span x-show="invoiceType === 'fee' && !feeType">Select a fee type first</span>
+                                        <span x-show="!(invoiceType === 'fee' && !feeType)">No students match</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
-                        <input type="text" name="title" class="form-control bg-light" required placeholder="e.g. Fall Semester Fee">
+                    {{-- Auto-calc info alert — only for auto-fill types (fee/rent), and only
+                         while the field still holds the untouched auto value. --}}
+                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start" x-show="showAutoAlert" x-cloak>
+                        <i class="fa-solid fa-wand-magic-sparkles fs-5 mt-1"></i>
+                        <div class="small">
+                            <strong>Auto-calculated.</strong> The amount was filled from <span x-text="selectedStudent ? selectedStudent.name : 'the student'"></span>'s saved fee plan. Edit it below to override.
+                        </div>
                     </div>
 
+                    {{-- Amount + Due Date --}}
+                    <div class="row gx-3">
+                        <div class="col-md-7 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                                <span>Amount</span>
+                                <span class="text-danger" x-show="invoiceType !== 'fee'">*</span>
+                                <span class="text-secondary text-lowercase fw-normal" x-show="isAutoAmountType" x-cloak x-text="autoAmountHint"></span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                                <input type="number" name="amount" x-model="amount" @input="amountAutoFilled = false"
+                                    class="form-control bg-light fw-bold text-dark"
+                                    :required="invoiceType !== 'fee'" min="1" step="0.01"
+                                    :placeholder="isAutoAmountType ? 'Auto' : '0.00'">
+                            </div>
+                        </div>
+                        <div class="col-md-5 mb-4">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date</label>
+                            <input type="date" name="due_date" class="form-control bg-light">
+                        </div>
+                    </div>
+
+                    {{-- Title --}}
                     <div class="mb-2">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Due Date</label>
-                        <input type="date" name="due_date" class="form-control bg-light">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Title / Description <span class="text-danger">*</span></label>
+                        <input type="text" name="title" x-model="title" class="form-control bg-light" required placeholder="e.g. Fall Semester Fee">
                     </div>
                 </div>
 
                 <div class="custom-overlay-footer bg-light">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="chargeModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :disabled="!studentId">
                         <i class="fa-solid fa-check me-2"></i>
                         <span x-text="invoiceType === 'fee' ? 'Generate Fee' : 'Create Invoice'"></span>
                     </button>
@@ -349,11 +402,131 @@ document.addEventListener('alpine:init', () => {
         tab: '{{ request("tab", "invoices") }}',
         search: '',
         status: '',
-        chargeModalOpen: false,
-        invoiceType: 'fee',
         noInvoiceResults: false,
         noPaymentResults: false,
-        
+
+        // --- New Invoice modal state ---
+        chargeModalOpen: false,
+        invoiceType: 'fee',          // fee | rent | ac | other
+        feeType: '',                 // '' | semester | yearly | custom (fee charge only)
+        students: {{ Illuminate\Support\Js::from($students->map(fn ($s) => [
+            'id' => $s->id,
+            'name' => $s->name,
+            'mobile' => (string) $s->mobile,
+            'fee_frequency' => $s->fee_frequency,
+            'fee_amount' => $s->fee_amount !== null ? (float) $s->fee_amount : null,
+        ])->values()) }},
+        studentId: '',
+        studentSearch: '',
+        pickerOpen: false,
+        amount: '',
+        title: '',
+        amountAutoFilled: false,
+
+        get selectedStudent() {
+            return this.students.find(s => String(s.id) === String(this.studentId)) || null;
+        },
+
+        get feeTypeLabel() {
+            return this.feeType ? this.feeType.charAt(0).toUpperCase() + this.feeType.slice(1) : '';
+        },
+
+        // Hostel Fee and Monthly Rent are the only charge types that pull an
+        // amount from the student's saved fee plan — AC Bill / Other are always manual.
+        get isAutoAmountType() {
+            return this.invoiceType === 'fee' || this.invoiceType === 'rent';
+        },
+
+        get autoAmountHint() {
+            if (this.selectedStudent && this.selectedStudent.fee_amount) {
+                return `(auto: ₹${Number(this.selectedStudent.fee_amount).toLocaleString('en-IN')})`;
+            }
+            return '(auto-fills from student)';
+        },
+
+        // The info alert only makes sense while the field still holds the
+        // untouched auto value — hide it the instant the type changes or the
+        // amount is edited by hand.
+        get showAutoAlert() {
+            return this.isAutoAmountType && this.amountAutoFilled;
+        },
+
+        get filteredStudents() {
+            // Fee charge with no fee type chosen yet → nothing to show.
+            if (this.invoiceType === 'fee' && !this.feeType) return [];
+
+            let list = this.students;
+
+            // Fee charge → filter by frequency; null-frequency students show everywhere.
+            if (this.invoiceType === 'fee') {
+                list = list.filter(s => s.fee_frequency === this.feeType || s.fee_frequency === null);
+            }
+
+            const q = this.studentSearch.trim().toLowerCase();
+            if (q) {
+                list = list.filter(s => s.name.toLowerCase().includes(q) || s.mobile.includes(q));
+            }
+            return list;
+        },
+
+        openModal() {
+            this.invoiceType = 'fee';
+            this.feeType = '';
+            this.resetStudentAndAmount();
+            this.title = '';
+            this.chargeModalOpen = true;
+        },
+
+        setChargeType(type) {
+            if (this.invoiceType === type) return;
+            this.invoiceType = type;
+            if (type !== 'fee') this.feeType = '';
+            this.resetStudentAndAmount();
+        },
+
+        setFeeType(type) {
+            if (this.feeType === type) return;
+            this.feeType = type;
+            this.resetStudentAndAmount();
+        },
+
+        togglePicker() {
+            if (this.invoiceType === 'fee' && !this.feeType) return; // gated until fee type chosen
+            this.pickerOpen = !this.pickerOpen;
+            if (this.pickerOpen) this.$nextTick(() => this.$refs.studentSearch?.focus());
+        },
+
+        selectStudent(s) {
+            this.studentId = s.id;
+            this.studentSearch = '';
+            this.pickerOpen = false;
+            // Always set both explicitly — otherwise a re-pick that doesn't
+            // qualify for auto-fill would leave the previous student's stale
+            // amount/flag in place.
+            if (this.isAutoAmountType && s.fee_amount) {
+                this.amount = String(s.fee_amount);
+                this.amountAutoFilled = true;
+            } else {
+                this.amount = '';
+                this.amountAutoFilled = false;
+            }
+        },
+
+        resetStudentAndAmount() {
+            this.studentId = '';
+            this.studentSearch = '';
+            this.pickerOpen = false;
+            this.amount = '';
+            this.amountAutoFilled = false;
+        },
+
+        onSubmit(e) {
+            if (!this.studentId) {
+                e.preventDefault();
+                this.pickerOpen = true;
+            }
+        },
+
         matchesSearchInvoice(name, mobile, title, statusValue) {
             const q = this.search.toLowerCase().trim();
             const filterStatus = this.status;
