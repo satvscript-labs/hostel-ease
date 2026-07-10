@@ -140,6 +140,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::middleware('access:property')->group(function () {
                 Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
                 Route::post('floors/reorder', [FloorController::class, 'reorder'])->name('floors.reorder');
+                Route::patch('floors/sharing-settings', [FloorController::class, 'updateSharingSettings'])->name('floors.sharing-settings');
                 Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
                 Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
                 Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');

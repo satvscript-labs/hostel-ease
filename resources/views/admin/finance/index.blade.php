@@ -301,7 +301,7 @@
                                   x-show="invoiceType === 'fee' && feeType" x-cloak x-text="feeTypeLabel + ' students only'"></span>
                         </label>
 
-                        <div class="he-picker" :class="{ 'is-open': pickerOpen }" @click.outside="pickerOpen = false">
+                        <div class="he-picker" :class="{ 'is-open': pickerOpen }" @click.outside.capture="pickerOpen = false">
                             <button type="button" class="he-picker-trigger" @click="togglePicker()" :disabled="invoiceType === 'fee' && !feeType">
                                 <template x-if="selectedStudent">
                                     <span class="d-flex align-items-center gap-2 text-truncate">

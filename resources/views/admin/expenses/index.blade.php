@@ -108,7 +108,7 @@
                     <i class="fa-solid fa-chevron-down text-muted small ms-2 transition-all" :class="{'fa-chevron-up': categoryOpen}"></i>
                 </div>
                 
-                <div x-show="categoryOpen" @click.outside="categoryOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
+                <div x-show="categoryOpen" @click.outside.capture="categoryOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
                     <div class="list-group list-group-flush rounded-4 py-2">
                         <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-4 {{ request('category') == '' ? 'active bg-primary text-white fw-bold' : 'text-dark fw-medium' }}" @click="$refs.filterForm.category.value=''; $refs.filterForm.submit()">
                             <i class="fa-solid fa-layer-group me-2 {{ request('category') == '' ? '' : 'text-muted' }}"></i> All Categories

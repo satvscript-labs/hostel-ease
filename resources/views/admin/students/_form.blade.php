@@ -163,7 +163,7 @@
                             <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': occDropdown}"></i>
                         </div>
                         
-                        <div x-show="occDropdown" @click.outside="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
+                        <div x-show="occDropdown" @click.outside.capture="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
                             <div class="list-group list-group-flush rounded-4 py-2">
                                 @foreach(config('hostelease.occupation_types') as $k => $label)
                                 <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium" data-occ="{{ $k }}" :class="occupation === '{{ $k }}' ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="occupation = '{{ $k }}'; occDropdown = false;">

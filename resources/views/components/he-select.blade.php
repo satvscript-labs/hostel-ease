@@ -7,9 +7,22 @@
 
      variant: 'filter' (icon + micro-label pill) | 'status' (colored badge)
      compact: true renders a slim, native-select-height trigger instead of
-              the taller filter-pill — use inside dense forms/modals.
+              the taller filter-pill — use inside dense forms/modals. Also
+              caps the menu to the trigger's own width instead of a fixed
+              220px, so it never overflows a narrow grid column.
      searchable: true adds a search box inside the dropdown menu, for long
-                 option lists (e.g. picking a student). --}}
+                 option lists (e.g. picking a student).
+
+     Note: click.outside uses the .capture modifier, not plain .outside.
+     Modals wrap their form in @click.stop (so clicking inside doesn't close
+     the modal itself) — a plain, bubble-phase click.outside listener gets
+     swallowed by that stopPropagation() before it ever reaches document, so
+     the dropdown never closes. .capture runs before the click reaches its
+     target at all, so it fires regardless, and it also closes any other
+     open dropdown before a second one's own @click handler opens it (capture
+     goes top-down first). Keep this modifier on every hand-rolled dropdown
+     too — see the same fix applied to the .he-picker in
+     admin/finance/index.blade.php. --}}
 @props([
     'name',
     'options' => [], // filter: ['val' => 'Label']  |  status: ['val' => ['label' => .., 'color' => ..]]
@@ -62,7 +75,7 @@
         },
     }"
     :class="{ 'is-open': open }"
-    @click.outside="open = false"
+    @click.outside.capture="open = false"
 >
     <input type="hidden" name="{{ $name }}" x-model="value">
 
@@ -88,7 +101,7 @@
         </div>
     @endif
 
-    <div class="he-select-menu" x-show="open" x-transition.opacity x-cloak style="display: none;">
+    <div class="he-select-menu @if($compact) he-select-menu--compact @endif" x-show="open" x-transition.opacity x-cloak style="display: none;">
         @if($searchable)
             <div class="p-2 border-bottom">
                 <input type="text" x-model="search" x-ref="searchInput"

@@ -51,7 +51,12 @@ return [
         'non_ac' => 'Non AC',
     ],
 
-    'sharing_options' => [1, 2, 3, 4, 5, 6, 7],
+    // Fallback ceiling for room-sharing size until a hostel sets its own via
+    // the Layout Builder's "Room Settings" (stored per-hostel in hostels.settings).
+    'default_max_room_sharing' => 7,
+
+    // Hard sanity cap on what a hostel can set that ceiling to.
+    'max_room_sharing_limit' => 30,
 
     'bed_statuses' => [
         'empty' => ['label' => 'Empty', 'color' => '#22c55e'],

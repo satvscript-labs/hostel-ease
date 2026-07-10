@@ -354,7 +354,7 @@
 @endpush
 
 @section('content')
-<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false">
+<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), {{ (int) hostelease_max_room_sharing() }}, @js(hostelease_sharing_labels()))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false">
     
     <!-- Header -->
     <div class="pb-header flex-wrap gap-3">
@@ -552,46 +552,79 @@
          the bed assignment, no second click. -->
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="feeGate.open" x-transition.opacity @click="feeGate.open = false" x-cloak style="display: none;">
-            <form x-ref="feeGateForm" @submit.prevent="saveFeeGate()" class="custom-overlay-modal" :class="{ 'is-open': feeGate.open }" x-show="feeGate.open" x-transition.opacity @click.stop style="display: none; max-width: 420px;">
-                <div class="custom-overlay-header py-3">
-                    <div>
-                        <h6 class="fw-bold mb-0">Set Fee Plan</h6>
-                        <div class="small text-muted" x-text="feeGate.student ? feeGate.student.name : ''"></div>
-                    </div>
+            <form @submit.prevent="saveFeeGate()" class="custom-overlay-modal" :class="{ 'is-open': feeGate.open }" x-show="feeGate.open" x-transition.opacity @click.stop style="display: none; max-width: 480px;">
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">Set Fee Plan</span>
+                    </h5>
                     <button type="button" class="btn-close" @click="feeGate.open = false"></button>
                 </div>
-                <div class="custom-overlay-body py-3">
-                    <p class="small text-muted mb-3">No fee plan set for this student yet — set it to complete the assignment.</p>
-
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label small fw-bold mb-1">Room Preference</label>
-                            <x-he-select name="room_preference" compact x-ref="feeGateRoom" placeholder="Any"
-                                :options="['' => 'Any', 'AC' => 'AC', 'Non-AC' => 'Non-AC']" :submit="false" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small fw-bold mb-1">Sharing</label>
-                            <x-he-select name="sharing_preference" compact x-ref="feeGateSharing" placeholder="Any"
-                                :options="['' => 'Any', 'Single' => 'Single', 'Double' => 'Double', 'Triple' => 'Triple', 'Quad' => 'Quad']" :submit="false" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small fw-bold mb-1">Fee Structure <span class="text-danger">*</span></label>
-                            <x-he-select name="fee_frequency" compact x-ref="feeGateFreq" placeholder="Select"
-                                :options="['monthly' => 'Monthly', 'semester' => 'Semester', 'yearly' => 'Yearly']" :submit="false" />
-                            <div class="text-danger small mt-1" x-show="feeGate.errors.fee_frequency" x-text="feeGate.errors.fee_frequency && feeGate.errors.fee_frequency[0]"></div>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small fw-bold mb-1">Amount (₹) <span class="text-danger">*</span></label>
-                            <input type="number" name="fee_amount" x-ref="feeGateAmount" class="form-control form-control-sm" min="0" step="0.01" placeholder="0.00">
-                            <div class="text-danger small mt-1" x-show="feeGate.errors.fee_amount" x-text="feeGate.errors.fee_amount && feeGate.errors.fee_amount[0]"></div>
+                <div class="custom-overlay-body">
+                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start">
+                        <i class="fa-solid fa-circle-info fs-5 mt-1"></i>
+                        <div class="small">
+                            No fee plan set for <strong x-text="feeGate.student ? feeGate.student.name : 'this student'"></strong> yet — set it to complete the assignment.
                         </div>
                     </div>
+
+                    {{-- Room Preference --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Room Preference</label>
+                        <div class="chip-group">
+                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === '' }" @click="feeGate.form.room_preference = ''">Any</button>
+                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === 'AC' }" @click="feeGate.form.room_preference = 'AC'">AC</button>
+                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === 'Non-AC' }" @click="feeGate.form.room_preference = 'Non-AC'">Non-AC</button>
+                        </div>
+                    </div>
+
+                    {{-- Sharing — a stepper, not a chip list. Chips (or a scrolling chip
+                         strip) grow wider or need scrolling as the hostel's own room-
+                         sharing ceiling grows (see Layout Builder → Room Settings); a
+                         stepper's footprint never changes whether the range is 1–4 or
+                         1–40. Stepping below 1 lands on "Any". --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Sharing</label>
+                        <div class="sharing-control">
+                            <button type="button" class="sharing-btn" @click="feeGate.sharingValue = Math.max(0, feeGate.sharingValue - 1)">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <div class="sharing-readout">
+                                <div class="fs-6 fw-bold" x-show="feeGate.sharingValue === 0" x-text="'Any'"></div>
+                                <div class="fs-6 fw-bold" x-show="feeGate.sharingValue > 0" x-text="sharingLabels[feeGate.sharingValue - 1]"></div>
+                            </div>
+                            <button type="button" class="sharing-btn" @click="feeGate.sharingValue = Math.min(maxSharing, feeGate.sharingValue + 1)">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Fee Structure --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Fee Structure <span class="text-danger">*</span></label>
+                        <div class="chip-group">
+                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'monthly' }" @click="feeGate.form.fee_frequency = 'monthly'">Monthly</button>
+                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'semester' }" @click="feeGate.form.fee_frequency = 'semester'">Semester</button>
+                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'yearly' }" @click="feeGate.form.fee_frequency = 'yearly'">Yearly</button>
+                        </div>
+                        <div class="text-danger small mt-1" x-show="feeGate.errors.fee_frequency" x-text="feeGate.errors.fee_frequency && feeGate.errors.fee_frequency[0]"></div>
+                    </div>
+
+                    {{-- Amount --}}
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                            <input type="number" x-model="feeGate.form.fee_amount" class="form-control bg-light fw-bold text-dark" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="text-danger small mt-1" x-show="feeGate.errors.fee_amount" x-text="feeGate.errors.fee_amount && feeGate.errors.fee_amount[0]"></div>
+                    </div>
                 </div>
-                <div class="custom-overlay-footer py-2">
-                    <button type="button" class="btn btn-sm btn-light border fw-semibold rounded-pill px-3" @click="feeGate.open = false">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-semibold rounded-pill px-3 shadow-sm" :disabled="feeGate.saving">
-                        <span x-show="!feeGate.saving"><i class="fa-solid fa-check me-1"></i> Save &amp; Assign</span>
-                        <span x-show="feeGate.saving"><i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...</span>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="feeGate.open = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :disabled="feeGate.saving">
+                        <span x-show="!feeGate.saving"><i class="fa-solid fa-check me-2"></i>Save &amp; Assign</span>
+                        <span x-show="feeGate.saving"><i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...</span>
                     </button>
                 </div>
             </form>
@@ -767,11 +800,13 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('propertyBoard', (firstFloorId, studentsList) => ({
+    Alpine.data('propertyBoard', (firstFloorId, studentsList, maxSharing = 7, sharingLabels = []) => ({
         activeFloorId: firstFloorId,
         searchQuery: '',
         students: studentsList,
-        
+        maxSharing,
+        sharingLabels,
+
         spotlight: {
             open: false,
             query: '',
@@ -793,6 +828,8 @@ document.addEventListener('alpine:init', () => {
             student: null,
             saving: false,
             errors: {},
+            sharingValue: 0, // 0 = "Any"; 1..maxSharing indexes into sharingLabels
+            form: { room_preference: '', sharing_preference: '', fee_frequency: '', fee_amount: '' },
         },
         
         get filteredStudents() {
@@ -839,34 +876,28 @@ document.addEventListener('alpine:init', () => {
             this.feeGate.student = student;
             this.feeGate.errors = {};
             this.feeGate.saving = false;
+            this.feeGate.form = {
+                room_preference: student.room_preference || '',
+                sharing_preference: student.sharing_preference || '',
+                fee_frequency: student.fee_frequency || '',
+                fee_amount: student.fee_amount || '',
+            };
+            // Reverse-map the stored label back to the stepper's number; an
+            // unrecognized/legacy value (indexOf -1) safely falls back to "Any".
+            this.feeGate.sharingValue = student.sharing_preference
+                ? Math.max(0, this.sharingLabels.indexOf(student.sharing_preference) + 1)
+                : 0;
             this.feeGate.open = true;
-
-            this.$nextTick(() => {
-                const prefill = (ref, val) => {
-                    const el = this.$refs[ref];
-                    if (!el) return;
-                    const data = Alpine.$data(el);
-                    data.value = val || '';
-                    data.label = (val && data.opts[val]) ? data.opts[val].label : el.querySelector('.he-select-trigger')?.textContent.trim();
-                };
-                prefill('feeGateRoom', student.room_preference);
-                prefill('feeGateSharing', student.sharing_preference);
-                prefill('feeGateFreq', student.fee_frequency);
-                if (this.$refs.feeGateAmount) this.$refs.feeGateAmount.value = student.fee_amount || '';
-            });
         },
 
         async saveFeeGate() {
             this.feeGate.saving = true;
             this.feeGate.errors = {};
+            this.feeGate.form.sharing_preference = this.feeGate.sharingValue > 0
+                ? this.sharingLabels[this.feeGate.sharingValue - 1]
+                : '';
 
-            const fd = new FormData(this.$refs.feeGateForm);
-            const payload = {
-                room_preference: fd.get('room_preference') || '',
-                sharing_preference: fd.get('sharing_preference') || '',
-                fee_frequency: fd.get('fee_frequency') || '',
-                fee_amount: fd.get('fee_amount') || '',
-            };
+            const payload = { ...this.feeGate.form };
 
             try {
                 const res = await fetch(`/admin/students/${this.feeGate.student.id}/fee-settings`, {

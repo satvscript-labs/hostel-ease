@@ -64,7 +64,7 @@
                                     <span x-text="c_plan === 'yearly' ? 'Yearly' : (c_plan === 'monthly' ? 'Monthly' : 'Trial (14 Days)')" class="text-dark fw-bold"></span>
                                     <i class="fa-solid fa-chevron-down text-muted small"></i>
                                 </button>
-                                <div x-show="dropOpen" @click.outside="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
+                                <div x-show="dropOpen" @click.outside.capture="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
                                     <div @click="c_plan = 'yearly'; recalcCreate(); dropOpen = false" class="px-3 py-2 border-bottom hover-bg-light cursor-pointer">
                                         <div class="fw-bold" :class="c_plan === 'yearly' ? 'text-primary' : 'text-dark'">Yearly</div>
                                     </div>
@@ -94,7 +94,7 @@
                                     <span x-text="c_status === 'paid' ? 'Paid' : (c_status === 'pending' ? 'Pending' : 'Failed')" class="fw-bold" :class="c_status === 'paid' ? 'text-success' : (c_status === 'pending' ? 'text-warning' : 'text-danger')"></span>
                                     <i class="fa-solid fa-chevron-down text-muted small"></i>
                                 </button>
-                                <div x-show="dropOpen" @click.outside="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
+                                <div x-show="dropOpen" @click.outside.capture="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
                                     <div @click="c_status = 'paid'; dropOpen = false" class="px-3 py-2 border-bottom hover-bg-light cursor-pointer text-success fw-bold">Paid</div>
                                     <div @click="c_status = 'pending'; dropOpen = false" class="px-3 py-2 border-bottom hover-bg-light cursor-pointer text-warning fw-bold">Pending</div>
                                     <div @click="c_status = 'failed'; dropOpen = false" class="px-3 py-2 hover-bg-light cursor-pointer text-danger fw-bold">Failed</div>
@@ -178,7 +178,7 @@
                                     <span x-text="e_status === 'active' ? 'Active' : (e_status === 'expired' ? 'Expired' : 'Suspended')" class="fw-bold" :class="e_status === 'active' ? 'text-success' : (e_status === 'expired' ? 'text-danger' : 'text-warning')"></span>
                                     <i class="fa-solid fa-chevron-down text-muted small"></i>
                                 </button>
-                                <div x-show="dropOpen" @click.outside="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
+                                <div x-show="dropOpen" @click.outside.capture="dropOpen = false" x-transition class="position-absolute w-100 bg-white shadow-lg rounded-3 mb-1 overflow-hidden border" style="display: none; z-index: 1050; bottom: 100%; top: auto;">
                                     <div @click="e_status = 'active'; dropOpen = false" class="px-3 py-2 border-bottom hover-bg-light cursor-pointer text-success fw-bold">Active</div>
                                     <div @click="e_status = 'expired'; dropOpen = false" class="px-3 py-2 border-bottom hover-bg-light cursor-pointer text-danger fw-bold">Expired</div>
                                     <div @click="e_status = 'suspended'; dropOpen = false" class="px-3 py-2 hover-bg-light cursor-pointer text-warning fw-bold">Suspended</div>

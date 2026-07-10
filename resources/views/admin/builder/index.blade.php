@@ -142,29 +142,9 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     
-    .sharing-control {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        background: rgba(0,0,0,0.02);
-        padding: 0.5rem 1rem;
-        border-radius: 1rem;
-        border: 1px solid rgba(0,0,0,0.05);
-    }
-    .sharing-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: white;
-        border: 1px solid rgba(0,0,0,0.1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .sharing-btn:hover { background: var(--he-primary); color: white; border-color: var(--he-primary); }
-    
+    /* .sharing-control / .sharing-btn now live in _premium.scss — shared
+       with the Fee-Plan Gate's sharing-preference stepper. */
+
     .add-room-card {
         border: 2px dashed rgba(79, 70, 229, 0.3);
         background: rgba(79, 70, 229, 0.02);
@@ -200,16 +180,21 @@
 @endpush
 
 @section('content')
-<div x-data="layoutBuilder(@js($floors))" class="page-enter" @keydown.window.escape="addingFloor = false">
-    
+<div x-data="layoutBuilder(@js($floors), {{ (int) $maxSharing }})" class="page-enter" @keydown.window.escape="addingFloor = false">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 fw-bold mb-1">Smart Layout Builder</h1>
             <p class="text-muted mb-0">Design your hostel hierarchy instantly without page reloads.</p>
         </div>
-        <a href="{{ route('admin.property.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Property Board
-        </a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold" @click="openRoomSettings()">
+                <i class="fa-solid fa-sliders me-2"></i>Room Settings
+            </button>
+            <a href="{{ route('admin.property.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back to Property Board
+            </a>
+        </div>
     </div>
 
     <div class="builder-container">
@@ -311,7 +296,7 @@
                                     <div class="sharing-control">
                                         <button class="sharing-btn" @click="if(room.sharing > 1) { room.sharing--; updateRoomDebounced(room); }"><i class="fa-solid fa-minus"></i></button>
                                         <div class="fw-bold fs-5 mx-2" style="width: 20px; text-align: center;" x-text="room.sharing"></div>
-                                        <button class="sharing-btn" @click="if(room.sharing < 6) { room.sharing++; updateRoomDebounced(room); }"><i class="fa-solid fa-plus"></i></button>
+                                        <button class="sharing-btn" @click="if(room.sharing < maxSharing) { room.sharing++; updateRoomDebounced(room); }"><i class="fa-solid fa-plus"></i></button>
                                     </div>
                                 </div>
                                 
@@ -383,18 +368,64 @@
             </div>
         </div>
     </div>
+
+    <!-- Room Settings — the hostel's own ceiling on beds-per-room. Drives
+         the sharing stepper on every room card here, room-creation validation,
+         and the Fee-Plan Gate's sharing-preference stepper on the Property
+         Board — all read this one value, so raising it here is the only
+         thing that ever needs to happen to support bigger dorm-style rooms. -->
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="roomSettings.open" x-transition.opacity @click="roomSettings.open = false" x-cloak style="display: none;">
+            <div class="custom-overlay-modal" :class="{ 'is-open': roomSettings.open }" x-show="roomSettings.open" x-transition.opacity @click.stop style="display: none; max-width: 440px;">
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">Room Settings</span>
+                    </h5>
+                    <button type="button" class="btn-close" @click="roomSettings.open = false"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Maximum Sharing Capacity</label>
+                    <p class="small text-muted mb-3">The largest number of beds allowed in a single room. Raise this before adding bigger dorm-style rooms — every sharing picker across the app follows this ceiling automatically.</p>
+
+                    <div class="sharing-control">
+                        <button type="button" class="sharing-btn" @click="roomSettings.value = Math.max(1, roomSettings.value - 1)">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <div class="sharing-readout">
+                            <div class="fs-4" x-text="roomSettings.value"></div>
+                            <div class="small text-muted" x-text="roomSettings.value === 1 ? 'bed per room' : 'beds per room'"></div>
+                        </div>
+                        <button type="button" class="sharing-btn" @click="roomSettings.value = Math.min({{ (int) config('hostelease.max_room_sharing_limit', 30) }}, roomSettings.value + 1)">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <div class="text-danger small mt-2" x-show="roomSettings.error" x-text="roomSettings.error"></div>
+                </div>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="roomSettings.open = false">Cancel</button>
+                    <button type="button" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" @click="saveRoomSettings()" :disabled="roomSettings.saving">
+                        <span x-show="!roomSettings.saving"><i class="fa-solid fa-check me-2"></i>Save</span>
+                        <span x-show="roomSettings.saving"><i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 @endsection
 
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('layoutBuilder', (initialFloors) => ({
+    Alpine.data('layoutBuilder', (initialFloors, initialMaxSharing = 7) => ({
         floors: initialFloors,
         activeFloor: initialFloors.length > 0 ? initialFloors[0] : null,
         addingFloor: false,
         newFloorName: '',
         isLoading: false,
+        maxSharing: initialMaxSharing,
 
         alertModal: {
             show: false,
@@ -403,6 +434,52 @@ document.addEventListener('alpine:init', () => {
             type: 'info',
             isConfirm: false,
             onConfirm: null
+        },
+
+        roomSettings: {
+            open: false,
+            value: initialMaxSharing,
+            saving: false,
+            error: '',
+        },
+
+        openRoomSettings() {
+            this.roomSettings.value = this.maxSharing;
+            this.roomSettings.error = '';
+            this.roomSettings.open = true;
+        },
+
+        async saveRoomSettings() {
+            this.roomSettings.saving = true;
+            this.roomSettings.error = '';
+
+            try {
+                const res = await fetch('{{ route('admin.floors.sharing-settings') }}', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({ max_room_sharing: this.roomSettings.value }),
+                });
+
+                if (res.status === 422) {
+                    const data = await res.json();
+                    this.roomSettings.error = data.errors?.max_room_sharing?.[0] || 'Could not save — check the value.';
+                    this.roomSettings.saving = false;
+                    return;
+                }
+                if (!res.ok) throw new Error('Save failed');
+
+                this.maxSharing = this.roomSettings.value;
+                this.roomSettings.open = false;
+            } catch (e) {
+                console.error(e);
+                this.roomSettings.error = 'Something went wrong — please try again.';
+            } finally {
+                this.roomSettings.saving = false;
+            }
         },
 
         showAlert(message, title = 'Notice', type = 'info') {

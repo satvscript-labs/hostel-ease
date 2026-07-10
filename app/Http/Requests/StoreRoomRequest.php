@@ -27,7 +27,7 @@ class StoreRoomRequest extends FormRequest
                     ->ignore($roomId),
             ],
             'room_type' => ['required', Rule::in(array_keys(config('hostelease.room_types')))],
-            'sharing' => ['required', 'integer', Rule::in(config('hostelease.sharing_options'))],
+            'sharing' => ['required', 'integer', 'min:1', 'max:'.hostelease_max_room_sharing()],
         ];
     }
 

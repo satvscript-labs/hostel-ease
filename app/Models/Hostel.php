@@ -38,6 +38,16 @@ class Hostel extends Model
         return $this->registration_token;
     }
 
+    /**
+     * Largest number of beds this hostel allows in a single room, set via the
+     * Layout Builder's "Room Settings" panel. Falls back to the system
+     * default until an owner has configured their own.
+     */
+    public function maxRoomSharing(): int
+    {
+        return (int) ($this->settings['max_room_sharing'] ?? config('hostelease.default_max_room_sharing', 7));
+    }
+
     protected function casts(): array
     {
         return [

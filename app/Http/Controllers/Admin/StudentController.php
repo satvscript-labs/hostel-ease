@@ -270,7 +270,7 @@ class StudentController extends Controller
     {
         $data = $request->validate([
             'room_preference' => ['nullable', 'string', 'in:AC,Non-AC'],
-            'sharing_preference' => ['nullable', 'string', 'in:Single,Double,Triple,Quad'],
+            'sharing_preference' => ['nullable', 'string', Rule::in(hostelease_sharing_labels())],
             'fee_frequency' => ['required', 'string', 'in:monthly,semester,yearly'],
             'fee_amount' => ['required', 'numeric', 'min:0'],
         ]);

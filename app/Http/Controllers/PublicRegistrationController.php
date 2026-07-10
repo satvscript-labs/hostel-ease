@@ -61,6 +61,11 @@ class PublicRegistrationController extends Controller
             $data['photo'] = $this->storageService->store($processed['content'], 'registrations/photos', 'public', $processed['extension']);
         }
 
+        if ($request->hasFile('aadhaar_file')) {
+            $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1200, 1200, 85);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'registrations/aadhaar', 'public', $processed['extension']);
+        }
+
         StudentRegistration::create($data + ['hostel_id' => $hostel->id, 'status' => 'pending']);
 
         return view('public.register', ['hostel' => $hostel, 'token' => $token, 'submitted' => true]);

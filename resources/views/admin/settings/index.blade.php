@@ -499,7 +499,7 @@
                                 <i class="fa-solid fa-chevron-down text-muted small me-2 transition-all" :class="{'fa-chevron-up': roleOpen}"></i>
                             </div>
                             
-                            <div x-show="roleOpen" @click.outside="roleOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded shadow-lg mt-1 w-100" style="display: none; z-index: 1050; max-height: 200px; overflow-y: auto;">
+                            <div x-show="roleOpen" @click.outside.capture="roleOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded shadow-lg mt-1 w-100" style="display: none; z-index: 1050; max-height: 200px; overflow-y: auto;">
                                 <div class="list-group list-group-flush py-1">
                                     @foreach($roles as $roleKey => $roleName)
                                     <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 transition-all" 

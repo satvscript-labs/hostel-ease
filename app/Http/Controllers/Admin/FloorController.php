@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreFloorRequest;
 use App\Models\Floor;
+use App\Models\Hostel;
 use App\Services\ActivityLogger;
+use App\Support\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,7 +25,33 @@ class FloorController extends Controller
                 ->withCount(['beds', 'beds as occupied_beds_count' => fn ($q) => $q->where('status', 'occupied')])
             ])->get();
 
-        return view('admin.builder.index', compact('floors'));
+        $maxSharing = hostelease_max_room_sharing();
+
+        return view('admin.builder.index', compact('floors', 'maxSharing'));
+    }
+
+    /**
+     * The hostel's own ceiling on beds-per-room, set from the Layout
+     * Builder's "Room Settings" panel — everything downstream (room
+     * creation, the sharing stepper, fee-plan gate) reads this dynamically.
+     */
+    public function updateSharingSettings(Request $request)
+    {
+        $data = $request->validate([
+            'max_room_sharing' => ['required', 'integer', 'min:1', 'max:'.config('hostelease.max_room_sharing_limit', 30)],
+        ]);
+
+        $hostel = Hostel::findOrFail(Tenant::id());
+        $hostel->settings = array_merge($hostel->settings ?? [], ['max_room_sharing' => $data['max_room_sharing']]);
+        $hostel->save();
+
+        $this->logger->log('hostel.settings.update', "Set maximum room sharing to {$data['max_room_sharing']}", $hostel);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'max_room_sharing' => $data['max_room_sharing']]);
+        }
+
+        return back()->with('success', 'Room settings updated.');
     }
 
     public function reorder(Request $request)

@@ -146,6 +146,18 @@ By default, picking an option **submits the closest `<form>`** (matches the pre-
 
 **When *not* to use it:** if a dropdown's value needs to drive live client-side filtering bound to an external Alpine `x-data` scope (e.g. Finance Board's status filter, which uses `x-model="status"` on the page's own component), or if it needs type-ahead search over a long list (student pickers use a richer `searchableSelect` Alpine helper for this), leave it as a raw `<select>`/custom Alpine block — retrofitting those into `<x-he-select>` would change working behavior, not just appearance. A handful of these exist intentionally across the app; they are not an oversight.
 
+### 4.1 Every dropdown/popover must use `@click.outside.capture`, not plain `.outside`
+
+Any hand-rolled dropdown, popover, or inline picker (`x-show="open" @click.outside="open = false"` on the panel/wrapper) must use `@click.outside.capture`. Plain `.outside` is a bubble-phase listener on `document`; a lot of our modals wrap their `<form>` in `@click.stop` so clicking inside doesn't close the modal — and that `stopPropagation()` swallows the click before it ever reaches `document`, so the dropdown silently never closes when you click another field in the same modal. It also means two dropdowns in the same modal can end up open at once, since dropdown A never hears about the click that opened dropdown B.
+
+`.capture` fixes both: it runs during the capture phase, before the click reaches its target at all, so `stopPropagation()` called later during bubbling can't block it — and because capture goes top-down, dropdown A's outside-close fires *before* dropdown B's own `@click="open = true"` handler runs, so opening a new one correctly closes any other that's open, automatically, with no extra event bus needed.
+
+```blade
+<div x-show="open" @click.outside.capture="open = false" ...>
+```
+
+`<x-he-select>` already does this (see its docblock). Apply the same modifier to every new hand-rolled dropdown, and fix old ones opportunistically when you're already touching that file.
+
 ---
 
 ## 5. Standard Overlay Modals — use `<x-he-modal>`

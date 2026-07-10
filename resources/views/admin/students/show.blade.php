@@ -892,7 +892,7 @@
                             <label class="form-label fw-bold small">Sharing Preference</label>
                             <x-he-select name="sharing_preference" icon="users" :submit="false"
                                 :selected="$student->sharing_preference"
-                                :options="['' => 'Select sharing', 'Single' => 'Single Occupancy', 'Double' => 'Double Sharing', 'Triple' => 'Triple Sharing', 'Quad' => 'Quad Sharing']" />
+                                :options="['' => 'Select sharing'] + collect(hostelease_sharing_labels())->mapWithKeys(fn ($l) => [$l => $l])->all()" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small">Fee Structure</label>

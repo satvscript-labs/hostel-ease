@@ -93,6 +93,57 @@ if (! function_exists('normalize_phone')) {
     }
 }
 
+if (! function_exists('hostelease_sharing_label')) {
+    /**
+     * Human label for a room-sharing count. The first four have friendly
+     * names; beyond that we fall back to "{n} Sharing" so this scales
+     * indefinitely as a hostel raises its own ceiling past Quad.
+     */
+    function hostelease_sharing_label(int $n): string
+    {
+        return match ($n) {
+            1 => 'Single',
+            2 => 'Double',
+            3 => 'Triple',
+            4 => 'Quad',
+            default => "{$n} Sharing",
+        };
+    }
+}
+
+if (! function_exists('hostelease_max_room_sharing')) {
+    /**
+     * The active hostel's own room-sharing ceiling (see
+     * Hostel::maxRoomSharing(), set via the Layout Builder's "Room Settings"
+     * panel). Falls back to the system default outside a tenant context.
+     */
+    function hostelease_max_room_sharing(): int
+    {
+        $hostelId = \App\Support\Tenant::id();
+
+        $hostel = $hostelId ? \App\Models\Hostel::find($hostelId) : null;
+
+        return $hostel?->maxRoomSharing() ?? config('hostelease.default_max_room_sharing', 7);
+    }
+}
+
+if (! function_exists('hostelease_sharing_labels')) {
+    /**
+     * Ordered labels 1..max — the single source every sharing-preference
+     * picker (student profile, fee-plan gate) reads from, so raising a
+     * hostel's ceiling in Room Settings is the only thing that ever needs
+     * to change for every picker to grow with it.
+     */
+    function hostelease_sharing_labels(?int $max = null): array
+    {
+        $max ??= hostelease_max_room_sharing();
+
+        return collect(range(1, max(1, $max)))
+            ->map(fn ($n) => hostelease_sharing_label($n))
+            ->all();
+    }
+}
+
 if (! function_exists('hostelease_receipt_number')) {
     /**
      * Generate a unique receipt number for a hostel.
