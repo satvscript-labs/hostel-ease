@@ -69,7 +69,7 @@ class HostelService
 
             $this->seedPaymentModes($hostel);
 
-            app(\App\Services\BranchBillingService::class)->renewBranch($hostel, $data['plan'] ?? 'yearly', [
+            app(\App\Services\Billing\AccountBillingService::class)->recordBranchRenewal($hostel, $data['plan'] ?? 'yearly', [
                 'amount' => $data['amount'] ?? null,
                 'payment_status' => $data['payment_status'] ?? 'pending',
                 'payment_method' => $data['payment_method'] ?? null,

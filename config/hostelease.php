@@ -110,6 +110,15 @@ return [
         'monthly' => (float) env('hostelease_PRICE_MONTHLY', 1000),
     ],
 
+    // Free trial length (days) for a new account (per-account, BRD D5).
+    'trial_days' => (int) env('hostelease_TRIAL_DAYS', 14),
+
+    // Grace window (days) after the anchor date before access is hard-blocked (BR-18).
+    'grace_days' => (int) env('hostelease_GRACE_DAYS', 3),
+
+    // How manual + volume discounts combine: 'stack' (sequential) or 'greater' (best of the two).
+    'discount_stacking' => env('hostelease_DISCOUNT_STACKING', 'stack'),
+
     // Path to the mysqldump binary (XAMPP: D:\xampp\mysql\bin\mysqldump.exe).
     'dump_binary' => env('DB_DUMP_BINARY', 'mysqldump'),
 

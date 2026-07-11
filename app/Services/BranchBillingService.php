@@ -74,6 +74,7 @@ class BranchBillingService
                 'payment_status' => $payment['payment_status'] ?? 'pending',
                 'payment_method' => $payment['payment_method'] ?? null,
                 'transaction_number' => $payment['transaction_number'] ?? null,
+                'razorpay_order_id' => $payment['razorpay_order_id'] ?? null,
                 'remarks' => $payment['remarks'] ?? "Branch renewal · {$branch->name}",
             ]);
 

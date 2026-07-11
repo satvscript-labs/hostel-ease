@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Hostel;
 use App\Models\User;
+use App\Services\BranchBillingService;
 use App\Services\HostelService;
 use App\Support\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,9 +44,7 @@ class HostelProvisioningTest extends TestCase
 
         $response = $this->actingAs($super)->post(route('superadmin.hostels.store'), [
             'name' => 'HTTP Hostel', 'owner_name' => 'Owner', 'mobile' => '9000011111',
-            'subscription_start' => now()->toDateString(),
-            'subscription_end' => now()->addYear()->toDateString(),
-            'status' => 'active',
+            'plan' => 'yearly', 'status' => 'active',
         ]);
 
         $hostel = Hostel::where('name', 'HTTP Hostel')->firstOrFail();
@@ -58,9 +57,8 @@ class HostelProvisioningTest extends TestCase
         $hostel = Hostel::factory()->expired()->create();
         $this->assertSame('expired', $hostel->status);
 
-        app(HostelService::class)->createSubscription($hostel, [
-            'start_date' => now()->toDateString(),
-            'end_date' => now()->addYear()->toDateString(),
+        // A paid renewal reactivates the branch and extends coverage into the future.
+        app(BranchBillingService::class)->renewBranch($hostel, 'yearly', [
             'amount' => 5000, 'payment_status' => 'paid',
         ]);
 

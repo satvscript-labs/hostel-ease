@@ -20,6 +20,7 @@ class Subscription extends Model
         'payment_status',
         'payment_method',
         'transaction_number',
+        'razorpay_order_id',
         'remarks',
     ];
 

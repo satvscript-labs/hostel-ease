@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\Subscription;
 use App\Services\ActivityLogger;
+use App\Services\Billing\AccountBillingService;
 use App\Services\BranchBillingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class SubscriptionController extends Controller
 {
     public function __construct(
         protected BranchBillingService $billing,
+        protected AccountBillingService $accountBilling,
         protected ActivityLogger $logger,
     ) {
     }
@@ -89,7 +91,7 @@ class SubscriptionController extends Controller
 
         $branch = Hostel::findOrFail($data['branch_id']);
 
-        $subscription = $this->billing->renewBranch($branch, $data['period'], [
+        $subscription = $this->accountBilling->recordBranchRenewal($branch, $data['period'], [
             'amount' => $data['amount'],
             'payment_status' => $data['payment_status'],
             'payment_method' => $data['payment_method'] ?? null,
@@ -128,6 +130,7 @@ class SubscriptionController extends Controller
         if ($data['payment_status'] === 'paid') {
             $this->billing->syncBranchToSubscription($subscription->fresh());
         }
+        $this->accountBilling->syncLegacySubscription($subscription->fresh());
 
         $this->logger->log('subscription.update', "Edited subscription #{$subscription->id} ({$data['payment_status']})", $subscription);
 
@@ -139,6 +142,7 @@ class SubscriptionController extends Controller
     {
         $subscription->update(['payment_status' => 'paid']);
         $this->billing->syncBranchToSubscription($subscription->fresh());
+        $this->accountBilling->syncLegacySubscription($subscription->fresh());
 
         $this->logger->log('subscription.paid', 'Accepted payment '.hostelease_money($subscription->amount)." · {$subscription->hostel->name}", $subscription);
 
