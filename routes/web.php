@@ -26,7 +26,9 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\SuperAdmin\AccountController;
 use App\Http\Controllers\SuperAdmin\AdminController;
+use App\Http\Controllers\SuperAdmin\DiscountController;
 use App\Http\Controllers\SuperAdmin\BackupController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboard;
 use App\Http\Controllers\SuperAdmin\HostelController;
@@ -106,6 +108,24 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
         // --- Module 12: Hostels, Subscriptions, Admins ---
         Route::resource('hostels', HostelController::class);
+
+        // Customers / Accounts (account-level billing control terminal)
+        Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
+        Route::get('accounts/{account}', [AccountController::class, 'show'])->name('accounts.show');
+        Route::post('accounts/{account}/renew', [AccountController::class, 'renew'])->name('accounts.renew');
+        Route::post('accounts/{account}/add-branch', [AccountController::class, 'addBranch'])->name('accounts.add-branch');
+        Route::post('accounts/{account}/align', [AccountController::class, 'align'])->name('accounts.align');
+        Route::post('accounts/{account}/comp', [AccountController::class, 'comp'])->name('accounts.comp');
+        Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
+        Route::post('accounts/{account}/discounts', [AccountController::class, 'storeDiscount'])->name('accounts.discounts.store');
+        Route::delete('accounts/{account}/discounts/{discount}', [AccountController::class, 'revokeDiscount'])->name('accounts.discounts.revoke');
+
+        // Discounts management (volume tiers + manual discount overview)
+        Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
+        Route::post('discounts/rules', [DiscountController::class, 'storeRule'])->name('discounts.rules.store');
+        Route::put('discounts/rules/{rule}', [DiscountController::class, 'updateRule'])->name('discounts.rules.update');
+        Route::patch('discounts/rules/{rule}/toggle', [DiscountController::class, 'toggleRule'])->name('discounts.rules.toggle');
+        Route::delete('discounts/rules/{rule}', [DiscountController::class, 'destroyRule'])->name('discounts.rules.destroy');
 
         Route::get('subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::post('subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');

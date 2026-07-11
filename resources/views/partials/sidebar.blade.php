@@ -27,6 +27,10 @@
                 <span class="sidebar-link-icon"><i class="fa-solid fa-gauge-high"></i></span>
                 <span class="sidebar-link-label">{{ __('Dashboard') }}</span>
             </a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.accounts.*') ? 'is-active' : '' }}" href="{{ route('superadmin.accounts.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-users-gear"></i></span>
+                <span class="sidebar-link-label">{{ __('Customers') }}</span>
+            </a>
             <a class="sidebar-link {{ request()->routeIs('superadmin.hostels.*') ? 'is-active' : '' }}" href="{{ route('superadmin.hostels.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-hotel"></i></span>
                 <span class="sidebar-link-label">{{ __('Hostels') }}</span>
@@ -34,6 +38,10 @@
             <a class="sidebar-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'is-active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-receipt"></i></span>
                 <span class="sidebar-link-label">{{ __('Subscriptions') }}</span>
+            </a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.discounts.*') ? 'is-active' : '' }}" href="{{ route('superadmin.discounts.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-percent"></i></span>
+                <span class="sidebar-link-label">{{ __('Discounts') }}</span>
             </a>
             <a class="sidebar-link {{ request()->routeIs('superadmin.activity') ? 'is-active' : '' }}" href="{{ route('superadmin.activity') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-list-check"></i></span>

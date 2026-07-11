@@ -5,7 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\Student;
-use App\Models\Subscription;
+use App\Models\SubscriptionOrder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -20,8 +20,10 @@ class DashboardController extends Controller
                 ->orWhere('subscription_end', '<', now())->count(),
             'due_renewals' => Hostel::expiringWithin(30)->count(),
             'total_students' => Student::acrossHostels()->count(),
-            'total_income' => (float) Subscription::paid()->sum('amount'),
-            'monthly_revenue' => (float) Subscription::paid()
+            // Revenue reads from the account-level order ledger (every paid path
+            // writes an order), so consolidated Account 360 renewals are counted.
+            'total_income' => (float) SubscriptionOrder::paid()->sum('amount'),
+            'monthly_revenue' => (float) SubscriptionOrder::paid()
                 ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
                 ->sum('amount'),
         ];
@@ -34,7 +36,7 @@ class DashboardController extends Controller
         // Revenue + registrations for the last 12 months (grouped in PHP — DB-agnostic).
         $since = now()->subMonths(11)->startOfMonth();
 
-        $revenue = Subscription::paid()->where('created_at', '>=', $since)
+        $revenue = SubscriptionOrder::paid()->where('created_at', '>=', $since)
             ->get(['amount', 'created_at'])
             ->groupBy(fn ($s) => $s->created_at->format('Y-m'))
             ->map(fn ($g) => (float) $g->sum('amount'));
