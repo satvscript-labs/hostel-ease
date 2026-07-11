@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Notification;
 use App\Models\Student;
 use App\Models\StudentDocument;
+use App\Models\SubscriptionAccount;
 use App\Support\Tenant;
 
 /**
@@ -97,16 +98,25 @@ class NotificationService
 
     /**
      * Build renewal alerts for the Super Admin (hostel_id = null feed).
+     * Account-level (not per-branch): a renewal now covers every co-terminated
+     * branch on one anchor, so one alert per account avoids near-duplicate
+     * entries for multi-branch customers.
      */
     public function generateForSuperAdmin(): void
     {
-        foreach (Hostel::expiringWithin(30)->get() as $hostel) {
-            $days = $hostel->daysUntilExpiry();
-            $this->push(null, 'renewal_due', 'hostel:'.$hostel->id,
-                "Renewal due — {$hostel->name}",
-                "Subscription "
-                .($days < 0 ? 'expired' : "expires in {$days} day(s)").
-                ' ('.optional($hostel->subscription_end)->format('d M Y').').',
+        // One-time cleanup: pre-account-model alerts were keyed per-branch
+        // ('hostel:id'); drop any stale entries before regenerating per-account.
+        Notification::where('hostel_id', null)->where('type', 'renewal_due')
+            ->whereNull('read_at')->where('data->sig', 'like', 'hostel:%')->delete();
+
+        foreach (SubscriptionAccount::expiringWithin(30)->with('owner')->get() as $account) {
+            $days = $account->daysUntilAnchor();
+            $owner = $account->owner?->name ?? 'Unknown owner';
+            $this->push(null, 'renewal_due', 'account:'.$account->id,
+                "Renewal due — {$owner}",
+                'Subscription '
+                .($days < 0 ? 'expired' : "expires in {$days} day(s)")
+                .' ('.optional($account->current_period_end)->format('d M Y').').',
                 $days <= 7 ? 'danger' : 'warning');
         }
     }

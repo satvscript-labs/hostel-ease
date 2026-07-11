@@ -181,14 +181,81 @@ class AccountBillingService
     {
         $branches = $this->includedBranches($account);
         $anchor = $branches->max('subscription_end');
-        $anyActive = $branches->contains(fn (Hostel $b) => $b->isActive());
+        $resolvedPeriod = $period ?? $account->period ?? BillingPeriod::Yearly;
 
         $account->update([
             'current_period_start' => $account->current_period_start ?? $branches->min('subscription_start') ?? now(),
             'current_period_end' => $anchor,
-            'status' => ($anyActive ? AccountStatus::Active : AccountStatus::Expired)->value,
-            'period' => ($period?->value) ?? ($account->period?->value) ?? BillingPeriod::Yearly->value,
+            'status' => $this->computeStatus($account, $anchor, $resolvedPeriod)->value,
+            'period' => $resolvedPeriod->value,
         ]);
+    }
+
+    /**
+     * Effective account status given an anchor + the grace window (BR-18):
+     *  - Suspended is a manual override that only Reactivate clears — never
+     *    silently overwritten by a renewal/sync/daily refresh.
+     *  - No anchor yet → leave whatever the account already is (e.g. a fresh Trial).
+     *  - Anchor today or in the future → Trial (if the period is trial) or Active.
+     *  - Anchor passed, still within the grace window → Grace.
+     *  - Anchor passed beyond the grace window → Expired.
+     *
+     * Accepts optional overrides so callers computing a *new* anchor/period as
+     * part of the same write (renewAccount, addBranch, align) can resolve "what
+     * would status become under this anchor" without persisting first.
+     */
+    public function computeStatus(SubscriptionAccount $account, ?Carbon $anchor = null, ?BillingPeriod $period = null): AccountStatus
+    {
+        if ($account->status === AccountStatus::Suspended) {
+            return AccountStatus::Suspended;
+        }
+
+        $anchor = $anchor ?? $account->current_period_end;
+        if (! $anchor) {
+            return $account->status ?? AccountStatus::Trial;
+        }
+
+        $period = $period ?? $account->period ?? BillingPeriod::Yearly;
+        $today = Carbon::now()->startOfDay();
+        $anchorDay = $anchor->copy()->startOfDay();
+
+        if ($anchorDay->greaterThanOrEqualTo($today)) {
+            return $period === BillingPeriod::Trial ? AccountStatus::Trial : AccountStatus::Active;
+        }
+
+        $graceDays = (int) config('hostelease.grace_days', 0);
+        if ($today->lte($anchorDay->copy()->addDays($graceDays))) {
+            return AccountStatus::Grace;
+        }
+
+        return AccountStatus::Expired;
+    }
+
+    /** Manually suspend an account and cascade to every included branch (BR-18). */
+    public function suspend(SubscriptionAccount $account, string $reason): void
+    {
+        DB::transaction(function () use ($account, $reason) {
+            $account->update([
+                'status' => AccountStatus::Suspended->value,
+                'notes' => trim(($account->notes ? $account->notes."\n" : '')."Suspended: {$reason}"),
+            ]);
+
+            $this->includedBranches($account)->each(fn (Hostel $b) => $b->update(['status' => 'suspended']));
+        });
+    }
+
+    /** Lift a manual suspension and recompute the account's real lifecycle status from its anchor. */
+    public function reactivate(SubscriptionAccount $account): void
+    {
+        DB::transaction(function () use ($account) {
+            $this->includedBranches($account)->each(fn (Hostel $b) => $b->update(['status' => 'active']));
+
+            // Clear the in-memory Suspended flag so computeStatus() (called inside
+            // refreshAccountAnchor) derives the real status from the anchor instead
+            // of re-preserving Suspended.
+            $account->status = AccountStatus::Active;
+            $this->refreshAccountAnchor($account);
+        });
     }
 
     // -----------------------------------------------------------------
@@ -247,7 +314,7 @@ class AccountBillingService
                 'period' => $quote['period']->value,
                 'current_period_start' => $account->current_period_start ?? now(),
                 'current_period_end' => $anchor,
-                'status' => AccountStatus::Active->value,
+                'status' => $this->computeStatus($account, $anchor, $quote['period'])->value,
             ]);
 
             $this->discounts->consume($quote['breakdown']['manual_discount_id']);

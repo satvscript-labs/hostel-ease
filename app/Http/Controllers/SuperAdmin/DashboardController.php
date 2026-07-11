@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\Student;
+use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -28,8 +29,12 @@ class DashboardController extends Controller
                 ->sum('amount'),
         ];
 
-        $upcomingRenewals = Hostel::expiringWithin(30)
-            ->orderBy('subscription_end')
+        // Account-level (not per-branch): a renewal covers every co-terminated
+        // branch on one anchor, so one row per account avoids near-duplicate
+        // entries for multi-branch customers (mirrors the Super Admin alert feed).
+        $upcomingRenewals = SubscriptionAccount::expiringWithin(30)
+            ->with('owner')
+            ->orderBy('current_period_end')
             ->limit(10)
             ->get();
 

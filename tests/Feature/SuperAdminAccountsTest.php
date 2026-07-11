@@ -86,6 +86,21 @@ class SuperAdminAccountsTest extends TestCase
         $this->assertDatabaseHas('subscription_orders', ['account_id' => $account->id, 'quantity' => 1]);
     }
 
+    public function test_suspend_blocks_access_and_reactivate_restores_it(): void
+    {
+        [$owner, $account] = $this->seedAccount();
+        $super = User::factory()->superAdmin()->create();
+        $branch = Hostel::whereIn('id', $owner->accessibleHostelIds())->first();
+
+        $this->actingAs($super)->post(route('superadmin.accounts.suspend', $account), ['reason' => 'payment dispute'])->assertRedirect();
+        $this->assertSame('suspended', $branch->fresh()->status);
+        $this->assertFalse($branch->fresh()->isActive());
+
+        $this->actingAs($super)->post(route('superadmin.accounts.reactivate', $account))->assertRedirect();
+        $this->assertSame('active', $branch->fresh()->status);
+        $this->assertTrue($branch->fresh()->isActive());
+    }
+
     public function test_add_discount_and_comp_and_override(): void
     {
         [, $account] = $this->seedAccount();

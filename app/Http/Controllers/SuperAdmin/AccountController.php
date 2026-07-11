@@ -199,4 +199,24 @@ class AccountController extends Controller
 
         return back()->with('success', 'Discount revoked.');
     }
+
+    /** Manual override: suspend the account and every included branch (BR-18). */
+    public function suspend(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        $this->billing->suspend($account, $data['reason']);
+        $this->logger->log('subscription.update', "Suspended account — {$data['reason']}", $account);
+
+        return back()->with('success', 'Account suspended — all branches blocked.');
+    }
+
+    /** Lift a manual suspension; status/access is recomputed from the account's anchor. */
+    public function reactivate(SubscriptionAccount $account): RedirectResponse
+    {
+        $this->billing->reactivate($account);
+        $this->logger->log('subscription.update', 'Reactivated account', $account);
+
+        return back()->with('success', 'Account reactivated.');
+    }
 }

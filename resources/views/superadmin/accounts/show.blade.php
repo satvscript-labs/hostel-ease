@@ -58,6 +58,16 @@
                         <li><button class="dropdown-item rounded-3 py-2" @click="compOpen = true"><i class="fa-solid fa-gift text-primary me-2"></i>Comp (free coverage)</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="overrideOpen = true"><i class="fa-solid fa-tag text-primary me-2"></i>Set custom price</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="discountOpen = true"><i class="fa-solid fa-percent text-primary me-2"></i>Add discount</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        @if($account->status->value === 'suspended')
+                            <li>
+                                <form method="POST" action="{{ route('superadmin.accounts.reactivate', $account) }}" data-confirm="Reactivate this account and all its branches?">
+                                    @csrf<button class="dropdown-item rounded-3 py-2 text-success"><i class="fa-solid fa-play me-2"></i>Reactivate</button>
+                                </form>
+                            </li>
+                        @else
+                            <li><button class="dropdown-item rounded-3 py-2 text-danger" @click="suspendOpen = true"><i class="fa-solid fa-ban me-2"></i>Suspend account</button></li>
+                        @endif
                     </ul>
                 </div>
             </div>
@@ -234,6 +244,20 @@
                 </form>
             </div>
 
+            {{-- Suspend --}}
+            <div class="custom-overlay-backdrop" x-show="suspendOpen" x-transition.opacity @click.self="suspendOpen=false" x-cloak style="display:none;">
+                <form method="POST" action="{{ route('superadmin.accounts.suspend', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':suspendOpen}">
+                    @csrf
+                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Suspend account</h5><button type="button" class="btn-close" @click="suspendOpen=false"></button></div>
+                    <div class="custom-overlay-body">
+                        <p class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1"></i>Blocks every branch on this account immediately, regardless of remaining coverage. Only an explicit Reactivate lifts it — renewals will not clear it.</p>
+                        <label class="form-label fw-bold small text-muted">REASON</label>
+                        <input type="text" name="reason" class="form-control bg-white border shadow-sm" placeholder="Why is this account being suspended?" required>
+                    </div>
+                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="suspendOpen=false">Cancel</button><button class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm">Suspend</button></div>
+                </form>
+            </div>
+
             {{-- Comp --}}
             <div class="custom-overlay-backdrop" x-show="compOpen" x-transition.opacity @click.self="compOpen=false" x-cloak style="display:none;">
                 <form method="POST" action="{{ route('superadmin.accounts.comp', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':compOpen}">
@@ -311,7 +335,7 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
-        renewOpen: false, addOpen: false, compOpen: false, overrideOpen: false, discountOpen: false,
+        renewOpen: false, addOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
         addBranchId: null, addBranchName: '',
         dType: 'percentage',
         openAdd(id, name) { this.addBranchId = id; this.addBranchName = name; this.addOpen = true; },

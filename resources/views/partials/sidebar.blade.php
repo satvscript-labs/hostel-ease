@@ -35,10 +35,10 @@
                 <span class="sidebar-link-icon"><i class="fa-solid fa-hotel"></i></span>
                 <span class="sidebar-link-label">{{ __('Hostels') }}</span>
             </a>
-            <a class="sidebar-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'is-active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
-                <span class="sidebar-link-icon"><i class="fa-solid fa-receipt"></i></span>
-                <span class="sidebar-link-label">{{ __('Subscriptions') }}</span>
-            </a>
+            {{-- Legacy per-branch Subscriptions page: superseded by Customers/Account 360
+                 for day-to-day work. Kept reachable by direct URL (superadmin.subscriptions.*
+                 routes/controller untouched) as a power-user fallback; removed from the
+                 primary nav to avoid two competing "billing" entry points. --}}
             <a class="sidebar-link {{ request()->routeIs('superadmin.discounts.*') ? 'is-active' : '' }}" href="{{ route('superadmin.discounts.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-percent"></i></span>
                 <span class="sidebar-link-label">{{ __('Discounts') }}</span>

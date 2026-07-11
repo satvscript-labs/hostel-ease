@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AccountStatus;
 use App\Enums\BillingPeriod;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -60,5 +61,22 @@ class SubscriptionAccount extends Model
     public function isEntitled(): bool
     {
         return $this->status->isEntitled();
+    }
+
+    /**
+     * Days until the anchor (positive = days remaining, 0 = today, negative =
+     * days since it passed). Mirrors Hostel::daysUntilExpiry()'s sign convention.
+     */
+    public function daysUntilAnchor(): ?int
+    {
+        return $this->current_period_end
+            ? now()->startOfDay()->diffInDays($this->current_period_end->copy()->startOfDay(), false)
+            : null;
+    }
+
+    public function scopeExpiringWithin(Builder $query, int $days): Builder
+    {
+        return $query->whereNotNull('current_period_end')
+            ->whereBetween('current_period_end', [now()->startOfDay(), now()->addDays($days)->endOfDay()]);
     }
 }

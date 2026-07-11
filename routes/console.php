@@ -15,6 +15,8 @@ Artisan::command('inspire', function () {
 | Renewal reminders, due-fee notifications and vacancy alerts run daily.
 | Commands are registered as their modules are built.
 */
+// Advance subscription lifecycle (grace/expiry) + send reminder emails, before alerts refresh.
+Schedule::command('hostelease:process-subscription-lifecycle')->dailyAt('07:30');
 // Refresh dashboard alerts every morning.
 Schedule::command('hostelease:generate-notifications')->dailyAt('08:00');
 // Nightly database backup (keeps 30 days).
