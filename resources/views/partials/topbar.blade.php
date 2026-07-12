@@ -15,8 +15,9 @@
                autocomplete="off"
                @focus="searchOpen = true" @blur="searchOpen = false">
         <kbd class="search-kbd d-none d-md-inline-flex">⌘K</kbd>
+
+        <div id="search-results" class="he-search-panel"></div>
     </div>
-    <div id="search-results" class="dropdown-menu w-100 shadow-lg border-0 rounded-4 mt-2" style="max-height: 400px; overflow-y: auto;"></div>
 
     {{-- Right Side Actions --}}
     <div class="topbar-actions">
@@ -207,6 +208,7 @@
 
     /* ─── Search Bar ──────────────────────────────────────── */
     .topbar-search {
+        position: relative; /* positioning context for .he-search-panel */
         flex-grow: 1;
         max-width: 420px;
         display: flex;
@@ -331,6 +333,104 @@
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         transform: translateY(-1px);
     }
+
+    /* ─── Global Search Results ───────────────────────────── */
+    /* Self-positioned relative to .topbar-search (not Bootstrap's
+       .dropdown-menu, which needs Popper.js for its "position: absolute;
+       inset: 0" to resolve correctly — this panel is toggled by plain JS,
+       so it gets its own anchored positioning instead, matching the
+       .he-select-menu pattern used elsewhere in the app). */
+    .he-search-panel {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        max-height: 400px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.4rem;
+        background: var(--he-bg-surface);
+        border-radius: var(--he-radius-md);
+        box-shadow: var(--he-shadow-lg);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-6px) scale(0.98);
+        transition: opacity 0.18s var(--ease-out-expo), transform 0.18s var(--ease-out-expo);
+    }
+    .he-search-panel.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0) scale(1);
+    }
+    @media (max-width: 575.98px) {
+        .he-search-panel { left: -0.5rem; right: -0.5rem; }
+    }
+    .he-search-group {
+        font-size: var(--he-text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+        color: var(--he-text-muted);
+        padding: 0.5rem 0.6rem 0.25rem;
+    }
+    .he-search-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 0.6rem;
+        border-radius: 0.6rem;
+        text-decoration: none;
+        color: var(--he-text-main);
+        transition: background 0.15s var(--ease-out-expo);
+    }
+    .he-search-item:hover { background: var(--he-primary-soft); }
+    .he-search-item.is-loading { pointer-events: none; }
+    .he-search-ic {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--he-primary-soft);
+        color: var(--he-primary);
+        font-size: 0.85rem;
+    }
+    .he-search-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .he-search-label {
+        font-weight: 600;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .he-search-sub {
+        color: var(--he-text-muted);
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .he-search-go {
+        opacity: 0;
+        color: var(--he-primary);
+        font-size: 0.75rem;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .he-search-item:hover .he-search-go { opacity: 1; transform: translateX(2px); }
+    .he-search-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1.75rem 1rem;
+        color: var(--he-text-muted);
+    }
+    .he-search-empty i { font-size: 1.5rem; opacity: 0.3; }
+    .he-search-empty span { font-size: var(--he-text-sm); }
 
     /* ─── Topbar Mobile Responsive ────────────────────────── */
     @media (max-width: 575.98px) {
