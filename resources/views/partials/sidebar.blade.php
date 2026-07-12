@@ -169,6 +169,14 @@
     <div class="sidebar-footer">
         <div class="sidebar-divider"></div>
 
+        @if($user->isHostelAdmin())
+        {{-- Subscription (owner self-serve billing) --}}
+        <a class="sidebar-link {{ request()->routeIs('admin.subscription.*') ? 'is-active' : '' }}" href="{{ route('admin.subscription.index') }}">
+            <span class="sidebar-link-icon"><i class="fa-solid fa-credit-card"></i></span>
+            <span class="sidebar-link-label">{{ __('Subscription') }}</span>
+        </a>
+        @endif
+
         @if(!$user->isSuperAdmin())
         {{-- Settings (pinned to bottom) --}}
         @php($settingsActive = request()->routeIs('admin.settings.*', 'admin.users.*', 'admin.branches.*'))

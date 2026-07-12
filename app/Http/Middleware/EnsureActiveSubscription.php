@@ -23,8 +23,12 @@ class EnsureActiveSubscription
                 : $user->hostel;
 
             if (! $hostel || ! $hostel->isActive()) {
+                // Owners land on their Subscription page (where they can renew);
+                // staff sub-users (who can't pay) see the read-only expired screen.
+                $target = $user->isHostelAdmin() ? 'admin.subscription.index' : 'subscription.expired';
+
                 return redirect()
-                    ->route('subscription.expired')
+                    ->route($target)
                     ->with('warning', 'Your hostel subscription has expired. Please renew to continue.');
             }
         }

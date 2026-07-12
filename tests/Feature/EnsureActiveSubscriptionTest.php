@@ -30,4 +30,16 @@ class EnsureActiveSubscriptionTest extends TestCase
             ->get(route('admin.dashboard'))
             ->assertOk();
     }
+
+    public function test_expired_owner_is_sent_to_their_subscription_page_to_renew(): void
+    {
+        $hostel = Hostel::factory()->expired()->create();
+        $owner = User::factory()->create(['hostel_id' => $hostel->id, 'role' => 'hostel_admin']);
+        $owner->hostels()->sync([$hostel->id]);
+
+        // Owner can pay, so they land on the Subscription page — not the read-only expired screen.
+        $this->actingAs($owner)
+            ->get(route('admin.dashboard'))
+            ->assertRedirect(route('admin.subscription.index'));
+    }
 }

@@ -96,6 +96,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
         Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
         Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
+
+        // Owner self-serve consolidated billing (Phase 6)
+        Route::get('subscription', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('subscription.index');
+        Route::post('subscription/renew-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'renewOrder'])->name('subscription.renew-order');
+        Route::post('subscription/add-branch-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranchOrder'])->name('subscription.add-branch-order');
+        Route::post('subscription/verify', [\App\Http\Controllers\Admin\SubscriptionController::class, 'verify'])->name('subscription.verify');
     });
 
     /*

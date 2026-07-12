@@ -47,7 +47,7 @@ class AccountBillingService
     {
         return SubscriptionAccount::firstOrCreate(
             ['owner_id' => $owner->id],
-            ['period' => BillingPeriod::Yearly->value, 'status' => AccountStatus::Trial->value],
+            ['period' => BillingPeriod::Trial->value, 'status' => AccountStatus::Trial->value],
         );
     }
 
