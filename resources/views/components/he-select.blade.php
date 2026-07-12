@@ -44,7 +44,10 @@
     $current = $normalized->get((string) $selected);
     $currentLabel = $current['label'] ?? $placeholder;
     $currentColor = $current['color'] ?? 'secondary';
-    $submitJs = $submit ? '$el.closest(\'form\').submit();' : '';
+    // $nextTick: let Alpine flush the x-model binding into the hidden <input>
+    // before we submit — otherwise the form posts the *stale* value (the field
+    // reads empty and the filter appears to do nothing / "just refresh").
+    $submitJs = $submit ? '$nextTick(() => $el.closest(\'form\').submit());' : '';
 @endphp
 <div
     {{ $attributes->class(['he-select-wrap']) }}
