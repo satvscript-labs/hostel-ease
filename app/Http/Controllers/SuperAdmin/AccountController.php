@@ -66,15 +66,23 @@ class AccountController extends Controller
     {
         $account->load('owner');
         $branches = $this->billing->includedBranches($account);
-        $orders = $account->orders()->with('lines')->latest()->paginate(10);
+        $orders = $account->orders()->with('lines.branch')->latest()->paginate(10);
         $discounts = $account->discounts()->with('branch')->latest()->get();
 
-        $period = $account->period?->value ?? 'yearly';
-        $renewQuote = $this->billing->quoteRenewal($account, $period);
+        // Discount-aware renewal quotes for both terms, so the Renew modal shows
+        // the true post-discount total live as the operator toggles Yearly/Monthly.
+        $renewQuotes = [
+            'yearly' => $this->renewQuoteArray($account, 'yearly'),
+            'monthly' => $this->renewQuoteArray($account, 'monthly'),
+        ];
+        // A 'trial' period account previews at a paid rate (never ₹0) — default the
+        // modal to a paid term.
+        $displayPeriod = $account->period?->isPaid() ? $account->period->value : 'yearly';
 
         // A per-branch add-to-cycle quote (each behind branch tops up a different
-        // gap to the anchor, so the modal must show that branch's own number).
+        // gap to the anchor, so the modal must show that branch's own numbers).
         $anchor = $account->current_period_end;
+        $anchorLabel = $anchor?->format('d M Y');
         $addQuotes = [];
         foreach ($branches as $b) {
             $behind = $anchor && $anchor->isFuture() && (! $b->subscription_end || $b->subscription_end->lt($anchor));
@@ -82,11 +90,48 @@ class AccountController extends Controller
                 continue;
             }
             $q = $this->billing->quoteAddBranch($account, $b);
-            $addQuotes[$b->id] = ['days' => $q['days_remaining'], 'amount' => round((float) $q['breakdown']['final'], 2)];
+            $addQuotes[$b->id] = [
+                'days' => $q['days_remaining'],
+                'unit' => (float) $q['unit'],
+                'prorated' => round((float) $q['prorated'], 2),
+                'volume' => round((float) $q['breakdown']['volume_amount'], 2),
+                'manual' => round((float) $q['breakdown']['manual_amount'], 2),
+                'auto' => round((float) $q['breakdown']['final'], 2),
+                'anchor' => $anchorLabel,
+            ];
         }
-        $alignBehind = $branches->filter(fn ($b) => ! $b->subscription_end || ($account->current_period_end && $b->subscription_end->lt($account->current_period_end)))->count();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuote', 'addQuotes', 'alignBehind'));
+        // Align quote — per-branch prorated top-ups, for the Align modal preview.
+        $alignRaw = $this->billing->quoteAlign($account);
+        $alignQuote = [
+            'count' => $alignRaw['count'],
+            'subtotal' => $alignRaw['subtotal'],
+            'anchor' => $anchorLabel,
+            'lines' => collect($alignRaw['lines'])->map(fn ($l) => [
+                'name' => $l['branch']->name,
+                'days' => $l['days'],
+                'amount' => round((float) $l['amount'], 2),
+            ])->values()->all(),
+        ];
+        $alignBehind = $alignRaw['count'];
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind'));
+    }
+
+    /** Flatten a renewal quote into the JS-friendly, discount-itemised shape the modal summary reads. */
+    protected function renewQuoteArray(SubscriptionAccount $account, string $period): array
+    {
+        $q = $this->billing->quoteRenewal($account, $period);
+
+        return [
+            'quantity' => $q['quantity'],
+            'unit' => (float) $q['unit'],
+            'subtotal' => round((float) $q['subtotal'], 2),
+            'volume' => round((float) $q['breakdown']['volume_amount'], 2),
+            'manual' => round((float) $q['breakdown']['manual_amount'], 2),
+            'auto' => round((float) $q['breakdown']['final'], 2),
+            'new_anchor' => $q['new_anchor']->format('d M Y'),
+        ];
     }
 
     /** Add a single branch to the current cycle with a prorated top-up (co-terminated). */
@@ -139,9 +184,20 @@ class AccountController extends Controller
     }
 
     /** Align staggered branches up to the anchor with a prorated top-up. */
-    public function align(SubscriptionAccount $account): RedirectResponse
+    public function align(Request $request, SubscriptionAccount $account): RedirectResponse
     {
-        $order = $this->billing->align($account, ['payment_status' => 'paid', 'payment_method' => 'cash', 'remarks' => 'Align to anchor']);
+        $data = $request->validate([
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
+            'remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $order = $this->billing->align($account, [
+            'amount' => $data['amount'] ?? null,
+            'payment_status' => 'paid',
+            'payment_method' => $data['payment_method'] ?? 'cash',
+            'remarks' => $data['remarks'] ?? 'Align to anchor',
+        ]);
 
         if (! $order) {
             return back()->with('info', 'Nothing to align — all branches already reach the renewal date.');

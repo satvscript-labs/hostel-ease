@@ -300,9 +300,9 @@ class AccountBillingService
         return DB::transaction(function () use ($account, $period, $payment) {
             $quote = $this->quoteRenewal($account, $period);
             $anchor = $quote['new_anchor'];
-            $amount = $payment['amount'] ?? $quote['breakdown']['final'];
+            [$amount, $discountTotal] = $this->resolveCharge($quote['subtotal'], $quote['breakdown'], $payment);
 
-            $order = $this->makeOrder($account, $quote['period'], $quote['quantity'], $quote['subtotal'], $quote['breakdown']['discount_total'], $amount, $payment);
+            $order = $this->makeOrder($account, $quote['period'], $quote['quantity'], $quote['subtotal'], $discountTotal, $amount, $payment);
 
             $branches = $this->includedBranches($account);
             $share = $branches->count() > 0 ? round($amount / $branches->count(), 2) : 0;
@@ -389,9 +389,9 @@ class AccountBillingService
             }
 
             $quote = $this->quoteAddBranch($account, $branch);
-            $amount = $payment['amount'] ?? $quote['breakdown']['final'];
+            [$amount, $discountTotal] = $this->resolveCharge($quote['prorated'], $quote['breakdown'], $payment);
 
-            $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $quote['prorated'], $quote['breakdown']['discount_total'], $amount, $payment);
+            $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $quote['prorated'], $discountTotal, $amount, $payment);
             $this->addLineAndMirror($order, $branch, $amount, $anchor);
 
             // A real (paid) top-up just happened — resolve the account off a paid
@@ -406,8 +406,46 @@ class AccountBillingService
     }
 
     /**
+     * Quote an Align: the prorated top-up for every branch that ends before the
+     * anchor, one line each. Align is deliberately priced at the plain prorated
+     * rate — it applies no volume/negotiated discount (only an operator amount
+     * override can reduce it, recorded as a manual adjustment). Mirrors the
+     * per-branch shape the Account 360 modal renders before charging.
+     *
+     * @return array{anchor:?Carbon, count:int, subtotal:float, lines:array<int, array{branch:Hostel, days:int, amount:float}>}
+     */
+    public function quoteAlign(SubscriptionAccount $account): array
+    {
+        $anchor = $account->current_period_end;
+        $lines = [];
+        $subtotal = 0.0;
+
+        if ($anchor) {
+            $bp = $this->paidPeriod($account->period?->value);
+            $unit = $this->unitPrice($account, $bp);
+
+            foreach ($this->branchesBehind($account, $anchor) as $branch) {
+                $from = $branch->subscription_end && $branch->subscription_end->isFuture() ? $branch->subscription_end : Carbon::now();
+                $days = (int) $from->diffInDays($anchor);
+                $amount = round($unit * $days / max(1, $bp->days()), 2);
+                $subtotal += $amount;
+                $lines[] = ['branch' => $branch, 'days' => $days, 'amount' => $amount];
+            }
+        }
+
+        return [
+            'anchor' => $anchor,
+            'count' => count($lines),
+            'subtotal' => round($subtotal, 2),
+            'lines' => $lines,
+        ];
+    }
+
+    /**
      * Align staggered branches: extend every branch that ends before the anchor
-     * up to the anchor, charging a prorated top-up per branch (BRD D4).
+     * up to the anchor, charging a prorated top-up per branch (BRD D4). An
+     * optional amount override is recorded as a manual discount and spread
+     * proportionally across the branch lines.
      */
     public function align(SubscriptionAccount $account, array $payment = []): ?SubscriptionOrder
     {
@@ -418,29 +456,21 @@ class AccountBillingService
 
         return DB::transaction(function () use ($account, $anchor, $payment) {
             $bp = $this->paidPeriod($account->period?->value);
-            $unit = $this->unitPrice($account, $bp);
-            $behind = $this->includedBranches($account)
-                ->filter(fn (Hostel $b) => ! $b->subscription_end || $b->subscription_end->lt($anchor));
-
-            if ($behind->isEmpty()) {
+            $quote = $this->quoteAlign($account);
+            if ($quote['count'] === 0) {
                 return null;
             }
 
-            $lines = [];
-            $subtotal = 0.0;
-            foreach ($behind as $branch) {
-                $from = $branch->subscription_end && $branch->subscription_end->isFuture() ? $branch->subscription_end : Carbon::now();
-                $days = $from->diffInDays($anchor);
-                $amount = round($unit * $days / max(1, $bp->days()), 2);
-                $subtotal += $amount;
-                $lines[] = [$branch, $amount];
-            }
+            $subtotal = $quote['subtotal'];
+            $override = $payment['amount'] ?? null;
+            $amount = $override !== null ? round((float) $override, 2) : $subtotal;
+            $discountTotal = $override !== null ? max(0, round($subtotal - $amount, 2)) : 0.0;
+            $scale = ($override !== null && $subtotal > 0) ? $amount / $subtotal : 1.0;
 
-            $amount = $payment['amount'] ?? round($subtotal, 2);
-            $order = $this->makeOrder($account, $bp, $behind->count(), round($subtotal, 2), 0, $amount, $payment);
+            $order = $this->makeOrder($account, $bp, $quote['count'], $subtotal, $discountTotal, $amount, $payment);
 
-            foreach ($lines as [$branch, $lineAmount]) {
-                $this->addLineAndMirror($order, $branch, $lineAmount, $anchor);
+            foreach ($quote['lines'] as $line) {
+                $this->addLineAndMirror($order, $line['branch'], round($line['amount'] * $scale, 2), $anchor);
             }
 
             // Same reasoning as addBranch(): a paid top-up just happened, so
@@ -449,6 +479,37 @@ class AccountBillingService
 
             return $order;
         });
+    }
+
+    /** Branches whose coverage ends before (or is missing relative to) the anchor. */
+    protected function branchesBehind(SubscriptionAccount $account, Carbon $anchor): Collection
+    {
+        return $this->includedBranches($account)
+            ->filter(fn (Hostel $b) => ! $b->subscription_end || $b->subscription_end->lt($anchor))
+            ->values();
+    }
+
+    /**
+     * Resolve the final charged amount + recorded discount for a charge.
+     * With no operator override the engine's discounted total stands. With an
+     * override, the difference from the pre-discount subtotal is recorded as the
+     * total discount (engine + operator), so subtotal − discount_total == amount
+     * always holds and the order row reads "list − discount = paid" (BR: 5.1).
+     *
+     * @param  array{final:float, discount_total:float}  $breakdown
+     * @return array{0:float, 1:float}  [amount, discountTotal]
+     */
+    protected function resolveCharge(float $subtotal, array $breakdown, array $payment): array
+    {
+        $override = $payment['amount'] ?? null;
+
+        if ($override === null) {
+            return [$breakdown['final'], $breakdown['discount_total']];
+        }
+
+        $amount = round((float) $override, 2);
+
+        return [$amount, max(0, round($subtotal - $amount, 2))];
     }
 
     /** Complimentary (₹0) grant of coverage across the account (BR-17). */

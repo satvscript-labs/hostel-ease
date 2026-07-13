@@ -51,7 +51,13 @@ class SuperAdminAccountsTest extends TestCase
         $this->actingAs($super)->get(route('superadmin.accounts.show', $account))
             ->assertOk()
             ->assertSee('Renew all')
-            ->assertSee('Branches');
+            ->assertSee('Branches')
+            // Redesigned billing modals + the shared live summary are present.
+            ->assertSee('Renew all branches')
+            ->assertSee('Add branch to cycle')
+            ->assertSee('Align branches to renewal date')
+            ->assertSee('he-summary', false)
+            ->assertSee('renewSummary', false);
     }
 
     public function test_renew_all_advances_the_anchor_and_records_an_order(): void

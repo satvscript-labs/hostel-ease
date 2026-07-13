@@ -3,8 +3,6 @@
 
 @php
     $unitYearly = $account->unit_price_override ?? config('hostelease.subscription_pricing.yearly', 10000);
-    $unitMonthly = $account->unit_price_override ?? config('hostelease.subscription_pricing.monthly', 1000);
-    $b = $renewQuote['breakdown'];
 @endphp
 
 @push('styles')
@@ -24,6 +22,31 @@
     .custom-overlay-header { padding:1.25rem 1.5rem; border-bottom:1px solid rgba(0,0,0,.05); display:flex; justify-content:space-between; align-items:center; }
     .custom-overlay-body { padding:1.5rem; overflow-y:auto; background:#fafafa; }
     .custom-overlay-footer { padding:1.25rem 1.5rem; border-top:1px solid rgba(0,0,0,.05); display:flex; gap:1rem; justify-content:flex-end; }
+
+    /* ── Expandable Orders & payments rows ── */
+    .order-table tbody.order-group { border-top: 1px solid rgba(15,23,42,.05); }
+    .order-table tbody.order-group:first-of-type { border-top: 0; }
+    .order-row { cursor: pointer; transition: background-color .18s ease; }
+    .order-row:hover { background-color: #f8fafc; }
+    .order-row.is-open { background-color: var(--he-primary-soft, rgba(79,70,229,.08)); }
+    .order-caret { transition: transform .25s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)); font-size:.8rem; }
+    .order-caret.rotated { transform: rotate(90deg); color: var(--he-primary, #4f46e5); }
+    .order-detail-row td { background: var(--he-bg-surface-raised, #f1f5f9); }
+    .order-detail { padding: 1.1rem 1.5rem 1.35rem 3rem; }
+    .od-label { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color: var(--he-text-muted, #64748b); margin-bottom:.5rem; }
+    .od-box { background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); overflow:hidden; }
+    .od-line { display:flex; justify-content:space-between; gap:1rem; padding:.5rem .85rem; font-size:.86rem; }
+    .od-line + .od-line { border-top:1px dashed rgba(15,23,42,.07); }
+    .od-line--total { font-weight:800; color: var(--he-text-main, #0f172a); background: var(--he-primary-soft, rgba(79,70,229,.06)); }
+    .od-meta { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:.6rem 1.25rem; background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); padding:.85rem 1rem; }
+    .od-meta > div { display:flex; flex-direction:column; gap:.1rem; min-width:0; }
+    .od-k { font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; color: var(--he-text-muted, #64748b); font-weight:700; }
+    .od-v { font-size:.86rem; font-weight:600; color: var(--he-text-main, #0f172a); word-break:break-word; }
+    .od-remarks { margin-top:.6rem; font-size:.84rem; color: var(--he-text-main, #334155); background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); padding:.55rem .85rem; }
+    .od-lines { background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); overflow:hidden; }
+    .od-line-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem .95rem; flex-wrap:wrap; }
+    .od-line-row + .od-line-row { border-top:1px solid rgba(15,23,42,.05); }
+    .od-line-row .od-coverage { flex:1; text-align:center; min-width:150px; }
 </style>
 @endpush
 
@@ -48,9 +71,7 @@
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" @click="renewOpen = true"><i class="fa-solid fa-arrows-rotate me-2"></i>Renew all</button>
                 @if($alignBehind > 0)
-                <form method="POST" action="{{ route('superadmin.accounts.align', $account) }}" class="d-inline" data-confirm="Align {{ $alignBehind }} branch(es) up to {{ optional($account->current_period_end)->format('d M Y') }} with a prorated top-up?">
-                    @csrf<button class="btn btn-outline-light rounded-pill px-3 fw-bold"><i class="fa-solid fa-diagram-project me-2"></i>Align ({{ $alignBehind }})</button>
-                </form>
+                <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="alignOpen = true"><i class="fa-solid fa-diagram-project me-2"></i>Align ({{ $alignBehind }})</button>
                 @endif
                 <div class="dropdown">
                     <button class="btn btn-outline-light rounded-pill px-3 fw-bold" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis"></i></button>
@@ -157,93 +178,106 @@
     <div class="panel-card shadow-sm mt-4">
         <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>Orders &amp; payments</h6></div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table align-middle mb-0 order-table">
                 <thead class="table-light text-uppercase" style="font-size:.7rem; letter-spacing:.5px;"><tr>
-                    <th class="py-3 px-4 border-0">Amount</th>
-                    <th class="py-3 px-4 border-0 text-center">Status</th>
-                    <th class="py-3 px-4 border-0 text-center">Qty</th>
-                    <th class="py-3 px-4 border-0">Term</th>
-                    <th class="py-3 px-4 border-0">Method</th>
-                    <th class="py-3 px-4 border-0">Date</th>
+                    <th class="py-3 ps-4 pe-2 border-0" style="width:32px;"></th>
+                    <th class="py-3 px-2 border-0">Amount</th>
+                    <th class="py-3 px-2 border-0 text-center">Status</th>
+                    <th class="py-3 px-2 border-0 text-center">Qty</th>
+                    <th class="py-3 px-2 border-0">Term</th>
+                    <th class="py-3 px-2 border-0">Method</th>
+                    <th class="py-3 px-4 border-0 text-end">Date</th>
                 </tr></thead>
-                <tbody class="border-top-0">
                 @forelse($orders as $order)
-                    <tr>
-                        <td class="px-4 py-3">
-                            <div class="fw-bold {{ (float)$order->amount == 0 ? 'text-secondary' : 'text-dark' }}">{{ hostelease_money($order->amount) }}</div>
-                            @if((float)$order->discount_total > 0)<div class="small text-success">−{{ hostelease_money($order->discount_total) }} disc</div>@endif
-                        </td>
-                        <td class="px-4 py-3 text-center"><span class="badge bg-{{ $order->payment_status->value === 'paid' ? 'success' : ($order->payment_status->value === 'pending' ? 'warning' : 'danger') }}-subtle text-{{ $order->payment_status->value === 'paid' ? 'success' : ($order->payment_status->value === 'pending' ? 'warning' : 'danger') }} rounded-pill px-3 py-1">{{ $order->payment_status->label() }}</span></td>
-                        <td class="px-4 py-3 text-center fw-bold">{{ $order->quantity }}</td>
-                        <td class="px-4 py-3">{{ $order->period?->label() ?? '—' }}</td>
-                        <td class="px-4 py-3">{{ $order->payment_method?->label() ?? '—' }}</td>
-                        <td class="px-4 py-3 text-muted small">{{ $order->created_at?->format('d M Y') }}</td>
-                    </tr>
+                    @php($statusColor = $order->payment_status->value === 'paid' ? 'success' : ($order->payment_status->value === 'pending' ? 'warning' : 'danger'))
+                    <tbody class="order-group" x-data="{ open: false }">
+                        <tr class="order-row" @click="open = !open" :class="{ 'is-open': open }">
+                            <td class="ps-4 pe-2 py-3"><i class="fa-solid fa-chevron-right order-caret text-muted" :class="{ 'rotated': open }"></i></td>
+                            <td class="px-2 py-3">
+                                <div class="fw-bold a360-metric {{ (float)$order->amount == 0 ? 'text-secondary' : 'text-dark' }}">{{ hostelease_money($order->amount) }}</div>
+                                @if((float)$order->discount_total > 0)<div class="small text-success fw-semibold">−{{ hostelease_money($order->discount_total) }} discount</div>@endif
+                            </td>
+                            <td class="px-2 py-3 text-center"><span class="badge bg-{{ $statusColor }}-subtle text-{{ $statusColor }} rounded-pill px-3 py-1">{{ $order->payment_status->label() }}</span></td>
+                            <td class="px-2 py-3 text-center fw-bold">{{ $order->quantity }}</td>
+                            <td class="px-2 py-3">{{ $order->period?->label() ?? '—' }}</td>
+                            <td class="px-2 py-3">{{ $order->payment_method?->label() ?? '—' }}</td>
+                            <td class="px-4 py-3 text-muted small text-end text-nowrap">{{ $order->created_at?->format('d M Y') }}</td>
+                        </tr>
+                        <tr class="order-detail-row">
+                            <td colspan="7" class="p-0 border-0">
+                                <div x-show="open" x-collapse x-cloak>
+                                    <div class="order-detail">
+                                        <div class="row g-3">
+                                            {{-- Charge breakdown --}}
+                                            <div class="col-md-4">
+                                                <div class="od-label">Charge breakdown</div>
+                                                <div class="od-box">
+                                                    <div class="od-line"><span>Subtotal</span><span class="a360-metric">{{ hostelease_money($order->subtotal) }}</span></div>
+                                                    @if((float)$order->discount_total > 0)
+                                                        <div class="od-line text-success"><span>Discount</span><span class="a360-metric">−{{ hostelease_money($order->discount_total) }}</span></div>
+                                                    @endif
+                                                    <div class="od-line od-line--total"><span>{{ (float)$order->amount == 0 ? 'Complimentary' : 'Total paid' }}</span><span class="a360-metric">{{ hostelease_money($order->amount) }}</span></div>
+                                                </div>
+                                            </div>
+                                            {{-- Meta --}}
+                                            <div class="col-md-8">
+                                                <div class="od-label">Details</div>
+                                                <div class="od-meta">
+                                                    <div><span class="od-k">Order</span><span class="od-v">#{{ $order->id }}</span></div>
+                                                    <div><span class="od-k">Placed</span><span class="od-v">{{ $order->created_at?->format('d M Y · h:i A') ?? '—' }}</span></div>
+                                                    <div><span class="od-k">Term</span><span class="od-v">{{ $order->period?->label() ?? '—' }}</span></div>
+                                                    <div><span class="od-k">Method</span><span class="od-v">{{ $order->payment_method?->label() ?? '—' }}</span></div>
+                                                    <div><span class="od-k">Status</span><span class="od-v text-{{ $statusColor }}">{{ $order->payment_status->label() }}</span></div>
+                                                    <div><span class="od-k">Branches</span><span class="od-v">{{ $order->quantity }}</span></div>
+                                                    @if($order->transaction_number)<div><span class="od-k">Txn / Ref</span><span class="od-v font-monospace">{{ $order->transaction_number }}</span></div>@endif
+                                                    @if($order->razorpay_order_id)<div><span class="od-k">Razorpay</span><span class="od-v font-monospace">{{ $order->razorpay_order_id }}</span></div>@endif
+                                                    @if($order->legacy_subscription_id)<div><span class="od-k">Migrated</span><span class="od-v">legacy #{{ $order->legacy_subscription_id }}</span></div>@endif
+                                                </div>
+                                                @if($order->remarks)
+                                                    <div class="od-remarks"><i class="fa-solid fa-quote-left text-muted me-2 small"></i>{{ $order->remarks }}</div>
+                                                @endif
+                                            </div>
+                                            {{-- Per-branch coverage --}}
+                                            <div class="col-12">
+                                                <div class="od-label">Branch coverage ({{ $order->lines->count() }})</div>
+                                                @if($order->lines->isEmpty())
+                                                    <div class="text-muted small fst-italic">No branch lines recorded for this order.</div>
+                                                @else
+                                                    <div class="od-lines">
+                                                        @foreach($order->lines as $line)
+                                                            <div class="od-line-row">
+                                                                <div class="fw-semibold text-dark"><i class="fa-solid fa-hotel text-primary me-2 small"></i>{{ $line->branch?->name ?? 'Branch #'.$line->branch_id }}</div>
+                                                                <div class="od-coverage small text-muted">
+                                                                    {{ optional($line->start_date)->format('d M Y') ?? '—' }}
+                                                                    <i class="fa-solid fa-arrow-right-long mx-1" style="font-size:.7rem;"></i>
+                                                                    {{ optional($line->end_date)->format('d M Y') ?? '—' }}
+                                                                </div>
+                                                                <div class="fw-bold a360-metric text-dark">{{ hostelease_money($line->amount) }}</div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
                 @empty
-                    <tr><td colspan="6" class="p-0"><x-he-empty-state icon="receipt" title="No orders yet" subtitle="Renewals and payments will appear here." /></td></tr>
+                    <tbody><tr><td colspan="7" class="p-0"><x-he-empty-state icon="receipt" title="No orders yet" subtitle="Renewals and payments will appear here." /></td></tr></tbody>
                 @endforelse
-                </tbody>
             </table>
         </div>
-        @if($orders->hasPages())<div class="p-3 border-top">{{ $orders->links() }}</div>@endif
+        @if($orders->hasPages())<div class="p-3 border-top">{{ $orders->withQueryString()->links() }}</div>@endif
     </div>
+
+    {{-- ══ Billing modals (redesigned — shared shell + live summary) ══ --}}
+    @include('superadmin.accounts._billing_modals')
 
     {{-- ══ Modals ══ --}}
     <template x-teleport="body">
         <div>
-            {{-- Renew all --}}
-            <div class="custom-overlay-backdrop" x-show="renewOpen" x-transition.opacity @click.self="renewOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('superadmin.accounts.renew', $account) }}" class="custom-overlay-modal" style="max-width:560px;" :class="{'is-open':renewOpen}">
-                    @csrf
-                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Renew all branches</h5><button type="button" class="btn-close" @click="renewOpen=false"></button></div>
-                    <div class="custom-overlay-body">
-                        <div class="d-flex gap-2 mb-4">
-                            <button type="button" class="btn flex-fill rounded-pill fw-bold" :class="period==='yearly'?'btn-primary':'btn-light'" @click="period='yearly'">Yearly</button>
-                            <button type="button" class="btn flex-fill rounded-pill fw-bold" :class="period==='monthly'?'btn-primary':'btn-light'" @click="period='monthly'">Monthly</button>
-                        </div>
-                        <input type="hidden" name="period" :value="period">
-                        <div class="bg-white border rounded-4 p-3 mb-3">
-                            <div class="d-flex justify-content-between mb-1"><span class="text-muted"><span x-text="quantity"></span> branch(es) × <span x-text="money(unit())"></span></span><span class="fw-semibold" x-text="money(quantity*unit())"></span></div>
-                            <div class="d-flex justify-content-between align-items-center pt-2 border-top"><span class="fw-bold">Estimated total</span><span class="h5 fw-bold mb-0 text-primary" x-text="money(quantity*unit())"></span></div>
-                            <div class="small text-muted mt-1">Discounts are applied automatically on save. Leave amount blank to charge the discounted total.</div>
-                        </div>
-                        <label class="form-label fw-bold small text-muted">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
-                        <input type="number" step="0.01" name="amount" class="form-control bg-white border shadow-sm mb-3" placeholder="Auto (discounted total)">
-                        <label class="form-label fw-bold small text-muted">METHOD</label>
-                        <select name="payment_method" class="form-select bg-white border shadow-sm mb-3">
-                            <option value="cash">Cash</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="rtgs">RTGS / NEFT</option><option value="online">Online</option>
-                        </select>
-                        <label class="form-label fw-bold small text-muted">TXN / REMARKS</label>
-                        <input type="text" name="transaction_number" class="form-control bg-white border shadow-sm mb-2" placeholder="Reference (optional)">
-                        <input type="text" name="remarks" class="form-control bg-white border shadow-sm" placeholder="Remarks (optional)">
-                    </div>
-                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="renewOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Renew</button></div>
-                </form>
-            </div>
-
-            {{-- Add branch to cycle --}}
-            <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('superadmin.accounts.add-branch', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':addOpen}">
-                    @csrf
-                    <input type="hidden" name="branch_id" :value="addBranchId">
-                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Add branch to cycle</h5><button type="button" class="btn-close" @click="addOpen=false"></button></div>
-                    <div class="custom-overlay-body">
-                        <p class="text-muted small">Co-terminates <span class="fw-bold text-dark" x-text="addBranchName"></span> on the renewal date ({{ optional($account->current_period_end)->format('d M Y') }}) with a prorated charge for the <span x-text="addDays"></span> day(s) remaining.</p>
-                        <div class="bg-white border rounded-4 p-3 mb-3 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Prorated (<span x-text="addDays"></span> days)</span>
-                            <span class="h5 fw-bold mb-0 text-primary" x-text="money(addAmount)"></span>
-                        </div>
-                        <label class="form-label fw-bold small text-muted">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
-                        <input type="number" step="0.01" name="amount" class="form-control bg-white border shadow-sm mb-3" :placeholder="'Auto (' + money(addAmount) + ')'">
-                        <label class="form-label fw-bold small text-muted">METHOD</label>
-                        <select name="payment_method" class="form-select bg-white border shadow-sm">
-                            <option value="cash">Cash</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="rtgs">RTGS / NEFT</option><option value="online">Online</option>
-                        </select>
-                    </div>
-                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="addOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Add branch</button></div>
-                </form>
-            </div>
-
             {{-- Suspend --}}
             <div class="custom-overlay-backdrop" x-show="suspendOpen" x-transition.opacity @click.self="suspendOpen=false" x-cloak style="display:none;">
                 <form method="POST" action="{{ route('superadmin.accounts.suspend', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':suspendOpen}">
@@ -335,24 +369,84 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
-        renewOpen: false, addOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
-        addBranchId: null, addBranchName: '', addDays: 0, addAmount: 0,
-        addQuotes: @json($addQuotes),
+        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
         dType: 'percentage',
-        openAdd(id, name) {
-            this.addBranchId = id;
-            this.addBranchName = name;
-            const q = this.addQuotes[id] || { days: 0, amount: 0 };
-            this.addDays = q.days;
-            this.addAmount = q.amount;
-            this.addOpen = true;
+
+        r2(v) { return Math.round(v * 100) / 100; },
+
+        // Builds {rows, finalLabel, final, note} for a single-subtotal charge
+        // (Renew, Add): list line → engine discounts → optional override adjustment.
+        buildSummary({ lineLabel, subtotal, volume, manual, auto, override, note }) {
+            subtotal = subtotal || 0; volume = volume || 0; manual = manual || 0;
+            auto = (auto === undefined || auto === null) ? subtotal : auto;
+            const rows = [{ label: lineLabel, amount: subtotal, kind: 'line' }];
+            if (volume > 0) rows.push({ label: 'Volume tier discount', amount: volume, kind: 'discount' });
+            if (manual > 0) rows.push({ label: 'Negotiated discount', amount: manual, kind: 'discount' });
+            let final = auto;
+            const ov = parseFloat(override);
+            if (override !== '' && override !== null && !isNaN(ov)) {
+                if (ov < auto) {
+                    if (volume > 0 || manual > 0) rows.push({ label: 'Auto price', amount: auto, kind: 'subtle' });
+                    const adj = this.r2(auto - ov);
+                    const pct = auto > 0 ? (adj / auto * 100) : 0;
+                    rows.push({ label: 'Manual adjustment (−' + pct.toFixed(1) + '%)', amount: adj, kind: 'discount' });
+                }
+                final = ov;
+            }
+            return { rows, finalLabel: 'Payable now', final, note };
         },
-        period: @json($account->period?->value === 'monthly' ? 'monthly' : 'yearly'),
-        quantity: {{ $branches->count() }},
-        unitYearly: {{ (float) $unitYearly }},
-        unitMonthly: {{ (float) $unitMonthly }},
-        unit() { return this.period === 'monthly' ? this.unitMonthly : this.unitYearly; },
-        money(v) { return '₹' + Number(v || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2}); },
+
+        // ── Renew all ──
+        period: @json($displayPeriod),
+        renewQuotes: @json($renewQuotes),
+        renewOverride: '',
+        get renewSummary() {
+            const q = this.renewQuotes[this.period] || {};
+            return this.buildSummary({
+                lineLabel: (q.quantity || 0) + ' branch(es) × ' + heMoney(q.unit) + '/' + (this.period === 'monthly' ? 'mo' : 'yr'),
+                subtotal: q.subtotal, volume: q.volume, manual: q.manual, auto: q.auto,
+                override: this.renewOverride,
+                note: q.quantity ? ('Renews all branches to ' + q.new_anchor) : '',
+            });
+        },
+
+        // ── Add to cycle ──
+        addBranchId: null, addBranchName: '', addOverride: '',
+        addQuotes: @json($addQuotes),
+        openAdd(id, name) { this.addBranchId = id; this.addBranchName = name; this.addOverride = ''; this.addOpen = true; },
+        get addQuote() { return this.addQuotes[this.addBranchId] || {}; },
+        get addSummary() {
+            const q = this.addQuote;
+            return this.buildSummary({
+                lineLabel: 'Prorated · ' + (q.days || 0) + ' day(s) remaining',
+                subtotal: q.prorated, volume: q.volume, manual: q.manual, auto: q.auto,
+                override: this.addOverride,
+                note: '',
+            });
+        },
+
+        // ── Align ──
+        alignQuote: @json($alignQuote),
+        alignOverride: '',
+        get alignSummary() {
+            const q = this.alignQuote;
+            const rows = (q.lines || []).map(l => ({ label: l.name + ' · ' + l.days + 'd', amount: l.amount, kind: 'line' }));
+            const subtotal = q.subtotal || 0;
+            let final = subtotal;
+            const ov = parseFloat(this.alignOverride);
+            if (this.alignOverride !== '' && !isNaN(ov)) {
+                if (ov < subtotal) {
+                    rows.push({ label: 'Subtotal', amount: subtotal, kind: 'subtle' });
+                    const adj = this.r2(subtotal - ov);
+                    const pct = subtotal > 0 ? (adj / subtotal * 100) : 0;
+                    rows.push({ label: 'Manual adjustment (−' + pct.toFixed(1) + '%)', amount: adj, kind: 'discount' });
+                }
+                final = ov;
+            }
+            return { rows, finalLabel: 'Payable now', final, note: q.count ? ('Aligns ' + q.count + ' branch(es) to ' + q.anchor) : '' };
+        },
+
+        money(v) { return heMoney(v); },
     }));
 });
 </script>

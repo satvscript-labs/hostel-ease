@@ -172,6 +172,64 @@ class AccountBillingServiceTest extends TestCase
         $this->assertNotSame('trial', $account->period->value);
     }
 
+    public function test_renew_override_is_recorded_as_a_discount(): void
+    {
+        // 2 branches × ₹10,000 = ₹20,000 auto. Operator overrides to ₹18,000 →
+        // the ₹2,000 gap must land in discount_total, so subtotal−discount==amount.
+        [$owner] = $this->ownerWithBranches([now()->addMonths(2), now()->addMonths(2)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(2),
+        ]);
+
+        $order = $this->service()->renewAccount($account, 'yearly', ['amount' => 18000, 'payment_status' => 'paid', 'payment_method' => 'cash']);
+
+        $this->assertSame('20000.00', (string) $order->subtotal);
+        $this->assertSame('2000.00', (string) $order->discount_total);
+        $this->assertSame('18000.00', (string) $order->amount);
+        $this->assertSame((float) $order->subtotal - (float) $order->discount_total, (float) $order->amount);
+    }
+
+    public function test_add_branch_override_is_recorded_as_a_discount(): void
+    {
+        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(12), now()->addMonths(6)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(12),
+        ]);
+        $behind = $branches->last();
+        $auto = (float) $this->service()->quoteAddBranch($account, $behind)['breakdown']['final'];
+
+        $order = $this->service()->addBranch($account, $behind, ['amount' => $auto - 200, 'payment_status' => 'paid', 'payment_method' => 'cash']);
+
+        $this->assertSame('200.00', (string) $order->discount_total);
+        $this->assertEqualsWithDelta($auto - 200, (float) $order->amount, 0.01);
+        $this->assertEqualsWithDelta((float) $order->subtotal - (float) $order->discount_total, (float) $order->amount, 0.01);
+    }
+
+    public function test_align_quote_and_override_discount(): void
+    {
+        // Two branches behind the anchor by different gaps.
+        [$owner] = $this->ownerWithBranches([now()->addMonths(12), now()->addMonths(6), now()->addMonths(3)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(12),
+        ]);
+
+        $quote = $this->service()->quoteAlign($account);
+        $this->assertSame(2, $quote['count']);                 // two branches are behind
+        $this->assertGreaterThan(0, $quote['subtotal']);
+
+        // No override → no discount recorded (Align applies no engine discount).
+        $plain = $this->service()->align($account, ['payment_status' => 'paid', 'payment_method' => 'cash']);
+        $this->assertSame('0.00', (string) $plain->discount_total);
+
+        // Reset a branch behind again and override the align total downward.
+        $account->owner->hostels->first()->update(['subscription_end' => now()->addMonths(4)]);
+        $account->refresh();
+        $subtotal = $this->service()->quoteAlign($account)['subtotal'];
+        $order = $this->service()->align($account, ['amount' => $subtotal - 300, 'payment_status' => 'paid', 'payment_method' => 'cash']);
+        $this->assertSame('300.00', (string) $order->discount_total);
+        $this->assertEqualsWithDelta((float) $order->subtotal - (float) $order->discount_total, (float) $order->amount, 0.01);
+    }
+
     public function test_comp_grants_zero_rupee_coverage(): void
     {
         [$owner] = $this->ownerWithBranches([now()->addMonth()]);
