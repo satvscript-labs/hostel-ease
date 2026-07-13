@@ -116,9 +116,16 @@ function initGlobalSearch() {
     const url = input.closest('[data-search-url]')?.dataset.searchUrl;
     let timer;
 
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+
     const render = (results) => {
         if (!results.length) {
-            panel.innerHTML = '<span class="dropdown-item-text text-muted small">No matches.</span>';
+            panel.innerHTML = `<div class="he-search-empty">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>No matches found.</span>
+            </div>`;
             panel.classList.add('show');
             return;
         }
@@ -126,14 +133,33 @@ function initGlobalSearch() {
         let lastGroup = null;
         results.forEach((r) => {
             if (r.group !== lastGroup) {
-                html += `<h6 class="dropdown-header">${r.group}</h6>`;
+                html += `<div class="he-search-group">${esc(r.group)}</div>`;
                 lastGroup = r.group;
             }
-            html += `<a class="dropdown-item d-flex align-items-center gap-2" href="${r.url}">
-                <i class="fa-solid ${r.icon} text-primary"></i>
-                <span><span class="fw-semibold">${r.label}</span>
-                <small class="text-muted d-block">${r.sub ?? ''}</small></span></a>`;
+            html += `<a class="he-search-item" href="${esc(r.url)}">
+                <span class="he-search-ic"><i class="fa-solid ${esc(r.icon)}"></i></span>
+                <span class="he-search-text">
+                    <span class="he-search-label">${esc(r.label)}</span>
+                    <small class="he-search-sub">${esc(r.sub)}</small>
+                </span>
+                <i class="fa-solid fa-arrow-right he-search-go"></i>
+            </a>`;
         });
+        panel.innerHTML = html;
+        panel.classList.add('show');
+    };
+
+    const renderLoading = () => {
+        let html = '';
+        for (let i = 0; i < 3; i++) {
+            html += `<div class="he-search-item is-loading">
+                <span class="he-search-ic skeleton"></span>
+                <span class="he-search-text">
+                    <span class="skeleton d-block" style="width:55%;height:12px;border-radius:4px;"></span>
+                    <span class="skeleton d-block" style="width:35%;height:9px;border-radius:4px;margin-top:6px;"></span>
+                </span>
+            </div>`;
+        }
         panel.innerHTML = html;
         panel.classList.add('show');
     };
@@ -142,6 +168,7 @@ function initGlobalSearch() {
         clearTimeout(timer);
         const q = input.value.trim();
         if (q.length < 2) { panel.classList.remove('show'); return; }
+        renderLoading();
         timer = setTimeout(() => {
             window.axios.get(url, { params: { q } })
                 .then((res) => render(res.data.results || []))

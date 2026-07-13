@@ -26,3 +26,5 @@ composer.phar
 /.vscode
 /.zed
 /_artifact/
+database/database.sqlite
+proxy.cjs
