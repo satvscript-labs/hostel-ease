@@ -24,6 +24,12 @@ use App\Models\ActivityLog;
 use App\Models\Notification;
 use App\Models\StudentRegistration;
 use App\Models\PaymentMode;
+use App\Models\Discount;
+use App\Enums\BillingPeriod;
+use App\Enums\DiscountRecurrence;
+use App\Enums\DiscountStatus;
+use App\Enums\DiscountType;
+use App\Services\Billing\AccountBillingService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -66,6 +72,71 @@ class DemoHostelSeeder extends Seeder
             'status' => 'active',
         ], $owner);
 
+        // 3b. Extra branches (no student/room data) so the Phase 4 billing
+        // flows — Align, Add-to-cycle, Renew-from-expired, volume tiers —
+        // can be exercised against a real account in prod without the many
+        // throwaway Test-N owners from Phase4TestingSeeder.
+        //
+        // Branch 3 "behind" the account anchor (Boys/Girls end 10mo out) by
+        // 4 months, for Align / Add-to-cycle proration testing.
+        $hostel3 = $this->createBranch([
+            'name' => 'Sunrise Annex',
+            'mobile' => '+919876543212',
+            'email' => 'sunriseannex@example.com',
+            'address' => 'Satellite Road',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'status' => 'active',
+            'subscription_start' => now()->subMonths(6),
+            'subscription_end' => now()->addMonths(6),
+        ], $owner, populate: false);
+
+        // Branch 4 expired well past the grace window, for the "renew an
+        // expired branch" flow and the Customers-list Status filter.
+        $hostel4 = $this->createBranch([
+            'name' => 'Sunrise Outpost',
+            'mobile' => '+919876543213',
+            'email' => 'sunriseoutpost@example.com',
+            'address' => 'Old City Road',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'status' => 'expired',
+            'subscription_start' => now()->subMonths(14),
+            'subscription_end' => now()->subMonths(2),
+        ], $owner, populate: false);
+
+        // Branch 5 co-terminated with Boys/Girls (same anchor), so the
+        // account has 3 co-terminated branches — enough to trigger a
+        // volume-tier discount on Renew all.
+        $hostel5 = $this->createBranch([
+            'name' => 'Sunrise PG',
+            'mobile' => '+919876543214',
+            'email' => 'sunrisepg@example.com',
+            'address' => 'Vastrapur',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'status' => 'active',
+            'subscription_start' => now()->subMonths(2),
+            'subscription_end' => now()->addMonths(10),
+        ], $owner, populate: false);
+
+        // Wire the account/order spine (Phase 4 billing) so Account 360,
+        // Align, Comp, etc. all resolve correctly for Ramesh Patel — the
+        // legacy Subscription rows above don't create this on their own.
+        $account = app(AccountBillingService::class)->accountFor($owner);
+        app(AccountBillingService::class)->refreshAccountAnchor($account, BillingPeriod::Yearly);
+
+        Discount::updateOrCreate(
+            ['account_id' => $account->id, 'reason' => 'Loyalty — long-term customer (seed fixture)'],
+            [
+                'branch_id' => null,
+                'recurrence' => DiscountRecurrence::EveryRenewal->value,
+                'type' => DiscountType::Percentage->value,
+                'value' => 5,
+                'status' => DiscountStatus::Active->value,
+            ],
+        );
+
         // 4. Create Sub-Users (Staff Logins)
         $manager1 = User::updateOrCreate(
             ['mobile' => '+919876543001'],
@@ -103,14 +174,14 @@ class DemoHostelSeeder extends Seeder
         );
         $accountant->hostels()->sync([$hostel1->id, $hostel2->id]);
 
-        $this->command->info('Demo branches "Sunrise Boys Hostel" and "Sunrise Girls Hostel" seeded completely with all data!');
+        $this->command->info('Demo branches seeded: Boys/Girls with full data; Annex/Outpost/PG empty for billing tests.');
     }
 
-    private function createBranch(array $data, User $owner): Hostel
+    private function createBranch(array $data, User $owner, bool $populate = true): Hostel
     {
         $data['owner_name'] = $owner->name;
-        $data['subscription_start'] = now()->subMonths(2);
-        $data['subscription_end'] = now()->addMonths(10);
+        $data['subscription_start'] = $data['subscription_start'] ?? now()->subMonths(2);
+        $data['subscription_end'] = $data['subscription_end'] ?? now()->addMonths(10);
 
         $hostel = Hostel::updateOrCreate(['mobile' => $data['mobile']], $data);
 
@@ -137,6 +208,10 @@ class DemoHostelSeeder extends Seeder
             'description' => "Hostel {$hostel->name} was set up.",
             'ip_address' => '127.0.0.1',
         ]);
+
+        if (! $populate) {
+            return $hostel;
+        }
 
         // --- FLOORS & ROOMS & BEDS ---
         $floorNames = ['Ground Floor', 'First Floor'];
