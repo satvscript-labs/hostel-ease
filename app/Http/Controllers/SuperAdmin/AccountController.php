@@ -71,10 +71,22 @@ class AccountController extends Controller
 
         $period = $account->period?->value ?? 'yearly';
         $renewQuote = $this->billing->quoteRenewal($account, $period);
-        $addQuote = $this->billing->quoteAddBranch($account);
+
+        // A per-branch add-to-cycle quote (each behind branch tops up a different
+        // gap to the anchor, so the modal must show that branch's own number).
+        $anchor = $account->current_period_end;
+        $addQuotes = [];
+        foreach ($branches as $b) {
+            $behind = $anchor && $anchor->isFuture() && (! $b->subscription_end || $b->subscription_end->lt($anchor));
+            if (! $behind) {
+                continue;
+            }
+            $q = $this->billing->quoteAddBranch($account, $b);
+            $addQuotes[$b->id] = ['days' => $q['days_remaining'], 'amount' => round((float) $q['breakdown']['final'], 2)];
+        }
         $alignBehind = $branches->filter(fn ($b) => ! $b->subscription_end || ($account->current_period_end && $b->subscription_end->lt($account->current_period_end)))->count();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuote', 'addQuote', 'alignBehind'));
+        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuote', 'addQuotes', 'alignBehind'));
     }
 
     /** Add a single branch to the current cycle with a prorated top-up (co-terminated). */

@@ -326,15 +326,25 @@ class AccountBillingService
     /**
      * Quote adding a branch mid-cycle: prorate to the current anchor (BR-10).
      *
+     * The charge covers only the stretch the branch does not already hold —
+     * from its own coverage end (it keeps whatever time it has already paid
+     * for, or is on) up to the anchor — never from *today*, which would re-bill
+     * time the branch is already covered for. A brand-new branch (none passed,
+     * or one with no future coverage) prorates from now. This mirrors align()'s
+     * per-branch top-up so the two ops price an identical branch identically.
+     *
      * @return array{prorated:float, days_remaining:int, anchor:?Carbon, unit:float, breakdown:array}
      */
-    public function quoteAddBranch(SubscriptionAccount $account, ?string $period = null): array
+    public function quoteAddBranch(SubscriptionAccount $account, ?Hostel $branch = null, ?string $period = null): array
     {
-        $bp = BillingPeriod::tryFrom($period ?? ($account->period?->value ?? 'yearly')) ?? BillingPeriod::Yearly;
+        $bp = $this->paidPeriod($period ?? $account->period?->value);
         $anchor = $account->current_period_end;
         $unit = $this->unitPrice($account, $bp);
 
-        $days = ($anchor && $anchor->isFuture()) ? Carbon::now()->diffInDays($anchor) : 0;
+        $from = $branch && $branch->subscription_end && $branch->subscription_end->isFuture()
+            ? $branch->subscription_end->copy()
+            : Carbon::now();
+        $days = ($anchor && $anchor->greaterThan($from)) ? $from->diffInDays($anchor) : 0;
         $prorated = round($unit * $days / max(1, $bp->days()), 2);
 
         return [
@@ -347,6 +357,20 @@ class AccountBillingService
     }
 
     /**
+     * Resolve a *paid* billing period for a proration. A co-termination top-up
+     * is always priced at a paid rate — never 'trial' (which prices at ₹0). An
+     * account's period can transiently read 'trial' (e.g. right after a trial
+     * branch is provisioned); pricing an add/align off that would hand out free
+     * coverage. Falls back to Yearly when there's no usable paid cadence.
+     */
+    protected function paidPeriod(?string $period): BillingPeriod
+    {
+        $bp = BillingPeriod::tryFrom((string) $period);
+
+        return $bp && $bp->isPaid() ? $bp : BillingPeriod::Yearly;
+    }
+
+    /**
      * Add a branch to a live account: charge a prorated amount and co-terminate
      * the branch on the existing anchor. If the account has no live anchor, this
      * falls back to a plain single-branch renewal.
@@ -356,14 +380,15 @@ class AccountBillingService
         return DB::transaction(function () use ($account, $branch, $payment) {
             $anchor = $account->current_period_end;
             if (! $anchor || ! $anchor->isFuture()) {
-                // No live cycle to co-terminate with — treat as a normal renewal.
-                $sub = $this->recordBranchRenewal($branch, $account->period?->value ?? 'yearly', $payment);
+                // No live cycle to co-terminate with — treat as a normal renewal
+                // at a paid rate (never trial, which would add the branch free).
+                $sub = $this->recordBranchRenewal($branch, $this->paidPeriod($account->period?->value)->value, $payment);
 
                 return SubscriptionOrder::firstWhere('legacy_subscription_id', $sub->id)
-                    ?? $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $sub->amount, 0, $sub->amount, $payment);
+                    ?? $this->makeOrder($account, $this->paidPeriod($account->period?->value), 1, $sub->amount, 0, $sub->amount, $payment);
             }
 
-            $quote = $this->quoteAddBranch($account);
+            $quote = $this->quoteAddBranch($account, $branch);
             $amount = $payment['amount'] ?? $quote['breakdown']['final'];
 
             $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $quote['prorated'], $quote['breakdown']['discount_total'], $amount, $payment);
@@ -388,7 +413,7 @@ class AccountBillingService
         }
 
         return DB::transaction(function () use ($account, $anchor, $payment) {
-            $bp = $account->period ?? BillingPeriod::Yearly;
+            $bp = $this->paidPeriod($account->period?->value);
             $unit = $this->unitPrice($account, $bp);
             $behind = $this->includedBranches($account)
                 ->filter(fn (Hostel $b) => ! $b->subscription_end || $b->subscription_end->lt($anchor));

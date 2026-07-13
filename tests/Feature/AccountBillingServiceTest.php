@@ -99,6 +99,44 @@ class AccountBillingServiceTest extends TestCase
         $this->assertSame($account->current_period_end->toDateString(), $newBranch->fresh()->subscription_end->toDateString());
     }
 
+    public function test_add_branch_prorates_the_gap_from_the_branch_coverage_not_from_today(): void
+    {
+        // Anchor is 12 months out; the branch being added is already covered for
+        // 6 of those months. Add-to-cycle must bill only the ~6-month gap, not a
+        // near-full year from today (the bug: charging now→anchor).
+        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(12), now()->addMonths(6)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(12),
+        ]);
+        $behind = $branches->last(); // ends in ~6 months
+
+        $quote = $this->service()->quoteAddBranch($account, $behind);
+
+        // ~183 days remaining (6mo → 12mo), not ~365 (today → 12mo).
+        $this->assertGreaterThan(150, $quote['days_remaining']);
+        $this->assertLessThan(200, $quote['days_remaining']);
+        // ≈ ₹10,000 × 183/365 ≈ ₹5,000 — a half-year slice, not the full ₹10,000.
+        $this->assertGreaterThan(4000, (float) $quote['prorated']);
+        $this->assertLessThan(6000, (float) $quote['prorated']);
+    }
+
+    public function test_add_branch_on_a_trial_period_account_still_charges_a_paid_rate(): void
+    {
+        // Account period reads 'trial' (as it does right after a trial branch is
+        // provisioned), but it has a real future anchor. The top-up must price at
+        // the paid yearly rate — never ₹0 (the bug: pricing off the trial period).
+        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(6), now()->addMonths(3)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'trial', 'status' => 'active', 'current_period_end' => now()->addMonths(6),
+        ]);
+        $behind = $branches->last();
+
+        $quote = $this->service()->quoteAddBranch($account, $behind);
+
+        $this->assertGreaterThan(0, (float) $quote['prorated']);
+        $this->assertSame(10000.0, (float) $quote['unit']); // yearly list price, not the trial's ₹0
+    }
+
     public function test_comp_grants_zero_rupee_coverage(): void
     {
         [$owner] = $this->ownerWithBranches([now()->addMonth()]);

@@ -228,13 +228,13 @@
                     <input type="hidden" name="branch_id" :value="addBranchId">
                     <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Add branch to cycle</h5><button type="button" class="btn-close" @click="addOpen=false"></button></div>
                     <div class="custom-overlay-body">
-                        <p class="text-muted small">Co-terminates <span class="fw-bold text-dark" x-text="addBranchName"></span> on the renewal date ({{ optional($account->current_period_end)->format('d M Y') }}) with a prorated charge for the {{ $addQuote['days_remaining'] }} day(s) remaining.</p>
+                        <p class="text-muted small">Co-terminates <span class="fw-bold text-dark" x-text="addBranchName"></span> on the renewal date ({{ optional($account->current_period_end)->format('d M Y') }}) with a prorated charge for the <span x-text="addDays"></span> day(s) remaining.</p>
                         <div class="bg-white border rounded-4 p-3 mb-3 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Prorated ({{ $addQuote['days_remaining'] }} days)</span>
-                            <span class="h5 fw-bold mb-0 text-primary">{{ hostelease_money($addQuote['breakdown']['final']) }}</span>
+                            <span class="text-muted">Prorated (<span x-text="addDays"></span> days)</span>
+                            <span class="h5 fw-bold mb-0 text-primary" x-text="money(addAmount)"></span>
                         </div>
                         <label class="form-label fw-bold small text-muted">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
-                        <input type="number" step="0.01" name="amount" class="form-control bg-white border shadow-sm mb-3" placeholder="Auto ({{ hostelease_money($addQuote['breakdown']['final']) }})">
+                        <input type="number" step="0.01" name="amount" class="form-control bg-white border shadow-sm mb-3" :placeholder="'Auto (' + money(addAmount) + ')'">
                         <label class="form-label fw-bold small text-muted">METHOD</label>
                         <select name="payment_method" class="form-select bg-white border shadow-sm">
                             <option value="cash">Cash</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="rtgs">RTGS / NEFT</option><option value="online">Online</option>
@@ -336,9 +336,17 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
         renewOpen: false, addOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
-        addBranchId: null, addBranchName: '',
+        addBranchId: null, addBranchName: '', addDays: 0, addAmount: 0,
+        addQuotes: @json($addQuotes),
         dType: 'percentage',
-        openAdd(id, name) { this.addBranchId = id; this.addBranchName = name; this.addOpen = true; },
+        openAdd(id, name) {
+            this.addBranchId = id;
+            this.addBranchName = name;
+            const q = this.addQuotes[id] || { days: 0, amount: 0 };
+            this.addDays = q.days;
+            this.addAmount = q.amount;
+            this.addOpen = true;
+        },
         period: @json($account->period?->value === 'monthly' ? 'monthly' : 'yearly'),
         quantity: {{ $branches->count() }},
         unitYearly: {{ (float) $unitYearly }},
