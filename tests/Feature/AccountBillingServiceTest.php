@@ -137,6 +137,41 @@ class AccountBillingServiceTest extends TestCase
         $this->assertSame(10000.0, (float) $quote['unit']); // yearly list price, not the trial's ₹0
     }
 
+    public function test_add_branch_clears_a_stale_trial_period_after_a_paid_top_up(): void
+    {
+        // Account period is still 'trial' (left over from the added branch's own
+        // trial provisioning), but the top-up we're about to charge is real money.
+        // The account must read Active afterwards, not Trial — a paid customer
+        // should never see a "Trial" pill (the bug: refreshAccountAnchor() kept
+        // inheriting the stale 'trial' period after addBranch()'s own paid charge).
+        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(6), now()->addMonths(3)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'trial', 'status' => 'trial', 'current_period_end' => now()->addMonths(6),
+        ]);
+        $behind = $branches->last();
+
+        $this->service()->addBranch($account, $behind, ['payment_status' => 'paid', 'payment_method' => 'cash']);
+
+        $account->refresh();
+        $this->assertSame(AccountStatus::Active, $account->status);
+        $this->assertNotSame('trial', $account->period->value);
+    }
+
+    public function test_align_clears_a_stale_trial_period_after_a_paid_top_up(): void
+    {
+        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(6), now()->addMonths(2)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'trial', 'status' => 'trial', 'current_period_end' => now()->addMonths(6),
+        ]);
+
+        $order = $this->service()->align($account, ['payment_status' => 'paid', 'payment_method' => 'cash']);
+
+        $this->assertNotNull($order);
+        $account->refresh();
+        $this->assertSame(AccountStatus::Active, $account->status);
+        $this->assertNotSame('trial', $account->period->value);
+    }
+
     public function test_comp_grants_zero_rupee_coverage(): void
     {
         [$owner] = $this->ownerWithBranches([now()->addMonth()]);

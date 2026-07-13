@@ -394,7 +394,11 @@ class AccountBillingService
             $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $quote['prorated'], $quote['breakdown']['discount_total'], $amount, $payment);
             $this->addLineAndMirror($order, $branch, $amount, $anchor);
 
-            $this->refreshAccountAnchor($account);
+            // A real (paid) top-up just happened — resolve the account off a paid
+            // cadence, not whatever it was left on (e.g. 'trial' from the branch's
+            // own provisioning). Otherwise the account keeps reading Trial even
+            // though the branch is now fully paid through the anchor (BR-18-adjacent).
+            $this->refreshAccountAnchor($account, $this->paidPeriod($account->period?->value));
             $this->discounts->consume($quote['breakdown']['manual_discount_id']);
 
             return $order;
@@ -439,7 +443,9 @@ class AccountBillingService
                 $this->addLineAndMirror($order, $branch, $lineAmount, $anchor);
             }
 
-            $this->refreshAccountAnchor($account);
+            // Same reasoning as addBranch(): a paid top-up just happened, so
+            // resolve off the paid cadence ($bp), not a possibly-'trial' $account->period.
+            $this->refreshAccountAnchor($account, $bp);
 
             return $order;
         });
