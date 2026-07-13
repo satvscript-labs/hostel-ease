@@ -2,7 +2,10 @@
 @section('title', 'Account · '.($account->owner?->name ?? 'Customer'))
 
 @php
-    $unitYearly = $account->unit_price_override ?? config('hostelease.subscription_pricing.yearly', 10000);
+    $unitYearly = $account->unit_price_override_yearly ?? config('hostelease.subscription_pricing.yearly', 10000);
+    $unitMonthly = $account->unit_price_override_monthly ?? config('hostelease.subscription_pricing.monthly', 1000);
+    $customYearly = $account->unit_price_override_yearly !== null;
+    $customMonthly = $account->unit_price_override_monthly !== null;
 @endphp
 
 @push('styles')
@@ -47,6 +50,28 @@
     .od-line-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem .95rem; flex-wrap:wrap; }
     .od-line-row + .od-line-row { border-top:1px solid rgba(15,23,42,.05); }
     .od-line-row .od-coverage { flex:1; text-align:center; min-width:150px; }
+
+    /* ── Comp modal — stepper, branch tiles, gift preview ── */
+    .comp-stepper { display:flex; align-items:stretch; border:1px solid rgba(15,23,42,.12); border-radius: var(--he-radius-full, 9999px); overflow:hidden; background:#fff; }
+    .comp-step { border:0; background:#fff; width:44px; color: var(--he-primary, #4f46e5); font-size:.9rem; display:flex; align-items:center; justify-content:center; }
+    .comp-step:hover { background: var(--he-primary-soft, rgba(79,70,229,.08)); }
+    .comp-step-input { border:0; text-align:center; width:100%; font-weight:800; font-size:1.1rem; color: var(--he-text-main,#0f172a); -moz-appearance:textfield; }
+    .comp-step-input::-webkit-outer-spin-button, .comp-step-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .comp-step-input:focus { outline:0; }
+    .comp-tile { display:flex; align-items:center; gap:.7rem; text-align:left; background:#fff; border:1.5px solid rgba(15,23,42,.1); border-radius: var(--he-radius-md, 10px); padding:.65rem .8rem; transition: all .2s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)); }
+    .comp-tile:hover { border-color: rgba(79,70,229,.4); }
+    .comp-tile.is-selected { border-color: var(--he-primary, #4f46e5); background: var(--he-primary-soft, rgba(79,70,229,.07)); box-shadow: 0 4px 12px rgba(79,70,229,.1); }
+    .comp-tile-check { width:22px; height:22px; flex-shrink:0; border-radius:50%; border:1.5px solid rgba(15,23,42,.2); display:flex; align-items:center; justify-content:center; color:#fff; font-size:.65rem; transition: all .2s; }
+    .comp-tile.is-selected .comp-tile-check { background: var(--he-primary, #4f46e5); border-color: var(--he-primary, #4f46e5); }
+    .comp-tile-check i { opacity:0; transition:opacity .2s; }
+    .comp-tile.is-selected .comp-tile-check i { opacity:1; }
+    .comp-tile-name { display:block; font-weight:700; color: var(--he-text-main,#0f172a); font-size:.88rem; line-height:1.2; }
+    .comp-tile-end { display:block; font-size:.72rem; color: var(--he-text-muted,#64748b); }
+    .comp-preview { background: var(--he-bg-surface-raised, #f1f5f9); border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-lg, 16px); overflow:hidden; }
+    .comp-preview-head { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; padding:.7rem 1rem; font-size:.86rem; color: var(--he-text-main,#0f172a); border-bottom:1px solid rgba(15,23,42,.06); background:#fff; }
+    .comp-preview-badge { margin-left:auto; font-size:.72rem; font-weight:700; color: var(--he-success,#10b981); background: var(--he-success-soft,#d1fae5); border-radius: var(--he-radius-full,9999px); padding:.2rem .6rem; }
+    .comp-preview-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.5rem 1rem; }
+    .comp-preview-row + .comp-preview-row { border-top:1px dashed rgba(15,23,42,.07); }
 </style>
 @endpush
 
@@ -100,7 +125,11 @@
             <div class="col-6 col-md-3">
                 <div class="text-white-50 small text-uppercase" style="letter-spacing:.5px;">Unit price</div>
                 <div class="h4 fw-bold mb-0 a360-metric">{{ hostelease_money($unitYearly) }}<span class="fs-6 fw-normal text-white-50">/yr</span>
-                    @if($account->unit_price_override !== null)<span class="badge bg-warning-subtle text-warning rounded-pill ms-1" style="font-size:.6rem;">custom</span>@endif
+                    @if($customYearly)<span class="badge bg-warning-subtle text-warning rounded-pill ms-1" style="font-size:.6rem;">custom</span>@endif
+                </div>
+                <div class="text-white-50" style="font-size:.72rem;">
+                    {{ hostelease_money($unitMonthly) }}/mo
+                    @if($customMonthly)<span class="badge bg-warning-subtle text-warning rounded-pill" style="font-size:.55rem;">custom</span>@endif
                 </div>
             </div>
         </div>
@@ -292,36 +321,6 @@
                 </form>
             </div>
 
-            {{-- Comp --}}
-            <div class="custom-overlay-backdrop" x-show="compOpen" x-transition.opacity @click.self="compOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('superadmin.accounts.comp', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':compOpen}">
-                    @csrf
-                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Complimentary coverage</h5><button type="button" class="btn-close" @click="compOpen=false"></button></div>
-                    <div class="custom-overlay-body">
-                        <p class="text-muted small">Grants free coverage to every branch on one anchor date — recorded as a ₹0 order.</p>
-                        <label class="form-label fw-bold small text-muted">TERM</label>
-                        <select name="period" class="form-select bg-white border shadow-sm mb-3"><option value="yearly">Yearly</option><option value="monthly">Monthly</option></select>
-                        <label class="form-label fw-bold small text-muted">REASON</label>
-                        <input type="text" name="reason" class="form-control bg-white border shadow-sm" placeholder="Why this comp?" required>
-                    </div>
-                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="compOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Grant</button></div>
-                </form>
-            </div>
-
-            {{-- Override --}}
-            <div class="custom-overlay-backdrop" x-show="overrideOpen" x-transition.opacity @click.self="overrideOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('superadmin.accounts.override', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':overrideOpen}">
-                    @csrf
-                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Custom unit price</h5><button type="button" class="btn-close" @click="overrideOpen=false"></button></div>
-                    <div class="custom-overlay-body">
-                        <p class="text-muted small">A bespoke per-branch price for this account. Leave blank to fall back to list price ({{ hostelease_money(config('hostelease.subscription_pricing.yearly',10000)) }}/yr).</p>
-                        <label class="form-label fw-bold small text-muted">UNIT PRICE (₹ / branch / term)</label>
-                        <input type="number" step="0.01" name="unit_price_override" class="form-control bg-white border shadow-sm" value="{{ $account->unit_price_override }}" placeholder="List price">
-                    </div>
-                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="overrideOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Save</button></div>
-                </form>
-            </div>
-
             {{-- Add discount --}}
             <div class="custom-overlay-backdrop" x-show="discountOpen" x-transition.opacity @click.self="discountOpen=false" x-cloak style="display:none;">
                 <form method="POST" action="{{ route('superadmin.accounts.discounts.store', $account) }}" class="custom-overlay-modal" style="max-width:560px;" :class="{'is-open':discountOpen}">
@@ -444,6 +443,50 @@ document.addEventListener('alpine:init', () => {
                 final = ov;
             }
             return { rows, finalLabel: 'Payable now', final, note: q.count ? ('Aligns ' + q.count + ' branch(es) to ' + q.anchor) : '' };
+        },
+
+        // ── Comp ──
+        compTerm: 'yearly',
+        compMultiplier: 1,
+        compBranches: @json($compBranches),
+        compSelected: @json($compBranchIds),
+        toggleCompBranch(id) {
+            const i = this.compSelected.indexOf(id);
+            if (i === -1) this.compSelected.push(id); else this.compSelected.splice(i, 1);
+        },
+        get compAllSelected() { return this.compBranches.length > 0 && this.compSelected.length === this.compBranches.length; },
+        toggleCompAll() { this.compSelected = this.compAllSelected ? [] : this.compBranches.map(b => b.id); },
+        get compMultiplierLabel() {
+            const n = parseInt(this.compMultiplier) || 1;
+            const unit = this.compTerm === 'monthly' ? 'month' : 'year';
+            return n + ' ' + unit + (n > 1 ? 's' : '');
+        },
+        compNewEnd(b) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            let from = b.end ? new Date(b.end + 'T00:00:00') : today;
+            if (from < today) from = today;
+            const n = parseInt(this.compMultiplier) || 1;
+            const d = new Date(from);
+            if (this.compTerm === 'yearly') d.setFullYear(d.getFullYear() + n); else d.setMonth(d.getMonth() + n);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        },
+        get compPreview() {
+            return this.compBranches
+                .filter(b => this.compSelected.includes(b.id))
+                .map(b => ({ name: b.name, from: b.endLabel, to: this.compNewEnd(b) }));
+        },
+
+        // ── Custom unit price (per-period) ──
+        priceTab: 'yearly',
+        priceYearly: @json($account->unit_price_override_yearly !== null ? (float) $account->unit_price_override_yearly : ''),
+        priceMonthly: @json($account->unit_price_override_monthly !== null ? (float) $account->unit_price_override_monthly : ''),
+        listYearly: {{ (float) config('hostelease.subscription_pricing.yearly', 10000) }},
+        listMonthly: {{ (float) config('hostelease.subscription_pricing.monthly', 1000) }},
+        priceEffective(term) {
+            const custom = term === 'monthly' ? this.priceMonthly : this.priceYearly;
+            const list = term === 'monthly' ? this.listMonthly : this.listYearly;
+            const v = parseFloat(custom);
+            return (custom !== '' && custom !== null && !isNaN(v)) ? { amount: v, custom: true } : { amount: list, custom: false };
         },
 
         money(v) { return heMoney(v); },

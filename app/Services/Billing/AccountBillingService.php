@@ -84,8 +84,14 @@ class AccountBillingService
             return 0.0;
         }
 
-        if ($account->unit_price_override !== null) {
-            return (float) $account->unit_price_override;
+        // Per-period bespoke rate (BR-6): a custom yearly price no longer leaks
+        // into monthly renewals and vice-versa.
+        $override = $period === BillingPeriod::Monthly
+            ? $account->unit_price_override_monthly
+            : $account->unit_price_override_yearly;
+
+        if ($override !== null) {
+            return (float) $override;
         }
 
         return $this->branchBilling->unitPrice($period->value);
@@ -512,20 +518,51 @@ class AccountBillingService
         return [$amount, max(0, round($subtotal - $amount, 2))];
     }
 
-    /** Complimentary (₹0) grant of coverage across the account (BR-17). */
-    public function comp(SubscriptionAccount $account, string $period, string $reason): SubscriptionOrder
+    /**
+     * Complimentary (₹0) grant of coverage (BR-17). Extends each selected branch
+     * by `multiplier × term` from its own current coverage end (or today if it
+     * has lapsed), never shortening. Recorded as one ₹0 order (method=comp) with
+     * a line per branch. Unselected branches are untouched, so a comp can be
+     * scoped to just some branches and staggered branches stay staggered.
+     *
+     * @param  int[]  $branchIds
+     */
+    public function comp(SubscriptionAccount $account, string $period, int $multiplier, array $branchIds, string $reason): SubscriptionOrder
     {
-        return $this->renewAccount($account, $period, [
-            'amount' => 0,
-            'payment_status' => PaymentStatus::Paid->value,
-            'payment_method' => PaymentMethod::Comp->value,
-            'remarks' => 'Complimentary — '.$reason,
-        ]);
+        return DB::transaction(function () use ($account, $period, $multiplier, $branchIds, $reason) {
+            $bp = $this->paidPeriod($period);
+            $multiplier = max(1, $multiplier);
+
+            $branches = $this->includedBranches($account)
+                ->whereIn('id', $branchIds)
+                ->values();
+
+            $order = $this->makeOrder($account, $bp, $branches->count(), 0, 0, 0, [
+                'payment_status' => PaymentStatus::Paid->value,
+                'payment_method' => PaymentMethod::Comp->value,
+                'remarks' => 'Complimentary '.$multiplier.'× '.$bp->label().' — '.$reason,
+            ]);
+
+            foreach ($branches as $branch) {
+                $base = $branch->subscription_end && $branch->subscription_end->isFuture()
+                    ? $branch->subscription_end->copy()
+                    : Carbon::now();
+                $newEnd = $bp === BillingPeriod::Monthly ? $base->addMonths($multiplier) : $base->addYears($multiplier);
+                $this->addLineAndMirror($order, $branch, 0, $newEnd);
+            }
+
+            $this->refreshAccountAnchor($account, $bp);
+
+            return $order;
+        });
     }
 
-    public function setUnitPriceOverride(SubscriptionAccount $account, ?float $price): void
+    public function setUnitPriceOverride(SubscriptionAccount $account, ?float $yearly, ?float $monthly): void
     {
-        $account->update(['unit_price_override' => $price]);
+        $account->update([
+            'unit_price_override_yearly' => $yearly,
+            'unit_price_override_monthly' => $monthly,
+        ]);
     }
 
     // -----------------------------------------------------------------

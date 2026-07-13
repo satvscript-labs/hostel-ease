@@ -24,7 +24,8 @@ class SubscriptionAccount extends Model
         'current_period_start',
         'current_period_end',
         'status',
-        'unit_price_override',
+        'unit_price_override_yearly',
+        'unit_price_override_monthly',
         'auto_debit',
         'razorpay_subscription_id',
         'notes',
@@ -37,7 +38,8 @@ class SubscriptionAccount extends Model
             'status' => AccountStatus::class,
             'current_period_start' => 'date',
             'current_period_end' => 'date',
-            'unit_price_override' => 'decimal:2',
+            'unit_price_override_yearly' => 'decimal:2',
+            'unit_price_override_monthly' => 'decimal:2',
             'auto_debit' => 'boolean',
         ];
     }

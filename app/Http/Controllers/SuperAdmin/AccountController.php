@@ -115,7 +115,16 @@ class AccountController extends Controller
         ];
         $alignBehind = $alignRaw['count'];
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind'));
+        // Branch data for the Comp modal (checkbox tiles + live gift preview).
+        $compBranches = $branches->map(fn ($b) => [
+            'id' => $b->id,
+            'name' => $b->name,
+            'end' => optional($b->subscription_end)->toDateString(),
+            'endLabel' => optional($b->subscription_end)->format('d M Y') ?? 'No coverage',
+        ])->values()->all();
+        $compBranchIds = $branches->pluck('id')->all();
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds'));
     }
 
     /** Flatten a renewal quote into the JS-friendly, discount-itemised shape the modal summary reads. */
@@ -208,16 +217,26 @@ class AccountController extends Controller
         return back()->with('success', "Aligned {$order->quantity} branch(es) to the renewal date.");
     }
 
-    /** Complimentary (₹0) grant across the account. */
+    /** Complimentary (₹0) grant — N terms to selected branches. */
     public function comp(Request $request, SubscriptionAccount $account): RedirectResponse
     {
         $data = $request->validate([
             'period' => ['required', Rule::in(['yearly', 'monthly'])],
+            'multiplier' => ['required', 'integer', 'min:1', 'max:60'],
+            'branches' => ['required', 'array', 'min:1'],
+            'branches.*' => ['integer'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $order = $this->billing->comp($account, $data['period'], $data['reason']);
-        $this->logger->log('subscription.paid', "Comp granted ({$data['period']}) — {$data['reason']}", $order);
+        // Only branches this owner actually holds may be comped.
+        $branchIds = array_values(array_intersect(
+            array_map('intval', $data['branches']),
+            $account->owner?->accessibleHostelIds() ?? [],
+        ));
+        abort_unless(count($branchIds) > 0, 422);
+
+        $order = $this->billing->comp($account, $data['period'], (int) $data['multiplier'], $branchIds, $data['reason']);
+        $this->logger->log('subscription.paid', "Comp granted ({$data['multiplier']}× {$data['period']}, {$order->quantity} branch(es)) — {$data['reason']}", $order);
 
         return back()->with('success', 'Complimentary coverage granted.');
     }
@@ -226,11 +245,15 @@ class AccountController extends Controller
     public function override(Request $request, SubscriptionAccount $account): RedirectResponse
     {
         $data = $request->validate([
-            'unit_price_override' => ['nullable', 'numeric', 'min:0'],
+            'unit_price_override_yearly' => ['nullable', 'numeric', 'min:0'],
+            'unit_price_override_monthly' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $this->billing->setUnitPriceOverride($account, $data['unit_price_override'] ?? null);
-        $this->logger->log('subscription.update', 'Set custom unit price '.($data['unit_price_override'] !== null ? hostelease_money($data['unit_price_override']) : 'cleared'), $account);
+        $yearly = ($data['unit_price_override_yearly'] ?? null) !== null ? (float) $data['unit_price_override_yearly'] : null;
+        $monthly = ($data['unit_price_override_monthly'] ?? null) !== null ? (float) $data['unit_price_override_monthly'] : null;
+
+        $this->billing->setUnitPriceOverride($account, $yearly, $monthly);
+        $this->logger->log('subscription.update', 'Set custom unit price — yearly: '.($yearly !== null ? hostelease_money($yearly) : 'list').', monthly: '.($monthly !== null ? hostelease_money($monthly) : 'list'), $account);
 
         return back()->with('success', 'Custom price updated.');
     }
