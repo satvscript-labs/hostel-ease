@@ -70,6 +70,11 @@
             this.color = this.opts[val] ? this.opts[val].color : 'secondary';
             this.open = false;
             this.search = '';
+            // Bridges the value out to an ancestor's own x-data scope (e.g. a
+            // form toggling conditional fields on this select's value) — the
+            // hidden input's x-model updates the DOM but doesn't dispatch a
+            // native input/change event, so a listener on it wouldn't fire.
+            this.$dispatch('he-select-change', { name: {{ \Illuminate\Support\Js::from($name) }}, value: val, label: this.label });
             {{ $submitJs }}
         },
         toggle() {

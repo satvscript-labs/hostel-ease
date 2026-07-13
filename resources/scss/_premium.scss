@@ -163,6 +163,23 @@ body {
     pointer-events: none;
 }
 
+/* White button — used app-wide (back buttons, icon actions) but was never
+   defined, so it rendered as a bare transparent .btn. A proper white surface
+   with a hairline border + soft shadow is the intent. */
+.btn-white {
+    background-color: var(--he-bg-surface);
+    color: var(--he-text-main);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.2s var(--ease-out-expo);
+}
+.btn-white:hover {
+    background-color: var(--he-bg-surface);
+    color: var(--he-primary);
+    border-color: rgba(79, 70, 229, 0.3);
+    transform: translateY(-1px);
+    box-shadow: var(--he-shadow-md);
+}
+
 /* Glass Tile (hover-lift white card utility — for rich/custom card
    layouts that don't fit .bento-card's fixed icon+value+label shape,
    e.g. a staff profile card or a table wrapper) */
@@ -1046,6 +1063,60 @@ body {
     color: var(--he-text-main);
 }
 
+/* ─── Canonical page-level search field ──────────────────────────────
+   The ONE style for an in-page search / list-filter input (Students,
+   Property Board, etc.). Distinct from the topbar's global search only by
+   context — both share the same visual language: a soft 14px card radius, a
+   colored icon *badge* (not a bare glyph), a raised-surface rest state, and
+   a primary focus ring. Never hand-roll a page search or reuse the bare
+   `.search-input` name (which the topbar owns) — use `.he-search`. Pages may
+   layer their own width/placement (`flex`, fixed width) on the wrapper. */
+.he-search {
+    position: relative;
+    width: 100%;
+}
+.he-search__icon {
+    position: absolute;
+    left: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--he-primary-soft);
+    color: var(--he-primary);
+    font-size: 0.75rem;
+    pointer-events: none;
+    transition: all 0.2s var(--ease-out-expo);
+}
+.he-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 3.1rem;
+    border-radius: 14px;
+    border: 1.5px solid rgba(0, 0, 0, 0.06);
+    background: var(--he-bg-surface-raised);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--he-text-main);
+    transition: all 0.25s var(--ease-out-expo);
+}
+.he-search__input::placeholder { color: var(--he-text-muted); font-weight: 400; }
+.he-search__input:focus {
+    outline: none;
+    background: var(--he-bg-surface);
+    border-color: var(--he-primary);
+    box-shadow: 0 0 0 4px var(--he-primary-soft);
+}
+.he-search:focus-within .he-search__icon { background: var(--he-primary); color: #fff; }
+
+@media (max-width: 576px) {
+    .he-search__input { font-size: 16px; padding: 0.65rem 0.9rem 0.65rem 2.85rem; } /* 16px stops iOS zoom */
+    .he-search__icon { width: 26px; height: 26px; font-size: 0.68rem; }
+}
+
 /* Standard Overlay Modal — see .agents/ui_design_guidelines.md §5 for the
    full markup spec. Always wrap in <template x-teleport="body">. Use the
    <x-he-modal> component instead of hand-copying this markup. */
@@ -1106,6 +1177,120 @@ body {
     display: flex;
     gap: 1rem;
     justify-content: flex-end;
+}
+
+/* Bottom-sheet presentation on phones — a centered dialog reads as a website
+   popup; a sheet that rises from the bottom edge with a grab handle reads as a
+   native app. Applies to every .custom-overlay modal (and thus <x-he-modal>)
+   app-wide. The modal animates on translateY here, overriding the scale used
+   on desktop (later source + equal specificity wins). */
+@media (max-width: 576px) {
+    .custom-overlay-backdrop {
+        align-items: flex-end;
+        padding: 0;
+    }
+    .custom-overlay-modal {
+        max-width: 100% !important;
+        width: 100%;
+        max-height: 92vh;
+        border-radius: var(--he-radius-lg) var(--he-radius-lg) 0 0;
+        transform: translateY(100%);
+    }
+    .custom-overlay-modal.is-open {
+        transform: translateY(0);
+    }
+    /* Grab handle */
+    .custom-overlay-header {
+        position: relative;
+        padding-top: 1.6rem;
+    }
+    .custom-overlay-header::before {
+        content: '';
+        position: absolute;
+        top: 0.55rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 38px;
+        height: 4px;
+        border-radius: var(--he-radius-full);
+        background: rgba(0, 0, 0, 0.15);
+    }
+    /* Full-width footer buttons stack; primary CTA (last in DOM) lands at the
+       bottom, closest to the thumb. */
+    .custom-overlay-footer {
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+    .custom-overlay-footer > .btn { width: 100%; }
+    /* Native inputs inside sheets: ≥16px stops iOS auto-zoom on focus. */
+    .custom-overlay-body input:not([type="checkbox"]):not([type="radio"]),
+    .custom-overlay-body select,
+    .custom-overlay-body textarea {
+        font-size: 16px;
+    }
+}
+
+/* ── SweetAlert2 (confirm dialogs + toasts) ──────────────────────────────
+   Two fixes, both app-wide since `data-confirm` fires from any destructive
+   action anywhere, including from inside an open .custom-overlay:
+   1. z-index: SweetAlert2's default (1060) sits BELOW .custom-overlay-backdrop
+      (9999) — a confirm/toast triggered while a modal/sheet is open used to
+      render invisibly behind it (e.g. Approve/Reject from the Registrations
+      Review sheet looked like nothing happened).
+   2. Reskin: default SweetAlert2 styling (system font, square-ish corners,
+      generic blue) reads as an off-brand popup dropped on top of our custom
+      overlay system. Reskinned to match — rounded-pill buttons, our radius/
+      shadow tokens, brand font — so it never breaks the premium feel,
+      including on the mobile bottom-sheet flow this was reported from. */
+.swal2-container { z-index: 10060 !important; }
+.swal2-popup {
+    border-radius: var(--he-radius-lg) !important;
+    box-shadow: var(--he-shadow-float) !important;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+    padding-bottom: 1.75rem !important;
+}
+.swal2-title { font-weight: 800 !important; color: var(--he-text-main) !important; }
+.swal2-html-container { color: var(--he-text-muted) !important; }
+.swal2-actions { gap: 0.75rem !important; }
+.swal2-styled {
+    border-radius: var(--he-radius-full) !important;
+    font-weight: 700 !important;
+    padding: 0.6rem 1.5rem !important;
+    box-shadow: none !important;
+    transition: transform 0.15s var(--ease-out-expo) !important;
+}
+.swal2-styled:hover { transform: translateY(-1px); }
+.swal2-styled:focus { box-shadow: 0 0 0 4px var(--he-primary-soft) !important; }
+.swal2-icon.swal2-warning { border-color: var(--he-warning) !important; color: var(--he-warning) !important; }
+.swal2-icon.swal2-success { border-color: var(--he-success) !important; color: var(--he-success) !important; }
+.swal2-icon.swal2-error { border-color: var(--he-danger) !important; color: var(--he-danger) !important; }
+/* Toasts (flash messages, "link copied") stay compact and don't need the
+   full popup treatment beyond radius/shadow/font. */
+.swal2-toast.swal2-popup { padding: 0.75rem 1rem !important; }
+
+@media (max-width: 576px) {
+    /* A centered confirm dialog is fine on mobile (it's a short yes/no
+       decision, not a form) — but give it the same rounded, dense
+       treatment as the rest of the mobile system rather than the
+       edge-to-edge default. Explicit horizontal padding on the popup is
+       load-bearing here: SweetAlert2's own `.swal2-actions` spans the full
+       popup width by default (invisibly, since its buttons are normally
+       auto-width and centered) — stretching buttons to width:100% below
+       exposes that there's no built-in inset, so without this padding the
+       buttons touch the popup's own rounded corners edge-to-edge. */
+    .swal2-popup {
+        width: calc(100% - 2rem) !important;
+        padding-left: 1.4rem !important;
+        padding-right: 1.4rem !important;
+    }
+    .swal2-actions {
+        flex-direction: column-reverse !important;
+        width: 100%;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        gap: 0.6rem !important;
+    }
+    .swal2-styled { width: 100%; margin: 0 !important; }
 }
 
 /* Reduced Motion */

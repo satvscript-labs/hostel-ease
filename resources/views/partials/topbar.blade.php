@@ -9,7 +9,7 @@
 
     {{-- Global Search --}}
     <div class="topbar-search" :class="{ 'is-focused': searchOpen }" data-search-url="{{ route('search') }}">
-        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <span class="search-icon-badge"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" id="global-search" class="search-input"
                placeholder="{{ $user->isSuperAdmin() ? __('Search hostels…') : __('Search students, rooms, beds…') }}"
                autocomplete="off"
@@ -207,37 +207,53 @@
     .topbar-hamburger:hover .hamburger-line { background: #0f172a; }
 
     /* ─── Search Bar ──────────────────────────────────────── */
+    /* Global search — same premium language as the canonical `.he-search`
+       page field (icon badge + 14px radius + raised surface + primary focus
+       ring), implemented inline here because the topbar search is a flex row
+       carrying the ⌘K hint and the results panel. Keep the two visually in
+       step. */
     .topbar-search {
         position: relative; /* positioning context for .he-search-panel */
         flex-grow: 1;
         max-width: 420px;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.45rem 0.85rem;
-        border-radius: 10px;
-        background: #f1f5f9;
-        border: 1.5px solid transparent;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        gap: 0.6rem;
+        padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+        border-radius: 14px;
+        background: var(--he-bg-surface-raised, #f1f5f9);
+        border: 1.5px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .topbar-search.is-focused {
         background: #fff;
         border-color: var(--he-primary, #4f46e5);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
     }
-    .search-icon {
-        color: #94a3b8;
-        font-size: 0.85rem;
+    .search-icon-badge {
+        width: 30px;
+        height: 30px;
         flex-shrink: 0;
-        transition: color 0.2s ease;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--he-primary-soft, rgba(79, 70, 229, 0.1));
+        color: var(--he-primary, #4f46e5);
+        font-size: 0.75rem;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .topbar-search.is-focused .search-icon { color: var(--he-primary, #4f46e5); }
+    .topbar-search.is-focused .search-icon-badge {
+        background: var(--he-primary, #4f46e5);
+        color: #fff;
+    }
     .search-input {
         border: none;
         background: transparent;
         outline: none;
         flex: 1;
-        font-size: 0.85rem;
+        min-width: 0;
+        font-size: 0.9rem;
         color: #0f172a;
         font-weight: 500;
     }

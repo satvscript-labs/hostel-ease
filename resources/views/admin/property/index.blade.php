@@ -11,32 +11,9 @@
         margin-bottom: 2rem;
     }
     
-    .pb-search-wrapper {
-        position: relative;
-        width: 300px;
-    }
-    .pb-search-wrapper .fa-search {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--he-text-muted);
-    }
-    .pb-search {
-        width: 100%;
-        padding: 0.75rem 1rem 0.75rem 2.5rem;
-        border-radius: 50px;
-        border: 1px solid rgba(0,0,0,0.05);
-        background: rgba(255,255,255,0.9);
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        transition: all 0.3s ease;
-    }
-    .pb-search:focus {
-        outline: none;
-        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
-        border-color: rgba(79, 70, 229, 0.3);
-    }
+    /* Search uses the canonical `.he-search` (see _premium.scss); only the
+       page-level width lives here. */
+    .pb-search-field { width: 300px; }
 
     /* Bento Stats Row */
     .pb-stats-row {
@@ -68,9 +45,9 @@
         font-size: 1.5rem;
     }
     .pb-stat-primary { background: linear-gradient(135deg, var(--he-primary), var(--he-accent)); color: white; box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3); }
-    .pb-stat-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-    .pb-stat-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-    .pb-stat-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .pb-stat-success { background: rgba(16, 185, 129, 0.1); color: var(--he-success); }
+    .pb-stat-danger { background: rgba(239, 68, 68, 0.1); color: var(--he-danger); }
+    .pb-stat-warning { background: rgba(245, 158, 11, 0.1); color: var(--he-warning); }
 
     /* The Blueprint Layout */
     .floor-section {
@@ -159,12 +136,12 @@
     .bed-tile.bed-empty {
         background: rgba(16, 185, 129, 0.06);
         border: 1px dashed rgba(16, 185, 129, 0.3);
-        color: #10b981;
+        color: var(--he-success);
         justify-content: center;
     }
     .bed-tile.bed-empty:hover {
         background: rgba(16, 185, 129, 0.12);
-        border-color: #10b981;
+        border-color: var(--he-success);
     }
     .bed-tile.bed-empty .bed-status-text {
         font-weight: 700;
@@ -176,12 +153,12 @@
     .bed-tile.bed-occupied {
         background: rgba(239, 68, 68, 0.06);
         border: 1px solid rgba(239, 68, 68, 0.15);
-        color: #ef4444;
+        color: var(--he-danger);
         box-shadow: 0 2px 8px rgba(0,0,0,0.01);
     }
     .bed-tile.bed-occupied:hover {
         background: rgba(239, 68, 68, 0.12);
-        border-color: #ef4444;
+        border-color: var(--he-danger);
     }
     .occupant-details {
         display: flex;
@@ -212,7 +189,7 @@
         font-size: 0.6rem;
         font-weight: 700;
         background: rgba(239, 68, 68, 0.15);
-        color: #ef4444;
+        color: var(--he-danger);
         padding: 0.1rem 0.35rem;
         border-radius: 4px;
     }
@@ -226,10 +203,10 @@
     }
 
     /* Maintenance */
-    .bed-tile.bed-maintenance { 
-        background: rgba(245, 158, 11, 0.06); 
-        color: #d97706; 
-        border: 1px dashed rgba(245, 158, 11, 0.3); 
+    .bed-tile.bed-maintenance {
+        background: rgba(245, 158, 11, 0.06);
+        color: #d97706;
+        border: 1px dashed rgba(245, 158, 11, 0.3);
         cursor: not-allowed;
         flex-direction: column;
         justify-content: center;
@@ -239,7 +216,7 @@
     }
     .bed-tile.bed-maintenance:hover {
         background: rgba(245, 158, 11, 0.12);
-        border-color: #f59e0b;
+        border-color: var(--he-warning);
     }
     .bed-maintenance .maintenance-text {
         font-size: 0.65rem;
@@ -350,25 +327,148 @@
     }
 
     [x-cloak] { display: none !important; }
+
+    /* ============================================================
+       MOBILE — Property Board reimagined for a phone (≤576px).
+       Goal: feel like a native app, not a shrunk website. No
+       horizontal scroll anywhere; elements align vertically because
+       width is the scarce axis; density over roominess.
+       ============================================================ */
+    @media (max-width: 576px) {
+        /* Header: a real title (bigger, tighter) + subtitle, then ONE
+           toolbar row combining search + the builder action — not three
+           stacked full-width bars (global search, local search, button)
+           reading as a repetitive column of pills. The builder action
+           collapses to an icon-only circle, same pattern as the dashboard's
+           "View Finances" link. */
+        .pb-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.7rem;
+            margin-bottom: 1.25rem;
+        }
+        /* Mobile page-heading standard (see 01/02 audit docs): heading
+           2.2rem/1.5, subheading 1rem/1.5 — big enough to read as a header. */
+        .pb-header h1 { font-size: 2.2rem; line-height: 1.5; letter-spacing: -0.01em; margin-bottom: 0.1rem; }
+        .pb-header > div:first-child p, .pb-header .text-muted { font-size: 1rem; line-height: 1.5; }
+        .pb-toolbar { flex-direction: row; width: 100%; gap: 0.6rem !important; }
+        .pb-search-field { width: auto; flex: 1; min-width: 0; }
+
+        .pb-builder-btn {
+            width: 46px;
+            height: 46px;
+            padding: 0 !important;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pb-builder-ic { margin: 0 !important; font-size: 1.05rem; }
+        .pb-builder-text { display: none; }
+
+        /* Stats: a tidy 2×2 widget grid (iOS-widget feel), not 4-across
+           and never a horizontal scroll strip. */
+        .pb-stats-row {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.7rem;
+            margin-bottom: 1.5rem;
+        }
+        .pb-stat-card {
+            padding: 0.85rem;
+            gap: 0.7rem;
+            border-radius: 1rem;
+        }
+        .pb-stat-card:hover { transform: none; } /* no hover lift on touch */
+        .pb-stat-icon { width: 42px; height: 42px; font-size: 1.15rem; border-radius: 0.8rem; }
+        .pb-stat-card .fs-4 { font-size: 1.35rem !important; }
+        .pb-stat-card .small { font-size: 0.6rem !important; }
+
+        /* Floors */
+        .floor-section { margin-bottom: 1.75rem; }
+        .floor-header {
+            padding: 0.7rem 0.9rem;
+            margin-bottom: 1rem;
+            border-radius: 0.85rem;
+        }
+        .floor-header h2 { font-size: 1.15rem; }
+        .floor-header-bar { height: 24px; margin-right: 0.85rem; }
+        .floor-header .badge { font-size: 0.58rem !important; padding: 0.35rem 0.6rem !important; }
+
+        /* One room per row (full width) — a 320px min-width grid would
+           otherwise overflow a 360px phone. */
+        .room-grid { grid-template-columns: 1fr; gap: 1rem; }
+        .room-card { padding: 1rem; border-radius: 1rem; }
+        .room-header { margin-bottom: 0.85rem; }
+        .room-number { font-size: 1.05rem; }
+        .room-type { font-size: 0.62rem; padding: 0.28rem 0.7rem; }
+
+        /* Beds go vertical: full-width list rows, one per line. Horizontal
+           space is scarce, so we never sit two tiles side-by-side and force
+           names/labels to clip. Each bed reads like a clean native list row. */
+        .bed-grid { grid-template-columns: 1fr; gap: 0.55rem; }
+        .bed-tile {
+            height: auto;
+            min-height: 52px;
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.8rem;
+            justify-content: flex-start;
+        }
+        .bed-tile:hover { transform: none; box-shadow: none; } /* no hover on touch */
+        .bed-tile.bed-empty { justify-content: flex-start; }
+        .bed-empty .bed-status-text { font-size: 0.8rem; letter-spacing: 0.3px; }
+        .occupant-avatar { width: 38px; height: 38px; }
+        .occupant-name { font-size: 0.9rem; }
+        .bed-badge { font-size: 0.62rem; }
+        /* Maintenance row: lay out horizontally like the others (desktop
+           stacks it inside a small square tile — a full row wants a line). */
+        .bed-tile.bed-maintenance {
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .bed-maintenance .maintenance-text { font-size: 0.75rem; }
+        .bed-maintenance .maintenance-bed-label { margin-left: auto; font-size: 0.72rem; }
+
+        /* Spotlight quick-assign: near full-width sheet from the top,
+           inputs at 16px so iOS doesn't zoom. */
+        .spotlight-backdrop { padding-top: 6vh; padding-left: 0.75rem; padding-right: 0.75rem; }
+        .spotlight-panel { max-width: 100%; border-radius: 1.25rem; }
+        .spotlight-input { font-size: 16px; padding: 1.15rem 1.15rem 1.15rem 3.25rem; }
+        .spotlight-input-container i { left: 1.15rem; font-size: 1.1rem; }
+        .spotlight-results { max-height: 55vh; }
+        .spotlight-item { padding: 0.75rem; }
+
+        /* Details slide-over is already full-width; tighten its padding so it
+           reads dense like an app screen, not a roomy desktop panel. */
+        .slide-header { padding: 1.1rem 1.25rem; }
+        .slide-body { padding: 1.25rem; }
+        .slide-footer { padding: 1.1rem 1.25rem; }
+        .student-card-preview { padding: 1.25rem; margin-bottom: 1.5rem; }
+
+        /* Any native input in this page's modals: 16px to prevent iOS zoom. */
+        .glass-input { font-size: 16px; }
+    }
 </style>
 @endpush
 
 @section('content')
-<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), {{ (int) hostelease_max_room_sharing() }}, @js(hostelease_sharing_labels()))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false">
+<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), {{ (int) hostelease_max_room_sharing() }}, @js(hostelease_sharing_labels()))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false; transferOpen = false; releaseOpen = false; feeGate.open = false; closeDetails()">
     
     <!-- Header -->
     <div class="pb-header flex-wrap gap-3">
         <div>
-            <h1 class="display-6 fw-bold mb-1">Property Board</h1>
+            <h1 class="h3 fw-bold mb-1">Property Board</h1>
             <p class="text-muted mb-0">Visualize and manage your entire hostel layout instantly.</p>
         </div>
-        <div class="d-flex gap-3 align-items-center">
-            <div class="pb-search-wrapper">
-                <i class="fa-solid fa-search"></i>
-                <input type="text" class="pb-search" placeholder="Find room or occupant..." x-model="searchQuery">
+        <div class="pb-toolbar d-flex gap-3 align-items-center">
+            <div class="he-search pb-search-field">
+                <span class="he-search__icon"><i class="fa-solid fa-search"></i></span>
+                <input type="text" class="he-search__input" placeholder="Find room or occupant..." x-model="searchQuery">
             </div>
-            <a href="{{ route('admin.floors.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
-                <i class="fa-solid fa-hammer me-2"></i>Layout Builder
+            <a href="{{ route('admin.floors.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold pb-builder-btn">
+                <i class="fa-solid fa-hammer me-2 pb-builder-ic"></i><span class="pb-builder-text">Layout Builder</span>
             </a>
         </div>
     </div>
@@ -716,81 +816,89 @@
         </div>
     </template>
 
-    <!-- Modals for Transfer and Release -->
+    <!-- Transfer & Release — canonical custom-overlay anatomy (matches the
+         fee-gate modal above; Alpine-driven, no Bootstrap). Both become
+         bottom sheets on mobile via the system rule in _premium.scss. -->
     <template x-teleport="body">
-        <div class="modal fade" id="transferModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST">
-                    @csrf @method('PATCH')
-                    <div class="modal-header border-0 pb-0 mt-2 ms-2">
-                        <h5 class="modal-title fw-bold fs-4">Transfer Student</h5>
-                        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <p class="text-muted">Move <strong x-text="panels.details.data.student_name"></strong> to a new bed.</p>
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Select New Bed</label>
-                            <select name="bed_id" class="glass-input bg-light" required>
-                                <option value="">Choose an available bed...</option>
-                                @foreach($allFloors as $f)
-                                    <optgroup label="{{ $f->name }}">
-                                        @foreach($f->rooms as $r)
-                                            @foreach($r->beds as $b)
-                                                @if($b->status === 'available' || $b->status === 'empty')
-                                                    <option value="{{ $b->id }}">Room {{ $r->room_number }} - Bed {{ $b->bed_number }}</option>
-                                                @endif
-                                            @endforeach
+        <div class="custom-overlay-backdrop" x-show="transferOpen" x-transition.opacity @click="transferOpen = false" x-cloak style="display: none;">
+            <form class="custom-overlay-modal" :class="{ 'is-open': transferOpen }" x-show="transferOpen" @click.stop
+                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST" style="display: none; max-width: 480px;">
+                @csrf @method('PATCH')
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid fa-right-left" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">Transfer Student</span>
+                    </h5>
+                    <button type="button" class="btn-close" @click="transferOpen = false"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <p class="text-muted">Move <strong x-text="panels.details.data.student_name"></strong> to a new bed.</p>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Select New Bed</label>
+                        <select name="bed_id" class="glass-input" required>
+                            <option value="">Choose an available bed...</option>
+                            @foreach($allFloors as $f)
+                                <optgroup label="{{ $f->name }}">
+                                    @foreach($f->rooms as $r)
+                                        @foreach($r->beds as $b)
+                                            @if($b->status === 'available' || $b->status === 'empty')
+                                                <option value="{{ $b->id }}">Room {{ $r->room_number }} - Bed {{ $b->bed_number }}</option>
+                                            @endif
                                         @endforeach
-                                    </optgroup>
-                                @endforeach
-                            </select>
-                        </div>
-                        
-                        <div class="mb-2">
-                            <label class="form-label fw-bold">Transfer Date</label>
-                            <input type="date" name="join_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required>
-                        </div>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="modal-footer border-0 pt-0 mb-2 me-2">
-                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary rounded-pill px-4">Transfer Now</button>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Transfer Date</label>
+                        <input type="date" name="join_date" class="glass-input" value="{{ now()->toDateString() }}" required>
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="custom-overlay-footer">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="transferOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                        <i class="fa-solid fa-right-left me-2"></i>Transfer Now
+                    </button>
+                </div>
+            </form>
         </div>
     </template>
 
     <template x-teleport="body">
-        <div class="modal fade" id="releaseModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <form class="modal-content" style="border-radius: 1.5rem; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST">
-                    @csrf @method('PATCH')
-                    <div class="modal-header border-0 pb-0 mt-2 ms-2">
-                        <h5 class="modal-title fw-bold fs-4 text-danger">Release Student</h5>
-                        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+        <div class="custom-overlay-backdrop" x-show="releaseOpen" x-transition.opacity @click="releaseOpen = false" x-cloak style="display: none;">
+            <form class="custom-overlay-modal" :class="{ 'is-open': releaseOpen }" x-show="releaseOpen" @click.stop
+                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST" style="display: none; max-width: 480px;">
+                @csrf @method('PATCH')
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0 text-danger">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="ms-1">Release Student</span>
+                    </h5>
+                    <button type="button" class="btn-close" @click="releaseOpen = false"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <p class="text-muted mb-4">Release <strong x-text="panels.details.data.student_name"></strong> from bed <strong x-text="panels.details.bed"></strong>? The bed will become available immediately.</p>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Leave Date</label>
+                        <input type="date" name="leave_date" class="glass-input" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
                     </div>
-                    <div class="modal-body p-4">
-                        <p class="text-muted mb-4">Release <strong x-text="panels.details.data.student_name"></strong> from bed <strong x-text="panels.details.bed"></strong>? The bed will become available immediately.</p>
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Leave Date</label>
-                            <input type="date" name="leave_date" class="glass-input bg-light" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
-                        </div>
-                        
-                        <div class="form-check p-3 bg-danger-subtle rounded-3 d-flex align-items-center">
-                            <input class="form-check-input m-0 flex-shrink-0" type="checkbox" name="mark_student_left" value="1" id="markLeft" checked style="width: 1.25rem; height: 1.25rem;">
-                            <label class="form-check-label ms-3 text-danger fw-bold lh-sm" for="markLeft">
-                                Also mark student as "Left" (Vacating Hostel entirely)
-                            </label>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-0 pt-0 mb-2 me-2">
-                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm">Release Student</button>
-                    </div>
-                </form>
-            </div>
+
+                    <label class="form-check p-3 bg-danger-subtle rounded-3 d-flex align-items-center m-0" for="markLeft" style="cursor: pointer;">
+                        <input class="form-check-input m-0 flex-shrink-0" type="checkbox" name="mark_student_left" value="1" id="markLeft" checked style="width: 1.25rem; height: 1.25rem;">
+                        <span class="ms-3 text-danger fw-bold lh-sm">Also mark student as "Left" (Vacating Hostel entirely)</span>
+                    </label>
+                </div>
+                <div class="custom-overlay-footer">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="releaseOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-danger fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                        <i class="fa-solid fa-right-from-bracket me-2"></i>Release Student
+                    </button>
+                </div>
+            </form>
         </div>
     </template>
 
@@ -822,6 +930,10 @@ document.addEventListener('alpine:init', () => {
                 data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '' }
             }
         },
+
+        // Transfer & Release overlays (canonical custom-overlay, Alpine-driven).
+        transferOpen: false,
+        releaseOpen: false,
 
         feeGate: {
             open: false,
@@ -953,14 +1065,12 @@ document.addEventListener('alpine:init', () => {
 
         openTransfer() {
             this.closeDetails();
-            const m = new bootstrap.Modal(document.getElementById('transferModal'));
-            m.show();
+            this.transferOpen = true;
         },
 
         openRelease() {
             this.closeDetails();
-            const m = new bootstrap.Modal(document.getElementById('releaseModal'));
-            m.show();
+            this.releaseOpen = true;
         }
     }));
 });

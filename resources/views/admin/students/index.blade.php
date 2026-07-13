@@ -1,14 +1,14 @@
 @extends('layouts.app')
 @section('title', 'Students')
 
-@section('content')
+@push('styles')
 <style>
-    /* Hero & Toolbar */
+    /* Hero — standard indigo→purple gradient (was an off-palette indigo→blue). */
     .students-hero {
-        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
-        border-radius: 1.5rem;
-        padding: 3rem 2rem 5rem;
-        color: white;
+        background: linear-gradient(135deg, var(--he-primary) 0%, var(--he-accent) 100%);
+        border-radius: var(--he-radius-lg);
+        padding: 2.5rem 2rem 4.5rem;
+        color: #fff;
         margin-bottom: -3rem;
         position: relative;
         overflow: hidden;
@@ -20,19 +20,20 @@
         content: '';
         position: absolute;
         top: -50%; right: -20%;
-        width: 300px; height: 300px;
-        background: rgba(255,255,255,0.1);
+        width: 320px; height: 320px;
+        background: rgba(255,255,255,0.12);
         border-radius: 50%;
-        filter: blur(40px);
+        filter: blur(45px);
         pointer-events: none;
     }
-    
+    .students-hero h1 { letter-spacing: -0.02em; }
+
+    /* Toolbar — card standard (was blur + heavy shadow). */
     .filter-toolbar {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255,255,255,0.8);
-        border-radius: 1.25rem;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+        background: var(--he-bg-surface);
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: var(--he-radius-lg);
+        box-shadow: var(--he-shadow-lg);
         padding: 1rem;
         position: relative;
         z-index: 10;
@@ -42,87 +43,68 @@
         align-items: center;
         justify-content: space-between;
     }
-    .search-input-wrapper {
-        position: relative;
+    /* Search uses the canonical `.he-search` (see _premium.scss); only the
+       page-level width lives here. */
+    .students-search {
         flex-grow: 1;
         max-width: 400px;
     }
-    .search-input-wrapper i {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #94a3b8;
-    }
-    .search-input {
-        width: 100%;
-        padding: 0.75rem 1rem 0.75rem 2.5rem;
-        border-radius: 2rem;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
-        transition: all 0.3s;
-    }
-    .search-input:focus {
-        background: #fff;
-        border-color: var(--he-primary);
-        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
-        outline: none;
-    }
-    
-    /* Segmented Filter Pills */
+
+    /* Filter chips — outlined pills that fill with the brand gradient when
+       active; soft primary tint on hover. Wrap (never a scroll strip). */
     .filter-pills {
         display: flex;
+        flex-wrap: wrap;
         gap: 0.5rem;
-        background: #f1f5f9;
-        padding: 0.35rem;
-        border-radius: 2rem;
-        overflow-x: auto;
     }
-    .filter-pills::-webkit-scrollbar { display: none; }
     .filter-pill {
-        border: none;
-        background: transparent;
-        padding: 0.5rem 1.25rem;
-        border-radius: 1.5rem;
+        border: 1.5px solid rgba(0, 0, 0, 0.08);
+        background: var(--he-bg-surface);
+        padding: 0.5rem 1.15rem;
+        border-radius: var(--he-radius-full);
         font-weight: 600;
-        font-size: 0.9rem;
-        color: #64748b;
-        transition: all 0.3s;
+        font-size: 0.85rem;
+        color: var(--he-text-muted);
+        transition: all 0.2s var(--ease-out-expo);
         white-space: nowrap;
-    }
-    .filter-pill.active {
-        background: #fff;
-        color: var(--he-primary);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        cursor: pointer;
     }
     .filter-pill:hover:not(.active) {
-        color: #1e293b;
+        border-color: var(--he-primary);
+        color: var(--he-primary);
+        background: var(--he-primary-soft);
+    }
+    .filter-pill.active {
+        background: linear-gradient(135deg, var(--he-primary), var(--he-accent));
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
     }
 
     /* ID Badge Cards */
     .id-card {
-        background: #fff;
-        border-radius: 1.5rem;
-        border: 1px solid #e2e8f0;
+        background: var(--he-bg-surface);
+        border-radius: var(--he-radius-lg);
+        border: 1px solid rgba(0,0,0,0.05);
         overflow: hidden;
         position: relative;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
         display: block;
         text-decoration: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        box-shadow: var(--he-shadow-sm);
     }
     .id-card:hover {
-        transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        transform: translateY(-6px);
+        box-shadow: var(--he-shadow-float);
     }
     .id-card-banner {
         height: 80px;
         position: relative;
     }
-    .banner-active { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .banner-active { background: linear-gradient(135deg, var(--he-success) 0%, #059669 100%); }
     .banner-left { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
-    .banner-nobed { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-    
+    .banner-nobed { background: linear-gradient(135deg, var(--he-warning) 0%, #d97706 100%); }
+
     .id-avatar-wrapper {
         position: absolute;
         top: 40px;
@@ -132,13 +114,13 @@
         height: 80px;
         border-radius: 50%;
         padding: 4px;
-        background: #fff;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        background: var(--he-bg-surface);
+        box-shadow: var(--he-shadow-md);
         z-index: 2;
-        transition: all 0.3s;
+        transition: transform 0.3s var(--ease-out-expo);
     }
     .id-card:hover .id-avatar-wrapper {
-        transform: translateX(-50%) scale(1.1);
+        transform: translateX(-50%) scale(1.08);
     }
     .id-avatar {
         width: 100%;
@@ -151,16 +133,16 @@
         text-align: center;
     }
     .id-name {
-        color: #1e293b;
+        color: var(--he-text-main);
         font-weight: 800;
         font-size: 1.15rem;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.35rem;
     }
     .id-status-badge {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 700;
         padding: 0.3rem 0.75rem;
-        border-radius: 1rem;
+        border-radius: var(--he-radius-full);
         display: inline-flex;
         align-items: center;
         gap: 0.3rem;
@@ -168,16 +150,16 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    .status-active { background: #d1fae5; color: #047857; }
-    .status-left { background: #f1f5f9; color: #475569; }
-    
+    .status-active { background: var(--he-success-soft); color: #047857; }
+    .status-left { background: var(--he-bg-surface-raised); color: var(--he-text-muted); }
+
     /* Bento Info Grid */
     .id-info-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.5rem;
-        background: #f8fafc;
-        border-radius: 1rem;
+        background: var(--he-bg-canvas);
+        border-radius: var(--he-radius-md);
         padding: 0.75rem;
     }
     .id-info-item {
@@ -185,26 +167,26 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 0.5rem;
-        border-radius: 0.75rem;
-        background: #fff;
-        border: 1px solid #e2e8f0;
+        padding: 0.6rem 0.5rem;
+        border-radius: var(--he-radius-sm);
+        background: var(--he-bg-surface);
+        border: 1px solid rgba(0,0,0,0.04);
     }
     .id-info-val {
         font-weight: 700;
-        color: #334155;
-        font-size: 0.85rem;
-        margin-top: 0.25rem;
+        color: var(--he-text-main);
+        font-size: 0.82rem;
+        margin-top: 0.3rem;
     }
     .id-info-icon {
-        color: #94a3b8;
+        color: var(--he-text-muted);
         font-size: 1rem;
     }
 
     /* Hover Overlay Action */
     .id-overlay {
         position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
+        inset: 0;
         background: rgba(255,255,255,0.7);
         backdrop-filter: blur(4px);
         z-index: 10;
@@ -212,37 +194,49 @@
         align-items: center;
         justify-content: center;
         opacity: 0;
-        transition: opacity 0.3s;
-        border-radius: 1.5rem;
+        transition: opacity 0.3s var(--ease-out-expo);
+        border-radius: var(--he-radius-lg);
     }
     .id-card:hover .id-overlay {
         opacity: 1;
     }
     .overlay-btn {
         background: var(--he-primary);
-        color: white;
+        color: #fff;
         border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 2rem;
+        padding: 0.7rem 1.4rem;
+        border-radius: var(--he-radius-full);
         font-weight: 700;
-        transform: translateY(20px);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateY(16px);
+        transition: transform 0.3s var(--ease-out-expo);
         box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
     }
     .id-card:hover .overlay-btn {
         transform: translateY(0);
     }
-    
-    /* Cascade Animation */
-    .student-item {
-        animation: cascadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
-    }
-    @keyframes cascadeIn {
-        from { opacity: 0; transform: translateY(30px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
+
+    /* Mobile — native, dense; heading uses the standard 2.2rem/1.5 scale. */
+    @media (max-width: 576px) {
+        .students-hero {
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 1.75rem 1.35rem 4rem;
+        }
+        .students-hero h1 { font-size: 2.2rem; line-height: 1.5; margin-bottom: 0.1rem; }
+        .students-hero p { font-size: 1rem; line-height: 1.5; }
+        .students-hero .btn { display: none; } /* the FAB is the mobile add action */
+        .filter-toolbar { padding: 0.85rem; gap: 0.75rem; }
+        .students-search { max-width: none; width: 100%; }
+        /* Chips fill the row: one row if they fit, else they wrap and each
+           row stretches to full width (no orphan chip on its own). */
+        .filter-pills { width: 100%; }
+        .filter-pills .filter-pill { flex: 1 1 auto; text-align: center; }
+        .id-card-body { padding: 3rem 1.1rem 1.1rem; }
     }
 </style>
+@endpush
 
+@section('content')
 <div x-data="studentList()" class="page-enter">
     
     <!-- Hero Banner -->
@@ -258,9 +252,9 @@
 
     <!-- Toolbar -->
     <div class="filter-toolbar mb-4">
-        <div class="search-input-wrapper">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" class="search-input" placeholder="Search by name, mobile, room..." x-model="query">
+        <div class="he-search students-search">
+            <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" class="he-search__input" placeholder="Search by name, mobile, room..." x-model="query">
         </div>
         <div class="filter-pills">
             <button class="filter-pill" :class="{ active: filter === '' }" @click="filter = ''">All</button>
@@ -273,7 +267,7 @@
     </div>
 
     <!-- Student Cards Grid -->
-    <div class="row g-4">
+    <div class="row g-4 stagger">
         @forelse($students as $index => $s)
             @php
                 $asg = $s->activeAssignment;
@@ -288,7 +282,6 @@
                 }
             @endphp
         <div class="col-12 col-md-6 col-lg-4 col-xl-3 student-item"
-             style="animation-delay: {{ $index * 0.05 }}s;"
              x-show="matchesSearch('{{ strtolower(addslashes($s->name)) }}', '{{ $s->mobile }}', '{{ $asg ? strtolower($asg->bed->room->room_number) : '' }}', '{{ $s->status }}', '{{ $s->occupation_type }}')">
              
             <a href="{{ route('admin.students.show', $s) }}" class="id-card">
@@ -344,29 +337,33 @@
         </div>
         @empty
         <div class="col-12">
-            <div class="empty-state bg-white p-5 rounded-4 shadow-sm text-center border">
-                <i class="fa-solid fa-users d-block text-muted mb-3" style="font-size: 3rem;"></i>
-                <h4 class="fw-bold text-dark">No students found</h4>
-                <p class="text-muted">Add your first student to get started.</p>
-                <a href="{{ route('admin.students.create') }}" class="btn btn-primary rounded-pill px-4 mt-2">
-                    <i class="fa-solid fa-plus me-1"></i> Add Student
-                </a>
+            <div class="card-premium">
+                <x-he-empty-state icon="users" title="No students found"
+                    subtitle="Add your first student to get started.">
+                    <a href="{{ route('admin.students.create') }}" class="btn btn-primary rounded-pill px-4 mt-3 tactile-btn">
+                        <i class="fa-solid fa-plus me-1"></i> Add Student
+                    </a>
+                </x-he-empty-state>
             </div>
         </div>
         @endforelse
     </div>
 
     <!-- No Results Message -->
-    <div class="empty-state bg-white p-5 rounded-4 shadow-sm text-center border mt-4" x-show="noResults" x-cloak>
-        <i class="fa-solid fa-magnifying-glass d-block text-muted mb-3" style="font-size: 3rem;"></i>
-        <h4 class="fw-bold text-dark">No Matches</h4>
-        <p class="text-muted">No students match your search or filter criteria.</p>
+    <div class="card-premium mt-4" x-show="noResults" x-cloak>
+        <x-he-empty-state icon="magnifying-glass" title="No matches"
+            subtitle="No students match your search or filter criteria." />
     </div>
 
-    <!-- Mobile FAB -->
-    <a href="{{ route('admin.students.create') }}" class="fab d-md-none" title="Add Student">
-        <i class="fa-solid fa-plus"></i>
-    </a>
+    {{-- Mobile FAB — teleported to <body> so its position:fixed anchors to
+         the viewport. Inside .page-enter the entrance animation leaves a
+         lingering transform, which would trap the fixed FAB to the page
+         (it'd sit at the end of the content instead of the screen corner). --}}
+    <template x-teleport="body">
+        <a href="{{ route('admin.students.create') }}" class="fab" title="Add Student">
+            <i class="fa-solid fa-plus"></i>
+        </a>
+    </template>
 </div>
 
 @push('scripts')
