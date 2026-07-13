@@ -252,46 +252,6 @@ main h1 { font-weight: 800; letter-spacing: -.01em; }
 .btn-whatsapp { background: #25D366; border-color: #25D366; color: #fff; }
 .btn-whatsapp:hover { background: #1ebe5b; border-color: #1ebe5b; color: #fff; }
 
-/* ---------- Bento dashboard ---------- */
-.bento {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-auto-rows: 134px;
-    grid-auto-flow: row dense;
-    gap: 1rem;
-}
-.bento .bento-card {
-    background: #fff;
-    border: 1px solid #e6e8ef;
-    border-radius: 1.25rem;
-    padding: 1.1rem 1.2rem;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
-    overflow: hidden;
-    transition: transform .15s ease, box-shadow .15s ease;
-    display: flex;
-    flex-direction: column;
-    text-decoration: none;
-    color: inherit;
-}
-.bento .bento-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(16, 24, 40, .10); }
-.bento .c2 { grid-column: span 2; }
-.bento .r2 { grid-row: span 2; }
-.bento .bento-icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 1.15rem; }
-.bento .bento-value { font-size: 1.7rem; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
-.bento .bento-label { color: #6b7280; font-size: .82rem; }
-.bento .bento-card.hero { background: linear-gradient(135deg, #2563eb, #1e3a8a); color: #fff; border: none; }
-.bento .bento-card.hero .bento-label { color: rgba(255, 255, 255, .8); }
-.bento canvas { flex: 1 1 auto; min-height: 0; }
-.bento .bento-list { overflow-y: auto; margin: 0; }
-
-@media (max-width: 991.98px) {
-    .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 126px; }
-    .bento .c2 { grid-column: span 2; }
-}
-@media (max-width: 575.98px) {
-    .bento { gap: .7rem; grid-auto-rows: 110px; }
-    .bento .bento-value { font-size: 1.3rem; }
-    .bento .bento-card { padding: .85rem .9rem; border-radius: 1rem; }
-    .bento .bento-icon { width: 36px; height: 36px; font-size: .95rem; border-radius: 11px; }
-}
+/* Bento dashboard grid — canonical definition lives in _premium.scss now
+   (single source; used to be duplicated here with different values). */
 

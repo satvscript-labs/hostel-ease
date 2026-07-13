@@ -3,52 +3,9 @@
 
 @section('content')
 <style>
-    /* iOS Smoothness & Hover Micro-Motion */
-    .glass-tile {
-        background: #ffffff;
-        border: 1px solid rgba(0,0,0,0.02);
-        transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-    .glass-tile:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.05) !important;
-    }
-    .tactile-btn {
-        transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .tactile-btn:active {
-        transform: scale(0.97);
-    }
-    
-    /* Glowing Avatar wrapper */
-    .tile-icon-wrapper {
-        position: relative;
-        z-index: 2;
-    }
-    .tile-icon-wrapper::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: inherit;
-        filter: blur(12px);
-        opacity: 0.6;
-        z-index: -1;
-        border-radius: inherit;
-        transition: opacity 0.4s ease;
-    }
-    .glass-tile:hover .tile-icon-wrapper::after {
-        opacity: 0.9;
-    }
-
-    /* Staggered Fade Up Animations */
-    .stagger-1 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.1s both; }
-    .stagger-2 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.15s both; }
-    .stagger-3 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.2s both; }
-    
-    @keyframes fadeUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    /* Page-specific bits only — shared tokens/utilities (.glass-tile,
+       .tactile-btn, .tile-icon-wrapper, .stagger-N, fadeUp) now live in
+       _premium.scss. */
 
     /* Fluid Attendance Pills */
     .attendance-pill-group {
@@ -406,11 +363,8 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mode</label>
-                            <select name="mode" class="form-select bg-light border-0 shadow-none">
-                                <option value="cash">Cash</option>
-                                <option value="upi">UPI</option>
-                                <option value="bank">Bank Transfer</option>
-                            </select>
+                            <x-he-select name="mode" icon="wallet" :submit="false" :selected="'cash'"
+                                :options="['cash' => 'Cash', 'upi' => 'UPI', 'bank' => 'Bank Transfer']" />
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Notes / Ref</label>

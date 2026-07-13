@@ -15,7 +15,12 @@ class StoreHostelRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->mobile) {
-            $this->merge(['mobile' => substr(preg_replace('/\D+/', '', $this->mobile), -10)]);
+            // Store in the same +91XXXXXXXXXX form as every other login (owners,
+            // staff, students — see LoginController). Bare 10-digit numbers here
+            // meant a new branch never matched its existing owner (a duplicate
+            // customer was created) and the auto-created owner login could never
+            // sign in, since login normalises the entered number to +91 form.
+            $this->merge(['mobile' => '+91'.substr(preg_replace('/\D+/', '', $this->mobile), -10)]);
         }
     }
 
@@ -27,7 +32,7 @@ class StoreHostelRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150'],
             'owner_name' => ['required', 'string', 'max:150'],
-            'mobile' => ['required', 'digits:10'],
+            'mobile' => ['required', 'regex:/^\+91\d{10}$/'],
             'email' => ['nullable', 'email', 'max:150'],
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -49,6 +54,7 @@ class StoreHostelRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'mobile.regex' => 'Enter a valid 10-digit mobile number.',
             'mobile.unique' => 'This mobile number is already used by another login.',
         ];
     }

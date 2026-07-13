@@ -2,14 +2,10 @@
 @section('title', 'Add Student')
 
 @section('content')
-<div class="page-enter">
-    <!-- Header -->
-    <div class="d-flex align-items-center gap-3 mb-4">
-        <a href="{{ route('admin.students.index') }}" class="btn btn-white rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-            <i class="fa-solid fa-arrow-left text-muted"></i>
-        </a>
-        <h1 class="h3 fw-bold mb-0">Add New Student</h1>
-    </div>
+<div class="page-enter" x-data>
+    {{-- Header --}}
+    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-white rounded-pill px-3 mb-3 shadow-sm fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i> Students</a>
+    <h1 class="form-page-title fw-bold mb-4">Add New Student</h1>
 
     @if($errors->any())
         <div class="alert alert-danger rounded-4 border-danger-subtle mb-4">
@@ -17,7 +13,7 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('admin.students.store') }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ route('admin.students.store') }}" enctype="multipart/form-data" id="studentForm">
         @csrf
         @include('admin.students._form', ['student' => null])
     </form>

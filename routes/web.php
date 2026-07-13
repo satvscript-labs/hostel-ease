@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\FloorController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentModeController;
-use App\Http\Controllers\Admin\PromiseController;
 use App\Http\Controllers\Admin\PropertyController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoomController;
@@ -27,7 +26,9 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\SuperAdmin\AccountController;
 use App\Http\Controllers\SuperAdmin\AdminController;
+use App\Http\Controllers\SuperAdmin\DiscountController;
 use App\Http\Controllers\SuperAdmin\BackupController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboard;
 use App\Http\Controllers\SuperAdmin\HostelController;
@@ -95,6 +96,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
         Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
         Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
+
+        // Owner self-serve consolidated billing (Phase 6)
+        Route::get('subscription', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('subscription.index');
+        Route::post('subscription/renew-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'renewOrder'])->name('subscription.renew-order');
+        Route::post('subscription/add-branch-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranchOrder'])->name('subscription.add-branch-order');
+        Route::post('subscription/verify', [\App\Http\Controllers\Admin\SubscriptionController::class, 'verify'])->name('subscription.verify');
     });
 
     /*
@@ -107,6 +114,26 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
         // --- Module 12: Hostels, Subscriptions, Admins ---
         Route::resource('hostels', HostelController::class);
+
+        // Customers / Accounts (account-level billing control terminal)
+        Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
+        Route::get('accounts/{account}', [AccountController::class, 'show'])->name('accounts.show');
+        Route::post('accounts/{account}/renew', [AccountController::class, 'renew'])->name('accounts.renew');
+        Route::post('accounts/{account}/add-branch', [AccountController::class, 'addBranch'])->name('accounts.add-branch');
+        Route::post('accounts/{account}/align', [AccountController::class, 'align'])->name('accounts.align');
+        Route::post('accounts/{account}/comp', [AccountController::class, 'comp'])->name('accounts.comp');
+        Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
+        Route::post('accounts/{account}/suspend', [AccountController::class, 'suspend'])->name('accounts.suspend');
+        Route::post('accounts/{account}/reactivate', [AccountController::class, 'reactivate'])->name('accounts.reactivate');
+        Route::post('accounts/{account}/discounts', [AccountController::class, 'storeDiscount'])->name('accounts.discounts.store');
+        Route::delete('accounts/{account}/discounts/{discount}', [AccountController::class, 'revokeDiscount'])->name('accounts.discounts.revoke');
+
+        // Discounts management (volume tiers + manual discount overview)
+        Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
+        Route::post('discounts/rules', [DiscountController::class, 'storeRule'])->name('discounts.rules.store');
+        Route::put('discounts/rules/{rule}', [DiscountController::class, 'updateRule'])->name('discounts.rules.update');
+        Route::patch('discounts/rules/{rule}/toggle', [DiscountController::class, 'toggleRule'])->name('discounts.rules.toggle');
+        Route::delete('discounts/rules/{rule}', [DiscountController::class, 'destroyRule'])->name('discounts.rules.destroy');
 
         Route::get('subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::post('subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');
@@ -141,6 +168,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::middleware('access:property')->group(function () {
                 Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');
                 Route::post('floors/reorder', [FloorController::class, 'reorder'])->name('floors.reorder');
+                Route::patch('floors/sharing-settings', [FloorController::class, 'updateSharingSettings'])->name('floors.sharing-settings');
                 Route::resource('floors', FloorController::class)->only(['index', 'store', 'update', 'destroy']);
                 Route::resource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
                 Route::get('beds/{bed}/history', [BedController::class, 'history'])->name('beds.history');
@@ -185,9 +213,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
                 // Payment modes
                 Route::resource('payment-modes', PaymentModeController::class)->only(['index', 'store', 'update', 'destroy']);
-
-                // Promise to pay
-                Route::put('promise/{type}/{id}', [PromiseController::class, 'update'])->name('promise.update');
 
                 // AC Bills
                 Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);

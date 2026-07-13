@@ -20,7 +20,7 @@
         color: white;
         padding: 3rem 2.5rem;
         box-shadow: 0 20px 40px rgba(79, 70, 229, 0.25);
-        animation: fade-up 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        animation: fadeUp 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     
     .hero-mesh {
@@ -77,7 +77,7 @@
         transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         opacity: 0;
         transform: translateY(20px);
-        animation: fade-up 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        animation: fadeUp 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     .action-tile:hover {
         transform: translateY(-5px);
@@ -119,8 +119,13 @@
     .action-tile:nth-child(4) { animation-delay: 0.25s; }
     .action-tile:nth-child(5) { animation-delay: 0.3s; }
 
-    /* 3. Financial Snapshot Bento */
-    .bento-card {
+    /* 3. Financial Snapshot Bento
+       NB: named .dash-card (not .bento-card) on purpose — .bento-card is a
+       canonical component in _premium.scss with different radius/shadow;
+       reusing that name here would silently shadow the global one (the exact
+       two-definitions drift the design law warns against). This is a
+       dashboard-local rich card, so it gets its own name. */
+    .dash-card {
         background: #fff;
         border-radius: 1.5rem;
         padding: 1.5rem;
@@ -128,7 +133,7 @@
         border: 1px solid rgba(0,0,0,0.02);
         opacity: 0;
         transform: translateY(20px);
-        animation: fade-up 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        animation: fadeUp 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     .bento-finance { grid-column: span 12; animation-delay: 0.3s; }
     @media(min-width: 992px) { .bento-finance { grid-column: span 8; } }
@@ -144,7 +149,37 @@
         border-radius: 1rem;
         background: var(--he-bg-canvas);
         border: 1px solid rgba(0,0,0,0.02);
+        min-width: 0; /* let the value shrink/wrap instead of forcing the grid track wider */
     }
+    .f-metric-value {
+        font-size: var(--he-text-xl);
+        line-height: 1.15;
+        /* Amounts can reach lakhs/crore (₹99,99,999.00) — never truncate money;
+           let it wrap as a last resort instead of overflowing the tile. */
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    /* Card header "view all" link — a text pill on desktop, an icon-only
+       circle on mobile (see mobile pass) so it can never wrap or crowd the
+       title, no matter how narrow the viewport. */
+    .dash-link-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+        padding: 0.4rem 0.9rem;
+        border-radius: var(--he-radius-full);
+        background: var(--he-bg-surface-raised);
+        color: var(--he-text-main);
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s var(--ease-out-expo);
+    }
+    .dash-link-btn:hover { background: var(--he-primary-soft); color: var(--he-primary); }
+    .dash-link-icon { font-size: 0.7rem; opacity: 0.6; }
+    .dash-card-header h3 { min-width: 0; }
 
     /* 4. Operations & Occupancy */
     .bento-pulse { grid-column: span 12; animation-delay: 0.4s; }
@@ -215,9 +250,87 @@
     .feed-marker.bg-warning { box-shadow: 0 0 10px rgba(245, 158, 11, 0.4), 0 0 0 1px rgba(0,0,0,0.05); }
     .feed-marker.bg-info { box-shadow: 0 0 10px rgba(14, 165, 233, 0.4), 0 0 0 1px rgba(0,0,0,0.05); }
 
-    @keyframes fade-up {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+    /* Chart skeleton — shown until Chart.js has drawn, so the card never
+       "pops" its content in on load (per the design law's skeleton rule). */
+    .chart-shell { position: relative; height: 250px; }
+    .chart-shell canvas { position: relative; z-index: 1; }
+    .chart-skeleton {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border-radius: var(--he-radius-md);
+        transition: opacity 0.4s var(--ease-out-expo);
+    }
+    .chart-shell.is-ready .chart-skeleton { opacity: 0; pointer-events: none; }
+
+    /* fadeUp is defined once, canonically, in _premium.scss — not redeclared here. */
+
+    /* ─── Mobile pass (spec 02 §1: no scroll strips, compact density) ─── */
+    @media (max-width: 767.98px) {
+        .dash-grid { gap: 0.85rem; }
+        .dash-hero { padding: 1.75rem 1.25rem; border-radius: 1.15rem; }
+        .dash-hero h1 { font-size: 1.6rem; }
+        .dash-hero .hero-badge { font-size: 0.75rem; padding: 0.4rem 0.8rem; margin-bottom: 0.75rem; }
+        .dash-hero .fs-5 { font-size: 0.95rem !important; }
+        .dash-card { padding: 1.1rem; border-radius: 1.15rem; }
+
+        /* Quick actions become a wrapping grid — no horizontal-scroll strip. */
+        .quick-actions-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.55rem;
+            overflow: visible;
+            padding-bottom: 0;
+        }
+        .action-tile { min-width: 0; padding: 0.8rem 0.4rem; border-radius: 0.9rem; }
+        .action-icon { width: 38px; height: 38px; font-size: 0.95rem; margin-bottom: 0.5rem; border-radius: 11px; }
+        .action-tile .small { font-size: 0.7rem; line-height: 1.2; }
+
+        /* Card header: title stays one line; the "view all" link collapses
+           to an icon-only circle so it never wraps or crowds the title,
+           regardless of viewport width. */
+        .dash-card-header h3 { font-size: 0.95rem; }
+        .dash-link-btn {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            justify-content: center;
+        }
+        .dash-link-text { display: none; }
+        .dash-link-icon { font-size: 0.7rem; opacity: 1; }
+
+        /* Financial metrics go vertical on mobile — a 3-column grid squeezes
+           lakh/crore-sized values into ~75px tiles, which forces wrapping no
+           matter how small the font gets. A single-column row list (label
+           left, value right, matching the .pulse-stat-row pattern already
+           used lower on this page) gives each value the card's full width,
+           so it never needs to wrap or shrink to an unreadable size. */
+        .finance-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .f-metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.75rem;
+        }
+        .f-metric > div:first-child {
+            margin-bottom: 0 !important;
+            flex: 1 1 auto;
+            min-width: 0; /* label may wrap/shrink first — the value never does */
+        }
+        .f-metric-value {
+            font-size: 1rem;
+            flex: 0 0 auto;
+            white-space: nowrap; /* the value's turn to own the row never comes second */
+        }
+
+        .radial-widget svg { width: 132px; height: 132px; }
+        .pulse-stat-row { padding: 0.6rem 0; }
     }
 </style>
 @endpush
@@ -263,34 +376,38 @@
     </div>
 
     {{-- 3. Financial Snapshot Bento --}}
-    <div class="bento-card bento-finance">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="dash-card bento-finance">
+        <div class="dash-card-header d-flex justify-content-between align-items-center mb-4">
             <h3 class="h5 fw-bold mb-0">Financial Snapshot</h3>
-            <a href="{{ route('admin.finance.index') }}" class="btn btn-sm btn-light rounded-pill px-3">View Finances</a>
+            <a href="{{ route('admin.finance.index') }}" class="dash-link-btn">
+                <span class="dash-link-text">View Finances</span>
+                <i class="fa-solid fa-chevron-right dash-link-icon"></i>
+            </a>
         </div>
-        
+
         <div class="finance-metrics">
             <div class="f-metric">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Monthly Income</div>
-                <div class="fs-4 fw-bold text-success">{{ hostelease_money($stats['monthly_income']) }}</div>
+                <div class="f-metric-value fw-bold text-success">{{ hostelease_money($stats['monthly_income']) }}</div>
             </div>
             <div class="f-metric">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Pending Dues</div>
-                <div class="fs-4 fw-bold text-danger">{{ hostelease_money($stats['pending_fees']) }}</div>
+                <div class="f-metric-value fw-bold text-danger">{{ hostelease_money($stats['pending_fees']) }}</div>
             </div>
             <div class="f-metric">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Monthly Expenses</div>
-                <div class="fs-4 fw-bold text-warning">{{ hostelease_money($stats['expenses_month']) }}</div>
+                <div class="f-metric-value fw-bold text-warning">{{ hostelease_money($stats['expenses_month']) }}</div>
             </div>
         </div>
         
-        <div style="height: 250px; position: relative;">
+        <div class="chart-shell" id="revenueChartShell">
+            <div class="chart-skeleton skeleton"></div>
             <canvas id="revenueChart"></canvas>
         </div>
     </div>
 
     {{-- 4. Operations & Occupancy (Pulse) --}}
-    <div class="bento-card bento-pulse">
+    <div class="dash-card bento-pulse">
         <h3 class="h5 fw-bold mb-4">Hostel Pulse</h3>
         
         <div class="radial-widget" x-data="{ pct: 0 }" x-init="setTimeout(() => pct = {{ $stats['occupancy_pct'] }}, 300)">
@@ -341,7 +458,7 @@
     </div>
 
     {{-- 5. Unified Live Feed --}}
-    <div class="bento-card bento-feed">
+    <div class="dash-card bento-feed">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h3 class="h5 fw-bold mb-0">Live Activity Feed</h3>
         </div>
@@ -361,10 +478,8 @@
                     </div>
                 </div>
             @empty
-                <div class="text-muted py-4 text-center">
-                    <i class="fa-solid fa-mug-hot d-block fs-3 mb-2 opacity-50"></i>
-                    No recent activity.
-                </div>
+                <x-he-empty-state icon="mug-hot" title="No recent activity"
+                    subtitle="New payments, check-ins and alerts will show up here as they happen." />
             @endforelse
         </div>
     </div>
@@ -372,11 +487,14 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    
+    // Chart.js is already bundled in app.js (window.Chart) — no CDN re-load.
+    const canvas = document.getElementById('revenueChart');
+    if (!canvas || !window.Chart) return;
+    const Chart = window.Chart;
+    const ctx = canvas.getContext('2d');
+
     // Create glowing gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     gradient.addColorStop(0, 'rgba(79, 70, 229, 0.3)');
@@ -441,6 +559,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Chart is drawn — fade the skeleton out.
+    document.getElementById('revenueChartShell')?.classList.add('is-ready');
 });
 </script>
 @endpush

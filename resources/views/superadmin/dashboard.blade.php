@@ -47,8 +47,8 @@
         <p class="text-muted mb-0 small">Platform overview, revenue, and active subscriptions.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ route('superadmin.subscriptions.index') }}" class="btn btn-primary shadow-sm rounded-pill px-4">
-            <i class="fa-solid fa-receipt me-2"></i> Subscriptions
+        <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-primary shadow-sm rounded-pill px-4">
+            <i class="fa-solid fa-users-gear me-2"></i> Customers
         </a>
     </div>
 </div>
@@ -115,32 +115,33 @@
     <div class="card-body p-0">
         <div class="p-4 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center">
             <h5 class="fw-bold mb-0 text-dark">Upcoming Renewals (30 days)</h5>
-            <a href="{{ route('superadmin.hostels.index') }}" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm fw-medium">View All Hostels</a>
+            <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm fw-medium">View All Customers</a>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">
                     <tr>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Hostel Branch</th>
                         <th class="py-3 px-4 text-muted fw-semibold border-0">Owner</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Expiry Date</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0 text-center">Branches</th>
+                        <th class="py-3 px-4 text-muted fw-semibold border-0">Renewal Date</th>
                         <th class="py-3 px-4 text-muted fw-semibold border-0">Days Left</th>
                         <th class="py-3 px-4 text-muted fw-semibold border-0 text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody class="border-top-0">
-                @forelse($upcomingRenewals as $h)
+                @forelse($upcomingRenewals as $account)
+                    @php($days = $account->daysUntilAnchor())
                     <tr>
-                        <td class="px-4 py-3 fw-bold text-dark">{{ $h->name }}</td>
-                        <td class="px-4 py-3 fw-medium text-secondary">{{ $h->owner_name }}</td>
-                        <td class="px-4 py-3 text-dark fw-medium">{{ optional($h->subscription_end)->format('d M Y') }}</td>
+                        <td class="px-4 py-3 fw-bold text-dark">{{ $account->owner?->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-center fw-medium text-secondary">{{ count($account->owner?->accessibleHostelIds() ?? []) }}</td>
+                        <td class="px-4 py-3 text-dark fw-medium">{{ optional($account->current_period_end)->format('d M Y') }}</td>
                         <td class="px-4 py-3">
-                            <span class="badge bg-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }} border border-{{ $h->daysUntilExpiry() <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3 py-1">
-                                {{ $h->daysUntilExpiry() }} days
+                            <span class="badge bg-{{ $days <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $days <= 7 ? 'danger' : 'warning' }} border border-{{ $days <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3 py-1">
+                                {{ $days }} days
                             </span>
                         </td>
                         <td class="px-4 py-3 text-end">
-                            <a href="{{ route('superadmin.subscriptions.index') }}" class="btn btn-sm btn-light text-primary rounded-pill fw-semibold px-3 shadow-sm" title="Manage Subscription">
+                            <a href="{{ route('superadmin.accounts.show', $account) }}" class="btn btn-sm btn-light text-primary rounded-pill fw-semibold px-3 shadow-sm" title="Open account">
                                 Renew
                             </a>
                         </td>

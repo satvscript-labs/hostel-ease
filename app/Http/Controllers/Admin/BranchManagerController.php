@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\Subscription;
 use App\Services\ActivityLogger;
+use App\Services\Billing\AccountBillingService;
 use App\Services\BranchBillingService;
 use App\Services\RazorpayService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
@@ -23,6 +26,7 @@ class BranchManagerController extends Controller
 {
     public function __construct(
         protected BranchBillingService $billing,
+        protected AccountBillingService $accountBilling,
         protected RazorpayService $razorpay,
         protected ActivityLogger $logger,
     ) {
@@ -145,23 +149,63 @@ class BranchManagerController extends Controller
             return response()->json(['message' => 'Payment verification failed. You have not been charged.'], 400);
         }
 
-        // Idempotent check
-        if (! Subscription::where('transaction_number', $data['razorpay_payment_id'])->exists()) {
-            $quote = $this->billing->quote($branch, $data['period']);
+        // Idempotency fast-path; the DB unique index on transaction_number is the real guard (below).
+        if (Subscription::where('transaction_number', $data['razorpay_payment_id'])->exists()) {
+            return response()->json([
+                'message' => 'Payment already confirmed — branch subscription is active.',
+                'redirect' => route('admin.settings.index').'?tab=branches',
+            ]);
+        }
 
-            $subscription = $this->billing->renewBranch($branch, $data['period'], [
-                'amount' => $quote['amount'],
+        $quote = $this->billing->quote($branch, $data['period']);
+
+        // Server-side amount verification: never trust the client for the captured amount.
+        // Signature already proved authenticity; if the fetch fails we fall back to the quote.
+        $amount = $quote['amount'];
+        try {
+            $payment = $this->razorpay->fetchPayment($data['razorpay_payment_id']);
+
+            if ($payment['order_id'] && $payment['order_id'] !== $data['razorpay_order_id']) {
+                Log::warning('Razorpay verify: payment/order mismatch', [
+                    'payment' => $payment['id'], 'expected_order' => $data['razorpay_order_id'], 'payment_order' => $payment['order_id'],
+                ]);
+
+                return response()->json(['message' => 'Payment verification failed.'], 400);
+            }
+
+            if ($payment['amount'] !== $quote['amount_paise']) {
+                Log::warning('Razorpay verify: captured amount differs from quote', [
+                    'payment' => $payment['id'], 'expected_paise' => $quote['amount_paise'], 'captured_paise' => $payment['amount'],
+                ]);
+            }
+
+            // Record what was actually captured.
+            $amount = $payment['amount'] / 100;
+        } catch (RuntimeException $e) {
+            Log::warning('Razorpay verify: payment fetch failed, using quote amount', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $subscription = $this->accountBilling->recordBranchRenewal($branch, $data['period'], [
+                'amount' => $amount,
                 'payment_status' => 'paid',
                 'payment_method' => 'online',
                 'transaction_number' => $data['razorpay_payment_id'],
-                'remarks' => 'Razorpay order '.$data['razorpay_order_id'].' · Branch: '.$branch->name,
+                'razorpay_order_id' => $data['razorpay_order_id'],
+                'remarks' => 'Razorpay · Branch: '.$branch->name,
             ]);
 
             $this->logger->log(
                 'subscription.paid',
-                "Online {$data['period']} renewal for {$branch->name} — ".hostelease_money($quote['amount']),
+                "Online {$data['period']} renewal for {$branch->name} — ".hostelease_money($amount),
                 $subscription,
             );
+        } catch (QueryException $e) {
+            // A concurrent delivery (the server-side webhook) already recorded this payment id.
+            // The unique index turned the race into a clean no-op instead of a double-grant.
+            if ((string) $e->getCode() !== '23000') {
+                throw $e;
+            }
         }
 
         return response()->json([

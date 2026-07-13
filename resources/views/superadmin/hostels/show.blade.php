@@ -209,7 +209,7 @@
                     <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
                         <i class="fa-solid fa-receipt text-primary"></i> Billing & Subscriptions
                     </h2>
-                    <a href="{{ route('superadmin.subscriptions.index') }}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                    <a href="{{ $account ? route('superadmin.accounts.show', $account) : route('superadmin.subscriptions.index') }}" class="btn btn-primary rounded-pill px-4 shadow-sm">
                         <i class="fa-solid fa-rotate me-2"></i> Add / Renew
                     </a>
                 </div>

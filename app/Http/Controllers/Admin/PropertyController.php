@@ -26,11 +26,13 @@ class PropertyController extends Controller
      */
     public function index(Request $request): View
     {
-        // 1. Eager load the entire property hierarchy for the visual board
+        // 1. Eager load the entire property hierarchy for the visual board.
+        //    Beds sort by their numeric part (B1..B10..Bn), not as text —
+        //    a plain orderBy('bed_number') would put B10 right after B1.
         $floors = Floor::with(['rooms' => function($q) {
             $q->orderBy('room_number');
         }, 'rooms.beds' => function($q) {
-            $q->orderBy('bed_number');
+            $q->orderByRaw('CAST(SUBSTRING(bed_number, 2) AS UNSIGNED)');
         }, 'rooms.beds.activeAssignment.student'])->ordered()->get();
 
         // Also fetch floors again just for the transfer dropdown, grouped correctly

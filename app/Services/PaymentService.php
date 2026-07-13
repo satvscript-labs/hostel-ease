@@ -23,10 +23,18 @@ class PaymentService
         return DB::transaction(function () use ($data) {
             $hostelId = $data['hostel_id'] ?? \App\Support\Tenant::id();
 
+            // Never trust a caller's credit_used beyond what the student actually has,
+            // even though the controller also validates this (defense in depth).
+            $studentForCredit = Student::find($data['student_id']);
+            $creditUsed = min(
+                (float) ($data['credit_used'] ?? 0),
+                (float) ($studentForCredit->credit_balance ?? 0),
+            );
+
             $payment = new Payment([
                 'student_id' => $data['student_id'],
                 'amount' => $data['amount'],
-                'credit_used' => $data['credit_used'] ?? 0,
+                'credit_used' => $creditUsed,
                 'mode' => $data['mode'],
                 'reference_number' => $data['reference_number'] ?? null,
                 'paid_on' => $data['paid_on'] ?? now()->toDateString(),
@@ -37,7 +45,7 @@ class PaymentService
             $payment->receipt_number = $this->uniqueReceiptNumber($hostelId);
             $payment->save();
 
-            $student = Student::find($payment->student_id);
+            $student = $studentForCredit;
             if ($student && $payment->credit_used > 0) {
                 $student->credit_balance = max(0, (float) $student->credit_balance - (float) $payment->credit_used);
                 $student->save();

@@ -19,7 +19,7 @@ class LedgerSummaryExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection()
     {
-        return Student::with(['semesterFees', 'monthlyRents', 'acBillShares', 'payments'])
+        return Student::with(['invoices', 'payments'])
             ->orderBy('name')->get();
     }
 

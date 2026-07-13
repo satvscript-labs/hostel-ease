@@ -33,11 +33,26 @@ class BedGenerator
 
             if ($target > $current) {
                 for ($i = $current + 1; $i <= $target; $i++) {
-                    $room->beds()->create([
-                        'hostel_id' => $room->hostel_id,
-                        'bed_number' => 'B'.$i,
-                        'status' => 'empty',
-                    ]);
+                    $bedNumber = 'B'.$i;
+
+                    // Beds are soft-deleted when a room shrinks, so their
+                    // (room_id, bed_number) row still occupies the unique
+                    // index — growing back past that number must restore it
+                    // rather than insert, or it collides with itself.
+                    $existing = $room->beds()->withTrashed()->where('bed_number', $bedNumber)->first();
+
+                    if ($existing) {
+                        $existing->restore();
+                        $existing->status = 'empty';
+                        $existing->save();
+                    } else {
+                        $room->beds()->create([
+                            'hostel_id' => $room->hostel_id,
+                            'bed_number' => $bedNumber,
+                            'status' => 'empty',
+                        ]);
+                    }
+
                     $created++;
                 }
             } elseif ($target < $current) {

@@ -2,13 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\AcBillStudent;
 use App\Models\Hostel;
-use App\Models\MonthlyRent;
+use App\Models\Invoice;
 use App\Models\Notification;
-use App\Models\SemesterFee;
 use App\Models\Student;
 use App\Models\StudentDocument;
+use App\Models\SubscriptionAccount;
 use App\Support\Tenant;
 
 /**
@@ -74,15 +73,13 @@ class NotificationService
         $this->toggle($leaving > 0, $hostel->id, 'leaving_soon', 'leaving7',
             'Students leaving soon', "{$leaving} student(s) leaving within 7 days.", 'warning');
 
-        // Pending fees (semester + monthly rent)
-        $feeDue = (float) SemesterFee::where('status', '!=', 'paid')->sum('balance')
-            + (float) MonthlyRent::where('status', '!=', 'paid')->sum('balance');
+        // Pending fees (fee + rent + other invoices, excluding AC)
+        $feeDue = (float) Invoice::where('type', '!=', 'ac')->where('status', '!=', 'paid')->sum('balance');
         $this->toggle($feeDue > 0, $hostel->id, 'fee_pending', 'fees',
             'Pending fees', hostelease_money($feeDue).' outstanding across students.', 'warning');
 
         // Pending AC bills
-        $acDue = (float) (AcBillStudent::where('status', '!=', 'paid')->sum('amount')
-            - AcBillStudent::where('status', '!=', 'paid')->sum('paid_amount'));
+        $acDue = (float) Invoice::where('type', 'ac')->where('status', '!=', 'paid')->sum('balance');
         $this->toggle($acDue > 0, $hostel->id, 'ac_pending', 'ac',
             'Pending AC bills', hostelease_money($acDue).' AC dues outstanding.', 'info');
 
@@ -101,16 +98,25 @@ class NotificationService
 
     /**
      * Build renewal alerts for the Super Admin (hostel_id = null feed).
+     * Account-level (not per-branch): a renewal now covers every co-terminated
+     * branch on one anchor, so one alert per account avoids near-duplicate
+     * entries for multi-branch customers.
      */
     public function generateForSuperAdmin(): void
     {
-        foreach (Hostel::expiringWithin(30)->get() as $hostel) {
-            $days = $hostel->daysUntilExpiry();
-            $this->push(null, 'renewal_due', 'hostel:'.$hostel->id,
-                "Renewal due — {$hostel->name}",
-                "Subscription "
-                .($days < 0 ? 'expired' : "expires in {$days} day(s)").
-                ' ('.optional($hostel->subscription_end)->format('d M Y').').',
+        // One-time cleanup: pre-account-model alerts were keyed per-branch
+        // ('hostel:id'); drop any stale entries before regenerating per-account.
+        Notification::where('hostel_id', null)->where('type', 'renewal_due')
+            ->whereNull('read_at')->where('data->sig', 'like', 'hostel:%')->delete();
+
+        foreach (SubscriptionAccount::expiringWithin(30)->with('owner')->get() as $account) {
+            $days = $account->daysUntilAnchor();
+            $owner = $account->owner?->name ?? 'Unknown owner';
+            $this->push(null, 'renewal_due', 'account:'.$account->id,
+                "Renewal due — {$owner}",
+                'Subscription '
+                .($days < 0 ? 'expired' : "expires in {$days} day(s)")
+                .' ('.optional($account->current_period_end)->format('d M Y').').',
                 $days <= 7 ? 'danger' : 'warning');
         }
     }
@@ -121,13 +127,11 @@ class NotificationService
     protected function promisesDueCount(): int
     {
         $today = now()->toDateString();
-        $due = fn ($q) => $q->whereNotNull('promise_date')
-            ->whereDate('promise_date', '<=', $today)
-            ->where('status', '!=', 'paid');
 
-        return SemesterFee::where($due)->count()
-            + MonthlyRent::where($due)->count()
-            + AcBillStudent::where($due)->count();
+        return Invoice::whereNotNull('promise_date')
+            ->whereDate('promise_date', '<=', $today)
+            ->where('status', '!=', 'paid')
+            ->count();
     }
 
     protected function toggle(bool $condition, ?int $hostelId, string $type, string $sig, string $title, string $message, string $level): void

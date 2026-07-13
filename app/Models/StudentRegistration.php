@@ -13,7 +13,8 @@ class StudentRegistration extends Model
     protected $fillable = [
         'hostel_id', 'name', 'mobile', 'father_mobile', 'mother_mobile',
         'aadhaar', 'address', 'city', 'state', 'occupation_type',
-        'joining_date', 'photo', 'status', 'student_id', 'reviewed_at',
+        'college', 'field_of_study', 'joining_date', 'photo', 'aadhaar_file',
+        'status', 'student_id', 'reviewed_at',
     ];
 
     protected function casts(): array

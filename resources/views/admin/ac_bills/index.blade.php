@@ -32,7 +32,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card glass-tile h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
+            <div class="card h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">AC Collected</div>
@@ -46,7 +46,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card glass-tile h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
+            <div class="card h-100 border-0 shadow-sm" style="border-radius: 1.25rem; background: #fff;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">AC Dues</div>
@@ -107,7 +107,7 @@
                     <i class="fa-solid fa-chevron-down text-muted small ms-2 transition-all" :class="{'fa-chevron-up': floorOpen}"></i>
                 </div>
                 
-                <div x-show="floorOpen" @click.outside="floorOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
+                <div x-show="floorOpen" @click.outside.capture="floorOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
                     <div class="list-group list-group-flush rounded-4 py-2">
                         <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-4 {{ !$filterFloor ? 'active bg-primary text-white fw-bold' : 'text-dark fw-medium' }}" @click="$refs.filterForm.floor.value=''; $refs.filterForm.submit()">
                             <i class="fa-solid fa-layer-group fa-fw me-2 {{ !$filterFloor ? '' : 'text-muted' }}"></i> All Floors
@@ -124,9 +124,9 @@
     </div>
 
     <!-- List View -->
-    <div class="d-flex flex-column gap-3">
+    <div class="d-flex flex-column gap-3 stagger">
         @forelse($bills as $index => $bill)
-        <div class="card border-0 shadow-sm rounded-4 ac-item" style="animation-delay: {{ min($index * 50, 500) }}ms;">
+        <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-3 p-md-4">
                 <div class="row align-items-center m-0 w-100">
                     
@@ -303,15 +303,4 @@
 
 </div>
 
-@push('scripts')
-<style>
-    .ac-item {
-        animation: cascadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
-    }
-    @keyframes cascadeIn {
-        from { opacity: 0; transform: translateY(30px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-</style>
-@endpush
 @endsection

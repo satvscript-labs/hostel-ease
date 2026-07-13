@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreHostelRequest;
 use App\Models\Hostel;
 use App\Services\ActivityLogger;
+use App\Services\Billing\AccountBillingService;
 use App\Services\HostelService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -15,6 +16,7 @@ class HostelController extends Controller
     public function __construct(
         protected HostelService $hostels,
         protected ActivityLogger $logger,
+        protected AccountBillingService $billing,
     ) {
     }
 
@@ -79,11 +81,17 @@ class HostelController extends Controller
             ->load(['admins.hostels', 'subscriptions' => fn ($q) => $q->latest('end_date')]);
 
         $ownerAdmin = \App\Models\User::where('mobile', $hostel->mobile)->where('role', 'hostel_admin')->first();
-        $branches = $ownerAdmin 
-            ? \App\Models\Hostel::whereIn('id', $ownerAdmin->accessibleHostelIds())->orderBy('name')->get() 
+        $branches = $ownerAdmin
+            ? \App\Models\Hostel::whereIn('id', $ownerAdmin->accessibleHostelIds())->orderBy('name')->get()
             : collect([$hostel]);
 
-        return view('superadmin.hostels.show', compact('hostel', 'branches'));
+        // Where the "Add / Renew" button should send the Super Admin: the new
+        // Account 360 terminal when this branch's owner already has an account,
+        // falling back to the legacy per-branch page otherwise (e.g. a branch
+        // with no linked hostel_admin login yet).
+        $account = $this->billing->accountForBranch($hostel);
+
+        return view('superadmin.hostels.show', compact('hostel', 'branches', 'account'));
     }
 
 

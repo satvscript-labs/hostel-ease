@@ -39,4 +39,9 @@ class AcBill extends Model
     {
         return $this->belongsTo(Room::class);
     }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class, 'ac_bill_id');
+    }
 }

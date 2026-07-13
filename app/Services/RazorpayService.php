@@ -16,6 +16,8 @@ class RazorpayService
 {
     private const ORDERS_URL = 'https://api.razorpay.com/v1/orders';
 
+    private const PAYMENTS_URL = 'https://api.razorpay.com/v1/payments';
+
     public function isConfigured(): bool
     {
         return (bool) config('services.razorpay.enabled')
@@ -70,6 +72,44 @@ class RazorpayService
             'amount' => (int) $data['amount'],
             'currency' => $data['currency'],
             'receipt' => $data['receipt'] ?? null,
+        ];
+    }
+
+    /**
+     * Fetch a captured payment from Razorpay for server-side verification
+     * (authoritative amount/status/order_id — never trust the client for these).
+     *
+     * @return array{id:string,amount:int,currency:string,status:string,order_id:?string}
+     *
+     * @throws RuntimeException on auth failure or API error.
+     */
+    public function fetchPayment(string $paymentId): array
+    {
+        if (! $this->isConfigured()) {
+            throw new RuntimeException('Razorpay is not configured.');
+        }
+
+        $response = Http::withBasicAuth(
+            config('services.razorpay.key'),
+            config('services.razorpay.secret'),
+        )->acceptJson()->get(self::PAYMENTS_URL.'/'.$paymentId);
+
+        if ($response->status() === 401) {
+            throw new RuntimeException('Razorpay authentication failed.', 401);
+        }
+        if ($response->failed()) {
+            $message = $response->json('error.description') ?? 'Razorpay payment fetch failed.';
+            throw new RuntimeException($message, $response->status() ?: 500);
+        }
+
+        $data = $response->json();
+
+        return [
+            'id' => $data['id'] ?? $paymentId,
+            'amount' => (int) ($data['amount'] ?? 0),
+            'currency' => $data['currency'] ?? 'INR',
+            'status' => $data['status'] ?? '',
+            'order_id' => $data['order_id'] ?? null,
         ];
     }
 

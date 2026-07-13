@@ -108,7 +108,7 @@
                     <i class="fa-solid fa-chevron-down text-muted small ms-2 transition-all" :class="{'fa-chevron-up': categoryOpen}"></i>
                 </div>
                 
-                <div x-show="categoryOpen" @click.outside="categoryOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
+                <div x-show="categoryOpen" @click.outside.capture="categoryOpen = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-3" style="min-width: 240px; left: 0; display: none; z-index: 1050;">
                     <div class="list-group list-group-flush rounded-4 py-2">
                         <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-4 {{ request('category') == '' ? 'active bg-primary text-white fw-bold' : 'text-dark fw-medium' }}" @click="$refs.filterForm.category.value=''; $refs.filterForm.submit()">
                             <i class="fa-solid fa-layer-group me-2 {{ request('category') == '' ? '' : 'text-muted' }}"></i> All Categories
@@ -222,11 +222,9 @@
                     <div class="row gx-3">
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Category <span class="text-danger">*</span></label>
-                            <select name="category" class="form-select bg-light" required>
-                                @foreach(config('hostelease.expense_categories') as $k=>$l)
-                                    <option value="{{ $k }}">{{ $l }}</option>
-                                @endforeach
-                            </select>
+                            <x-he-select name="category" icon="tags" :submit="false"
+                                :selected="array_key_first(config('hostelease.expense_categories'))"
+                                :options="config('hostelease.expense_categories')" />
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Date <span class="text-danger">*</span></label>
@@ -249,11 +247,9 @@
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">Payment Mode</label>
-                            <select name="mode" class="form-select bg-light">
-                                @foreach(config('hostelease.payment_modes') as $k=>$l)
-                                    <option value="{{ $k }}">{{ $l }}</option>
-                                @endforeach
-                            </select>
+                            <x-he-select name="mode" icon="wallet" :submit="false"
+                                :selected="array_key_first(config('hostelease.payment_modes'))"
+                                :options="config('hostelease.payment_modes')" />
                         </div>
                     </div>
 

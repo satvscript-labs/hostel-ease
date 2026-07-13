@@ -3,12 +3,8 @@
 
 @push('styles')
 <style>
-    :root {
-        --he-panel-bg: rgba(255, 255, 255, 0.85);
-        --he-backdrop: blur(24px);
-        --he-border: 1px solid rgba(255, 255, 255, 0.9);
-        --he-shadow-premium: 0 10px 40px rgba(0, 0, 0, 0.04);
-    }
+    /* No per-view :root token redeclaration (design law) — use the canonical
+       tokens from _premium.scss directly. */
     .form-layout {
         display: grid;
         grid-template-columns: 1fr;
@@ -21,63 +17,86 @@
         }
     }
     .premium-panel {
-        background: var(--he-panel-bg);
-        backdrop-filter: var(--he-backdrop);
-        border: var(--he-border);
-        border-radius: 1.5rem;
-        box-shadow: var(--he-shadow-premium);
+        background: var(--he-bg-surface);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        border-radius: var(--he-radius-lg);
+        box-shadow: var(--he-shadow-sm);
     }
+    .form-page-title { font-size: 1.6rem; letter-spacing: -0.01em; }
+
+    /* Mobile sticky Save bar — teleported to <body> (fixed can't live inside
+       .page-enter's transformed root; see mobile audit rule 10). Reconnects
+       to the form via form="studentForm". */
+    .form-mobile-bar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 1030;
+        display: flex; gap: 0.75rem;
+        padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+        background: var(--he-bg-surface);
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.06);
+    }
+    @media (min-width: 992px) { .form-mobile-bar { display: none; } }
+    /* Room for the sticky bar so it never covers the last field (matches the
+       bar's <992px visibility). */
+    @media (max-width: 991.98px) { .form-layout { padding-bottom: 4.5rem; } }
     .form-control, .form-select {
-        background-color: #f8fafc !important;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
+        background-color: var(--he-bg-surface-raised) !important;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: var(--he-radius-md);
         padding: 0.75rem 1rem;
-        transition: all 0.2s;
+        transition: all 0.2s var(--ease-out-expo);
         font-weight: 500;
     }
     .form-control:focus, .form-select:focus {
-        background-color: #fff !important;
+        background-color: var(--he-bg-surface) !important;
         border-color: var(--he-primary);
-        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        box-shadow: 0 0 0 4px var(--he-primary-soft);
     }
     .input-group-text {
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: var(--he-radius-md);
     }
     .photo-upload-wrap {
         width: 140px;
         height: 140px;
         border-radius: 50%;
-        border: 4px solid white;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        border: 4px solid var(--he-bg-surface);
+        box-shadow: var(--he-shadow-md);
         margin: 0 auto;
         position: relative;
         overflow: hidden;
-        background: #f1f5f9;
+        background: var(--he-bg-surface-raised);
         cursor: pointer;
     }
     .photo-upload-wrap img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        transition: transform 0.3s ease;
+        transition: transform 0.3s var(--ease-out-expo);
     }
     .upload-overlay {
         position: absolute;
         inset: 0;
-        background: rgba(0,0,0,0.5);
+        background: rgba(0, 0, 0, 0.5);
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
+        color: #fff;
         opacity: 0;
-        transition: opacity 0.2s;
+        transition: opacity 0.2s var(--ease-out-expo);
     }
     .photo-upload-wrap:hover .upload-overlay {
         opacity: 1;
     }
     .photo-upload-wrap:hover img {
         transform: scale(1.05);
+    }
+
+    @media (max-width: 576px) {
+        .form-control, .form-select { font-size: 16px; } /* ≥16px stops iOS zoom */
+        .form-page-title { font-size: 2.2rem; line-height: 1.5; } /* mobile heading standard */
     }
 </style>
 @endpush
@@ -116,7 +135,8 @@
             <p class="text-muted small fw-bold mb-0">JPG, PNG · max 4MB</p>
         </div>
 
-        <div class="premium-panel p-4">
+        {{-- Desktop actions (mobile uses the sticky bar below). --}}
+        <div class="premium-panel p-4 d-none d-lg-block">
             <h3 class="h6 fw-bold mb-3 text-uppercase text-muted">Actions</h3>
             <button type="submit" class="btn btn-premium w-100 rounded-pill fw-bold shadow-sm mb-3 py-2">
                 <i class="fa-solid fa-floppy-disk me-2"></i> {{ $student ? 'Update Student' : 'Save Student' }}
@@ -124,7 +144,7 @@
             <a href="{{ $student ? route('admin.students.show', $student) : route('admin.students.index') }}" class="btn btn-light w-100 rounded-pill fw-bold py-2 border">
                 Cancel
             </a>
-            
+
             @unless($student)
                 <div class="alert alert-info mt-4 mb-0 py-2 small fw-bold rounded-4 border-info-subtle">
                     <i class="fa-solid fa-info-circle me-1"></i>
@@ -163,7 +183,7 @@
                             <i class="fa-solid fa-chevron-down text-muted small transition-all" :class="{'fa-chevron-up': occDropdown}"></i>
                         </div>
                         
-                        <div x-show="occDropdown" @click.outside="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
+                        <div x-show="occDropdown" @click.outside.capture="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
                             <div class="list-group list-group-flush rounded-4 py-2">
                                 @foreach(config('hostelease.occupation_types') as $k => $label)
                                 <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium" data-occ="{{ $k }}" :class="occupation === '{{ $k }}' ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="occupation = '{{ $k }}'; occDropdown = false;">
@@ -256,13 +276,22 @@
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label fw-bold small">Status <span class="text-danger">*</span></label>
-                    <select name="status" class="form-select" required>
-                        <option value="active" @selected(old('status', $student?->status ?? 'active') === 'active')>Active</option>
-                        <option value="left" @selected(old('status', $student?->status) === 'left')>Left</option>
-                    </select>
+                    <x-he-select name="status" icon="toggle-on" :submit="false"
+                        :selected="old('status', $student?->status ?? 'active')"
+                        :options="['active' => 'Active', 'left' => 'Left']" />
                 </div>
             </div>
         </div>
 
     </div>
 </div>
+
+{{-- Mobile sticky Save bar (teleported so position:fixed anchors to the viewport). --}}
+<template x-teleport="body">
+    <div class="form-mobile-bar" x-data>
+        <a href="{{ $student ? route('admin.students.show', $student) : route('admin.students.index') }}" class="btn btn-light border rounded-pill fw-bold px-4 py-2">Cancel</a>
+        <button type="submit" form="studentForm" class="btn btn-premium rounded-pill fw-bold py-2 flex-grow-1">
+            <i class="fa-solid fa-floppy-disk me-2"></i>{{ $student ? 'Update Student' : 'Save Student' }}
+        </button>
+    </div>
+</template>

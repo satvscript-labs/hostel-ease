@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\PaymentService;
 use App\Services\ImageService;
 use App\Services\StorageService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -35,7 +36,7 @@ class StudentController extends Controller
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
-            'credit_used' => ['nullable', 'numeric', 'min:0'],
+            'credit_used' => ['nullable', 'numeric', 'min:0', 'max:'.(float) $student->credit_balance],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             'remarks' => ['nullable', 'string', 'max:500'],
@@ -265,11 +266,11 @@ class StudentController extends Controller
         return response()->json($preview);
     }
 
-    public function updateFeeSettings(Request $request, Student $student, \App\Services\ProrationService $prorationService): RedirectResponse
+    public function updateFeeSettings(Request $request, Student $student, \App\Services\ProrationService $prorationService): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'room_preference' => ['nullable', 'string', 'in:AC,Non-AC'],
-            'sharing_preference' => ['nullable', 'string', 'in:Single,Double,Triple,Quad'],
+            'sharing_preference' => ['nullable', 'string', Rule::in(hostelease_sharing_labels())],
             'fee_frequency' => ['required', 'string', 'in:monthly,semester,yearly'],
             'fee_amount' => ['required', 'numeric', 'min:0'],
         ]);
@@ -277,6 +278,11 @@ class StudentController extends Controller
         // If the student already has an invoice, we use ProrationService to handle the change
         if ($student->invoices()->count() > 0) {
             $prorationService->apply($student, $data);
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true]);
+            }
+
             return redirect()->route('admin.students.show', $student)
                 ->with('success', 'Plan changed and prorated invoice generated successfully.');
         }
@@ -309,6 +315,10 @@ class StudentController extends Controller
         }
 
         $this->logger->log('student.fee_settings', "Updated fee settings for {$student->name}", $student);
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Fee settings updated successfully.');

@@ -9,14 +9,15 @@
 
     {{-- Global Search --}}
     <div class="topbar-search" :class="{ 'is-focused': searchOpen }" data-search-url="{{ route('search') }}">
-        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <span class="search-icon-badge"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" id="global-search" class="search-input"
                placeholder="{{ $user->isSuperAdmin() ? __('Search hostels…') : __('Search students, rooms, beds…') }}"
                autocomplete="off"
                @focus="searchOpen = true" @blur="searchOpen = false">
         <kbd class="search-kbd d-none d-md-inline-flex">⌘K</kbd>
+
+        <div id="search-results" class="he-search-panel"></div>
     </div>
-    <div id="search-results" class="dropdown-menu w-100 shadow-lg border-0 rounded-4 mt-2" style="max-height: 400px; overflow-y: auto;"></div>
 
     {{-- Right Side Actions --}}
     <div class="topbar-actions">
@@ -206,36 +207,53 @@
     .topbar-hamburger:hover .hamburger-line { background: #0f172a; }
 
     /* ─── Search Bar ──────────────────────────────────────── */
+    /* Global search — same premium language as the canonical `.he-search`
+       page field (icon badge + 14px radius + raised surface + primary focus
+       ring), implemented inline here because the topbar search is a flex row
+       carrying the ⌘K hint and the results panel. Keep the two visually in
+       step. */
     .topbar-search {
+        position: relative; /* positioning context for .he-search-panel */
         flex-grow: 1;
         max-width: 420px;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.45rem 0.85rem;
-        border-radius: 10px;
-        background: #f1f5f9;
-        border: 1.5px solid transparent;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        gap: 0.6rem;
+        padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+        border-radius: 14px;
+        background: var(--he-bg-surface-raised, #f1f5f9);
+        border: 1.5px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .topbar-search.is-focused {
         background: #fff;
         border-color: var(--he-primary, #4f46e5);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
     }
-    .search-icon {
-        color: #94a3b8;
-        font-size: 0.85rem;
+    .search-icon-badge {
+        width: 30px;
+        height: 30px;
         flex-shrink: 0;
-        transition: color 0.2s ease;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--he-primary-soft, rgba(79, 70, 229, 0.1));
+        color: var(--he-primary, #4f46e5);
+        font-size: 0.75rem;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .topbar-search.is-focused .search-icon { color: var(--he-primary, #4f46e5); }
+    .topbar-search.is-focused .search-icon-badge {
+        background: var(--he-primary, #4f46e5);
+        color: #fff;
+    }
     .search-input {
         border: none;
         background: transparent;
         outline: none;
         flex: 1;
-        font-size: 0.85rem;
+        min-width: 0;
+        font-size: 0.9rem;
         color: #0f172a;
         font-weight: 500;
     }
@@ -331,6 +349,104 @@
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         transform: translateY(-1px);
     }
+
+    /* ─── Global Search Results ───────────────────────────── */
+    /* Self-positioned relative to .topbar-search (not Bootstrap's
+       .dropdown-menu, which needs Popper.js for its "position: absolute;
+       inset: 0" to resolve correctly — this panel is toggled by plain JS,
+       so it gets its own anchored positioning instead, matching the
+       .he-select-menu pattern used elsewhere in the app). */
+    .he-search-panel {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        max-height: 400px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.4rem;
+        background: var(--he-bg-surface);
+        border-radius: var(--he-radius-md);
+        box-shadow: var(--he-shadow-lg);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-6px) scale(0.98);
+        transition: opacity 0.18s var(--ease-out-expo), transform 0.18s var(--ease-out-expo);
+    }
+    .he-search-panel.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0) scale(1);
+    }
+    @media (max-width: 575.98px) {
+        .he-search-panel { left: -0.5rem; right: -0.5rem; }
+    }
+    .he-search-group {
+        font-size: var(--he-text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+        color: var(--he-text-muted);
+        padding: 0.5rem 0.6rem 0.25rem;
+    }
+    .he-search-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 0.6rem;
+        border-radius: 0.6rem;
+        text-decoration: none;
+        color: var(--he-text-main);
+        transition: background 0.15s var(--ease-out-expo);
+    }
+    .he-search-item:hover { background: var(--he-primary-soft); }
+    .he-search-item.is-loading { pointer-events: none; }
+    .he-search-ic {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--he-primary-soft);
+        color: var(--he-primary);
+        font-size: 0.85rem;
+    }
+    .he-search-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .he-search-label {
+        font-weight: 600;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .he-search-sub {
+        color: var(--he-text-muted);
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .he-search-go {
+        opacity: 0;
+        color: var(--he-primary);
+        font-size: 0.75rem;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .he-search-item:hover .he-search-go { opacity: 1; transform: translateX(2px); }
+    .he-search-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1.75rem 1rem;
+        color: var(--he-text-muted);
+    }
+    .he-search-empty i { font-size: 1.5rem; opacity: 0.3; }
+    .he-search-empty span { font-size: var(--he-text-sm); }
 
     /* ─── Topbar Mobile Responsive ────────────────────────── */
     @media (max-width: 575.98px) {

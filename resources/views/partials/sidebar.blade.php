@@ -27,13 +27,21 @@
                 <span class="sidebar-link-icon"><i class="fa-solid fa-gauge-high"></i></span>
                 <span class="sidebar-link-label">{{ __('Dashboard') }}</span>
             </a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.accounts.*') ? 'is-active' : '' }}" href="{{ route('superadmin.accounts.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-users-gear"></i></span>
+                <span class="sidebar-link-label">{{ __('Customers') }}</span>
+            </a>
             <a class="sidebar-link {{ request()->routeIs('superadmin.hostels.*') ? 'is-active' : '' }}" href="{{ route('superadmin.hostels.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-hotel"></i></span>
                 <span class="sidebar-link-label">{{ __('Hostels') }}</span>
             </a>
-            <a class="sidebar-link {{ request()->routeIs('superadmin.subscriptions.*') ? 'is-active' : '' }}" href="{{ route('superadmin.subscriptions.index') }}">
-                <span class="sidebar-link-icon"><i class="fa-solid fa-receipt"></i></span>
-                <span class="sidebar-link-label">{{ __('Subscriptions') }}</span>
+            {{-- Legacy per-branch Subscriptions page: superseded by Customers/Account 360
+                 for day-to-day work. Kept reachable by direct URL (superadmin.subscriptions.*
+                 routes/controller untouched) as a power-user fallback; removed from the
+                 primary nav to avoid two competing "billing" entry points. --}}
+            <a class="sidebar-link {{ request()->routeIs('superadmin.discounts.*') ? 'is-active' : '' }}" href="{{ route('superadmin.discounts.index') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-percent"></i></span>
+                <span class="sidebar-link-label">{{ __('Discounts') }}</span>
             </a>
             <a class="sidebar-link {{ request()->routeIs('superadmin.activity') ? 'is-active' : '' }}" href="{{ route('superadmin.activity') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-list-check"></i></span>
@@ -160,6 +168,14 @@
     ═══════════════════════════════════════════════════════════════ --}}
     <div class="sidebar-footer">
         <div class="sidebar-divider"></div>
+
+        @if($user->isHostelAdmin())
+        {{-- Subscription (owner self-serve billing) --}}
+        <a class="sidebar-link {{ request()->routeIs('admin.subscription.*') ? 'is-active' : '' }}" href="{{ route('admin.subscription.index') }}">
+            <span class="sidebar-link-icon"><i class="fa-solid fa-credit-card"></i></span>
+            <span class="sidebar-link-label">{{ __('Subscription') }}</span>
+        </a>
+        @endif
 
         @if(!$user->isSuperAdmin())
         {{-- Settings (pinned to bottom) --}}

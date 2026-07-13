@@ -38,6 +38,16 @@ class Hostel extends Model
         return $this->registration_token;
     }
 
+    /**
+     * Largest number of beds this hostel allows in a single room, set via the
+     * Layout Builder's "Room Settings" panel. Falls back to the system
+     * default until an owner has configured their own.
+     */
+    public function maxRoomSharing(): int
+    {
+        return (int) ($this->settings['max_room_sharing'] ?? config('hostelease.default_max_room_sharing', 7));
+    }
+
     protected function casts(): array
     {
         return [
@@ -82,10 +92,25 @@ class Hostel extends Model
         return $this->hasMany(Student::class);
     }
 
+    /**
+     * Access gate. A short grace window (config('hostelease.grace_days')) extends
+     * access past subscription_end without moving the date itself — the anchor
+     * stays the true renewal date everywhere else (quotes, proration, co-termination);
+     * only this check sees the grace extension (BR-18).
+     */
     public function isActive(): bool
     {
-        return $this->status === 'active'
-            && (! $this->subscription_end || ! $this->subscription_end->isPast());
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        if (! $this->subscription_end) {
+            return true;
+        }
+
+        $graceDays = (int) config('hostelease.grace_days', 0);
+
+        return ! $this->subscription_end->copy()->addDays($graceDays)->isPast();
     }
 
     public function isExpired(): bool

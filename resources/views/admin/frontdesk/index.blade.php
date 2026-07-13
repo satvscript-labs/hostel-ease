@@ -3,33 +3,6 @@
 
 @section('content')
 <style>
-    /* Premium Stats Cards */
-    .stat-card-glass {
-        border-radius: 1.25rem;
-        padding: 1.5rem;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        border: none;
-    }
-    .stat-card-glass::after {
-        content: '';
-        position: absolute;
-        top: -30px; right: -30px;
-        width: 100px; height: 100px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.1);
-        pointer-events: none;
-    }
-    .stat-card-visitors { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); }
-    .stat-card-complaints-open { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); }
-    .stat-card-complaints-prog { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-    .stat-card-complaints-res { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-    
     /* Searchable Select (Alpine) */
     .search-select-wrapper {
         position: relative;
@@ -86,50 +59,6 @@
     }
     .search-select-option:hover { background: #f1f5f9; }
     
-    /* Custom Overlay Modal */
-    .custom-overlay-backdrop {
-        position: fixed; inset: 0;
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(8px);
-        z-index: 1040;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-    }
-    .custom-overlay-modal {
-        width: 100%; max-width: 550px;
-        background: #fff;
-        border-radius: 1.25rem;
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-        display: flex;
-        flex-direction: column;
-        max-height: 85vh;
-        transform: scale(0.95);
-        opacity: 0;
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        overflow: hidden;
-    }
-    .custom-overlay-modal.is-open { transform: scale(1); opacity: 1; }
-    .custom-overlay-header {
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        display: flex; justify-content: space-between; align-items: center;
-        background: #fff;
-    }
-    .custom-overlay-body {
-        padding: 1.5rem;
-        overflow-y: auto;
-        flex-grow: 1;
-        background: #fafafa;
-    }
-    .custom-overlay-footer {
-        padding: 1.25rem 1.5rem;
-        border-top: 1px solid rgba(0,0,0,0.05);
-        background: #fff;
-        display: flex; gap: 1rem; justify-content: flex-end;
-    }
-    
     /* Priority Radios */
     .priority-selector { display: flex; gap: 0.5rem; }
     .priority-label {
@@ -166,17 +95,6 @@
         0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
         70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
         100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-
-    /* Staggered Fade Up Animations */
-    .stagger-1 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.1s both; }
-    .stagger-2 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.15s both; }
-    .stagger-3 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.2s both; }
-    .stagger-4 { animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.25s both; }
-    
-    @keyframes fadeUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
     }
 </style>
 
@@ -240,10 +158,8 @@
             <div class="col-12 col-md-8 d-flex justify-content-md-end align-items-end">
                 <form method="GET" action="{{ route('admin.frontdesk.index') }}" class="d-flex gap-2 bg-white p-2 rounded-pill shadow-sm border border-light">
                     <input type="hidden" name="tab" value="visitors">
-                    <select name="filter" class="form-select border-0 bg-light rounded-pill fw-medium" onchange="this.form.submit()" style="min-width: 150px;">
-                        <option value="">All Visitors</option>
-                        <option value="inside" {{ request('filter') == 'inside' ? 'selected' : '' }}>Currently Inside</option>
-                    </select>
+                    <x-he-select name="filter" icon="filter" :selected="request('filter', '')"
+                        :options="['' => 'All Visitors', 'inside' => 'Currently Inside']" />
                     <input type="date" name="date" class="form-control border-0 bg-light rounded-pill fw-medium" value="{{ request('date') }}" onchange="this.form.submit()">
                 </form>
             </div>
@@ -297,11 +213,7 @@
                     </div>
                 </div>
             @empty
-                <div class="col-12 text-center py-5">
-                    <i class="fa-solid fa-door-closed text-muted opacity-25 d-block mb-3" style="font-size: 4rem;"></i>
-                    <h5 class="fw-bold text-dark">No Visitors</h5>
-                    <p class="text-muted">No visitor records found.</p>
-                </div>
+                <x-he-empty-state class="col-12" icon="door-closed" title="No Visitors" subtitle="No visitor records found." />
             @endforelse
         </div>
     </div>
@@ -401,11 +313,7 @@
                     </div>
                 </div>
             @empty
-                <div class="col-12 text-center py-5">
-                    <i class="fa-solid fa-headset text-muted opacity-25 d-block mb-3" style="font-size: 4rem;"></i>
-                    <h5 class="fw-bold text-dark">No Complaints</h5>
-                    <p class="text-muted">You're all caught up!</p>
-                </div>
+                <x-he-empty-state class="col-12" icon="headset" title="No Complaints" subtitle="You're all caught up!" />
             @endforelse
         </div>
     </div>
@@ -562,11 +470,9 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Category</label>
-                        <select name="category" class="form-select bg-light" required>
-                            @foreach(config('hostelease.complaint_categories') as $k=>$l)
-                                <option value="{{ $k }}">{{ $l }}</option>
-                            @endforeach
-                        </select>
+                        <x-he-select name="category" icon="tags" :submit="false"
+                            :selected="array_key_first(config('hostelease.complaint_categories'))"
+                            :options="config('hostelease.complaint_categories')" />
                     </div>
 
                     <div class="mb-3">

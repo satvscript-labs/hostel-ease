@@ -102,7 +102,7 @@ class ReportService
      */
     public function pendingFees(): array
     {
-        $rows = Student::with(['semesterFees', 'monthlyRents', 'acBillShares', 'payments'])
+        $rows = Student::with(['invoices', 'payments'])
             ->orderBy('name')->get()
             ->map(function ($s) {
                 $t = $this->ledger->totalsFor($s);
@@ -175,8 +175,8 @@ class ReportService
     {
         $bills = AcBill::with('room')
             ->whereBetween('bill_month', [$from->startOfMonth(), $to->endOfMonth()])
-            ->withSum('shares as billed', 'amount')
-            ->withSum('shares as collected', 'paid_amount')
+            ->withSum('invoices as billed', 'amount')
+            ->withSum('invoices as collected', 'paid_amount')
             ->orderByDesc('bill_month')->get();
 
         $rows = $bills->map(fn ($b) => [

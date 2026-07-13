@@ -17,6 +17,7 @@ class Invoice extends Model
         'hostel_id',
         'student_id',
         'type', // 'fee', 'rent', 'ac', 'other'
+        'ac_bill_id',
         'title',
         'amount',
         'billing_cycle_start',
