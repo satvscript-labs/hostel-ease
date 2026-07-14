@@ -82,6 +82,14 @@ class OwnerSelfServeBillingTest extends TestCase
     {
         [$owner] = $this->ownerWith(2, now()->addMonths(4));
 
+        // Production-locked by default (P4 item 15): plans visible, ops supervised.
+        $this->actingAs($owner)->get(route('admin.subscription.index'))
+            ->assertOk()
+            ->assertSee('Your branches')
+            ->assertSee('Billing is managed by HostelEase support');
+
+        // Unlocked (post-launch): the renew CTA/modal come back.
+        config(['hostelease.owner_self_serve' => true]);
         $this->actingAs($owner)->get(route('admin.subscription.index'))
             ->assertOk()
             ->assertSee('Renew all');

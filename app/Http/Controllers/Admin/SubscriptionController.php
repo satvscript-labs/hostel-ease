@@ -68,6 +68,9 @@ class SubscriptionController extends Controller
                 'anchor' => $account->current_period_end?->format('d M Y'),
             ],
             'razorpayEnabled' => $this->razorpay->isConfigured(),
+            // Production lock (P4 item 15): while false, owners see everything
+            // but every mutating billing op is supervised via the Super Admin.
+            'selfServe' => (bool) config('hostelease.owner_self_serve'),
         ]);
     }
 
@@ -89,6 +92,10 @@ class SubscriptionController extends Controller
     /** Create a Razorpay order for a consolidated account renewal (all branches). */
     public function renewOrder(Request $request): JsonResponse
     {
+        if (! config('hostelease.owner_self_serve')) {
+            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now — please contact us to renew.'], 503);
+        }
+
         $data = $request->validate(['period' => ['required', Rule::in(['yearly', 'monthly'])]]);
 
         if (! $this->razorpay->isConfigured()) {
@@ -137,6 +144,10 @@ class SubscriptionController extends Controller
      */
     public function addBranchOrder(Request $request): JsonResponse
     {
+        if (! config('hostelease.owner_self_serve')) {
+            return response()->json(['message' => 'Adding branches is handled by HostelEase support right now — please contact us and we\'ll set it up for you.'], 503);
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -149,17 +160,10 @@ class SubscriptionController extends Controller
         $owner = $request->user();
         $account = $this->accountBilling->accountFor($owner);
 
-        $branch = Hostel::create([
-            'name' => $data['name'],
-            'owner_name' => $owner->name,
-            'mobile' => $owner->mobile,
-            'email' => $owner->email,
-            'city' => $data['city'] ?? null,
-            'status' => 'active',
-            'subscription_start' => now(),
-            'subscription_end' => now()->addDays((int) config('hostelease.trial_days', 14)),
-        ]);
-        $owner->hostels()->syncWithoutDetaching([$branch->id]);
+        // Invariant-keeping creation (P4 item 14): owner_id + pivot + primary
+        // branch — the old inline Hostel::create() set none of them. Trial plan
+        // keeps its 14-day window until the payment lands.
+        $branch = app(\App\Services\HostelService::class)->createBranchForOwner($owner, $data + ['plan' => 'trial']);
         $this->logger->log('branch.created', "New branch created: {$branch->name}");
 
         $quote = $this->accountBilling->quoteAddBranch($account);
@@ -201,6 +205,10 @@ class SubscriptionController extends Controller
      */
     public function verify(Request $request): JsonResponse
     {
+        if (! config('hostelease.owner_self_serve')) {
+            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now.'], 503);
+        }
+
         $data = $request->validate([
             'razorpay_order_id' => ['required', 'string'],
             'razorpay_payment_id' => ['required', 'string'],

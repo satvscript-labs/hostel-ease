@@ -119,6 +119,15 @@ return [
     // How manual + volume discounts combine: 'stack' (sequential) or 'greater' (best of the two).
     'discount_stacking' => env('hostelease_DISCOUNT_STACKING', 'stack'),
 
+    /*
+    | Production lock (P4 item 15): owner self-serve billing operations — online
+    | renewals, add-branch payments, and self-serve branch creation. While false,
+    | owners can SEE their plans/coverage but every mutating billing op is
+    | supervised: they must go through the Super Admin (Account 360). Flip the
+    | env once online payments are launched.
+    */
+    'owner_self_serve' => (bool) env('HOSTELEASE_OWNER_SELF_SERVE', false),
+
     // Path to the mysqldump binary (XAMPP: D:\xampp\mysql\bin\mysqldump.exe).
     'dump_binary' => env('DB_DUMP_BINARY', 'mysqldump'),
 

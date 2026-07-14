@@ -21,6 +21,25 @@ class ProfileController extends Controller
         return view('profile.password', ['user' => Auth::user()]);
     }
 
+    /**
+     * Basic profile info (name/email). The mobile is the LOGIN username and the
+     * identity linking an owner to their branches — it is only changed via the
+     * Super Admin's hostel-edit flow, which syncs the login and every sibling
+     * branch together (P4 item 14).
+     */
+    public function update(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'email' => ['nullable', 'email', 'max:150'],
+        ]);
+
+        $request->user()->update($data);
+        $this->logger->log('profile.update', 'Updated profile info');
+
+        return back()->with('success', 'Profile updated.');
+    }
+
     public function updatePassword(Request $request): RedirectResponse
     {
         $data = $request->validate([

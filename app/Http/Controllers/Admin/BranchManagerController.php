@@ -36,6 +36,13 @@ class BranchManagerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Production lock (P4 item 15): branch creation has billing consequences
+        // (trial clock, account quantity, volume tiers) — supervised for now.
+        if (! config('hostelease.owner_self_serve')) {
+            return redirect()->route('admin.settings.index')->with('active_tab', 'branches')
+                ->with('error', 'Adding branches is handled by HostelEase support right now — please contact us and we\'ll set it up for you.');
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -45,26 +52,13 @@ class BranchManagerController extends Controller
 
         $owner = $request->user();
 
-        // Create the new Branch
-        $branch = Hostel::create([
-            'name' => $data['name'],
-            'owner_name' => $owner->name,
-            'mobile' => $owner->mobile,
-            'email' => $owner->email,
-            'address' => $data['address'] ?? null,
-            'city' => $data['city'] ?? null,
-            'state' => $data['state'] ?? null,
-            'status' => 'active',
-            'subscription_start' => now(),
-            'subscription_end' => now()->addDays(14),
+        // The invariant-keeping path (P4 item 14): sets owner_id, pivot access,
+        // and a primary branch — the old inline Hostel::create() left all three
+        // out. Then start the free-trial clock through the account spine.
+        $branch = app(\App\Services\HostelService::class)->createBranchForOwner($owner, $data + ['plan' => 'trial']);
+        $this->accountBilling->recordBranchRenewal($branch, 'trial', [
+            'payment_status' => 'paid', 'payment_method' => null, 'remarks' => 'Owner self-serve branch (trial)',
         ]);
-
-        // Attach to user
-        if ($owner->hostel_id !== null) {
-            $owner->hostels()->attach($branch->id);
-        } else {
-            $owner->update(['hostel_id' => $branch->id]);
-        }
 
         $this->logger->log('branch.created', "New branch created: {$branch->name}");
 
@@ -73,6 +67,10 @@ class BranchManagerController extends Controller
 
     public function createOrder(Request $request): JsonResponse
     {
+        if (! config('hostelease.owner_self_serve')) {
+            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now — please contact us to renew.'], 503);
+        }
+
         $data = $request->validate([
             'branch_id' => ['required', 'integer'],
             'period' => ['required', Rule::in(['yearly', 'monthly'])],
@@ -129,6 +127,10 @@ class BranchManagerController extends Controller
 
     public function verify(Request $request): JsonResponse
     {
+        if (! config('hostelease.owner_self_serve')) {
+            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now.'], 503);
+        }
+
         $data = $request->validate([
             'razorpay_order_id' => ['required', 'string'],
             'razorpay_payment_id' => ['required', 'string'],

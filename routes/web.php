@@ -82,9 +82,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     // Global instant search (both roles)
     Route::get('search', [SearchController::class, 'index'])->name('search');
 
-    // Change password (both roles)
+    // Change password + basic profile (both roles)
     Route::get('profile/password', [ProfileController::class, 'edit'])->name('profile.password');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // Switch active branch (multi-branch hostel admins)
     Route::get('branch/{hostel}/switch', [BranchController::class, 'switch'])->name('branch.switch');
@@ -265,6 +266,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::middleware('access:users')->group(function () {
                 Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
                 Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
+                Route::patch('users/{user}/toggle', [\App\Http\Controllers\Admin\UserController::class, 'toggle'])->name('users.toggle');
                 Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');
                 Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
             });

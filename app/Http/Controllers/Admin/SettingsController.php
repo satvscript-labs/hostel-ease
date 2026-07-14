@@ -5,61 +5,75 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\User;
+use App\Services\Billing\AccountBillingService;
 use App\Services\BranchBillingService;
 use App\Services\RazorpayService;
 use App\Support\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+/**
+ * Owner Settings hub: Profile · Users & Roles · My Branches (P4 item 15 —
+ * synced with the Super Admin systems: pivot-based access, explicit owner,
+ * account-level anchor, and the owner_self_serve production lock).
+ */
 class SettingsController extends Controller
 {
     public function __construct(
         protected BranchBillingService $billing,
+        protected AccountBillingService $accountBilling,
         protected RazorpayService $razorpay,
     ) {
     }
 
     public function index(Request $request): View
     {
-        $owner = $request->user();
-        $hostelId = Tenant::id();
+        // fresh(): the profile card reads columns (last_login_at, created_at)
+        // that an in-memory auth model may not carry under strict mode.
+        $owner = $request->user()->fresh() ?? $request->user();
+        $accessibleIds = $owner->accessibleHostelIds();
 
-        // 1. Data for Users & Roles Tab (matching original UserController index)
-        try {
-            $users = User::with('hostels')
-                ->where('hostel_id', $hostelId)
-                ->whereIn('role', array_keys(config('hostelease.staff_roles')))
-                ->orderBy('name')
-                ->get();
-        } catch (\Exception $e) {
-            $users = collect();
-        }
+        // The account owner(s) of these branches — hidden from the team list so
+        // co-admins never see the owner and the owner never sees themselves here
+        // (P4 item 16). Everyone else on the branches IS shown.
+        $ownerIds = Hostel::whereIn('id', $accessibleIds)->pluck('owner_id')->filter()->unique()->all();
+        $viewerIsOwner = in_array($owner->id, $ownerIds, true);
 
-        try {
-            $userBranches = Hostel::whereIn('id', $owner->accessibleHostelIds())
-                ->orderBy('name')
-                ->get();
-        } catch (\Exception $e) {
-            $userBranches = collect();
-        }
+        // Every login on the owner's branches EXCEPT the account owner: co-admins
+        // (hostel_admin, super-admin-granted) shown read-only + staff the owner
+        // manages. Access is the item-14 pivot (or primary branch), so a member
+        // created while another branch was active still appears.
+        $users = User::with('hostels:id,name')
+            ->where(function ($q) {
+                $q->whereIn('role', array_keys(config('hostelease.staff_roles')))
+                    ->orWhere('role', 'hostel_admin');
+            })
+            ->whereNotIn('id', $ownerIds)
+            ->where(function ($q) use ($accessibleIds) {
+                $q->whereIn('hostel_id', $accessibleIds)
+                    ->orWhereHas('hostels', fn ($h) => $h->whereIn('hostels.id', $accessibleIds));
+            })
+            ->orderByRaw("CASE WHEN role = 'hostel_admin' THEN 0 ELSE 1 END") // admins first
+            ->orderBy('name')
+            ->get();
 
-        // 2. Data for Branches & Subscriptions Tab (matching original BranchManagerController index)
-        try {
-            $myBranches = Hostel::whereIn('id', $owner->accessibleHostelIds())->get();
-        } catch (\Exception $e) {
-            $myBranches = collect();
-        }
+        $myBranches = Hostel::whereIn('id', $accessibleIds)->orderBy('name')->get();
+
+        // Account context — the one anchor every branch renews against.
+        $account = $this->accountBilling->accountFor($owner);
 
         return view('admin.settings.index', [
-            // Users data
+            'owner' => $owner,
+            'viewerIsOwner' => $viewerIsOwner,
             'users' => $users,
             'roles' => config('hostelease.staff_roles'),
-            'userBranches' => $userBranches,
-
-            // Branches data
-            'owner' => $owner,
+            'roleAccess' => config('hostelease.role_access'),
+            'userBranches' => $myBranches,
             'myBranches' => $myBranches,
+            'account' => $account,
+            'activeHostelId' => Tenant::id(),
             'razorpayEnabled' => $this->razorpay->isConfigured(),
+            'selfServe' => (bool) config('hostelease.owner_self_serve'),
             'monthlyPrice' => $this->billing->unitPrice('monthly'),
             'yearlyPrice' => $this->billing->unitPrice('yearly'),
         ]);

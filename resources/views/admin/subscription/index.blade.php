@@ -1,6 +1,21 @@
 @extends('layouts.app')
 @section('title', 'My Subscription')
 
+{{-- ─────────────────────────────────────────────────────────────────────────
+     REFERENCE (P4 item 15 — do not remove until the owner self-serve redesign):
+     The Super Admin billing terminal (Account 360) was heavily reworked in the
+     P4 fix rounds — live discount-aware summaries, per-period custom prices,
+     scoped comps, explicit owner FK (see _artifact/subscription_update/
+     07_phase4_manual_testing_fixes.md). THIS owner-facing page has NOT been
+     redesigned to match yet; it is deliberately deferred.
+
+     Until then it runs PRODUCTION-LOCKED via config('hostelease.owner_self_serve')
+     (default false): owners can view plans/coverage/history, but renewals,
+     add-branch payments, and self-serve branch creation are supervised — the
+     Super Admin performs them from Account 360. The same flag gates the
+     server-side ops (Admin\SubscriptionController / BranchManagerController).
+   ───────────────────────────────────────────────────────────────────────── --}}
+
 @php
     use App\Enums\AccountStatus;
     $status = $account->status;
@@ -73,7 +88,7 @@
                         @endif
                     </div>
                 </div>
-                @if($hero['cta'] && $status !== AccountStatus::Suspended)
+                @if($hero['cta'] && $status !== AccountStatus::Suspended && $selfServe)
                     <div class="d-flex flex-wrap gap-2">
                         @if($razorpayEnabled)
                             <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
@@ -84,6 +99,12 @@
                     </div>
                 @elseif($status === AccountStatus::Suspended)
                     <a href="tel:" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>Contact support</a>
+                @elseif(! $selfServe)
+                    {{-- Production lock: supervised billing (P4 item 15). --}}
+                    <div class="d-flex align-items-center gap-2 bg-white bg-opacity-10 rounded-pill px-3 py-2" style="backdrop-filter: blur(8px);">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span class="small fw-semibold">Renewals are handled by HostelEase support</span>
+                    </div>
                 @endif
             </div>
 
@@ -156,7 +177,7 @@
     </div>
 
     {{-- ── Mobile sticky renew bar ── --}}
-    @if($hero['cta'] && $status !== AccountStatus::Suspended && $razorpayEnabled)
+    @if($hero['cta'] && $status !== AccountStatus::Suspended && $razorpayEnabled && $selfServe)
         <div class="d-lg-none" style="height:76px;"></div>
         <div class="sub-sticky d-lg-none">
             <div class="d-flex align-items-center justify-content-between gap-3">
@@ -169,6 +190,18 @@
         </div>
     @endif
 
+    @unless($selfServe)
+        {{-- Production lock notice (P4 item 15): view-only billing. --}}
+        <div class="d-flex align-items-start gap-3 mt-4 p-3 px-4 rounded-4 shadow-sm" style="background:var(--he-warning-soft,#fef3c7); border:1px solid rgba(245,158,11,.25);">
+            <i class="fa-solid fa-shield-halved fs-5 mt-1" style="color:var(--he-warning,#f59e0b);"></i>
+            <div>
+                <div class="fw-bold text-dark" style="font-size:.92rem;">Billing is managed by HostelEase support</div>
+                <div class="small text-muted">Your plans and coverage above are always up to date. To renew, add a branch, or change your plan, contact support and our team will set it up on your account.</div>
+            </div>
+        </div>
+    @endunless
+
+    @if($selfServe)
     {{-- ══ Add-branch modal ══ --}}
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen=false" x-cloak style="display:none;">
@@ -261,11 +294,12 @@
             </div>
         </div>
     </template>
+    @endif
 </div>
 @endsection
 
 @push('scripts')
-@if($razorpayEnabled)
+@if($razorpayEnabled && $selfServe)
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 @endif
 <script>
