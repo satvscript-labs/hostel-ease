@@ -19,6 +19,7 @@
     .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius: 1.1rem; transition: all .3s cubic-bezier(.25,1,.5,1); }
     .panel-card:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.04); }
     .rec-pill { font-size:.68rem; font-weight:700; letter-spacing:.3px; }
+    .branch-link:hover { color: var(--he-primary, #4f46e5) !important; }
     .custom-overlay-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); z-index: 9999; display:flex; align-items:center; justify-content:center; padding:1rem; }
     .custom-overlay-modal { width:100%; background:#fff; border-radius:1.25rem; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); display:flex; flex-direction:column; max-height:90vh; transform:scale(.95); opacity:0; transition:all .3s cubic-bezier(.16,1,.3,1); overflow:hidden; }
     .custom-overlay-modal.is-open { transform:scale(1); opacity:1; }
@@ -149,7 +150,9 @@
                         @php($behind = $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
                         <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
                             <div>
-                                <div class="fw-bold text-dark">{{ $branch->name }}</div>
+                                <a href="{{ route('superadmin.hostels.show', $branch) }}" class="fw-bold text-dark text-decoration-none branch-link" title="Open hostel profile">
+                                    {{ $branch->name }} <i class="fa-solid fa-arrow-up-right-from-square text-muted ms-1" style="font-size:.6rem;"></i>
+                                </a>
                                 <div class="small text-muted">Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}</div>
                             </div>
                             <div class="d-flex align-items-center gap-2">

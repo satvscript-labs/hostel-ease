@@ -20,12 +20,32 @@ class HostelController extends Controller
     ) {
     }
 
-    public function index(): View
+    public function index(\Illuminate\Http\Request $request): View
     {
         $hostels = Hostel::withCount('students')
             ->withCount(['users as admins_count' => fn ($q) => $q->where('role', 'hostel_admin')])
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $q = trim((string) $request->string('q'));
+                $query->where(fn ($w) => $w->where('name', 'like', "%{$q}%")
+                    ->orWhere('owner_name', 'like', "%{$q}%")
+                    ->orWhere('mobile', 'like', "%{$q}%")
+                    ->orWhere('city', 'like', "%{$q}%"));
+            })
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
+
+        // Fleet-health tiles for the redesigned header (P4 item 13).
+        $stats = [
+            'total' => Hostel::count(),
+            'active' => Hostel::where('status', 'active')->count(),
+            'expiring' => Hostel::where('status', 'active')
+                ->whereNotNull('subscription_end')
+                ->whereBetween('subscription_end', [now()->startOfDay(), now()->addDays(30)->endOfDay()])
+                ->count(),
+            'expired' => Hostel::where('status', 'expired')->count(),
+        ];
 
         $hostelsJson = collect($hostels->items())->mapWithKeys(fn ($h) => [
             $h->id => [
@@ -58,7 +78,17 @@ class HostelController extends Controller
             $h->id => optional($owners->get($h->mobile), fn ($o) => $accounts->get($o->id)?->id),
         ])->all();
 
-        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson', 'accountByHostel'));
+        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson', 'accountByHostel', 'stats'));
+    }
+
+    /**
+     * Editing happens in the profile page's own modal — this route only exists
+     * because Route::resource declares it (the old Edit button 500'd on the
+     * missing method). Deep-links land on the profile with the modal open.
+     */
+    public function edit(Hostel $hostel): RedirectResponse
+    {
+        return redirect()->route('superadmin.hostels.show', [$hostel, 'edit' => 1]);
     }
 
     public function store(StoreHostelRequest $request): RedirectResponse

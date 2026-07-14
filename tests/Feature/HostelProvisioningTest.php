@@ -52,6 +52,49 @@ class HostelProvisioningTest extends TestCase
         $response->assertSessionHas('credentials');
     }
 
+    public function test_hostels_index_and_profile_render_and_edit_route_redirects(): void
+    {
+        $super = User::factory()->superAdmin()->create();
+        $hostel = Hostel::factory()->create(['name' => 'Render Wing', 'subscription_end' => now()->addYear()]);
+
+        // Redesigned index (stat tiles + directory) renders.
+        $this->actingAs($super)->get(route('superadmin.hostels.index'))
+            ->assertOk()->assertSee('Render Wing')->assertSee('Expiring', false);
+
+        // Redesigned profile: page-level Alpine scope owns BOTH modals (the old
+        // Add Admin button was dead because its teleport sat outside the scope).
+        $this->actingAs($super)->get(route('superadmin.hostels.show', $hostel))
+            ->assertOk()
+            ->assertSee('hostelProfile()', false)
+            ->assertSee('adminOpen', false)
+            ->assertSee('editOpen', false);
+
+        // Route::resource declares hostels.edit; the missing edit() 500'd. Now it
+        // deep-links to the profile with the edit modal auto-opened.
+        $this->actingAs($super)->get(route('superadmin.hostels.edit', $hostel))
+            ->assertRedirect(route('superadmin.hostels.show', [$hostel, 'edit' => 1]));
+    }
+
+    public function test_add_admin_branch_access_tiles_grant_the_selected_branches(): void
+    {
+        // Regression for the dead "ALSO GRANT ACCESS TO" selector: the old
+        // checkbox+CSS-sibling tiles didn't reliably toggle. The redesigned
+        // modal is Alpine-driven (adminSelected[] -> looped hidden inputs), so
+        // this asserts the branches actually submitted get synced onto the admin.
+        $super = User::factory()->superAdmin()->create();
+        $primary = Hostel::factory()->create(['name' => 'Primary Branch']);
+        $extra = Hostel::factory()->create(['name' => 'Extra Branch']);
+
+        $this->actingAs($super)->post(route('superadmin.admins.store'), [
+            'hostel_id' => $primary->id, 'name' => 'New Admin', 'mobile' => '9000022222',
+            'branches' => [$primary->id, $extra->id],
+        ])->assertRedirect();
+
+        $admin = User::where('mobile', '9000022222')->firstOrFail();
+        $this->assertTrue($admin->hostels->pluck('id')->contains($primary->id));
+        $this->assertTrue($admin->hostels->pluck('id')->contains($extra->id));
+    }
+
     public function test_renewal_extends_hostel_coverage_and_reactivates(): void
     {
         $hostel = Hostel::factory()->expired()->create();
