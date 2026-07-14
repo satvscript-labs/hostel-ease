@@ -110,32 +110,45 @@
         @if($manual->hasPages())<div class="p-3 border-top">{{ $manual->links() }}</div>@endif
     </div>
 
-    {{-- ══ Add/Edit tier modal ══ --}}
+    {{-- ══ Add/Edit tier modal (single modal, dynamic action for create vs edit) ══ --}}
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="modalOpen" x-transition.opacity @click.self="modalOpen=false" x-cloak style="display:none;">
-            <form method="POST" :action="formAction" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':modalOpen}">
+            <form method="POST" :action="formAction" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':modalOpen}" @click.stop>
                 @csrf
                 <input type="hidden" name="_method" :value="editId ? 'PUT' : 'POST'">
-                <div class="custom-overlay-header"><h5 class="fw-bold mb-0" x-text="editId ? 'Edit volume tier' : 'Add volume tier'"></h5><button type="button" class="btn-close" @click="modalOpen=false"></button></div>
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-layer-group text-primary me-2"></i><span x-text="editId ? 'Edit volume tier' : 'Add volume tier'"></span></h5>
+                    <button type="button" class="btn-close" @click="modalOpen=false"></button>
+                </div>
                 <div class="custom-overlay-body">
+                    <p class="text-muted small mb-3">Automatically discount an account once it reaches this branch count.</p>
                     <label class="form-label fw-bold small text-muted">APPLY WHEN BRANCHES ≥</label>
-                    <input type="number" min="1" name="min_quantity" x-model="f.min_quantity" class="form-control bg-white border shadow-sm mb-3" required>
+                    <div class="input-group shadow-sm mb-3">
+                        <span class="input-group-text bg-white fw-bold text-muted"><i class="fa-solid fa-hotel"></i></span>
+                        <input type="number" min="1" name="min_quantity" x-model="f.min_quantity" class="form-control border fw-bold" required>
+                    </div>
                     <div class="row g-3">
                         <div class="col-6">
                             <label class="form-label fw-bold small text-muted">TYPE</label>
-                            <select name="type" x-model="f.type" class="form-select bg-white border shadow-sm"><option value="percentage">Percentage (%)</option><option value="fixed">Fixed (₹)</option></select>
+                            <x-he-select name="type" :submit="false" compact x-model="f.type" :options="['percentage' => 'Percentage (%)', 'fixed' => 'Fixed (₹)']" />
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small text-muted">VALUE</label>
-                            <input type="number" step="0.01" name="value" x-model="f.value" class="form-control bg-white border shadow-sm" required>
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text bg-white fw-bold text-muted" x-text="f.type==='percentage' ? '%' : '₹'"></span>
+                                <input type="number" step="0.01" min="0" name="value" x-model="f.value" class="form-control border" required>
+                            </div>
                         </div>
-                        <div class="col-12" x-show="f.type==='percentage'">
+                        <div class="col-12" x-show="f.type==='percentage'" x-cloak>
                             <label class="form-label fw-bold small text-muted">MAX ₹ CAP <span class="fw-normal">— optional</span></label>
-                            <input type="number" step="0.01" name="max_amount" x-model="f.max_amount" class="form-control bg-white border shadow-sm">
+                            <input type="number" step="0.01" min="0" name="max_amount" x-model="f.max_amount" class="form-control bg-white border shadow-sm" placeholder="No cap">
                         </div>
                     </div>
                 </div>
-                <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="modalOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Save</button></div>
+                <div class="custom-overlay-footer">
+                    <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="modalOpen=false">Cancel</button>
+                    <button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-check me-2"></i>Save</button>
+                </div>
             </form>
         </div>
     </template>

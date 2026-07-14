@@ -322,44 +322,6 @@
                 </form>
             </div>
 
-            {{-- Add discount --}}
-            <div class="custom-overlay-backdrop" x-show="discountOpen" x-transition.opacity @click.self="discountOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('superadmin.accounts.discounts.store', $account) }}" class="custom-overlay-modal" style="max-width:560px;" :class="{'is-open':discountOpen}">
-                    @csrf
-                    <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Add discount</h5><button type="button" class="btn-close" @click="discountOpen=false"></button></div>
-                    <div class="custom-overlay-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted">APPLIES</label>
-                                <select name="recurrence" class="form-select bg-white border shadow-sm">
-                                    <option value="one_time">One-time (next charge)</option>
-                                    <option value="one_renewal">Next renewal only</option>
-                                    <option value="every_renewal">Permanent (every renewal)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted">TYPE</label>
-                                <select name="type" class="form-select bg-white border shadow-sm" x-model="dType">
-                                    <option value="percentage">Percentage (%)</option>
-                                    <option value="fixed">Fixed (₹)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted">VALUE</label>
-                                <input type="number" step="0.01" name="value" class="form-control bg-white border shadow-sm" required>
-                            </div>
-                            <div class="col-md-6" x-show="dType==='percentage'">
-                                <label class="form-label fw-bold small text-muted">MAX ₹ CAP <span class="fw-normal">— optional</span></label>
-                                <input type="number" step="0.01" name="max_amount" class="form-control bg-white border shadow-sm">
-                            </div>
-                            <div class="col-md-6"><label class="form-label fw-bold small text-muted">STARTS <span class="fw-normal">— optional</span></label><input type="date" name="starts_at" class="form-control bg-white border shadow-sm"></div>
-                            <div class="col-md-6"><label class="form-label fw-bold small text-muted">ENDS <span class="fw-normal">— optional</span></label><input type="date" name="ends_at" class="form-control bg-white border shadow-sm"></div>
-                            <div class="col-12"><label class="form-label fw-bold small text-muted">REASON</label><input type="text" name="reason" class="form-control bg-white border shadow-sm" placeholder="Negotiation context" required></div>
-                        </div>
-                    </div>
-                    <div class="custom-overlay-footer"><button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="discountOpen=false">Cancel</button><button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">Add discount</button></div>
-                </form>
-            </div>
         </div>
     </template>
 </div>

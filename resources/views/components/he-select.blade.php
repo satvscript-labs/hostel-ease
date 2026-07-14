@@ -55,9 +55,13 @@
         open: false,
         search: '',
         value: {{ \Illuminate\Support\Js::from((string) $selected) }},
-        label: {{ \Illuminate\Support\Js::from($currentLabel) }},
-        color: {{ \Illuminate\Support\Js::from($currentColor) }},
         opts: {{ \Illuminate\Support\Js::from($normalized) }},
+        placeholder: {{ \Illuminate\Support\Js::from($placeholder) }},
+        // Derived from value so an EXTERNAL change (parent x-model, e.g. an edit
+        // modal prefilling via openEdit) reflects in the trigger — a plain state
+        // var would only update on our own select().
+        get displayLabel() { const o = this.opts[this.value]; return o ? o.label : this.placeholder; },
+        get displayColor() { const o = this.opts[this.value]; return o ? o.color : 'secondary'; },
         get filteredOptions() {
             const entries = Object.entries(this.opts);
             if (!this.search) return entries;
@@ -66,15 +70,13 @@
         },
         select(val) {
             this.value = val;
-            this.label = this.opts[val] ? this.opts[val].label : '';
-            this.color = this.opts[val] ? this.opts[val].color : 'secondary';
             this.open = false;
             this.search = '';
             // Bridges the value out to an ancestor's own x-data scope (e.g. a
             // form toggling conditional fields on this select's value) — the
             // hidden input's x-model updates the DOM but doesn't dispatch a
             // native input/change event, so a listener on it wouldn't fire.
-            this.$dispatch('he-select-change', { name: {{ \Illuminate\Support\Js::from($name) }}, value: val, label: this.label });
+            this.$dispatch('he-select-change', { name: {{ \Illuminate\Support\Js::from($name) }}, value: val, label: this.displayLabel });
             {{ $submitJs }}
         },
         toggle() {
@@ -82,6 +84,7 @@
             if (this.open) this.$nextTick(() => this.$refs.searchInput?.focus());
         },
     }"
+    x-modelable="value"
     :class="{ 'is-open': open }"
     @click.outside.capture="open = false"
 >
@@ -90,20 +93,20 @@
     @if($variant === 'status')
         <button type="button" @click="toggle()"
             class="he-select-trigger badge rounded-pill px-3 py-2 border-0"
-            :class="`bg-${color}-subtle text-${color}`">
-            <span x-text="label"></span>
+            :class="`bg-${displayColor}-subtle text-${displayColor}`">
+            <span x-text="displayLabel"></span>
             <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.65em;"></i>
         </button>
     @elseif($compact)
         <button type="button" @click="toggle()" class="he-select-trigger he-select--compact form-select text-start">
-            <span x-text="label"></span>
+            <span x-text="displayLabel"></span>
         </button>
     @else
         <div @click="toggle()" class="he-select-trigger he-select--filter">
             <span class="he-select-icon"><i class="fa-solid fa-{{ $icon }}"></i></span>
             <span class="d-flex flex-column align-items-start" style="line-height: 1.15;">
                 @if($label)<span class="he-select-label">{{ $label }}</span>@endif
-                <span class="fw-semibold" x-text="label"></span>
+                <span class="fw-semibold" x-text="displayLabel"></span>
             </span>
             <i class="fa-solid fa-chevron-down ms-1 small text-muted"></i>
         </div>

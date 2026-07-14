@@ -147,6 +147,44 @@
     </x-slot:footer>
 </x-he-modal>
 
+{{-- ── Add negotiated discount ── --}}
+<x-he-modal open="discountOpen" title="Add discount" icon="percent"
+    :action="route('superadmin.accounts.discounts.store', $account)" :size="560">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label fw-bold small text-muted">APPLIES</label>
+            <x-he-select name="recurrence" :submit="false" compact selected="one_time" :options="[
+                'one_time' => 'One-time (next charge)',
+                'one_renewal' => 'Next renewal only',
+                'every_renewal' => 'Permanent (every renewal)',
+            ]" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold small text-muted">TYPE</label>
+            <x-he-select name="type" :submit="false" compact x-model="dType" :options="['percentage' => 'Percentage (%)', 'fixed' => 'Fixed (₹)']" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold small text-muted">VALUE <span class="text-danger">*</span></label>
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-white fw-bold text-muted" x-text="dType==='percentage' ? '%' : '₹'"></span>
+                <input type="number" step="0.01" min="0" name="value" class="form-control border" required>
+            </div>
+        </div>
+        <div class="col-md-6" x-show="dType==='percentage'" x-cloak>
+            <label class="form-label fw-bold small text-muted">MAX ₹ CAP <span class="fw-normal">— optional</span></label>
+            <input type="number" step="0.01" min="0" name="max_amount" class="form-control bg-white border shadow-sm">
+        </div>
+        <div class="col-md-6"><label class="form-label fw-bold small text-muted">STARTS <span class="fw-normal">— optional</span></label><input type="date" name="starts_at" class="form-control bg-white border shadow-sm"></div>
+        <div class="col-md-6"><label class="form-label fw-bold small text-muted">ENDS <span class="fw-normal">— optional</span></label><input type="date" name="ends_at" class="form-control bg-white border shadow-sm"></div>
+        <div class="col-12"><label class="form-label fw-bold small text-muted">REASON <span class="text-danger">*</span></label><input type="text" name="reason" class="form-control bg-white border shadow-sm" placeholder="Negotiation context" required></div>
+    </div>
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="discountOpen=false">Cancel</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-percent me-2"></i>Add discount</button>
+    </x-slot:footer>
+</x-he-modal>
+
 {{-- ── Comp (complimentary ₹0 coverage) ── --}}
 <x-he-modal open="compOpen" title="Complimentary coverage" icon="gift"
     :action="route('superadmin.accounts.comp', $account)" :size="600">
