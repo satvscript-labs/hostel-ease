@@ -174,7 +174,24 @@ class DemoHostelSeeder extends Seeder
         );
         $accountant->hostels()->sync([$hostel1->id, $hostel2->id]);
 
-        $this->command->info('Demo branches seeded: Boys/Girls with full data; Annex/Outpost/PG empty for billing tests.');
+        // 5. A CO-ADMIN (second hostel_admin, NOT the owner) — the kind you add
+        // from the Super Admin panel. Demonstrates P4 item 16: it shows on the
+        // owner's Settings › Team & access with an "Admin" badge (owner can
+        // disable/reset, not edit/delete), and never sees the owner in return.
+        $coAdmin = User::updateOrCreate(
+            ['mobile' => '+919876543004'],
+            [
+                'name' => 'Sanjay Co-Admin',
+                'email' => 'sanjay.admin@example.com',
+                'password' => Hash::make('password'),
+                'role' => 'hostel_admin',
+                'hostel_id' => $hostel1->id,
+                'is_active' => true,
+            ]
+        );
+        $coAdmin->hostels()->sync([$hostel1->id, $hostel2->id]); // access, but owner_id stays Ramesh
+
+        $this->command->info('Demo branches seeded: Boys/Girls with full data; Annex/Outpost/PG empty for billing tests. Owner Ramesh + co-admin Sanjay + 3 staff.');
     }
 
     private function createBranch(array $data, User $owner, bool $populate = true): Hostel
