@@ -129,4 +129,38 @@ class SuperAdminAccountsTest extends TestCase
         $this->assertSame('8000.00', (string) $account->fresh()->unit_price_override_yearly);
         $this->assertNull($account->fresh()->unit_price_override_monthly);  // monthly stays on list price
     }
+
+    public function test_add_hostel_creates_a_branch_under_the_owner_and_co_terminates(): void
+    {
+        [$owner, $account] = $this->seedAccount();
+        $super = User::factory()->superAdmin()->create();
+        $before = $owner->hostels()->count();
+
+        $this->actingAs($super)->post(route('superadmin.accounts.add-hostel', $account), [
+            'name' => 'Brand New Wing', 'plan' => 'yearly', 'payment_method' => 'cash',
+        ])->assertRedirect();
+
+        // Linked to the SAME owner (no new login, same mobile) — one more branch.
+        $this->assertSame($before + 1, $owner->fresh()->hostels()->count());
+        $hostel = Hostel::where('name', 'Brand New Wing')->firstOrFail();
+        $this->assertSame($owner->mobile, $hostel->mobile);
+        // Charged through the account path and co-terminated on the anchor.
+        $this->assertSame($account->current_period_end->toDateString(), $hostel->subscription_end->toDateString());
+        $this->assertDatabaseHas('subscription_order_lines', ['branch_id' => $hostel->id]);
+    }
+
+    public function test_add_hostel_on_trial_starts_a_free_14_day_clock(): void
+    {
+        [$owner, $account] = $this->seedAccount();
+        $super = User::factory()->superAdmin()->create();
+
+        $this->actingAs($super)->post(route('superadmin.accounts.add-hostel', $account), [
+            'name' => 'Trial Wing', 'plan' => 'trial',
+        ])->assertRedirect();
+
+        $hostel = Hostel::where('name', 'Trial Wing')->firstOrFail();
+        $this->assertTrue($owner->fresh()->hostels->contains($hostel->id));
+        // Its own ~14-day window, not co-terminated onto the 3-month anchor.
+        $this->assertTrue($hostel->subscription_end->lessThan($account->current_period_end));
+    }
 }

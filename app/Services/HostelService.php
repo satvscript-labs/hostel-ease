@@ -84,6 +84,41 @@ class HostelService
 
 
     /**
+     * Create a new branch under an EXISTING owner (no new login, no initial
+     * charge). The owner's name/mobile are inherited; the caller then routes the
+     * first charge through the account path (AccountBillingService::addBranch)
+     * so account-level discounts apply — which the Hostels-page provision flow
+     * cannot do (P4 item 3.1). Coverage is left blank for paid plans (the
+     * co-termination top-up sets it); trial keeps its 14-day window.
+     */
+    public function createBranchForOwner(User $owner, array $data): Hostel
+    {
+        return DB::transaction(function () use ($owner, $data) {
+            $plan = $data['plan'] ?? 'yearly';
+            $quote = app(\App\Services\BranchBillingService::class)->quote(new Hostel(), $plan);
+
+            $hostel = Hostel::create([
+                'name' => $data['name'],
+                'owner_name' => $owner->name,
+                'mobile' => $owner->mobile,
+                'email' => $data['email'] ?? $owner->email,
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'state' => $data['state'] ?? null,
+                'gst_number' => $data['gst_number'] ?? null,
+                'subscription_start' => $quote['start'],
+                'subscription_end' => $plan === 'trial' ? $quote['end'] : null,
+                'status' => 'active',
+            ]);
+
+            $owner->hostels()->syncWithoutDetaching([$hostel->id]);
+            $this->seedPaymentModes($hostel);
+
+            return $hostel;
+        });
+    }
+
+    /**
      * Seed the four default payment modes for a new hostel.
      */
     public function seedPaymentModes(Hostel $hostel): void

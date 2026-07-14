@@ -49,7 +49,16 @@ class HostelController extends Controller
             'trial' => 0,
         ];
 
-        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson'));
+        // Owner-account deep-link per row (P4 item 3.2), resolved in two batched
+        // queries rather than per-row.
+        $mobiles = collect($hostels->items())->pluck('mobile')->filter()->unique();
+        $owners = \App\Models\User::whereIn('mobile', $mobiles)->where('role', 'hostel_admin')->get(['id', 'mobile'])->keyBy('mobile');
+        $accounts = \App\Models\SubscriptionAccount::whereIn('owner_id', $owners->pluck('id'))->get(['id', 'owner_id'])->keyBy('owner_id');
+        $accountByHostel = collect($hostels->items())->mapWithKeys(fn ($h) => [
+            $h->id => optional($owners->get($h->mobile), fn ($o) => $accounts->get($o->id)?->id),
+        ])->all();
+
+        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson', 'accountByHostel'));
     }
 
     public function store(StoreHostelRequest $request): RedirectResponse

@@ -98,6 +98,7 @@
                 @if($alignBehind > 0)
                 <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="alignOpen = true"><i class="fa-solid fa-diagram-project me-2"></i>Align ({{ $alignBehind }})</button>
                 @endif
+                <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="addHostelOpen = true"><i class="fa-solid fa-building-circle-arrow-right me-2"></i>Add hostel</button>
                 <div class="dropdown">
                     <button class="btn btn-outline-light rounded-pill px-3 fw-bold" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2">
@@ -368,7 +369,7 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
-        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
+        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false, addHostelOpen: false,
         dType: 'percentage',
 
         r2(v) { return Math.round(v * 100) / 100; },
@@ -474,6 +475,36 @@ document.addEventListener('alpine:init', () => {
             return this.compBranches
                 .filter(b => this.compSelected.includes(b.id))
                 .map(b => ({ name: b.name, from: b.endLabel, to: this.compNewEnd(b) }));
+        },
+
+        // ── Add hostel to owner ── (Paid co-terminate at the account cadence, or Trial)
+        ahPlan: 'paid',
+        ahOverride: '',
+        ahPaidPeriod: @json($paidPeriod),
+        addHostelQuote: @json($addHostelQuote),
+        get addHostelSummary() {
+            if (this.ahPlan === 'trial') {
+                return { rows: [{ label: '14-day free trial', amount: 0, kind: 'line' }], finalLabel: 'Payable now', final: 0, note: 'Starts a 14-day trial from today (own clock, not co-terminated)' };
+            }
+            const q = this.addHostelQuote;
+            const rows = [];
+            const basis = q.mode === 'prorate' ? (q.days + ' days · prorated to anchor') : 'Full ' + this.ahPaidPeriod + ' term';
+            rows.push({ label: '1 new branch · ' + basis, amount: q.prorated, kind: 'line' });
+            if (q.volume > 0) rows.push({ label: 'Volume tier', amount: q.volume, kind: 'discount' });
+            if (q.manual > 0) rows.push({ label: 'Negotiated discount', amount: q.manual, kind: 'discount' });
+            let final = q.auto;
+            const override = parseFloat(this.ahOverride);
+            if (this.ahOverride !== '' && !isNaN(override) && override < q.auto) {
+                rows.push({ label: 'Auto price', amount: q.auto, kind: 'subtle' });
+                const adj = Math.round((q.auto - override) * 100) / 100;
+                const pct = q.auto > 0 ? Math.round(adj / q.auto * 1000) / 10 : 0;
+                rows.push({ label: 'Manual adjustment (−' + pct + '%)', amount: adj, kind: 'discount' });
+                final = override;
+            } else if (this.ahOverride !== '' && !isNaN(override)) {
+                final = override;
+            }
+            const note = q.mode === 'prorate' ? ('Co-terminates on ' + q.anchor) : 'New full term from today';
+            return { rows, finalLabel: 'Payable now', final, note };
         },
 
         // ── Custom unit price (per-period) ──

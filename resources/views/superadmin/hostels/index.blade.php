@@ -81,7 +81,12 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-end text-nowrap">
-                            <a href="{{ route('superadmin.hostels.show', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="View Profile">
+                            @if(!empty($accountByHostel[$h->id]))
+                            <a href="{{ route('superadmin.accounts.show', $accountByHostel[$h->id]) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="Owner Account">
+                                <i class="fa-solid fa-user-gear text-primary"></i>
+                            </a>
+                            @endif
+                            <a href="{{ route('superadmin.hostels.show', $h) }}" class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="View Profile">
                                 <i class="fa-regular fa-eye text-primary"></i>
                             </a>
                             <button type="button" @click="openEditModal({{ $h->id }})" class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Edit Hostel">

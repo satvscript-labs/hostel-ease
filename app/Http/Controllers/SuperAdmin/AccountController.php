@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SuperAdmin;
 
+use App\Enums\BillingPeriod;
 use App\Http\Controllers\Controller;
 use App\Models\Discount;
 use App\Models\Hostel;
@@ -9,6 +10,7 @@ use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
+use App\Services\HostelService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,6 +25,7 @@ class AccountController extends Controller
     public function __construct(
         protected AccountBillingService $billing,
         protected ActivityLogger $logger,
+        protected HostelService $hostels,
     ) {
     }
 
@@ -124,7 +127,41 @@ class AccountController extends Controller
         ])->values()->all();
         $compBranchIds = $branches->pluck('id')->all();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds'));
+        // Add-hostel-to-owner quote (a brand-new branch): prorate to the anchor at
+        // the account's own cadence when the cycle is live (discount-aware), else a
+        // full paid term. The period is dictated by the account (co-termination),
+        // not a free choice, so the summary always matches what addBranch() charges.
+        $paidPeriod = ($account->period && $account->period->isPaid()) ? $account->period->value : 'yearly';
+        $addHostelQuote = $this->addHostelQuoteArray($account, $paidPeriod);
+        $ownerEmail = $account->owner?->email;
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail'));
+    }
+
+    /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
+    protected function addHostelQuoteArray(SubscriptionAccount $account, string $period): array
+    {
+        $anchor = $account->current_period_end;
+
+        if ($anchor && $anchor->isFuture()) {
+            $q = $this->billing->quoteAddBranch($account, null, $period);
+
+            return [
+                'mode' => 'prorate',
+                'days' => $q['days_remaining'],
+                'unit' => (float) $q['unit'],
+                'prorated' => round((float) $q['prorated'], 2),
+                'volume' => round((float) $q['breakdown']['volume_amount'], 2),
+                'manual' => round((float) $q['breakdown']['manual_amount'], 2),
+                'auto' => round((float) $q['breakdown']['final'], 2),
+                'anchor' => $anchor->format('d M Y'),
+            ];
+        }
+
+        // No live cycle to co-terminate with — a plain full paid term from today.
+        $unit = $this->billing->unitPrice($account, BillingPeriod::from($period));
+
+        return ['mode' => 'full', 'days' => 0, 'unit' => $unit, 'prorated' => $unit, 'volume' => 0.0, 'manual' => 0.0, 'auto' => $unit, 'anchor' => null];
     }
 
     /** Flatten a renewal quote into the JS-friendly, discount-itemised shape the modal summary reads. */
@@ -166,6 +203,55 @@ class AccountController extends Controller
         $this->logger->log('subscription.paid', "Added branch {$branch->name} (prorated) — ".hostelease_money($order->amount), $order);
 
         return back()->with('success', "{$branch->name} added to the renewal cycle.");
+    }
+
+    /**
+     * Create a brand-new branch directly under this owner (no re-entered
+     * owner details, no new login) and charge its first term through the
+     * account path so discounts apply (P4 item 3.1).
+     */
+    public function addHostel(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'email' => ['nullable', 'email', 'max:150'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'gst_number' => ['nullable', 'string', 'max:50'],
+            'plan' => ['required', Rule::in(['yearly', 'monthly', 'trial'])],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
+        ]);
+
+        $owner = $account->owner;
+        abort_unless($owner, 404);
+
+        $hostel = \Illuminate\Support\Facades\DB::transaction(function () use ($account, $owner, $data) {
+            $hostel = $this->hostels->createBranchForOwner($owner, $data);
+
+            if ($data['plan'] === 'trial') {
+                // 14-day free trial — its own clock, no co-termination, no charge.
+                $this->billing->recordBranchRenewal($hostel, 'trial', [
+                    'payment_status' => 'paid', 'payment_method' => null, 'remarks' => 'Added branch (trial)',
+                ]);
+            } else {
+                // Prorate + co-terminate onto the anchor (discount-aware), or a
+                // full paid term when there is no live cycle.
+                $this->billing->addBranch($account, $hostel, [
+                    'amount' => $data['amount'] ?? null,
+                    'payment_status' => 'paid',
+                    'payment_method' => $data['payment_method'] ?? 'cash',
+                    'remarks' => 'Added hostel to account (prorated)',
+                ]);
+            }
+
+            return $hostel;
+        });
+
+        $this->logger->log('hostel.provision', "Added branch {$hostel->name} to {$owner->name}", $hostel);
+
+        return back()->with('success', "{$hostel->name} added under {$owner->name}.");
     }
 
     /** Consolidated renewal — every branch to one new anchor. */

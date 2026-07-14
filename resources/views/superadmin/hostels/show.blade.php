@@ -23,6 +23,11 @@
         </div>
     </div>
     <div class="d-flex gap-2">
+        @if($account)
+        <a href="{{ route('superadmin.accounts.show', $account) }}" class="btn btn-light border shadow-sm rounded-pill px-4 fw-semibold">
+            <i class="fa-solid fa-user-gear text-primary me-2"></i> Owner Account
+        </a>
+        @endif
         <a href="{{ route('superadmin.hostels.edit', $hostel) }}" class="btn btn-primary shadow-sm rounded-pill px-4">
             <i class="fa-solid fa-pen me-2"></i> Edit Profile
         </a>

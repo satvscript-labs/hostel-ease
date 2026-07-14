@@ -89,6 +89,64 @@
     </x-slot:footer>
 </x-he-modal>
 
+{{-- ── Add hostel directly to this owner ── --}}
+<x-he-modal open="addHostelOpen" title="Add hostel to {{ $account->owner?->name ?? 'owner' }}" icon="building-circle-arrow-right"
+    :action="route('superadmin.accounts.add-hostel', $account)" :size="620">
+    <input type="hidden" name="plan" :value="ahPlan === 'trial' ? 'trial' : ahPaidPeriod">
+    <p class="text-muted small mb-3">A new branch under this existing owner — no re-entered name or mobile, and its first charge runs through the account so <strong>discounts apply</strong>.</p>
+
+    <div class="row g-3">
+        <div class="col-md-7">
+            <label class="form-label fw-bold small text-muted">HOSTEL NAME <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control bg-white border shadow-sm" required autocomplete="off">
+        </div>
+        <div class="col-md-5">
+            <label class="form-label fw-bold small text-muted">EMAIL</label>
+            <input type="email" name="email" value="{{ $ownerEmail }}" class="form-control bg-white border shadow-sm" placeholder="Owner email">
+        </div>
+    </div>
+
+    {{-- Optional address / GST --}}
+    <div class="mt-2" x-data="{ moreOpen: false }">
+        <button type="button" @click="moreOpen = !moreOpen" class="btn btn-link text-muted fw-bold text-decoration-none p-0 small"><i class="fa-solid fa-location-dot me-1"></i> Address & GST <i class="fa-solid fa-chevron-down ms-1" :class="{ 'fa-rotate-180': moreOpen }" style="font-size:.7rem;"></i></button>
+        <div class="row g-3 mt-1" x-show="moreOpen" x-collapse x-cloak>
+            <div class="col-12"><label class="form-label fw-bold small text-muted">ADDRESS</label><textarea name="address" rows="2" class="form-control bg-white border shadow-sm"></textarea></div>
+            <div class="col-md-4"><label class="form-label fw-bold small text-muted">CITY</label><input type="text" name="city" class="form-control bg-white border shadow-sm"></div>
+            <div class="col-md-4"><label class="form-label fw-bold small text-muted">STATE</label><input type="text" name="state" class="form-control bg-white border shadow-sm"></div>
+            <div class="col-md-4"><label class="form-label fw-bold small text-muted">GST</label><input type="text" name="gst_number" class="form-control bg-white border shadow-sm"></div>
+        </div>
+    </div>
+
+    <hr class="my-3 text-muted">
+
+    {{-- Plan: Paid co-terminates at the account's own cadence; Trial is a free 14-day clock. --}}
+    <label class="form-label fw-bold small text-muted">PLAN</label>
+    <div class="d-flex gap-2 mb-3">
+        <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='paid'?'btn-primary':'btn-light border'" @click="ahPlan='paid'">
+            Paid · co-terminate <span class="text-capitalize" x-text="'(' + ahPaidPeriod + ')'"></span>
+        </button>
+        <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='trial'?'btn-primary':'btn-light border'" @click="ahPlan='trial'">Trial (14 days)</button>
+    </div>
+
+    <x-he-billing-summary data="addHostelSummary" />
+
+    {{-- Override + method only for paid plans --}}
+    <div x-show="ahPlan !== 'trial'" x-cloak>
+        <label class="form-label fw-bold small text-muted mt-3">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
+        <input type="number" step="0.01" min="0" name="amount" x-model="ahOverride"
+            class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(addHostelSummary.final) + ')'">
+        <div class="form-text">Enter a lower amount to record a manual discount; the difference is logged on the order.</div>
+
+        <label class="form-label fw-bold small text-muted mt-3">METHOD</label>
+        <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    </div>
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="addHostelOpen=false">Cancel</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-plus me-2"></i>Add hostel</button>
+    </x-slot:footer>
+</x-he-modal>
+
 {{-- ── Comp (complimentary ₹0 coverage) ── --}}
 <x-he-modal open="compOpen" title="Complimentary coverage" icon="gift"
     :action="route('superadmin.accounts.comp', $account)" :size="600">

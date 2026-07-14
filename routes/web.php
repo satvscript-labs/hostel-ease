@@ -120,6 +120,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('accounts/{account}', [AccountController::class, 'show'])->name('accounts.show');
         Route::post('accounts/{account}/renew', [AccountController::class, 'renew'])->name('accounts.renew');
         Route::post('accounts/{account}/add-branch', [AccountController::class, 'addBranch'])->name('accounts.add-branch');
+        Route::post('accounts/{account}/add-hostel', [AccountController::class, 'addHostel'])->name('accounts.add-hostel');
         Route::post('accounts/{account}/align', [AccountController::class, 'align'])->name('accounts.align');
         Route::post('accounts/{account}/comp', [AccountController::class, 'comp'])->name('accounts.comp');
         Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
