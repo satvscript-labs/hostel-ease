@@ -24,13 +24,24 @@ class AdminController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Normalise to the +91 login form BEFORE validating uniqueness — a bare
+        // 10-digit mobile here created co-admin logins that could never sign in
+        // (login normalises to +91...) and dodged the unique check against
+        // existing +91 rows (P4 item 14).
+        if ($request->filled('mobile')) {
+            $request->merge(['mobile' => '+91'.substr(preg_replace('/\D+/', '', $request->input('mobile')), -10)]);
+        }
+
         $data = $request->validate([
             'hostel_id' => ['required', 'exists:hostels,id'],
             'name' => ['required', 'string', 'max:150'],
-            'mobile' => ['required', 'digits:10', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
+            'mobile' => ['required', 'regex:/^\+91\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
             'email' => ['nullable', 'email', 'max:150'],
             'branches' => ['nullable', 'array'],
             'branches.*' => ['integer', 'exists:hostels,id'],
+        ], [
+            'mobile.regex' => 'Enter a valid 10-digit mobile number.',
+            'mobile.unique' => 'This mobile number is already used by another login.',
         ]);
 
         $password = str(str()->random(4))->upper()->toString() . random_int(1000, 9999);
@@ -58,6 +69,12 @@ class AdminController extends Controller
     public function toggle(User $admin): RedirectResponse
     {
         abort_unless($admin->isHostelAdmin(), 403);
+
+        // Invariant (P4 item 14): every branch keeps a working owner login.
+        // The owner can never be disabled — suspend the ACCOUNT instead.
+        if ($admin->is_active && $admin->isOwner()) {
+            return back()->with('error', "{$admin->name} is the owner login for their branches and cannot be disabled. Suspend the account from the customer's Account 360 instead.");
+        }
 
         $admin->update(['is_active' => ! $admin->is_active]);
         $this->logger->log('admin.toggle', ($admin->is_active ? 'Enabled' : 'Disabled')." admin {$admin->name}", $admin);
@@ -89,8 +106,12 @@ class AdminController extends Controller
             'hostels.*' => ['integer', 'exists:hostels,id'],
         ]);
 
-        // Always keep the admin's primary hostel in the set.
-        $ids = collect($data['hostels'] ?? [])->push($admin->hostel_id)->filter()->unique()->all();
+        // Always keep the admin's primary hostel AND every branch they OWN in
+        // the set — an owner can never lose access to their own branches.
+        $ids = collect($data['hostels'] ?? [])
+            ->push($admin->hostel_id)
+            ->merge($admin->ownedHostels()->pluck('id'))
+            ->filter()->unique()->values()->all();
         $admin->hostels()->sync($ids);
 
         $this->logger->log('admin.branches', "Updated branch access for {$admin->name}", $admin);

@@ -60,11 +60,25 @@ class AccountBillingService
 
     public function ownerForBranch(Hostel $branch): ?User
     {
-        $owner = User::where('role', 'hostel_admin')
-            ->whereHas('hostels', fn ($q) => $q->where('hostels.id', $branch->id))
-            ->first();
+        // The explicit owner FK is the authority (P4 item 14) — deterministic,
+        // and immune to a co-admin sorting first in the pivot.
+        if ($branch->owner_id && $branch->owner && $branch->owner->isHostelAdmin()) {
+            return $branch->owner;
+        }
 
-        return $owner ?: User::where('role', 'hostel_admin')->where('mobile', $branch->mobile)->first();
+        // Legacy fallbacks (pre-FK rows, factory data): mobile identity first,
+        // then any admin holding pivot access. Self-heal by persisting the
+        // resolution so the system converges on the FK.
+        $owner = User::where('role', 'hostel_admin')->where('mobile', $branch->mobile)->first()
+            ?: User::where('role', 'hostel_admin')
+                ->whereHas('hostels', fn ($q) => $q->where('hostels.id', $branch->id))
+                ->orderBy('id')->first();
+
+        if ($owner) {
+            $branch->forceFill(['owner_id' => $owner->id])->save();
+        }
+
+        return $owner;
     }
 
     /** The branches billed under an account (all the owner can access). */

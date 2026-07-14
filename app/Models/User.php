@@ -54,6 +54,18 @@ class User extends Authenticatable
         return $this->belongsToMany(Hostel::class, 'hostel_user')->withTimestamps();
     }
 
+    /** Branches this user is the explicit OWNER of (hostels.owner_id). */
+    public function ownedHostels(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Hostel::class, 'owner_id');
+    }
+
+    /** Whether this login owns at least one branch (owners must stay enabled). */
+    public function isOwner(): bool
+    {
+        return $this->ownedHostels()->exists();
+    }
+
     /**
      * IDs of every branch this admin may access (pivot + primary).
      */

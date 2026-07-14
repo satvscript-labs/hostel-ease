@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Branch;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Support\Tenant;
@@ -28,10 +26,14 @@ class UserController extends Controller
     {
         $hostelId = Tenant::id();
         // Sub-users whose primary hostel is the active one, excluding the owner.
+        // (The old version eager-loaded 'role'/'branch' relations from a dead,
+        // never-seeded Role/Branch subsystem — the relations didn't exist on
+        // User, so this endpoint threw. Roles are config-driven; branches are
+        // the requesting owner's accessible hostels. P4 item 14.)
         $users = User::where('hostel_id', $hostelId)
             ->where('id', '!=', $request->user()->id)
             ->whereIn('role', array_keys(config('hostelease.staff_roles')))
-            ->with(['role', 'branch'])
+            ->with('hostels:id,name')
             ->orderBy('name')->get()
             ->map(fn ($u) => [
                 'id' => $u->id,
@@ -39,20 +41,16 @@ class UserController extends Controller
                 'mobile' => $u->mobile,
                 'role' => $u->role,
                 'role_label' => config('hostelease.staff_roles.'.$u->role, $u->role),
-                'role_id' => $u->role_id,
-                'role_name' => $u->role()->first()?->display_name,
-                'branch_id' => $u->branch_id,
-                'branch_name' => $u->branch?->name,
+                'branches' => $u->hostels->map(fn ($h) => ['id' => $h->id, 'name' => $h->name])->values(),
                 'is_active' => (bool) $u->is_active,
             ]);
 
-        $roles = Role::whereIn('name', array_keys(config('hostelease.staff_roles')))->get();
-        $branches = Branch::where('hostel_id', $hostelId)->where('is_active', true)->get(['id', 'name']);
+        $branches = $request->user()->hostels()->orderBy('name')->get(['hostels.id', 'hostels.name'])
+            ->map(fn ($h) => ['id' => $h->id, 'name' => $h->name])->values();
 
         return response()->json([
             'users' => $users,
             'roles' => config('hostelease.staff_roles'),
-            'all_roles' => $roles->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'display_name' => $r->display_name]),
             'branches' => $branches,
             'role_access' => collect(config('hostelease.staff_roles'))->keys()->mapWithKeys(fn ($r) => [
                 $r => config('hostelease.role_access.'.$r),
@@ -66,8 +64,6 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'regex:/^\+91\d{10}$|^\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
-            'role_id' => ['nullable', 'exists:roles,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
             'password' => ['nullable', 'string', 'min:6', 'max:60'],
         ]);
 
@@ -82,8 +78,6 @@ class UserController extends Controller
             'mobile' => $mobile,
             'password' => Hash::make($password),
             'role' => $data['role'],
-            'role_id' => $data['role_id'],
-            'branch_id' => $data['branch_id'] ?? Branch::where('hostel_id', Tenant::id())->first()?->id,
             'is_active' => true,
         ]);
         // Grant branch access to the active hostel.
@@ -104,15 +98,11 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
-            'role_id' => ['nullable', 'exists:roles,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
         $model->update([
             'name' => $data['name'],
             'role' => $data['role'],
-            'role_id' => $data['role_id'],
-            'branch_id' => $data['branch_id'],
             'is_active' => $request->boolean('is_active', $model->is_active),
         ]);
         $this->logger->log('user.update', "Updated user {$model->name}", $model);

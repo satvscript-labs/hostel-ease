@@ -90,7 +90,7 @@ class HostelProvisioningTest extends TestCase
             'branches' => [$primary->id, $extra->id],
         ])->assertRedirect();
 
-        $admin = User::where('mobile', '9000022222')->firstOrFail();
+        $admin = User::where('mobile', '+919000022222')->firstOrFail(); // stored in +91 login form (item 14)
         $this->assertTrue($admin->hostels->pluck('id')->contains($primary->id));
         $this->assertTrue($admin->hostels->pluck('id')->contains($extra->id));
     }

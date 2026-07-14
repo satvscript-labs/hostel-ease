@@ -119,7 +119,9 @@ class HostelController extends Controller
         $hostel->loadCount('students', 'rooms', 'beds')
             ->load(['admins.hostels', 'subscriptions' => fn ($q) => $q->latest('end_date')]);
 
-        $ownerAdmin = \App\Models\User::where('mobile', $hostel->mobile)->where('role', 'hostel_admin')->first();
+        // The explicit owner FK is authoritative; billing's resolver self-heals
+        // legacy rows (mobile / pivot fallbacks) onto it.
+        $ownerAdmin = $hostel->owner ?? $this->billing->ownerForBranch($hostel);
         $branches = $ownerAdmin
             ? \App\Models\Hostel::whereIn('id', $ownerAdmin->accessibleHostelIds())->orderBy('name')->get()
             : collect([$hostel]);
@@ -137,10 +139,32 @@ class HostelController extends Controller
 
     public function update(StoreHostelRequest $request, Hostel $hostel): RedirectResponse
     {
-        $hostel->update($request->safe()->only([
+        $data = $request->safe()->only([
             'name', 'owner_name', 'mobile', 'email', 'address', 'city', 'state',
             'gst_number', 'subscription_start', 'subscription_end', 'status',
-        ]));
+        ]);
+
+        // The hostel mobile doubles as the owner's LOGIN username and as the
+        // identity that links sibling branches. Changing it here must move the
+        // owner login and every sibling branch with it — otherwise the branch
+        // orphans from its owner/account (P4 item 14, decision 3).
+        $newMobile = $data['mobile'] ?? null;
+        $owner = $hostel->owner;
+
+        if ($newMobile && $newMobile !== $hostel->mobile && $owner) {
+            $collision = \App\Models\User::where('mobile', $newMobile)->where('id', '!=', $owner->id)->exists();
+            if ($collision) {
+                return back()->withInput()->withErrors([
+                    'mobile' => 'That mobile already belongs to another login — it cannot become this owner\'s number.',
+                ]);
+            }
+
+            $owner->forceFill(['mobile' => $newMobile])->save();
+            $owner->ownedHostels()->where('id', '!=', $hostel->id)->update(['mobile' => $newMobile]);
+            $this->logger->log('hostel.update', "Owner mobile changed to {$newMobile} (login + all owned branches)", $hostel);
+        }
+
+        $hostel->update($data);
 
         $this->logger->log('hostel.update', "Updated hostel {$hostel->name}", $hostel);
 

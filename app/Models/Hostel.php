@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -15,6 +17,7 @@ class Hostel extends Model
         'name',
         'owner_name',
         'mobile',
+        'owner_id',
         'email',
         'address',
         'city',
@@ -62,9 +65,25 @@ class Hostel extends Model
         return $this->hasMany(User::class);
     }
 
-    public function admins(): HasMany
+    /**
+     * The ONE explicit owner of this branch (a hostel_admin User) — the same
+     * user the SubscriptionAccount hangs off. Replaces the old fragile
+     * inference by mobile match / "first admin in the pivot" (P4 item 14).
+     */
+    public function owner(): BelongsTo
     {
-        return $this->hasMany(User::class)->where('role', 'hostel_admin');
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * Admin logins with ACCESS to this branch — pivot-based, so a multi-branch
+     * owner shows on every branch they hold, not just their primary. (The old
+     * hasMany on users.hostel_id listed an owner only on their first branch.)
+     */
+    public function admins(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'hostel_user')
+            ->where('role', 'hostel_admin')->withTimestamps();
     }
 
     public function subscriptions(): HasMany

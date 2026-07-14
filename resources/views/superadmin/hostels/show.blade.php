@@ -135,6 +135,7 @@
                             <div class="min-w-0">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="fw-semibold text-dark text-truncate">{{ $a->name }}</span>
+                                    @if($hostel->owner_id === $a->id)<span class="badge rounded-pill text-white" style="font-size:.6rem; background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea));"><i class="fa-solid fa-crown me-1" style="font-size:.5rem;"></i>Owner</span>@endif
                                     @if(!$a->is_active)<span class="badge bg-secondary-subtle text-secondary rounded-pill" style="font-size:.6rem;">Disabled</span>@endif
                                 </div>
                                 <div class="small text-muted"><x-mobile-link :mobile="$a->mobile" /></div>
@@ -148,12 +149,14 @@
                             </div>
                         </div>
                         <div class="text-nowrap">
+                            @if($hostel->owner_id !== $a->id)
                             <form action="{{ route('superadmin.admins.toggle', $a) }}" method="POST" class="d-inline">
                                 @csrf @method('PATCH')
                                 <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width:30px;height:30px;" title="{{ $a->is_active ? 'Disable admin' : 'Enable admin' }}">
                                     <i class="fa-solid {{ $a->is_active ? 'fa-ban text-warning' : 'fa-check text-success' }}" style="font-size:.75rem;"></i>
                                 </button>
                             </form>
+                            @endif
                             <form action="{{ route('superadmin.admins.reset', $a) }}" method="POST" class="d-inline ms-1" data-confirm="Generate a new random password for {{ $a->name }}?">
                                 @csrf @method('PATCH')
                                 <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width:30px;height:30px;" title="Reset password">

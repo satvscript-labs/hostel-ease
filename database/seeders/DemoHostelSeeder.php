@@ -197,7 +197,13 @@ class DemoHostelSeeder extends Seeder
             ]
         );
 
+        // Invariants (P4 item 14): explicit owner FK, pivot access, and the
+        // owner always has a primary branch.
+        $hostel->update(['owner_id' => $owner->id]);
         $owner->hostels()->syncWithoutDetaching([$hostel->id]);
+        if (! $owner->hostel_id) {
+            $owner->forceFill(['hostel_id' => $hostel->id])->save();
+        }
         app(\App\Services\HostelService::class)->seedPaymentModes($hostel);
 
         // --- ACTIVITY LOGS ---

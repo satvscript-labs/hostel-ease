@@ -64,8 +64,14 @@ class HostelService
                 ]);
             }
 
-            // Grant this admin access to the new branch.
+            // Invariants (P4 item 14): the branch records its explicit owner,
+            // the owner always holds pivot access to it, and the owner always
+            // has a primary branch.
+            $hostel->update(['owner_id' => $admin->id]);
             $admin->hostels()->syncWithoutDetaching([$hostel->id]);
+            if (! $admin->hostel_id) {
+                $admin->forceFill(['hostel_id' => $hostel->id])->save();
+            }
 
             $this->seedPaymentModes($hostel);
 
@@ -101,6 +107,7 @@ class HostelService
                 'name' => $data['name'],
                 'owner_name' => $owner->name,
                 'mobile' => $owner->mobile,
+                'owner_id' => $owner->id,
                 'email' => $data['email'] ?? $owner->email,
                 'address' => $data['address'] ?? null,
                 'city' => $data['city'] ?? null,
@@ -112,6 +119,9 @@ class HostelService
             ]);
 
             $owner->hostels()->syncWithoutDetaching([$hostel->id]);
+            if (! $owner->hostel_id) {
+                $owner->forceFill(['hostel_id' => $hostel->id])->save();
+            }
             $this->seedPaymentModes($hostel);
 
             return $hostel;
