@@ -10,10 +10,21 @@
     @vite(['resources/scss/app.scss'])
 </head>
 <body class="d-flex align-items-center justify-content-center p-3" style="min-height:100vh; background: var(--he-bg-canvas);">
+    @php
+        $activeHostel = \App\Support\Tenant::id() ? \App\Models\Hostel::find(\App\Support\Tenant::id()) : auth()->user()?->hostel;
+    @endphp
     <div class="page-enter" style="max-width: 460px; width: 100%;">
         <div class="card-premium text-center overflow-hidden">
             <div class="expired-hero">
                 <div class="expired-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                @if($activeHostel)
+                    <div class="expired-branch">
+                        <i class="fa-solid fa-hotel me-1"></i>{{ $activeHostel->name }}
+                        @if($activeHostel->subscription_end)
+                            <span class="opacity-75">· ended {{ $activeHostel->subscription_end->format('d M Y') }}</span>
+                        @endif
+                    </div>
+                @endif
             </div>
             <div class="p-4 p-md-5 pt-4">
                 <h1 class="h4 fw-bold mb-2">Subscription expired</h1>
@@ -22,7 +33,7 @@
                     @if(auth()->user()?->isHostelAdmin())
                         Renew now to restore your dashboard.
                     @else
-                        Please ask the hostel owner to renew, or contact support.
+                        Your access is paused until the hostel owner renews — please reach out to them, or contact support.
                     @endif
                 </p>
 
@@ -60,6 +71,21 @@
             position: absolute;
             inset: 0;
             background: radial-gradient(circle at 30% 20%, rgba(147, 51, 234, 0.35), transparent 60%);
+        }
+        .expired-branch {
+            position: relative;
+            z-index: 1;
+            margin: 1rem auto 0;
+            display: inline-flex;
+            align-items: center;
+            font-size: var(--he-text-xs);
+            font-weight: 600;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: var(--he-radius-full);
+            padding: 0.35rem 0.9rem;
+            backdrop-filter: blur(6px);
         }
         .expired-icon {
             width: 72px;

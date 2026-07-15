@@ -10,6 +10,43 @@
         gap: 1.5rem;
     }
     
+    /* 0. Subscription heads-up banner */
+    .sub-alert {
+        grid-column: span 12;
+        display: flex; align-items: center; gap: 1rem;
+        padding: 0.9rem 1.1rem;
+        border-radius: 1.1rem;
+        border: 1px solid;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+        position: relative; overflow: hidden;
+    }
+    .sub-alert::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
+    .sub-alert-ic { width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .sub-alert-body { flex-grow: 1; min-width: 0; }
+    .sub-alert-title { font-weight: 800; color: var(--he-text-main, #0f172a); line-height: 1.2; font-size: 0.98rem; }
+    .sub-alert-msg { font-size: 0.82rem; color: var(--he-text-muted, #64748b); }
+    .sub-alert-cta { flex-shrink: 0; color: #fff; border: 0; }
+    .sub-alert-x { flex-shrink: 0; border: 0; background: transparent; color: var(--he-text-muted, #94a3b8); width: 30px; height: 30px; border-radius: 50%; transition: all .2s; }
+    .sub-alert-x:hover { background: rgba(15,23,42,.06); color: var(--he-text-main, #0f172a); }
+    /* tones */
+    .sub-alert--danger  { border-color: rgba(239,68,68,.25); }
+    .sub-alert--danger::before  { background: var(--he-danger, #ef4444); }
+    .sub-alert--danger  .sub-alert-ic { background: var(--he-danger-soft, #fee2e2); color: var(--he-danger, #ef4444); }
+    .sub-alert--danger  .sub-alert-cta { background: var(--he-danger, #ef4444); }
+    .sub-alert--warning { border-color: rgba(245,158,11,.28); }
+    .sub-alert--warning::before { background: var(--he-warning, #f59e0b); }
+    .sub-alert--warning .sub-alert-ic { background: var(--he-warning-soft, #fef3c7); color: var(--he-warning, #f59e0b); }
+    .sub-alert--warning .sub-alert-cta { background: var(--he-warning, #f59e0b); }
+    .sub-alert--info    { border-color: rgba(14,165,233,.25); }
+    .sub-alert--info::before    { background: var(--he-info, #0ea5e9); }
+    .sub-alert--info    .sub-alert-ic { background: var(--he-info-soft, #e0f2fe); color: var(--he-info, #0ea5e9); }
+    .sub-alert--info    .sub-alert-cta { background: var(--he-primary, #4f46e5); }
+    @media (max-width: 575.98px) {
+        .sub-alert { flex-wrap: wrap; }
+        .sub-alert-cta { order: 3; width: 100%; }
+    }
+
     /* 1. The Hero Greeting */
     .dash-hero {
         grid-column: span 12;
@@ -337,6 +374,23 @@
 
 @section('content')
 <div class="dash-grid">
+
+    {{-- 0. Subscription heads-up (grace / renewal due / trial ending) — dismissible, returns on reload --}}
+    @if($subAlert)
+        <div class="sub-alert sub-alert--{{ $subAlert['tone'] }}" x-data="{ show: true }" x-show="show" x-transition.opacity x-collapse>
+            <div class="sub-alert-ic"><i class="fa-solid fa-{{ $subAlert['icon'] }}"></i></div>
+            <div class="sub-alert-body">
+                <div class="sub-alert-title">{{ $subAlert['title'] }}</div>
+                <div class="sub-alert-msg">{{ $subAlert['msg'] }}</div>
+            </div>
+            @if($subAlert['isOwner'])
+                <a href="{{ route('admin.subscription.index') }}" class="btn btn-sm sub-alert-cta rounded-pill fw-semibold tactile-btn">
+                    <i class="fa-solid fa-receipt me-1"></i> {{ __('View subscription') }}
+                </a>
+            @endif
+            <button type="button" class="sub-alert-x" @click="show = false" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    @endif
 
     {{-- 1. Hero Greeting --}}
     <div class="dash-hero">

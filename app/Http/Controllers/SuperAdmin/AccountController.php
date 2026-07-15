@@ -32,13 +32,25 @@ class AccountController extends Controller
     /** Customers list — one row per account. */
     public function index(Request $request): View
     {
+        // Renewals worklist filter (item 15/§4): "due within N days" — accounts
+        // approaching OR past their renewal date (excludes manually suspended).
+        $dueDays = $request->filled('due') ? max(1, (int) $request->integer('due')) : null;
+
         // Eager-load owner + branch pivot for the count; no per-row queries (NFR-4).
         $accounts = SubscriptionAccount::query()
             ->with(['owner:id,name,mobile', 'owner.hostels:id'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->orderByRaw("CASE status WHEN 'grace' THEN 0 WHEN 'expired' THEN 1 WHEN 'trial' THEN 2 ELSE 3 END")
-            ->orderBy('current_period_end')
-            ->paginate(20);
+            ->when($dueDays, fn ($q) => $q->where('status', '!=', 'suspended')
+                ->whereNotNull('current_period_end')
+                ->where('current_period_end', '<=', now()->addDays($dueDays)->endOfDay()))
+            // A due worklist sorts purely by soonest/overdue first; the default
+            // list leads with grace/expired then by date.
+            ->when($dueDays, fn ($q) => $q->orderBy('current_period_end'))
+            ->when(! $dueDays, fn ($q) => $q
+                ->orderByRaw("CASE status WHEN 'grace' THEN 0 WHEN 'expired' THEN 1 WHEN 'trial' THEN 2 ELSE 3 END")
+                ->orderBy('current_period_end'))
+            ->paginate(20)
+            ->withQueryString();
 
         // Lifetime value for the whole page in one grouped query.
         $ltvs = SubscriptionOrder::whereIn('account_id', collect($accounts->items())->pluck('id'))
@@ -50,18 +62,24 @@ class AccountController extends Controller
         $accounts->through(function (SubscriptionAccount $account) use ($ltvs) {
             $account->branch_count = $account->owner?->hostels->count() ?? 0;
             $account->ltv = (float) ($ltvs[$account->id] ?? 0);
+            $account->days_until = $account->daysUntilAnchor();
 
             return $account;
         });
 
+        $dueSoon = fn (int $days) => SubscriptionAccount::where('status', '!=', 'suspended')
+            ->whereNotNull('current_period_end')
+            ->where('current_period_end', '<=', now()->addDays($days)->endOfDay())
+            ->count();
+
         $summary = [
             'accounts' => SubscriptionAccount::count(),
             'active' => SubscriptionAccount::where('status', 'active')->count(),
-            'due' => SubscriptionAccount::whereIn('status', ['grace', 'expired'])->count(),
+            'due_30' => $dueSoon(30),
             'revenue' => (float) SubscriptionOrder::paid()->sum('amount'),
         ];
 
-        return view('superadmin.accounts.index', compact('accounts', 'summary'));
+        return view('superadmin.accounts.index', compact('accounts', 'summary', 'dueDays'));
     }
 
     /** Account 360. */

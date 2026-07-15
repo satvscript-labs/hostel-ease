@@ -130,6 +130,28 @@ class SuperAdminAccountsTest extends TestCase
         $this->assertNull($account->fresh()->unit_price_override_monthly);  // monthly stays on list price
     }
 
+    public function test_customers_due_filter_is_a_renewals_worklist(): void
+    {
+        $super = User::factory()->superAdmin()->create();
+
+        // One renewing in 3 days, one far out.
+        $soon = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9000000021', 'name' => 'Soon Owner']);
+        Hostel::factory()->create(['mobile' => '9000000021', 'owner_id' => $soon->id, 'status' => 'active', 'subscription_end' => now()->addDays(3)]);
+        $soon->hostels()->sync(Hostel::where('owner_id', $soon->id)->pluck('id')->all());
+        SubscriptionAccount::create(['owner_id' => $soon->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addDays(3)]);
+
+        $far = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9000000022', 'name' => 'Faraway Owner']);
+        Hostel::factory()->create(['mobile' => '9000000022', 'owner_id' => $far->id, 'status' => 'active', 'subscription_end' => now()->addMonths(9)]);
+        $far->hostels()->sync(Hostel::where('owner_id', $far->id)->pluck('id')->all());
+        SubscriptionAccount::create(['owner_id' => $far->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(9)]);
+
+        $this->actingAs($super)->get(route('superadmin.accounts.index', ['due' => 7]))
+            ->assertOk()
+            ->assertSee('Soon Owner')          // within the window
+            ->assertDontSee('Faraway Owner')   // 9 months out — excluded
+            ->assertSee('Renewals due');       // the worklist tile
+    }
+
     public function test_add_hostel_creates_a_branch_under_the_owner_and_co_terminates(): void
     {
         [$owner, $account] = $this->seedAccount();

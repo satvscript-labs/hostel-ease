@@ -118,6 +118,56 @@ class DashboardController extends Controller
 
         $feed = $feed->sortByDesc('time')->take(10)->values();
 
-        return view('admin.dashboard', compact('stats', 'charts', 'feed'));
+        $subAlert = $this->subscriptionAlert();
+
+        return view('admin.dashboard', compact('stats', 'charts', 'feed', 'subAlert'));
+    }
+
+    /**
+     * A dismissible subscription heads-up for the active branch's account
+     * (grace / renewal due within 30 days / trial ending). Owners who fully
+     * lapse never reach the dashboard — they're redirected by
+     * EnsureActiveSubscription — so this covers the "still active but
+     * approaching / in grace" window they land on.
+     */
+    protected function subscriptionAlert(): ?array
+    {
+        $hostel = \App\Support\Tenant::id() ? \App\Models\Hostel::find(\App\Support\Tenant::id()) : null;
+        if (! $hostel) {
+            return null;
+        }
+
+        $account = app(\App\Services\Billing\AccountBillingService::class)->accountForBranch($hostel);
+        if (! $account || ! $account->current_period_end) {
+            return null;
+        }
+
+        $days = $account->daysUntilAnchor();
+        $isTrial = $account->period?->value === 'trial';
+        $end = $account->current_period_end->format('d M Y');
+        $noun = $isTrial ? 'trial' : 'subscription';
+
+        $alert = match (true) {
+            $account->status === \App\Enums\AccountStatus::Grace => [
+                'tone' => 'danger', 'icon' => 'triangle-exclamation',
+                'title' => 'Grace period — your '.$noun.' has expired',
+                'msg' => "It ended on {$end}. Access continues for a short grace window — renew now to avoid interruption.",
+            ],
+            $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days >= 0 && $days <= 7 => [
+                'tone' => 'warning', 'icon' => 'clock',
+                'title' => $isTrial
+                    ? ($days === 0 ? 'Your trial ends today' : "Your trial ends in {$days} day(s)")
+                    : ($days === 0 ? 'Renewal due today' : "Renewal due in {$days} day(s)"),
+                'msg' => "Your {$noun} renews on {$end}. Renew soon to keep every branch active.",
+            ],
+            $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days <= 30 => [
+                'tone' => 'info', 'icon' => 'calendar-check',
+                'title' => $isTrial ? "Your trial ends in {$days} days" : "Renewal coming up in {$days} days",
+                'msg' => "Your {$noun} renews on {$end}.",
+            ],
+            default => null,
+        };
+
+        return $alert ? $alert + ['isOwner' => auth()->user()->isHostelAdmin()] : null;
     }
 }

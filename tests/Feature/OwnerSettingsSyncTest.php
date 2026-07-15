@@ -135,6 +135,22 @@ class OwnerSettingsSyncTest extends TestCase
         $this->assertNotContains($foreign->id, $ids); // foreign branch silently dropped
     }
 
+    public function test_owner_dashboard_shows_a_renewal_heads_up_only_when_due_soon(): void
+    {
+        $owner = $this->owner(1); // anchor +6 months → outside the 30-day window
+        $this->actingAs($owner)->get(route('admin.dashboard'))
+            ->assertOk()->assertDontSee('class="sub-alert ', false);
+
+        // Move the account + branch to 5 days out → the warning banner appears.
+        SubscriptionAccount::where('owner_id', $owner->id)->update(['current_period_end' => now()->addDays(5), 'status' => 'active']);
+        Hostel::where('owner_id', $owner->id)->update(['subscription_end' => now()->addDays(5)]);
+
+        $this->actingAs($owner)->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee('sub-alert', false)
+            ->assertSee('Renewal due in 5 day(s)');
+    }
+
     public function test_change_password_page_renders_the_premium_ui(): void
     {
         $owner = $this->owner();

@@ -27,4 +27,5 @@ composer.phar
 /.zed
 /_artifact/
 database/database.sqlite
+database/database.sqlite.bak
 proxy.cjs
