@@ -3,8 +3,7 @@
 
 @push('styles')
 <style>
-    .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius:1.1rem; transition:all .3s cubic-bezier(.25,1,.5,1); }
-    .panel-card:hover { box-shadow:0 12px 30px rgba(0,0,0,0.04); }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
     .rec-pill { font-size:.68rem; font-weight:700; letter-spacing:.3px; }
     .custom-overlay-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:1rem; }
     .custom-overlay-modal { width:100%; background:#fff; border-radius:1.25rem; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); display:flex; flex-direction:column; max-height:90vh; transform:scale(.95); opacity:0; transition:all .3s cubic-bezier(.16,1,.3,1); overflow:hidden; }

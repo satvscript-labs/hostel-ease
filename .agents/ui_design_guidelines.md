@@ -158,6 +158,107 @@ Any hand-rolled dropdown, popover, or inline picker (`x-show="open" @click.outsi
 
 `<x-he-select>` already does this (see its docblock). Apply the same modifier to every new hand-rolled dropdown, and fix old ones opportunistically when you're already touching that file.
 
+### 4.2 Dropdown stacking checklist — verify the menu actually paints on top, EVERY time
+
+This bug has recurred on every page that placed a dropdown above a list (W2 Property Board,
+W5 Front Desk — twice in one phase). The menu's own `z-index: 1050` is **not enough**, because
+z-index only competes *inside the nearest ancestor stacking context* — and this codebase creates
+stacking contexts constantly: entrance animations (`.page-enter`, `.stagger-*`, any inline
+`animation: fadeUp`), `opacity-*` utilities, `backdrop-filter` glass, `transform`/`will-change`.
+If any ancestor of the dropdown forms a context that its *sibling* list rows don't share, the rows
+paint over the open menu and it looks like the dropdown "renders behind the UI".
+
+**Whenever you add, move, or restyle a dropdown/popover (including `<x-he-select>` and
+`<x-he-picker>`), you MUST verify with the menu OPEN that it paints above everything below it —
+in the browser, not by reading the CSS.** Then apply whichever fixes apply:
+
+1. **Row above a list** → give the dropdown-owning row an explicit raised stacking order:
+   `position: relative; z-index: 30;` (page-local class, e.g. `.fd-filter-row` on Front Desk).
+   This lifts the whole row — deterministic regardless of which ancestor forms a context.
+2. **Dropdown inside a card in a repeated list** (e.g. per-row status menus) → raise the *open*
+   card above its siblings: `:style="\`position: relative; z-index: ${open ? 50 : 1}\`"`
+   (Front Desk complaint cards are the reference).
+3. **Ancestor with `overflow: hidden`** clips instead of stacking — `.panel-card` clips by
+   design. A card that hosts a dropdown must override it locally (`overflow: visible`) *if* it
+   doesn't use `.panel-head` (whose corner treatment is why the clip exists).
+4. Entrance animations must end on `transform: none` (not `translateY(0)`) — a retained non-none
+   transform makes the context (and containing block) permanent. `fadeUp` in `_premium.scss` is
+   already correct; don't regress it, and don't write new keyframes that end on an identity
+   transform. This still doesn't remove contexts *during* the animation, which is why fixes 1–2
+   are required anyway.
+
+### 4.3 A filter must never reload the whole page — refresh only the list it affects
+
+**Rule: no filter, search, sort, or tab control may trigger a full page navigation.**
+`onchange="this.form.submit()"` is banned in new work and gets fixed on sight in old work.
+
+Changing a filter is a request to re-render *some rows*. A full reload answers it by destroying
+and rebuilding the entire document — so everything not encoded in the HTML is lost with it:
+
+| Lost on full reload | Consequence |
+|---|---|
+| Scroll position | You're thrown back to the top of a long list |
+| Every Alpine scope | Open dropdowns close, typed search text clears, the active tab resets |
+| Focus | Keyboard/screen-reader users lose their place |
+| Entrance animations | `.page-enter` / `.stagger` replay, so the page visibly re-lurches |
+
+Plus a blank gap while the document is swapped.
+
+**Use the `data-fragment` helper** (`initFragmentForms()` in `resources/js/app.js`). The form stays
+a plain GET form — this is progressive enhancement, so it still works with JS off:
+
+```blade
+<form method="GET" action="{{ route('...') }}" data-fragment="#visitor-list"> ... </form>
+
+<div id="visitor-list"> {{-- server-rendered rows --}} </div>
+```
+
+It intercepts submit, fetches the same URL, lifts the target out of the response, swaps only that
+element's `innerHTML`, and `pushState`s the URL so the view stays shareable and Back works.
+`data-fragment` accepts several comma-separated selectors when one filter drives more than one
+region (e.g. a list plus its count badge).
+
+**Find every element the filter's own query string drives, not just the list.** A filter often
+also renders a small readout of its *own current state* — a "16 Jul" chip next to a date picker, an
+active-filter count, a "clear" button that only appears once something is set. If that readout sits
+outside the list target, a fragment swap that only names the list will silently stop updating it —
+the list refreshes correctly, but the chip/badge/clear-button freezes at whatever it showed on the
+last full load (found on Front Desk's mobile date chip: the "16 Jul" label and its clear ✕ live in
+the filter bar, not `#visitor-list`, so they never updated once the list alone was the swap target).
+Audit the whole filter row, not just the results container, and add every such readout to
+`data-fragment` too — wrapped in an **always-present** element if the readout itself appears/
+disappears (e.g. the clear button only renders `@if(request('date'))`): the swap only updates an
+element it finds on *both* sides, so a container that doesn't exist yet in the current DOM can't
+receive one that exists in the fetched DOM. Wrap the conditional pieces in one persistent
+`<span id="...">`, `display: contents` so it doesn't add a layout box, and target that id.
+
+Non-obvious things it already handles — don't re-solve these per page:
+
+- **`requestSubmit()`, never `submit()`.** The DOM's `form.submit()` does not fire a `submit`
+  event, so it silently bypasses this (and `data-confirm`, and native validation) and hard-navigates.
+  `<x-he-select>` already calls `requestSubmit()`; any hand-written `onchange` must too.
+- **Out-of-order responses.** Two quick filter clicks can resolve backwards and paint the wrong
+  list. Each target group keeps one `AbortController` and cancels the superseded request.
+- **No loading signal.** A partial refresh has no tab spinner or white flash, so a slow filter
+  looks frozen. Targets get `.is-fragment-loading` (dim + input-blocked) during the swap.
+- **Failure.** On a network/HTTP error it falls back to the full navigation the user would have
+  had anyway, rather than stranding them on a stale list.
+- **Alpine re-init.** Alpine observes DOM mutations and initialises swapped-in nodes itself. Keep
+  the target *inside* the page's existing `x-data` root so new rows resolve parent scope (that's
+  how Front Desk's client-side search keeps working on freshly-swapped rows).
+
+**What this does and does not save.** Be accurate about the win: the helper requests the *same
+full page* and extracts the target from the response, so **the server still renders the whole
+page** — the saving is on the client (state, scroll, focus, no flash, no animation replay), not on
+the server. That's the part users actually feel, and it's why this is worth doing everywhere. If a
+page ever gets heavy enough that the server-side render is the bottleneck, the upgrade is small and
+local: have the controller return just the partial when `$request->ajax()`, and the same
+`data-fragment` markup keeps working unchanged (the JS already sends `X-Requested-With`).
+
+**When a full reload is still correct:** anything that legitimately changes the whole page —
+switching branch/tenant, login/logout, or a mutation that invalidates the chrome (sidebar counts,
+subscription state). Filtering a list is never one of those.
+
 ---
 
 ## 5. Standard Overlay Modals — use `<x-he-modal>`

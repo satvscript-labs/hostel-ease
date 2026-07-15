@@ -3,8 +3,7 @@
 
 @push('styles')
 <style>
-    .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius:1.1rem; transition:all .3s cubic-bezier(.25,1,.5,1); }
-    .panel-card:hover { box-shadow:0 12px 30px rgba(0,0,0,0.04); }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
 
     /* ── Segmented tab bar (scrolls horizontally on phones) ── */
     .st-tabs { display:flex; gap:.35rem; background:var(--he-bg-surface-raised,#f1f5f9); border:1px solid rgba(15,23,42,.06); border-radius:9999px; padding:.3rem; width:max-content; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }

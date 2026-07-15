@@ -47,7 +47,14 @@
     // $nextTick: let Alpine flush the x-model binding into the hidden <input>
     // before we submit — otherwise the form posts the *stale* value (the field
     // reads empty and the filter appears to do nothing / "just refresh").
-    $submitJs = $submit ? '$nextTick(() => $el.closest(\'form\').submit());' : '';
+    //
+    // requestSubmit(), NOT submit(): the DOM's form.submit() deliberately skips
+    // the 'submit' event entirely, so any interception (fragment filtering via
+    // data-fragment, validation, confirm dialogs) is bypassed and the page hard
+    // -navigates. requestSubmit() fires the event like a real button press, so
+    // a filter form can opt into partial refresh just by adding data-fragment.
+    // It also runs native validation, which submit() skips.
+    $submitJs = $submit ? '$nextTick(() => $el.closest(\'form\')?.requestSubmit());' : '';
 @endphp
 <div
     {{ $attributes->class(['he-select-wrap']) }}

@@ -5,19 +5,7 @@
 <style>
     /* Registrations — premium card language (was unstyled: .premium-panel
        was never defined for this page). */
-    .panel-card {
-        background: var(--he-bg-surface);
-        border: 1px solid rgba(0, 0, 0, 0.05);
-        border-radius: var(--he-radius-lg);
-        box-shadow: var(--he-shadow-sm);
-        overflow: hidden;
-    }
-    .panel-head {
-        padding: 0.9rem 1.25rem;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-    }
-    .panel-head h6 { margin: 0; font-weight: 700; color: var(--he-text-main); }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss. */
 
     .reg-page-title { font-size: 1.6rem; letter-spacing: -0.01em; }
 

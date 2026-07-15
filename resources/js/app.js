@@ -106,7 +106,102 @@ document.addEventListener('DOMContentLoaded', () => {
             .forEach((evt) => document.addEventListener(evt, reset, { passive: true }));
         reset();
     }
+
+    initFragmentForms();
 });
+
+/**
+ * Fragment filtering — re-render only the list a filter affects, never the page.
+ *
+ * A filter that does `this.form.submit()` throws away the whole document to
+ * change a few rows. Everything not in the HTML dies with it: scroll position,
+ * every Alpine scope (open dropdowns, typed search text, active tab), focus, and
+ * the entrance animations all replay. It reads as a lurch, and on a slow link
+ * the screen is blank in between.
+ *
+ * This keeps the document alive: fetch the same URL, take only the target
+ * element(s) out of the response, swap them in. Everything outside the target is
+ * untouched, so state and scroll survive by construction.
+ *
+ * Usage — the form is a normal GET form (works with JS off; this is progressive
+ * enhancement, not a replacement):
+ *
+ *   <form method="GET" data-fragment="#visitor-list"> ... </form>
+ *   <div id="visitor-list"> ...server-rendered rows... </div>
+ *
+ * `data-fragment` takes one or more CSS selectors (comma-separated) that must
+ * exist in BOTH the current page and the response.
+ *
+ * Notes:
+ * - Requires controls to submit via requestSubmit(), NOT submit(): the DOM's
+ *   form.submit() deliberately does not fire a 'submit' event, so it would sail
+ *   straight past this listener and hard-navigate. <x-he-select> uses
+ *   requestSubmit() for this reason.
+ * - The URL is kept in sync via pushState, so the filtered view stays
+ *   shareable/bookmarkable and Back works (popstate re-syncs).
+ * - Alpine auto-initialises swapped-in DOM (it observes mutations), and since
+ *   the target sits inside the page's existing x-data root, new rows resolve
+ *   parent scope normally.
+ */
+function initFragmentForms() {
+    const forms = document.querySelectorAll('form[data-fragment]');
+    if (!forms.length) return;
+
+    // One in-flight request per target group. Filters fire fast (a click, then
+    // another click); without this, a slow first response can land AFTER a fast
+    // second one and show the wrong list — the classic out-of-order swap.
+    const inFlight = new Map();
+
+    const swap = async (selectors, url, key) => {
+        inFlight.get(key)?.abort();
+        const controller = new AbortController();
+        inFlight.set(key, controller);
+
+        const targets = selectors.map((s) => document.querySelector(s)).filter(Boolean);
+        targets.forEach((t) => t.classList.add('is-fragment-loading'));
+
+        try {
+            const res = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal,
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            selectors.forEach((sel) => {
+                const fresh = doc.querySelector(sel);
+                const current = document.querySelector(sel);
+                if (fresh && current) current.innerHTML = fresh.innerHTML;
+            });
+            window.history.pushState({ fragment: true }, '', url);
+        } catch (err) {
+            if (err.name === 'AbortError') return; // superseded by a newer filter
+            // Never strand the user on a half-updated list — fall back to the
+            // full navigation they'd have got without this enhancement.
+            window.location.assign(url);
+            return;
+        } finally {
+            inFlight.delete(key);
+            targets.forEach((t) => t.classList.remove('is-fragment-loading'));
+        }
+    };
+
+    forms.forEach((form, i) => {
+        const selectors = form.dataset.fragment.split(',').map((s) => s.trim()).filter(Boolean);
+        if (!selectors.length) return;
+        const key = `fragment-${i}`;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = new URLSearchParams(new FormData(form)).toString();
+            const action = form.getAttribute('action') || window.location.pathname;
+            swap(selectors, query ? `${action}?${query}` : action, key);
+        });
+    });
+
+    // Back/forward must show the state the URL describes, not a stale list.
+    window.addEventListener('popstate', () => window.location.reload());
+}
 
 function initGlobalSearch() {
     const input = document.getElementById('global-search');

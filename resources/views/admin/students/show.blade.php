@@ -36,23 +36,7 @@
     .sp-metric-val { font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
     .sp-metric-val.is-due { color: #fca5a5; }
 
-    /* Panels */
-    .panel-card {
-        background: var(--he-bg-surface);
-        border: 1px solid rgba(0, 0, 0, 0.05);
-        border-radius: var(--he-radius-lg);
-        box-shadow: var(--he-shadow-sm);
-        transition: box-shadow 0.3s var(--ease-out-expo);
-        overflow: hidden;
-    }
-    .panel-card:hover { box-shadow: var(--he-shadow-md); }
-    .panel-head {
-        padding: 0.9rem 1.25rem;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-    }
-    .panel-head h6 { margin: 0; font-weight: 700; color: var(--he-text-main); }
-    .panel-body { padding: 1.25rem; }
+    /* Panels: .panel-card / .panel-head / .panel-body are canonical in _premium.scss. */
 
     /* List rows */
     .sp-row {
@@ -178,6 +162,7 @@
                             <li><button type="button" class="dropdown-item rounded-3 py-2" @click="qrOpen = true"><i class="fa-solid fa-qrcode text-primary me-2"></i>Show ID QR</button></li>
                             @endif
                             <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.pocket-money.show', $student) }}"><i class="fa-solid fa-wallet text-primary me-2"></i>Add pocket money</a></li>
+                            <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.security-deposits.index') }}"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Manage deposits</a></li>
                             <li><button type="button" class="dropdown-item rounded-3 py-2" @click="docOpen = true"><i class="fa-solid fa-upload text-primary me-2"></i>Upload document</button></li>
                             <li><button type="button" class="dropdown-item rounded-3 py-2" @click="feeOpen = true"><i class="fa-solid fa-sliders text-primary me-2"></i>Edit fee plan</button></li>
                         </ul>

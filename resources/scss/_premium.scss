@@ -107,7 +107,17 @@ body {
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        /* `none`, NOT translateY(0) — they animate identically, but with
+           fill-mode both/forwards the end value is RETAINED, and a retained
+           non-none transform makes the element a permanent stacking context
+           (and containing block). That trapped every dropdown under later
+           rows (each row is animated too, so z-index couldn't cross), and
+           it's the same mechanism that traps position:fixed children
+           (mobile rule 10). `none` releases both once the entrance ends;
+           during the ~0.5s animation the contexts still exist, so teleporting
+           fixed elements (rule 10) is still required. Found in W5 via the
+           Front Desk visitor-filter dropdown hiding behind the list. */
+        transform: none;
     }
 }
 
@@ -236,6 +246,53 @@ body {
     transform: translateY(-2px);
     box-shadow: var(--he-shadow-md);
 }
+
+/* --- Fragment loading — the in-place swap state for data-fragment filters
+   (see .agents/ui_design_guidelines.md §4.3). A partial refresh has no
+   browser-level "we're loading" signal (no tab spinner, no white flash), so
+   without this a slow filter just looks frozen. Dim + block input for the
+   moment the list is being replaced; anything outside the target stays fully
+   live and interactive, which is the whole point of not reloading. --- */
+.is-fragment-loading {
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 0.15s var(--ease-out-expo);
+}
+
+/* --- Panel Card — THE workhorse surface of the premium language.
+   The white bordered panel that every redesigned page is built from
+   (Account 360, Students, Registrations, Settings, Subscription, Hostels,
+   Discounts, Front Desk...). Distinct from .card-premium: a panel does NOT
+   lift on hover (it's a container, not a clickable), and it clips its
+   children so .panel-head's divider meets the rounded corner cleanly.
+
+   Owned HERE and only here. It previously lived in 9 separate per-view
+   <style> blocks in two drifting generations (Gen-1: #fff/1.1rem/no-shadow;
+   Gen-2: tokenized/16px/shadow) — the corner radius visibly disagreed across
+   the app. Unified W5 (authorized to include the BRD §5 desktop-frozen
+   surfaces: they move 17.6px -> 16px and gain the shadow they lacked).
+   Do not redeclare this in a view. --- */
+.panel-card {
+    background: var(--he-bg-surface);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: var(--he-radius-lg);
+    box-shadow: var(--he-shadow-sm);
+    transition: box-shadow 0.3s var(--ease-out-expo);
+    overflow: hidden;
+}
+.panel-card:hover { box-shadow: var(--he-shadow-md); }
+
+.panel-head {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.panel-head h6 { margin: 0; font-weight: 700; color: var(--he-text-main); }
+
+.panel-body { padding: 1.25rem; }
 
 /* Bed Tiles */
 .bed-tile-premium {
@@ -657,6 +714,33 @@ body {
     box-shadow: var(--he-shadow-sm);
 }
 
+/* Colour-coded chips — for a few-option choice where the COLOUR carries the
+   meaning, not just the selection (complaint priority: low/medium/high). Same
+   reasoning as .stat-card-glass's status variants: default to the neutral
+   indigo .chip.active, and reach for these only when the hue is information.
+   Added W5, generalising Front Desk's page-local hardcoded .priority-* CSS.
+   Usage: <span class="chip chip--danger" :class="{ active: ... }"> */
+.chip--info.active { background: var(--he-info); }
+.chip--success.active { background: var(--he-success); }
+.chip--warning.active { background: var(--he-warning); }
+.chip--danger.active { background: var(--he-danger); }
+
+.chip--info:hover { background: var(--he-info-soft); color: var(--he-info); }
+.chip--success:hover { background: var(--he-success-soft); color: var(--he-success); }
+.chip--warning:hover { background: var(--he-warning-soft); color: var(--he-warning); }
+.chip--danger:hover { background: var(--he-danger-soft); color: var(--he-danger); }
+
+/* Keep the active colour when hovering an already-selected chip. */
+.chip--info.active:hover { background: var(--he-info); color: var(--he-text-inverse); }
+.chip--success.active:hover { background: var(--he-success); color: var(--he-text-inverse); }
+.chip--warning.active:hover { background: var(--he-warning); color: var(--he-text-inverse); }
+.chip--danger.active:hover { background: var(--he-danger); color: var(--he-text-inverse); }
+
+/* Chips as a real form control: the radio drives state, the chip is the label.
+   Lets a chip-group replace a hand-rolled radio segmented control without JS. */
+.chip-radio { position: absolute; opacity: 0; pointer-events: none; }
+.chip-radio:focus-visible + .chip { box-shadow: 0 0 0 4px var(--he-primary-soft); }
+
 /* --- Sharing stepper — the one control for "how many share a room",
    whether that's a room's actual bed count (Layout Builder) or a student's
    sharing preference (Fee-Plan Gate). A stepper's width never depends on
@@ -959,10 +1043,24 @@ body {
     background: rgba(255, 255, 255, 0.1);
     pointer-events: none;
 }
-.stat-card-visitors { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); }
-.stat-card-complaints-open { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); }
-.stat-card-complaints-prog { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-.stat-card-complaints-res { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+/* Colour-coded status variants (Front Desk). The colour IS the meaning here —
+   that's why these exist alongside the neutral <x-he-stat-tile>/.bento-card.
+   Tokenized W5: `visitors` was `#4f46e5 -> #3b82f6`, an off-palette blue; it now
+   uses the app's signature indigo->purple (same gradient as Builder / Bed History).
+   The status three deepen their own hue via color-mix rather than hardcoding a
+   second hex, so they track the palette if a token ever moves. */
+.stat-card-visitors {
+    background: linear-gradient(135deg, var(--he-primary) 0%, var(--he-accent) 100%);
+}
+.stat-card-complaints-open {
+    background: linear-gradient(135deg, var(--he-danger) 0%, color-mix(in srgb, var(--he-danger) 78%, #000) 100%);
+}
+.stat-card-complaints-prog {
+    background: linear-gradient(135deg, var(--he-warning) 0%, color-mix(in srgb, var(--he-warning) 78%, #000) 100%);
+}
+.stat-card-complaints-res {
+    background: linear-gradient(135deg, var(--he-success) 0%, color-mix(in srgb, var(--he-success) 78%, #000) 100%);
+}
 
 /* --- Empty State --- */
 .empty-state {

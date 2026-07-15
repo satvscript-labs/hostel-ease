@@ -45,8 +45,7 @@
     .hero-danger  { background: linear-gradient(135deg,#7f1d1d,#450a0a); }
     .hero-muted   { background: linear-gradient(135deg,#334155,#0f172a); }
     .sub-metric { font-variant-numeric: tabular-nums; }
-    .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius:1.1rem; transition:all .3s cubic-bezier(.25,1,.5,1); }
-    .panel-card:hover { box-shadow:0 12px 30px rgba(0,0,0,0.04); }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
     .plan-pick { border:1.5px solid rgba(0,0,0,0.08); border-radius:1rem; padding:1rem 1.1rem; cursor:pointer; transition:all .2s var(--ease-out-expo,cubic-bezier(.16,1,.3,1)); }
     .plan-pick.on { border-color:var(--bs-primary); background:rgba(79,70,229,.05); box-shadow:0 6px 18px rgba(79,70,229,.12); }
     .custom-overlay-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:1rem; }

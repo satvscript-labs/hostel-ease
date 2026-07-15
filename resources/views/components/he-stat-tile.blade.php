@@ -1,6 +1,16 @@
-{{-- The one canonical stat-tile pattern (renders .bento-card markup).
-     Retires .glass-tile / .stat-card-glass / .stat-card-complaints-* /
-     .stat-card-visitors, which were never-defined, unstyled class names.
+{{-- The canonical stat-tile for NEUTRAL stats (renders .bento-card markup):
+     white card, colored icon badge, value, label. Reach for this by default.
+
+     One sanctioned exception — .stat-card-glass + its .stat-card-visitors /
+     .stat-card-complaints-* variants (defined in _premium.scss). Those are
+     gradient tiles used where the COLOR ITSELF carries meaning at a glance
+     (red = open, amber = in progress, green = resolved). Front Desk is their
+     only consumer. Confirmed as a keep in W5.
+
+     (An earlier version of this comment claimed those classes were "retired"
+     and "never-defined, unstyled class names". Both claims were false — they
+     are fully defined in _premium.scss and actively rendering. Corrected W5.)
+
      Full usage examples: .agents/ui_design_guidelines.md --}}
 @props([
     'icon' => 'circle-info',

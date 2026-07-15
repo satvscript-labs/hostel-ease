@@ -3,8 +3,7 @@
 
 @push('styles')
 <style>
-    .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius:1.1rem; transition:all .3s cubic-bezier(.25,1,.5,1); }
-    .panel-card:hover { box-shadow:0 12px 30px rgba(0,0,0,0.04); }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
 
     /* ── Profile hero (light band — hierarchy under Account 360's dark mesh hero) ── */
     .hp-hero { position:relative; overflow:hidden; }

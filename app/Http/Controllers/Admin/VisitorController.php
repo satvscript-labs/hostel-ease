@@ -31,8 +31,13 @@ class VisitorController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // Normalize mobile to +91 format
-        if (!blank($data['mobile'])) {
+        // Normalize mobile to +91 format.
+        // NOTE: `mobile` is `nullable`, and validate() only returns keys that were
+        // actually present in the request — so a payload that omits the field
+        // entirely leaves $data['mobile'] undefined, not null. Browser forms always
+        // submit mobile="" so this never surfaced in the UI, but any caller that
+        // omits it (API, tests) hit an "Undefined array key" 500. Coalesce first.
+        if (! blank($data['mobile'] ?? null)) {
             $digits = substr(preg_replace('/\D+/', '', $data['mobile']), -10);
             $data['mobile'] = '+91' . $digits;
         }

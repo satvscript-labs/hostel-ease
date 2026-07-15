@@ -3,7 +3,7 @@
 
 @push('styles')
 <style>
-    .panel-card { background:#fff; border:1px solid rgba(0,0,0,0.05); border-radius:1.1rem; }
+    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
     .pw-hero { display:flex; align-items:center; gap:1rem; padding:1.5rem; background:var(--he-gradient-mesh, linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)); border-radius:1.1rem 1.1rem 0 0; color:#fff; position:relative; overflow:hidden; }
     .pw-hero::after { content:''; position:absolute; top:-40px; right:-30px; width:160px; height:160px; background:radial-gradient(circle, rgba(147,51,234,.4) 0%, transparent 70%); border-radius:50%; filter:blur(18px); pointer-events:none; }
     .pw-avatar { width:52px; height:52px; border-radius:15px; background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea)); display:flex; align-items:center; justify-content:center; font-size:1.25rem; font-weight:800; color:#fff; box-shadow:0 8px 20px rgba(79,70,229,.35); flex-shrink:0; z-index:1; }
