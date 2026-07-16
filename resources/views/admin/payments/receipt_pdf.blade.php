@@ -8,8 +8,9 @@
     pinned to DejaVu Sans because it is the only bundled face carrying the ₹
     glyph — swap it and the rupee sign turns into a box.
 
-    One template, three consumers: the admin PDF download, the API download,
-    and the emailed attachment. Anything added here shows up in all three.
+    One template, two consumers: the admin PDF download and the emailed
+    attachment. Anything added here shows up in both. (An Api\PaymentController
+    used to render it too — dead code from a never-shipped app, deleted W6.2.)
 --}}
 @php
     $room = $payment->student->activeAssignment?->bed?->room?->room_number;

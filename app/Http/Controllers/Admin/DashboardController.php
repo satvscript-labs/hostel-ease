@@ -51,7 +51,9 @@ class DashboardController extends Controller
             'empty_beds' => $emptyBeds,
             'total_beds' => $totalBeds,
             'students' => Student::active()->count(),
-            'monthly_income' => (float) Payment::whereBetween('paid_on', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
+            // income() (W6.2): credit applications and credit-note refunds are
+            // internal bookkeeping, not money in — summing them overstated this.
+            'monthly_income' => (float) Payment::income()->whereBetween('paid_on', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount'),
             'pending_fees' => $pendingDues,
             'unresolved_complaints' => $unresolvedComplaints,
             'visitors_today' => Visitor::whereDate('check_in', now()->toDateString())->count(),
@@ -61,7 +63,7 @@ class DashboardController extends Controller
 
         // Monthly collection for the last 6 months (grouped in PHP — DB-agnostic).
         $months = collect(range(0, 5))->map(fn ($i) => now()->subMonths(5 - $i)->format('Y-m'));
-        $collection = Payment::where('paid_on', '>=', now()->subMonths(5)->startOfMonth())
+        $collection = Payment::income()->where('paid_on', '>=', now()->subMonths(5)->startOfMonth())
             ->get(['amount', 'paid_on'])
             ->groupBy(fn ($p) => $p->paid_on->format('Y-m'))
             ->map(fn ($g) => (float) $g->sum('amount'));

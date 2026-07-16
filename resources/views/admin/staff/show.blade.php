@@ -356,8 +356,12 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Mode</label>
-                            <x-he-select name="mode" icon="wallet" :submit="false" :selected="'cash'"
-                                :options="['cash' => 'Cash', 'upi' => 'UPI', 'bank' => 'Bank Transfer']" />
+                            {{-- W6.2: the tenant's real payment modes, not a third
+                                 hardcoded vocabulary ('bank' matched nothing else in
+                                 the app). paySalary validates against the same table. --}}
+                            <x-he-select name="mode" icon="wallet" :submit="false"
+                                :selected="$paymentModes->first()?->code ?? 'cash'"
+                                :options="$paymentModes->mapWithKeys(fn ($m) => [$m->code => $m->name])->all()" />
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold text-dark small text-uppercase letter-spacing-1">Notes / Ref</label>

@@ -1331,6 +1331,61 @@ body {
     .he-search__icon { width: 26px; height: 26px; font-size: 0.68rem; }
 }
 
+/* ── Icon action buttons + action rows ────────────────────────────────────
+   Promoted from the Finance Board's page-local styles the moment a second
+   page (Expenses, W6.2) needed them — rule 0: two hand-rolled copies is one
+   too many. The quiet squircle button for row actions (edit/delete/link),
+   and the action-row split: primary action left, destructive/secondary
+   actions pushed right. */
+.he-icon-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 10px;
+    background: var(--he-bg-surface);
+    color: var(--he-text-muted);
+    font-size: 0.8rem;
+    transition: all 0.18s var(--ease-out-expo);
+}
+.he-icon-btn:hover {
+    background: var(--he-primary-soft);
+    color: var(--he-primary);
+    border-color: var(--he-primary);
+}
+.he-icon-btn:active { transform: scale(0.94); }
+.he-icon-btn.is-danger:hover {
+    background: var(--he-danger-soft);
+    color: var(--he-danger);
+    border-color: var(--he-danger);
+}
+.he-icon-btn.is-whatsapp:hover {
+    background: rgba(37, 211, 102, 0.12);
+    color: #128c7e;
+    border-color: #25d366;
+}
+/* Thumb-sized variant for phones (44px minimum touch target). */
+.he-icon-btn--lg {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+}
+.he-act-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.he-act-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
 /* ── Pager ────────────────────────────────────────────────────────────────
    The app-wide pagination skin (views/vendor/pagination/premium.blade.php,
    registered as the default paginator view in AppServiceProvider — every

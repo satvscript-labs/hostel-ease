@@ -519,6 +519,25 @@ See section 5.2 above.
 <x-he-skeleton height="240px" />           {{-- one block, e.g. a chart --}}
 ```
 
+### `.he-icon-btn` / `.he-act-row` (CSS, `_premium.scss`)
+
+The squircle icon button for row actions and the action-row split. Promoted from the Finance
+Board's page-local styles when Expenses needed them (W6.2) — don't hand-roll new row buttons.
+
+```blade
+<div class="he-act-row">                       {{-- primary action(s) left --}}
+    <button class="btn btn-success rounded-pill">Collect</button>
+    <div class="he-act-right">                 {{-- secondary/destructive pushed right --}}
+        <button class="he-icon-btn" title="Edit" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+        <button class="he-icon-btn is-danger" title="Delete" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+    </div>
+</div>
+```
+
+`he-icon-btn--lg` is the 44px phone variant (minimum touch target); `is-danger` / `is-whatsapp`
+recolour the hover. Icon-only buttons **must** carry `title` + `aria-label` — dropping the visible
+label must never drop the accessible name.
+
 **Important for anyone editing these component files:** never write a literal `<x-he-*>` self-reference tag inside that component's own Blade comment block, and never nest a `{{-- --}}` comment inside another one. Both cause Blade to compile a live, self-invoking component call from what looks like a comment, which infinitely recurses and crashes with a memory-exhaustion error. Keep component docblocks to plain prose; put runnable examples here in this markdown file instead.
 
 ---

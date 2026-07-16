@@ -23,6 +23,7 @@ class Expense extends Model
         'reference_number',
         'notes',
         'recorded_by',
+        'staff_salary_payment_id',
     ];
 
     protected function casts(): array
@@ -36,6 +37,21 @@ class Expense extends Model
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /** The staff salary payment this expense mirrors, when auto-created (W6.2). */
+    public function salaryPayment(): BelongsTo
+    {
+        return $this->belongsTo(StaffSalaryPayment::class, 'staff_salary_payment_id');
+    }
+
+    /**
+     * Salary-mirror expenses are managed from the Staff page — editing or
+     * deleting them here would silently desync the salary record they mirror.
+     */
+    public function isSalaryLinked(): bool
+    {
+        return $this->staff_salary_payment_id !== null;
     }
 
     public function scopeBetween($query, $from, $to)

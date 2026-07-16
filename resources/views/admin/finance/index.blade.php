@@ -47,39 +47,22 @@
         margin-bottom: 0.15rem;
     }
     /* One quiet container for the actions — separated from the numbers by a
-       hairline so the row reads "data | what you can do about it". */
+       hairline so the row reads "data | what you can do about it".
+       (The buttons themselves are the canonical .he-icon-btn / .he-act-row
+       family — promoted to _premium.scss in W6.2 when Expenses needed them.) */
     .fin-row-acts {
         display: flex; align-items: center; justify-content: flex-end;
         gap: 0.5rem;
         padding-left: 1.25rem;
         border-left: 1px solid rgba(0, 0, 0, 0.06);
     }
-    .fin-icon-btn {
-        width: 36px; height: 36px; flex-shrink: 0;
-        display: inline-flex; align-items: center; justify-content: center;
-        border: 1px solid rgba(0, 0, 0, 0.07);
-        border-radius: 10px;
-        background: var(--he-bg-surface);
-        color: var(--he-text-muted);
-        font-size: 0.8rem;
-        transition: all 0.18s var(--ease-out-expo);
-    }
-    .fin-icon-btn:hover { background: var(--he-primary-soft); color: var(--he-primary); border-color: var(--he-primary); }
-    .fin-icon-btn:active { transform: scale(0.94); }
-    .fin-icon-btn.is-danger:hover { background: var(--he-danger-soft); color: var(--he-danger); border-color: var(--he-danger); }
-    .fin-icon-btn.is-whatsapp:hover { background: rgba(37, 211, 102, 0.12); color: #128c7e; border-color: #25d366; }
-    /* Thumb-sized variant for phones (44px minimum touch target). */
-    .fin-icon-btn--lg { width: 44px; height: 44px; border-radius: 12px; font-size: 0.95rem; }
     @media (max-width: 1299.98px) {
         .fin-row { column-gap: 0.85rem; }
         .fin-row-acts { padding-left: 0.85rem; }
     }
 
-    /* ── Phone action row ──────────────────────────────────────────────────
-       Collect left (capped — a full-bleed green bar is a shouty way to say
-       "one of three things you can do"), edit/delete right. */
-    .fin-act-row { display: flex; align-items: center; gap: 0.5rem; }
-    .fin-act-right { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+    /* Phone: Collect left (capped — a full-bleed green bar is a shouty way
+       to say "one of three things you can do"), edit/delete right. */
     .fin-collect {
         flex: 1 1 auto;
         max-width: 220px;

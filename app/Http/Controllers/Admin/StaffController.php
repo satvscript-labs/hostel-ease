@@ -112,7 +112,11 @@ class StaffController extends Controller
         }
         $payments = StaffSalaryPayment::where('staff_id', $staff->id)->orderByDesc('paid_on')->get();
 
-        return view('admin.staff.show', compact('staff', 'counts', 'attendance', 'payments'));
+        // Feeds the Pay Salary modal's mode picker — same tenant vocabulary
+        // as every other payment in the app (W6.2).
+        $paymentModes = \App\Models\PaymentMode::active()->orderBy('sort_order')->orderBy('name')->get();
+
+        return view('admin.staff.show', compact('staff', 'counts', 'attendance', 'payments', 'paymentModes'));
     }
 
 
@@ -141,28 +145,62 @@ class StaffController extends Controller
             'salary_month' => ['required', 'date_format:Y-m'],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
-            'mode' => ['required', 'string', 'max:40'],
+            // Was a free string — salaries now spend through the same tenant
+            // payment_modes vocabulary as every other outflow (W6.2).
+            'mode' => ['required', Rule::in(\App\Models\PaymentMode::active()->pluck('code')->all())],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
-        StaffSalaryPayment::create([
-            'hostel_id' => Tenant::id(),
-            'staff_id' => $staff->id,
-            'salary_month' => Carbon::parse($data['salary_month'].'-01')->startOfMonth(),
-            'amount' => $data['amount'],
-            'paid_on' => $data['paid_on'],
-            'mode' => $data['mode'],
-            'notes' => $data['notes'] ?? null,
-        ]);
 
-        return back()->with('success', "Salary recorded for {$staff->name}.");
+        $month = Carbon::parse($data['salary_month'].'-01')->startOfMonth();
+
+        // Salary + its expense mirror are one fact recorded twice, so they're
+        // created in one transaction (owner decision, W6.2). Before this,
+        // salaries paid through the staff module never reached Expenses or
+        // Net Profit at all — and an owner who ALSO logged them by hand
+        // double-counted. The mirror is what makes payroll visible to the
+        // P&L exactly once.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $staff, $month) {
+            $payment = StaffSalaryPayment::create([
+                'hostel_id' => Tenant::id(),
+                'staff_id' => $staff->id,
+                'salary_month' => $month,
+                'amount' => $data['amount'],
+                'paid_on' => $data['paid_on'],
+                'mode' => $data['mode'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            \App\Models\Expense::create([
+                'hostel_id' => Tenant::id(),
+                'category' => 'staff_salary',
+                'title' => "Salary — {$staff->name} · {$month->format('M Y')}",
+                'amount' => $data['amount'],
+                'expense_date' => $data['paid_on'],
+                'paid_to' => $staff->name,
+                'mode' => $data['mode'],
+                'notes' => $data['notes'] ?? null,
+                'recorded_by' => auth()->id(),
+                'staff_salary_payment_id' => $payment->id,
+            ]);
+        });
+
+        return back()->with('success', "Salary recorded for {$staff->name} — logged to expenses.");
     }
 
     public function deleteSalary(Staff $staff, StaffSalaryPayment $payment): RedirectResponse
     {
         abort_unless($payment->staff_id === $staff->id, 404);
-        $payment->delete();
 
-        return back()->with('success', 'Salary entry removed.');
+        // The mirror goes with the salary — leaving it behind would keep a
+        // phantom expense inflating the P&L (the FK's nullOnDelete is only a
+        // backstop; this is the real cascade).
+        \Illuminate\Support\Facades\DB::transaction(function () use ($payment) {
+            \App\Models\Expense::where('staff_salary_payment_id', $payment->id)->get()
+                ->each->delete();
+            $payment->delete();
+        });
+
+        return back()->with('success', 'Salary entry removed — its expense entry went with it.');
     }
 
     protected function validateStaff(Request $request, ?Staff $staff = null): array

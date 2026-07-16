@@ -91,27 +91,27 @@
                          them out was eating the row. The three SEND actions sit
                          together on the left; reverse is destructive and
                          unrelated, so it keeps its distance on the right. --}}
-                    <div class="fin-act-row mt-2">
+                    <div class="he-act-row mt-2">
                         <a href="{{ route('admin.payments.pdf', $payment) }}" target="_blank" rel="noopener"
-                           class="fin-icon-btn fin-icon-btn--lg" title="{{ __('Download PDF receipt') }}" aria-label="{{ __('Download PDF receipt') }}">
+                           class="he-icon-btn he-icon-btn--lg" title="{{ __('Download PDF receipt') }}" aria-label="{{ __('Download PDF receipt') }}">
                             <i class="fa-solid fa-file-pdf"></i>
                         </a>
                         <form action="{{ route('admin.payments.whatsapp', $payment) }}" method="POST" target="_blank" class="m-0">
                             @csrf
-                            <button class="fin-icon-btn fin-icon-btn--lg is-whatsapp" title="{{ __('Send receipt on WhatsApp') }}" aria-label="{{ __('Send receipt on WhatsApp') }}">
+                            <button class="he-icon-btn he-icon-btn--lg is-whatsapp" title="{{ __('Send receipt on WhatsApp') }}" aria-label="{{ __('Send receipt on WhatsApp') }}">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </button>
                         </form>
-                        <button type="button" class="fin-icon-btn fin-icon-btn--lg" title="{{ __('Email receipt') }}" aria-label="{{ __('Email receipt') }}"
+                        <button type="button" class="he-icon-btn he-icon-btn--lg" title="{{ __('Email receipt') }}" aria-label="{{ __('Email receipt') }}"
                                 @click="openEmail({{ $emailPayload }})">
                             <i class="fa-solid fa-envelope"></i>
                         </button>
 
-                        <div class="fin-act-right">
+                        <div class="he-act-right">
                             <form action="{{ route('admin.payments.destroy', $payment) }}" method="POST" class="m-0"
                                   data-confirm="{{ __('Reverse this payment? Invoice balances will be restored.') }}">
                                 @csrf @method('DELETE')
-                                <button class="fin-icon-btn fin-icon-btn--lg is-danger" title="{{ __('Reverse transaction') }}" aria-label="{{ __('Reverse transaction') }}">
+                                <button class="he-icon-btn he-icon-btn--lg is-danger" title="{{ __('Reverse transaction') }}" aria-label="{{ __('Reverse transaction') }}">
                                     <i class="fa-solid fa-rotate-left"></i>
                                 </button>
                             </form>

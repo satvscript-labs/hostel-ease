@@ -19,8 +19,9 @@ class PaymentController extends Controller
     /**
      * Everything the receipt template touches. Model::shouldBeStrict() bans
      * lazy loading outside production, so a relation the PDF reads but nobody
-     * loads is an exception, not an N+1 — keep this in step with the template
-     * (and with Api\PaymentController::receipt, which renders the same view).
+     * loads is an exception, not an N+1 — keep this in step with the template.
+     * (W6.2: the Api\PaymentController that also rendered this view was dead
+     * code from the never-shipped Flutter app and has been deleted.)
      */
     public const RECEIPT_RELATIONS = [
         'student.activeAssignment.bed.room',

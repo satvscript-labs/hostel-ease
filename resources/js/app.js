@@ -60,19 +60,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-bs-toggle="tooltip"]')
         .forEach((el) => new bootstrap.Tooltip(el));
 
-    // Confirm-on-submit for delete forms
-    document.querySelectorAll('form[data-confirm]').forEach((form) => {
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            Swal.fire({
-                title: 'Are you sure?',
-                text: form.dataset.confirm || 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                confirmButtonText: 'Yes, proceed',
-            }).then((r) => r.isConfirmed && form.submit());
-        });
+    // Confirm-on-submit for delete forms. DELEGATED, not bound per-form:
+    // the per-form version only covered forms that existed at page load, so
+    // any delete button inside fragment-swapped content (a filtered list, a
+    // pagination page) submitted with NO confirmation — money-destroying
+    // clicks went straight through. One document-level listener covers every
+    // form forever, including ones that don't exist yet. (form.submit() on
+    // confirm is deliberate: it skips the submit event, so this listener
+    // doesn't re-intercept its own confirmation.)
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('form[data-confirm]');
+        if (!form) return;
+        e.preventDefault();
+        Swal.fire({
+            title: 'Are you sure?',
+            text: form.dataset.confirm || 'This action cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, proceed',
+        }).then((r) => r.isConfirmed && form.submit());
     });
 
     // Flash messages -> toast

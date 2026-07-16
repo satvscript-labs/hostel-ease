@@ -77,14 +77,14 @@
                             </button>
                         @endif
 
-                        <button type="button" class="fin-icon-btn" title="{{ __('Edit invoice') }}" @click="openEdit({{ $editPayload }})">
+                        <button type="button" class="he-icon-btn" title="{{ __('Edit invoice') }}" @click="openEdit({{ $editPayload }})">
                             <i class="fa-solid fa-pen"></i>
                         </button>
 
                         <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" class="m-0"
                               data-confirm="{{ __('Delete this invoice? This cannot be undone.') }}">
                             @csrf @method('DELETE')
-                            <button class="fin-icon-btn is-danger" title="{{ __('Delete') }}">
+                            <button class="he-icon-btn is-danger" title="{{ __('Delete') }}">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </form>
@@ -126,7 +126,7 @@
                          wrapping it — "₹ Collect ₹1,25,000.00" becomes
                          "Collect" (§4.8). A paid invoice renders NO left button
                          at all, rather than an empty pill holding the space. --}}
-                    <div class="fin-act-row">
+                    <div class="he-act-row">
                         @if($invoice->balance > 0)
                             <button type="button" class="btn btn-success rounded-pill fw-bold fin-collect" data-fit-label
                                     @click="openCollect({{ $collectPayload }})">
@@ -135,15 +135,15 @@
                                 <span class="fin-collect-amt">{{ hostelease_money($invoice->balance) }}</span>
                             </button>
                         @endif
-                        <div class="fin-act-right">
-                            <button type="button" class="fin-icon-btn fin-icon-btn--lg"
+                        <div class="he-act-right">
+                            <button type="button" class="he-icon-btn he-icon-btn--lg"
                                     title="{{ __('Edit invoice') }}" aria-label="{{ __('Edit invoice') }}" @click="openEdit({{ $editPayload }})">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                             <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" class="m-0"
                                   data-confirm="{{ __('Delete this invoice? This cannot be undone.') }}">
                                 @csrf @method('DELETE')
-                                <button class="fin-icon-btn fin-icon-btn--lg is-danger" title="{{ __('Delete') }}" aria-label="{{ __('Delete') }}">
+                                <button class="he-icon-btn he-icon-btn--lg is-danger" title="{{ __('Delete') }}" aria-label="{{ __('Delete') }}">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>

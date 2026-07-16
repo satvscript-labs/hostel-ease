@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\ApiTenant;
 use App\Http\Middleware\CheckAccess;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureUserRole;
@@ -26,7 +25,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureUserRole::class,
             'tenant' => SetTenant::class,
-            'api.tenant' => ApiTenant::class,
             'access' => CheckAccess::class,
             'subscription.active' => EnsureActiveSubscription::class,
             'no-cache' => \App\Http\Middleware\PreventBackHistory::class,

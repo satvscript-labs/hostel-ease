@@ -55,4 +55,21 @@ class Payment extends Model
     {
         return $query->whereBetween('paid_on', [$from, $to]);
     }
+
+    /**
+     * Real money that entered the hostel — the only rows that count as income
+     * (owner decision, W6.2). Two payment modes are internal bookkeeping, not
+     * revenue, and summing them inflates every P&L they touch:
+     *
+     *  - 'credit'      applies a student's EXISTING credit balance to a new
+     *                  invoice. That cash was already income the day it
+     *                  arrived; counting the application counts it twice.
+     *  - 'credit_note' is a proration REFUND for unused days, stored as a
+     *                  positive amount. It's money owed back — a liability
+     *                  masquerading as revenue if summed.
+     */
+    public function scopeIncome($query)
+    {
+        return $query->whereNotIn('mode', ['credit', 'credit_note']);
+    }
 }
