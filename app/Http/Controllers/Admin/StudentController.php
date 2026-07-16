@@ -153,12 +153,19 @@ class StudentController extends Controller
         }
 
         // Build Unified Timeline
+        //
+        // Every event carries `precise`: whether a clock time is actually known
+        // for it. join_date, leave_date and paid_on are DATE columns — they hold
+        // no time, so rendering them as "12:00 AM" was the view inventing a
+        // midnight that never happened. Only entries with a real timestamp
+        // behind them get a time; the rest show the date alone.
         $timeline = collect();
 
-        // 1. Bed Assignments
+        // 1. Bed Assignments — date columns, no clock time exists.
         foreach ($student->assignments as $a) {
             $timeline->push((object)[
                 'date' => $a->join_date,
+                'precise' => false,
                 'type' => 'assignment',
                 'title' => "Assigned to Room {$a->bed->room->room_number} / Bed {$a->bed->bed_number}",
                 'amount' => $a->monthly_rent,
@@ -169,6 +176,7 @@ class StudentController extends Controller
             if ($a->leave_date) {
                 $timeline->push((object)[
                     'date' => $a->leave_date,
+                    'precise' => false,
                     'type' => 'unassignment',
                     'title' => "Vacated Room {$a->bed->room->room_number} / Bed {$a->bed->bed_number}",
                     'icon' => 'door-open',
@@ -177,10 +185,11 @@ class StudentController extends Controller
             }
         }
 
-        // 2. Invoices
+        // 2. Invoices — created_at is a real timestamp.
         foreach ($invoices as $inv) {
             $timeline->push((object)[
                 'date' => $inv->created_at,
+                'precise' => true,
                 'type' => 'invoice',
                 'title' => "Invoice Generated: {$inv->title}",
                 'amount' => $inv->amount,
@@ -205,8 +214,18 @@ class StudentController extends Controller
                 $color = 'info';
             }
 
+            // paid_on is the business date the owner entered; created_at is the
+            // moment the receipt was actually recorded. When they fall on the
+            // same day, created_at IS that day's real time — use it, so three
+            // collections two minutes apart read 05:36 / 05:38 / 05:40 instead
+            // of three identical midnights. A backdated payment keeps its
+            // entered date and shows no time, because none is known.
+            $recordedSameDay = $pay->created_at && $pay->paid_on
+                && $pay->created_at->isSameDay($pay->paid_on);
+
             $timeline->push((object)[
-                'date' => $pay->paid_on,
+                'date' => $recordedSameDay ? $pay->created_at : $pay->paid_on,
+                'precise' => $recordedSameDay,
                 'type' => 'payment',
                 'title' => $title,
                 'amount' => $pay->amount,

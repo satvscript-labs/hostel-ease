@@ -108,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initFragmentForms();
+    initRequiredRings();
+    initFitLabels();
 });
 
 /**
@@ -132,6 +134,16 @@ document.addEventListener('DOMContentLoaded', () => {
  * `data-fragment` takes one or more CSS selectors (comma-separated) that must
  * exist in BOTH the current page and the response.
  *
+ * Anchors participate too (added W6.1 for pagination + "clear filters"):
+ *
+ *   <a href="?page=2" ...>            inside an element with [data-fragment-container]
+ *                                     and a Laravel .page-link class → swaps that
+ *                                     container in place (pagination without reload)
+ *   <a href="..." data-fragment="#a"> explicit targets, same semantics as the form
+ *
+ * Modified clicks (ctrl/cmd/shift/middle) are left alone so open-in-new-tab
+ * keeps working — the href is a real URL precisely so it can.
+ *
  * Notes:
  * - Requires controls to submit via requestSubmit(), NOT submit(): the DOM's
  *   form.submit() deliberately does not fire a 'submit' event, so it would sail
@@ -145,7 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function initFragmentForms() {
     const forms = document.querySelectorAll('form[data-fragment]');
-    if (!forms.length) return;
+    const hasContainers = document.querySelector('[data-fragment-container]');
+    if (!forms.length && !hasContainers) return;
 
     // One in-flight request per target group. Filters fire fast (a click, then
     // another click); without this, a slow first response can land AFTER a fast
@@ -174,6 +187,11 @@ function initFragmentForms() {
                 if (fresh && current) current.innerHTML = fresh.innerHTML;
             });
             window.history.pushState({ fragment: true }, '', url);
+
+            // Alpine re-initialises swapped nodes itself, but plain-JS
+            // enhancements (fit-labels, and anything added later) have no way
+            // to know a list just got replaced. Announce it.
+            document.dispatchEvent(new CustomEvent('he:fragment-swapped', { detail: { selectors, url } }));
         } catch (err) {
             if (err.name === 'AbortError') return; // superseded by a newer filter
             // Never strand the user on a half-updated list — fall back to the
@@ -199,8 +217,271 @@ function initFragmentForms() {
         });
     });
 
+    // Anchors: pagination links inside a [data-fragment-container] (Laravel's
+    // .page-link), and any anchor that declares data-fragment targets itself.
+    document.addEventListener('click', (e) => {
+        // Respect open-in-new-tab / window: only plain left clicks are ours.
+        if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+        const a = e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.origin !== window.location.origin) return;
+
+        let selectors = null;
+        let key = null;
+
+        if (a.dataset.fragment) {
+            selectors = a.dataset.fragment.split(',').map((s) => s.trim()).filter(Boolean);
+            key = `link-${a.dataset.fragment}`;
+        } else if (a.classList.contains('page-link')) {
+            // Only pagination is intercepted inside a container — content links
+            // (student profiles etc.) must stay real navigations.
+            const container = a.closest('[data-fragment-container]');
+            if (!container || !container.id) return;
+            selectors = [`#${container.id}`];
+            key = `container-${container.id}`;
+        }
+
+        if (!selectors || !selectors.length) return;
+        e.preventDefault();
+        swap(selectors, a.href, key);
+    });
+
     // Back/forward must show the state the URL describes, not a stale list.
     window.addEventListener('popstate', () => window.location.reload());
+}
+
+/**
+ * ── Dynamic menu placement ───────────────────────────────────────────────
+ *
+ * A dropdown must open into the space that EXISTS, never into space the page
+ * has to grow to provide. An absolutely-positioned menu that runs past the
+ * viewport edge extends the document, and the browser answers with a
+ * scrollbar — vertical is merely ugly, horizontal drags the whole layout
+ * sideways and can strand the menu off-screen entirely.
+ *
+ * So: measure, then place. No space on the right → open to the left. No space
+ * below → open above. Doesn't fit either way → clamp it and let the menu
+ * itself scroll. The menu never decides the page's size.
+ *
+ * Call on open (after the menu is visible, so it can be measured) and it
+ * re-places itself on scroll/resize until it's hidden again.
+ *
+ * @param {HTMLElement} trigger  the control the menu belongs to
+ * @param {HTMLElement} menu     the absolutely-positioned menu itself
+ */
+export function placeMenu(trigger, menu) {
+    if (!trigger || !menu) return;
+
+    const GAP = 8; // matches the CSS `top: calc(100% + 0.5rem)`
+    const EDGE = 8; // keep this much clear of the viewport edge
+
+    const place = () => {
+        // Reset first: measure the DEFAULT placement, not wherever the last
+        // pass left it, or the decisions compound and the menu walks away.
+        menu.style.top = '';
+        menu.style.bottom = '';
+        menu.style.left = '';
+        menu.style.right = '';
+        menu.style.maxWidth = '';
+        menu.style.maxHeight = '';
+        menu.style.overflowY = '';
+
+        const vw = document.documentElement.clientWidth;
+        const vh = document.documentElement.clientHeight;
+        const t = trigger.getBoundingClientRect();
+        let m = menu.getBoundingClientRect();
+
+        // ── Horizontal ──
+        if (m.right > vw - EDGE) {
+            // Try right-aligning to the trigger (menu grows leftward).
+            menu.style.left = 'auto';
+            menu.style.right = '0';
+            m = menu.getBoundingClientRect();
+
+            // Still out? It's wider than the space on either side — pin it
+            // inside the viewport and cap the width.
+            if (m.left < EDGE) {
+                menu.style.right = 'auto';
+                menu.style.left = `${EDGE - t.left}px`;
+                menu.style.maxWidth = `${vw - EDGE * 2}px`;
+            }
+        }
+
+        // ── Vertical ──
+        m = menu.getBoundingClientRect();
+        const spaceBelow = vh - t.bottom - GAP - EDGE;
+        const spaceAbove = t.top - GAP - EDGE;
+
+        if (m.height > spaceBelow && spaceAbove > spaceBelow) {
+            // More room up top — flip above the trigger.
+            menu.style.top = 'auto';
+            menu.style.bottom = `calc(100% + ${GAP}px)`;
+            if (m.height > spaceAbove) {
+                menu.style.maxHeight = `${Math.max(spaceAbove, 120)}px`;
+                menu.style.overflowY = 'auto';
+            }
+        } else if (m.height > spaceBelow) {
+            // Below is the better of two bad options — clamp and scroll.
+            menu.style.maxHeight = `${Math.max(spaceBelow, 120)}px`;
+            menu.style.overflowY = 'auto';
+        }
+    };
+
+    place();
+
+    // Re-place while open; self-unsubscribe once the menu is hidden (Alpine's
+    // x-show sets display:none, which zeroes offsetParent).
+    if (menu._hePlacing) return;
+    menu._hePlacing = true;
+
+    const reposition = () => {
+        if (!menu.isConnected || menu.offsetParent === null) {
+            window.removeEventListener('resize', reposition);
+            window.removeEventListener('scroll', reposition, true);
+            menu._hePlacing = false;
+            return;
+        }
+        place();
+    };
+
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true); // capture: catches scrolling ancestors too
+}
+
+window.hePlaceMenu = placeMenu;
+
+/**
+ * ── Fit-or-drop labels ───────────────────────────────────────────────────
+ *
+ * <button data-fit-label> with a [data-fit-optional] part inside: when the
+ * full text can't fit on one line, the optional part is dropped rather than
+ * wrapped. "₹ Collect ₹1,000.00" becomes "Collect" — never two lines, never a
+ * half-clipped "₹ Collect ₹1,0…".
+ *
+ * Measured, not guessed: a media query can't know how long an amount is, and
+ * ₹1,000 and ₹1,25,000 don't need the same room.
+ */
+function fitLabel(el) {
+    el.classList.remove('is-fit-short');
+    // scrollWidth > clientWidth only means anything while the content is
+    // nowrap + overflow:hidden — that's what .is-fit-* CSS guarantees.
+    if (el.scrollWidth > el.clientWidth + 1) el.classList.add('is-fit-short');
+}
+
+function initFitLabels() {
+    if (!('ResizeObserver' in window)) return;
+
+    const observer = new ResizeObserver((entries) => {
+        entries.forEach((entry) => fitLabel(entry.target));
+    });
+
+    const scan = () => {
+        document.querySelectorAll('[data-fit-label]').forEach((el) => {
+            fitLabel(el);
+            observer.observe(el); // observing twice is a no-op
+        });
+    };
+
+    scan();
+    // Fragment swaps replace whole lists — the new buttons need observing too.
+    document.addEventListener('he:fragment-swapped', scan);
+}
+
+/**
+ * ── Attention rings ──────────────────────────────────────────────────────
+ *
+ * The one gesture the app uses to point at a control the user must deal with.
+ * Two meanings, identical motion (see .he-ring in _premium.scss):
+ *
+ *   'primary'  a DEPENDENCY — "answer this first and what you just reached
+ *              for will work". Fired by hand from a component, e.g. clicking
+ *              a picker that can't filter until a fee type is chosen.
+ *   'danger'   a MANDATORY field left empty at submit. Fired automatically
+ *              for any <form data-ring-required>.
+ *
+ * Exposed as window.heRing so Alpine components can fire the dependency case
+ * without importing anything.
+ *
+ * Why re-add on a rAF: re-applying a class the element already has does NOT
+ * restart a CSS animation. Ring, ring again 200ms later, and nothing would
+ * happen — the second click would look broken. Removing, forcing a frame,
+ * then re-adding is what makes it retriggerable.
+ */
+const RING_MS = 2400; // 1.1s × 2 iterations + the longest stagger, then clean up.
+
+export function ringElements(els, tone = 'danger') {
+    const list = Array.from(els).filter(Boolean);
+    if (!list.length) return;
+
+    const toneClass = `he-ring--${tone}`;
+
+    list.forEach((el, i) => {
+        el.classList.remove('he-ring', 'he-ring--primary', 'he-ring--danger');
+        clearTimeout(el._heRingTimer);
+
+        requestAnimationFrame(() => {
+            // Stagger reads as one sweep across a group rather than a flash.
+            el.style.setProperty('--he-ring-delay', `${i * 90}ms`);
+            el.classList.add('he-ring', toneClass);
+
+            el._heRingTimer = setTimeout(() => {
+                el.classList.remove('he-ring', toneClass);
+                el.style.removeProperty('--he-ring-delay');
+            }, RING_MS + i * 90);
+        });
+    });
+}
+
+window.heRing = ringElements;
+
+/**
+ * <form data-ring-required> — replaces the browser's native validation bubble
+ * with the app's own red ring on every empty mandatory field at once.
+ *
+ * The bubble points at ONE field, is unstyleable, and vanishes on the next
+ * click; a modal with three empty required fields makes you discover them one
+ * submit at a time. This marks them all, staggered, and focuses the first.
+ *
+ * Hooked to 'invalid', NOT 'submit': when constraint validation fails the
+ * browser never fires a submit event at all, so a submit listener would sit
+ * there doing nothing. 'invalid' fires once per failing control just before
+ * the bubble, and preventDefault() on it suppresses that bubble. This also
+ * means no novalidate attribute is needed (forget it and native validation
+ * silently wins), and it needs no init-time sweep — so forms that Alpine
+ * teleports into <body> after boot are covered for free.
+ *
+ * 'invalid' doesn't bubble, hence capture: the capture phase still walks down
+ * through document to the target, so one listener catches every form.
+ *
+ * The events arrive one per control, so they're batched into a microtask and
+ * rung together — otherwise each field would start its own un-staggered ring.
+ */
+function initRequiredRings() {
+    const pending = new Set();
+    let scheduled = false;
+
+    document.addEventListener(
+        'invalid',
+        (e) => {
+            const form = e.target.form;
+            if (!form || !form.hasAttribute('data-ring-required')) return;
+
+            e.preventDefault(); // drop the native bubble; the ring replaces it
+            pending.add(e.target);
+
+            if (scheduled) return;
+            scheduled = true;
+            queueMicrotask(() => {
+                const els = Array.from(pending);
+                pending.clear();
+                scheduled = false;
+
+                ringElements(els, 'danger');
+                els[0]?.focus({ preventScroll: false });
+            });
+        },
+        true,
+    );
 }
 
 function initGlobalSearch() {

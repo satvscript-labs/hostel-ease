@@ -80,7 +80,14 @@
         },
         toggle() {
             this.open = !this.open;
-            if (this.open) this.$nextTick(() => this.$refs.pickerSearch?.focus());
+            // $nextTick: the panel must be visible before it can be measured
+            // (§4.7 — a panel opens into the space that exists; it never makes
+            // the page grow a scrollbar to fit it). This one is tall, so near
+            // the bottom of a viewport it flips above the trigger.
+            if (this.open) this.$nextTick(() => {
+                window.hePlaceMenu?.(this.$el, this.$refs.pickerPanel);
+                this.$refs.pickerSearch?.focus();
+            });
         },
     }"
     x-modelable="value"
@@ -101,7 +108,7 @@
         <i class="fa-solid fa-chevron-down small chevron"></i>
     </button>
 
-    <div class="he-picker-panel" x-show="open" x-transition.opacity x-cloak style="display: none;">
+    <div class="he-picker-panel" x-ref="pickerPanel" x-show="open" x-transition.opacity x-cloak style="display: none;">
         <div class="he-picker-search">
             <input type="text" x-model="search" x-ref="pickerSearch"
                    class="form-control form-control-sm bg-light border-0"

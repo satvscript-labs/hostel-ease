@@ -205,6 +205,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 
                 // Invoices
                 Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+                Route::patch('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
                 Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
 
                 // Payments (View, delete, receipt actions)

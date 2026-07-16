@@ -31,9 +31,18 @@ class HostelEaseGenerateInvoices extends Command
     {
         $this->info('Starting automated invoice generation...');
 
+        // MONTHLY ONLY (W6.1 owner decision). Monthly is the one frequency where
+        // "last due + N months" is genuinely true — a month is a month. Semester
+        // and yearly terms end when the student's academic calendar says they
+        // end, which only the owner knows; auto-billing them on a blind
+        // 6/12-month assumption generated real invoices on fictional dates.
+        // Recurring semester/yearly billing is now owner-driven via the Finance
+        // Board's bulk Hostel Fee flow (with a covered-until warning as the
+        // memory aid). The initial invoice on plan save is untouched — that's
+        // an explicit owner action with a proration preview.
         $students = Student::where('status', 'active')
+            ->where('fee_frequency', 'monthly')
             ->whereNotNull('fee_amount')
-            ->whereNotNull('fee_frequency')
             ->whereNotNull('join_date')
             ->get();
 
@@ -47,12 +56,7 @@ class HostelEaseGenerateInvoices extends Command
             $dueDate = null;
             $periodLabel = '';
 
-            $monthsToAdd = 1;
-            if ($student->fee_frequency === 'semester') {
-                $monthsToAdd = 6;
-            } elseif ($student->fee_frequency === 'yearly') {
-                $monthsToAdd = 12;
-            }
+            $monthsToAdd = 1; // monthly-only command (see query above)
 
             if (!$lastInvoice) {
                 // Should have been generated on save, but just in case
@@ -76,11 +80,6 @@ class HostelEaseGenerateInvoices extends Command
 
             if ($shouldGenerate) {
                 $title = "Rent for $periodLabel";
-                if ($student->fee_frequency === 'semester') {
-                    $title = "Semester Fee ($periodLabel)";
-                } elseif ($student->fee_frequency === 'yearly') {
-                    $title = "Yearly Fee ($periodLabel)";
-                }
 
                 $cycleEnd = $dueDate->copy()->addMonthsNoOverflow($monthsToAdd)->subDay();
 

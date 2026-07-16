@@ -12,6 +12,12 @@
               220px, so it never overflows a narrow grid column.
      searchable: true adds a search box inside the dropdown menu, for long
                  option lists (e.g. picking a student).
+     iconOnlyMobile: true collapses the filter trigger to a square icon below
+                 md, so it can share a row with a search box on a phone. Give
+                 each option its own `icon` and the trigger's icon then reports
+                 the current value — that IS the readout, which is why the text
+                 can go. The menu still spells every option out.
+                 Per-option icons: ['paid' => ['label' => 'Paid', 'icon' => 'circle-check']]
 
      Note: click.outside uses the .capture modifier, not plain .outside.
      Modals wrap their form in @click.stop (so clicking inside doesn't close
@@ -33,13 +39,17 @@
     'submit' => true,
     'compact' => false,
     'searchable' => false,
+    'iconOnlyMobile' => false,
     'placeholder' => '— Select —',
 ])
 @php
+    // Per-option `icon` is optional and defaults to null (NOT to the component's
+    // $icon): the trigger falls back to $icon itself, but a null here lets the
+    // menu skip the <i> entirely rather than render fa-undefined.
     $normalized = collect($options)->mapWithKeys(function ($opt, $key) {
         return is_array($opt)
-            ? [(string) $key => ['label' => $opt['label'] ?? $key, 'color' => $opt['color'] ?? 'secondary']]
-            : [(string) $key => ['label' => $opt, 'color' => 'secondary']];
+            ? [(string) $key => ['label' => $opt['label'] ?? $key, 'color' => $opt['color'] ?? 'secondary', 'icon' => $opt['icon'] ?? null]]
+            : [(string) $key => ['label' => $opt, 'color' => 'secondary', 'icon' => null]];
     });
     $current = $normalized->get((string) $selected);
     $currentLabel = $current['label'] ?? $placeholder;
@@ -57,7 +67,7 @@
     $submitJs = $submit ? '$nextTick(() => $el.closest(\'form\')?.requestSubmit());' : '';
 @endphp
 <div
-    {{ $attributes->class(['he-select-wrap']) }}
+    {{ $attributes->class(['he-select-wrap', 'he-select--icon-mobile' => $iconOnlyMobile]) }}
     x-data="{
         open: false,
         search: '',
@@ -69,6 +79,9 @@
         // var would only update on our own select().
         get displayLabel() { const o = this.opts[this.value]; return o ? o.label : this.placeholder; },
         get displayColor() { const o = this.opts[this.value]; return o ? o.color : 'secondary'; },
+        // The current option's own icon, else the component's default — this is
+        // the whole readout once .he-select--icon-mobile drops the text.
+        get displayIcon() { const o = this.opts[this.value]; return (o && o.icon) ? o.icon : {{ \Illuminate\Support\Js::from($icon) }}; },
         get filteredOptions() {
             const entries = Object.entries(this.opts);
             if (!this.search) return entries;
@@ -88,11 +101,19 @@
         },
         toggle() {
             this.open = !this.open;
-            if (this.open) this.$nextTick(() => this.$refs.searchInput?.focus());
+            // $nextTick: the menu must be VISIBLE before it can be measured
+            // (§4.7 — a menu opens into the space that exists, it never makes
+            // the page grow a scrollbar to fit it).
+            if (this.open) this.$nextTick(() => {
+                window.hePlaceMenu?.(this.$el, this.$refs.menu);
+                this.$refs.searchInput?.focus();
+            });
         },
     }"
     x-modelable="value"
-    :class="{ 'is-open': open }"
+    {{-- is-filtered: a non-empty value is selected. An icon-only trigger can't
+         say "a filter is active" on its own, so the border does. --}}
+    :class="{ 'is-open': open, 'is-filtered': value !== '' && value !== null }"
     @click.outside.capture="open = false"
 >
     <input type="hidden" name="{{ $name }}" x-model="value">
@@ -110,16 +131,20 @@
         </button>
     @else
         <div @click="toggle()" class="he-select-trigger he-select--filter">
-            <span class="he-select-icon"><i class="fa-solid fa-{{ $icon }}"></i></span>
-            <span class="d-flex flex-column align-items-start" style="line-height: 1.15;">
+            <span class="he-select-icon"><i class="fa-solid" :class="'fa-' + displayIcon"></i></span>
+            {{-- No Bootstrap display utilities here: `d-flex` is
+                 `display: flex !important` and silently beat the
+                 `display: none` that icon-only-mobile relies on. .he-select-text
+                 owns its own layout in _premium.scss. --}}
+            <span class="he-select-text">
                 @if($label)<span class="he-select-label">{{ $label }}</span>@endif
                 <span class="fw-semibold" x-text="displayLabel"></span>
             </span>
-            <i class="fa-solid fa-chevron-down ms-1 small text-muted"></i>
+            <i class="fa-solid fa-chevron-down ms-1 small text-muted he-select-chevron"></i>
         </div>
     @endif
 
-    <div class="he-select-menu @if($compact) he-select-menu--compact @endif" x-show="open" x-transition.opacity x-cloak style="display: none;">
+    <div class="he-select-menu @if($compact) he-select-menu--compact @endif" x-ref="menu" x-show="open" x-transition.opacity x-cloak style="display: none;">
         @if($searchable)
             <div class="p-2 border-bottom">
                 <input type="text" x-model="search" x-ref="searchInput"
@@ -129,7 +154,13 @@
         <div @if($searchable) style="max-height: 220px; overflow-y: auto;" @endif>
             <template x-for="[val, opt] in filteredOptions" :key="val">
                 <button type="button" class="he-select-option" :class="{ active: value === val }" @click="select(val)">
-                    <span x-text="opt.label"></span>
+                    <span class="d-flex align-items-center gap-2" style="min-width: 0;">
+                        {{-- Teaches the icon→value mapping the collapsed
+                             trigger relies on. Skipped when an option has no
+                             icon of its own. --}}
+                        <i class="fa-solid text-muted" style="width: 1em;" :class="'fa-' + opt.icon" x-show="opt.icon"></i>
+                        <span class="text-truncate" x-text="opt.label"></span>
+                    </span>
                     <i class="fa-solid fa-check" x-show="value === val"></i>
                 </button>
             </template>

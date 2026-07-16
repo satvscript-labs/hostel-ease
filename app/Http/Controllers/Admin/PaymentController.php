@@ -16,6 +16,19 @@ use Illuminate\Support\Facades\Mail;
 
 class PaymentController extends Controller
 {
+    /**
+     * Everything the receipt template touches. Model::shouldBeStrict() bans
+     * lazy loading outside production, so a relation the PDF reads but nobody
+     * loads is an exception, not an N+1 — keep this in step with the template
+     * (and with Api\PaymentController::receipt, which renders the same view).
+     */
+    public const RECEIPT_RELATIONS = [
+        'student.activeAssignment.bed.room',
+        'collector',
+        'hostel',
+        'invoices',
+    ];
+
     public function __construct(
         protected PaymentService $payments,
         protected WhatsAppService $whatsapp,
@@ -25,7 +38,7 @@ class PaymentController extends Controller
 
     public function pdf(Payment $payment): Response
     {
-        $payment->load('student', 'collector', 'hostel');
+        $payment->load(self::RECEIPT_RELATIONS);
         $pdf = Pdf::loadView('admin.payments.receipt_pdf', ['payment' => $payment]);
 
         return $pdf->download($payment->receipt_number.'.pdf');
@@ -50,7 +63,7 @@ class PaymentController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email']]);
 
-        $payment->load('student', 'collector', 'hostel');
+        $payment->load(self::RECEIPT_RELATIONS);
         $pdf = Pdf::loadView('admin.payments.receipt_pdf', ['payment' => $payment])->output();
 
         Mail::to($data['email'])->queue(new ReceiptMail($payment, $pdf));

@@ -59,6 +59,37 @@ if (! function_exists('hostelease_money')) {
     }
 }
 
+if (! function_exists('hostelease_amount_words')) {
+    /**
+     * Spell an amount out in Indian English ("Rupees One Lakh Fifty Thousand
+     * Twenty-One and Fifty Paise Only") — the legal-ish line printed on a
+     * receipt so the figure can't be altered after the fact.
+     *
+     * Returns null when the intl extension isn't loaded rather than throwing:
+     * a missing extension on a host must not take the receipt PDF down with
+     * it. Callers omit the line when this is null.
+     */
+    function hostelease_amount_words(int|float|null $amount): ?string
+    {
+        if (! class_exists(\NumberFormatter::class)) {
+            return null;
+        }
+
+        $amount = round((float) ($amount ?? 0), 2);
+        $rupees = (int) floor($amount);
+        $paise = (int) round(($amount - $rupees) * 100);
+
+        $speller = new \NumberFormatter('en_IN', \NumberFormatter::SPELLOUT);
+
+        $words = 'rupees '.$speller->format($rupees);
+        if ($paise > 0) {
+            $words .= ' and '.$speller->format($paise).' paise';
+        }
+
+        return Str::title($words).' Only';
+    }
+}
+
 if (! function_exists('normalize_phone')) {
     /**
      * Normalize an Indian phone number for storage: ensures +91 prefix.

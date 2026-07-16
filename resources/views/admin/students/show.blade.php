@@ -452,7 +452,11 @@
                                     <div>
                                         <div class="fw-bold text-dark">{{ $event->title }}</div>
                                         <div class="mt-1 small fw-bold text-muted">
-                                            {{ \Carbon\Carbon::parse($event->date)->format('d M Y, h:i A') }}
+                                            {{-- Time only when one is actually known — date
+                                                 columns (join/leave/backdated paid_on) carry
+                                                 no clock, and printing 12:00 AM invented one. --}}
+                                            @php($at = \Carbon\Carbon::parse($event->date))
+                                            {{ $at->format('d M Y') }}{{ ($event->precise ?? false) ? ', '.$at->format('h:i A') : '' }}
                                             @if(isset($event->desc)) · {{ $event->desc }} @endif
                                         </div>
                                     </div>

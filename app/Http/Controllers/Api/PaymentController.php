@@ -132,7 +132,10 @@ class PaymentController extends Controller
      */
     public function receipt(int $payment): SymfonyResponse
     {
-        $model = Payment::with('student', 'collector', 'hostel')->findOrFail($payment);
+        // Same view as the admin download — so, the same relations. Strict mode
+        // turns a missed eager-load here into an exception, not a slow query.
+        $model = Payment::with(\App\Http\Controllers\Admin\PaymentController::RECEIPT_RELATIONS)
+            ->findOrFail($payment);
 
         return Pdf::loadView('admin.payments.receipt_pdf', ['payment' => $model])
             ->download($model->receipt_number.'.pdf');

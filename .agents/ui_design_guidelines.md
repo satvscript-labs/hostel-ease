@@ -187,6 +187,10 @@ in the browser, not by reading the CSS.** Then apply whichever fixes apply:
    transform. This still doesn't remove contexts *during* the animation, which is why fixes 1–2
    are required anyway.
 
+> **§4.2 is about paint order; §4.7 is about placement.** They are the same family and a dropdown
+> owes you both checks: it must paint *on top of* its neighbours **and** open into space that
+> already exists. Verify both with the menu open, in the browser.
+
 ### 4.3 A filter must never reload the whole page — refresh only the list it affects
 
 **Rule: no filter, search, sort, or tab control may trigger a full page navigation.**
@@ -217,6 +221,19 @@ It intercepts submit, fetches the same URL, lifts the target out of the response
 element's `innerHTML`, and `pushState`s the URL so the view stays shareable and Back works.
 `data-fragment` accepts several comma-separated selectors when one filter drives more than one
 region (e.g. a list plus its count badge).
+
+**Pagination and anchors participate too** (added W6.1, Finance is the reference):
+
+- Wrap a paginated list in an element with `id` + `data-fragment-container` — Laravel's
+  `.page-link` anchors inside it are intercepted and swap that container in place, so paging
+  never reloads. `->withQueryString()` on the paginator is mandatory or page 2 drops the filter.
+  Use distinct page params (`paginate(15, ['*'], 'inv_page')`) when two lists share a page.
+- `<a data-fragment="#a, #b">` gives any anchor form-like swap semantics — the Finance "clear
+  filters" chip uses this. Modified clicks (ctrl/cmd/shift/middle) pass through untouched so
+  open-in-new-tab still works.
+- **Server-side search needs a debounce** on the input (`@input.debounce.450ms=
+  "$el.form.requestSubmit()"`) — every keystroke is a round-trip; the AbortController makes
+  out-of-order responses safe but not free.
 
 **Find every element the filter's own query string drives, not just the list.** A filter often
 also renders a small readout of its *own current state* — a "16 Jul" chip next to a date picker, an
@@ -258,6 +275,146 @@ local: have the controller return just the partial when `$request->ajax()`, and 
 **When a full reload is still correct:** anything that legitimately changes the whole page —
 switching branch/tenant, login/logout, or a mutation that invalidates the chrome (sidebar counts,
 subscription state). Filtering a list is never one of those.
+
+---
+
+### 4.4 The attention ring — one gesture for "deal with this control"
+
+**A form must never fail silently, and must never let the browser do the telling.** Two situations,
+**one** motion, so the product teaches it once (`.he-ring` in `_premium.scss`, driven by
+`window.heRing(elements, tone)` / `ringElements()` in `app.js`):
+
+| Tone | Meaning | Fired by |
+|---|---|---|
+| `.he-ring--primary` | **Dependency** — "answer this first and the thing you just reached for will work". Nothing is wrong; the order is backwards. | By hand, from the dependent control's click handler. |
+| `.he-ring--danger` | **Mandatory field left empty** at submit. | Automatically, for any `<form data-ring-required>`. |
+
+**Every dynamic form with a dependency owes the user a ring.** Whenever control B is disabled,
+empty, or inert *because* control A hasn't been answered — a picker that can't filter until a type
+is chosen, an amount that can't resolve without a plan, a submit that can't run without a selection
+— reaching for B must ring A. The alternative is a control that does nothing when clicked, which
+users read as broken software.
+
+Rules, learned the hard way:
+
+- **Never `:disabled` the dependent control.** A disabled button fires no click, so there is
+  nothing to hang the ring on, and the user is told nothing. Make it *look* locked
+  (`.is-locked`) and *act* as a pointer to what's missing.
+- **Ring only — never animate `transform`.** An animation that ends on a retained transform leaves
+  a permanent stacking context, and the next dropdown opens behind its neighbours (§4.2 all over
+  again). `box-shadow` paints outside layout and costs nothing.
+- **Re-applying the class does not restart a CSS animation.** Ring, then ring again 200 ms later,
+  and nothing visibly happens — the second click looks broken. `ringElements()` removes the class,
+  waits a frame, and re-adds it. Use the helper; don't hand-roll a boolean flag.
+- **Stagger a group** (`--he-ring-delay`, 90 ms steps) so several rings read as one sweep.
+- **`prefers-reduced-motion`** keeps the border (the meaning) and drops the pulse (the motion).
+
+**Mandatory fields: `<form data-ring-required>` and nothing else.** No `novalidate`, no per-field
+wiring. Why it hooks `invalid` rather than `submit`: when constraint validation fails **the browser
+never fires a submit event at all**, so a submit listener would sit there doing nothing. `invalid`
+fires once per failing control just before the bubble, `preventDefault()` suppresses the bubble,
+and one capture-phase listener covers every form on the page — including the ones Alpine teleports
+into `<body>` long after boot. All empty fields ring together, staggered; the first gets focus. The
+native bubble points at one field at a time, is unstyleable, and vanishes on the next click.
+
+---
+
+### 4.5 Filter bars are ONE row — the search flexes, the filter collapses
+
+A search box and its filters belong on the **same row at every width**. Two traps:
+
+- **`.he-search` sets `width: 100%`.** As a flex item that resolves `flex-basis` to 100%, so the
+  search claims the whole line and every filter beside it wraps to a second row. Use
+  **`.he-search--inline`** (`flex: 1 1 240px; width: auto; min-width: 0`) whenever the search shares
+  a row. A flex item must size from `flex`, not `width`.
+- **A filter pill with a text value cannot share a 375px row with a search box.** Pass
+  **`icon-only-mobile`** to `<x-he-select>`: below `md` the trigger collapses to a square icon.
+  Give every option its own `icon` — the trigger's icon then *is* the readout, which is the whole
+  reason the text can go. The menu still spells every option out, so nothing is guessed, and
+  `.is-filtered` borders the trigger when a value is active (an icon alone can't say "a filter is
+  on").
+
+**The clear X belongs inside the search field** (`.he-search--clearable` + `.he-search__clear`), not
+floating beside it as another chip, and it clears **the search only** — every other filter clears
+via its own "All …" option. It's client state (`x-model` + `x-show`), never server-rendered:
+`.he-search` must stay *outside* the swapped fragment, because swapping the input would drop typing
+focus mid-keystroke.
+
+---
+
+### 4.6 Pagination is owned by the design system
+
+`Paginator::defaultView('vendor.pagination.premium')` is set in `AppServiceProvider` — **every**
+`->links()` in the app renders `resources/views/vendor/pagination/premium.blade.php`
+(`.he-pager`). Do not hand-roll a pager and do not reach back for Bootstrap's.
+
+- **Keep `class="page-link"` on the anchors.** The fragment router keys off exactly that class to
+  paginate without a reload (§4.3). Rename it and every paginated list silently reverts to full
+  reloads.
+- **Keep the hrefs real URLs** — that's what makes ctrl/middle-click open a page in a new tab, and
+  what the no-JS fallback follows.
+- `defaultSimpleView` deliberately still points at Bootstrap: the premium view needs
+  `$elements`/`total()`, which `simplePaginate` doesn't provide.
+
+---
+
+### 4.7 A dropdown opens into the space that EXISTS — it never makes the page grow
+
+**A menu must never cause a scrollbar.** Not vertical, not horizontal. An absolutely-positioned
+menu that runs past the viewport edge extends the *document*, and the browser answers with a
+scrollbar: vertically that's merely ugly, horizontally it drags the entire layout sideways and can
+leave the menu itself off-screen and unreachable. The menu is a transient overlay. It does not get
+to decide the size of the page.
+
+So placement is **measured at open time, never hardcoded**:
+
+- No room on the **right** → open to the **left** (right-align to the trigger).
+- No room **below** → open **above**.
+- Fits **neither** way → pin inside the viewport, cap `max-width`/`max-height`, and let the **menu**
+  scroll — never the page.
+- These are examples, not the whole list. The rule is the principle: *fit the space you're in.*
+
+`window.hePlaceMenu(trigger, menu)` (`placeMenu()` in `app.js`) implements it and is wired into
+`<x-he-select>` already. **Any hand-rolled dropdown, popover, or panel must call it too** — see
+`.he-picker` in `admin/finance/index.blade.php`.
+
+Non-negotiables when wiring it up:
+
+- **Call it in `$nextTick` after opening.** A menu with `display: none` measures 0×0, so a call
+  before it's visible silently places it wrong.
+- **Reset before measuring.** `placeMenu` clears `top/bottom/left/right/max*` first: measuring a
+  menu still carrying the *last* open's overrides compounds the decisions and the menu walks off
+  down the page.
+- **It re-places on scroll and resize** while open, and unsubscribes itself once hidden. Don't add
+  your own listeners.
+- **This replaces media-query placement.** A `@media (max-width: …) { right: 0 }` guess is not a
+  measurement — it's right by luck at one width and wrong at every other.
+
+Mobile is not exempt. It's where this hurts most: the viewport is small, the trigger is often hard
+against an edge, and a horizontal scrollbar on a phone is a broken page.
+
+---
+
+### 4.8 Fit or drop — a label never wraps and never half-clips
+
+A button whose text can't fit has three options; only one is acceptable:
+
+1. Wrap to two lines — breaks the row's height and the layout around it. ✗
+2. Clip mid-glyph — "₹ Collect ₹1,2…" reads as a bug. ✗
+3. **Drop the optional part** — "₹ Collect ₹1,25,000.00" → "Collect". ✓
+
+Mark it up as `<button data-fit-label>` with the droppable part in a child the CSS hides under
+`.is-fit-short`. `initFitLabels()` (`app.js`) measures each one with a `ResizeObserver` and toggles
+the class.
+
+- The element **must** be `white-space: nowrap; overflow: hidden` — `scrollWidth > clientWidth`
+  only means "doesn't fit" while wrapping is forbidden and overflow is allowed.
+- **Measured, not guessed.** A media query cannot know how long an amount is; ₹1,000 and ₹1,25,000
+  don't need the same room, and the same breakpoint is right for one and wrong for the other.
+- Fragment swaps replace whole lists, so the new buttons need re-scanning: the swap dispatches
+  **`he:fragment-swapped`** on `document` (§4.3) and `initFitLabels` listens. Any other plain-JS
+  enhancement that decorates list rows should listen to it too — Alpine re-initialises swapped
+  nodes by itself, but nothing else does.
 
 ---
 
@@ -322,6 +479,16 @@ Full class list (`.custom-overlay-header/body/footer`) is in `_premium.scss`. Al
 {{-- One field inside a larger form (modal) — does not auto-submit --}}
 <x-he-select name="type" icon="tags" :submit="false" :selected="'fee'"
     :options="['fee' => 'Hostel Fee', 'rent' => 'Monthly Rent']" />
+
+{{-- Sharing a filter row with a search box (§4.5): collapses to a square icon
+     below md. Each option's own `icon` becomes the trigger's icon, so the icon
+     IS the readout once the text is gone — give every option one. --}}
+<x-he-select name="status" icon="filter" icon-only-mobile :selected="$status ?? ''"
+    :options="[
+        '' => ['label' => 'All Statuses', 'icon' => 'filter'],
+        'paid' => ['label' => 'Paid', 'icon' => 'circle-check'],
+        'pending' => ['label' => 'Pending', 'icon' => 'clock'],
+    ]" />
 ```
 
 ### `<x-he-modal>`
