@@ -418,6 +418,54 @@ the class.
 
 ---
 
+### 4.9 In-content layout measures its CONTAINER, not the viewport
+
+**With a fixed sidebar, viewport media queries lie.** A 1043px window is a ~770px content column,
+so `col-md-4`, `d-lg-grid`, and every `@media (min-width: 992px)` rule laid out for space that
+doesn't exist — that is exactly how the owner got wrapped-mid-digit stat values and crushed rows
+*on a desktop*. Any layout inside the content column that changes shape with available width uses
+**container queries**:
+
+- **`.he-adaptive`** (`_premium.scss`) declares the measuring container — put it on the list/grid
+  wrapper (the fragment container is usually the right element).
+- **`.he-cq-wide` / `.he-cq-card`** are the two renderings of a list row: the wide layout is always
+  a grid, the card is the bespoke phone layout; they flip at the design-wide **640px container**
+  tier. Never gate these two layouts with `d-lg-*` again — that was the bug.
+- Page row-grids add their own upper tier (e.g. `@container (min-width: 880px)` for one-line rows).
+
+**Warning that earns its place in §4.2:** `container-type` applies layout containment, which
+**creates a stacking context**. Never wrap a dropdown-OWNING region (filter bars) in a container —
+only the content the dropdown floats above (lists, tile grids).
+
+Viewport media queries remain correct for things that genuinely follow the *window*: the sidebar
+itself, the FAB, the page title scale, modal sizing.
+
+### 4.10 Nothing crushes — floors, nowrap figures, reflow
+
+Three rules, one principle: **when space runs out, the layout changes shape; it never mangles its
+content.** A name shrunk to "N…", a phone number wrapped one character per line, "₹104,500.0⏎0" —
+every one of these is a layout that chose crushing over reflowing, and every one is a bug.
+
+1. **Every truncating text zone gets a floor** (`minmax(220px, 1fr)`, never `minmax(0, …)` on a
+   column that carries words) — and every text line that may truncate carries `text-truncate`
+   explicitly. A missing nowrap is how a phone number becomes a vertical strip of digits.
+2. **Figures never wrap.** Money/marks/counts are `white-space: nowrap` + tabular numerals. Where
+   a figure must fit variable space, its size is FLUID — `clamp(min, Ncqi, max)` against its own
+   container — so the number shrinks as a whole. (Pair with §4.8: where shrinking isn't enough,
+   drop the optional part.)
+3. **When floors don't fit, REFLOW — rows can expand.** A one-line row becomes a two-line row
+   (identity on top, data below, actions anchored right across both) via a container tier, then
+   the phone card below that. Stats become compact rows instead of stacked screen-filling cards
+   (`.he-stats`). More lines is a design decision; crushed content never is.
+
+Canonical implementations to reuse, not re-invent: **`.he-stats`** (adaptive stat tiles — see §6),
+**`.he-page-head`** (title grows on phones; ONE desktop action, `d-none d-md-inline-flex`, and the
+FAB below md — a header button that wraps under the title is a bug), and the **three-tier row**
+(wide grid ≥880 container / two-line reflow ≥640 / phone card below — Finance `_invoices` is the
+reference).
+
+---
+
 ## 5. Standard Overlay Modals — use `<x-he-modal>`
 
 Whenever implementing a modal/dialog in this codebase, use `<x-he-modal>` (`resources/views/components/he-modal.blade.php`) rather than hand-copying the markup below. It renders exactly this structure:
@@ -517,6 +565,52 @@ See section 5.2 above.
 ```blade
 <x-he-skeleton rows="3" height="52px" />   {{-- stacked bars --}}
 <x-he-skeleton height="240px" />           {{-- one block, e.g. a chart --}}
+```
+
+### `.he-stats` (CSS, `_premium.scss`)
+
+Adaptive stat tiles (§4.9/§4.10): side-by-side cards when the container is ≥700px, ONE compact
+row-panel when it isn't — which is what a phone, a narrow window, and a sidebar-squeezed desktop
+all actually are. Values are nowrap + container-fluid (`clamp(…cqi…)`): they resize, never wrap.
+`--he-stats-cols` sets the wide column count; `.he-stat--hero` is the gradient accent slot.
+
+```blade
+<div class="he-stats">
+    <div class="he-stats__grid" style="--he-stats-cols: 3;">
+        <div class="he-stat he-stat--hero">
+            <div class="he-stat__head">
+                <div class="he-stat__icon" style="background: rgba(255,255,255,0.15); color: #fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="he-stat__label">Total Outstanding</div>
+            </div>
+            <div class="he-stat__value">{{ hostelease_money($outstanding) }}</div>
+        </div>
+        <div class="he-stat">
+            <div class="he-stat__head">
+                <div class="he-stat__icon" style="background: var(--he-success-soft); color: var(--he-success);"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div class="he-stat__label">Total Collected</div>
+            </div>
+            <div class="he-stat__value text-success">{{ hostelease_money($collected) }}</div>
+        </div>
+    </div>
+</div>
+```
+
+### `.he-page-head` (CSS, `_premium.scss`)
+
+Title + subtitle left, ONE primary action right — desktop only (`d-none d-md-inline-flex`); phones
+get the FAB. `flex-wrap: nowrap` by design: the action never drops under the heading, the subtitle
+wraps instead. The title GROWS on phones (2.2rem ≤576px) — the approved mobile scale.
+
+```blade
+<div class="he-page-head mb-4">
+    <div>
+        <h1 class="he-page-title">Finance Board</h1>
+        <p class="he-page-sub">Manage invoices, dues, and transactions in one place.</p>
+    </div>
+    <button type="button" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm d-none d-md-inline-flex align-items-center" @click="openModal()">
+        <i class="fa-solid fa-plus me-1"></i> New Invoice
+    </button>
+</div>
 ```
 
 ### `.he-icon-btn` / `.he-act-row` (CSS, `_premium.scss`)

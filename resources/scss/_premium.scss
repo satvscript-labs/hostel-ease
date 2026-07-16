@@ -1331,6 +1331,176 @@ body {
     .he-search__icon { width: 26px; height: 26px; font-size: 0.68rem; }
 }
 
+/* ── Adaptive layout primitives (design law 4.9/4.10) ─────────────────────
+   With a fixed sidebar, VIEWPORT media queries lie about the space content
+   actually has: a 1043px window is a ~770px content column, and layouts
+   sized by @media crush. Anything inside the content column that changes
+   layout with available width measures its CONTAINER, not the window.
+
+   .he-adaptive     declares the measuring container. NOTE: container-type
+                    applies layout containment, which creates a stacking
+                    context — never wrap a dropdown-OWNING region (filter
+                    bars) in one, only the content it floats above (lists,
+                    tile grids). See 4.2.
+   .he-cq-wide/-card  the two renderings of a list row. Wide is always a
+                    grid; card is the bespoke phone layout. The 640px tier is
+                    the design-wide default for "enough room for a row at
+                    all". */
+.he-adaptive {
+    container-type: inline-size;
+}
+.he-cq-wide { display: none; }
+.he-cq-card { display: block; }
+@container (min-width: 640px) {
+    .he-cq-wide { display: grid; }
+    .he-cq-card { display: none; }
+}
+
+/* ── Adaptive stat tiles ──────────────────────────────────────────────────
+   One markup, two renderings, measured by container width (law 4.9):
+
+     wide  (container ≥ 700px): side-by-side cards, label+icon over a big
+           fluid value.
+     narrow (below): ONE panel of compact [icon · label · value] rows —
+           three phone-height rows instead of three screen-filling cards.
+
+   Values are nowrap + container-fluid (each .he-stat is its own container,
+   so cqi sizes the number to ITS card): a figure shrinks as a whole, it
+   never wraps mid-digit (law 4.10).
+
+   .he-stat--hero is the accent slot (e.g. Total Outstanding): a gradient
+   card when wide, the panel's dark leading row when narrow. */
+.he-stats {
+    container: he-stats / inline-size;
+}
+.he-stats__grid {
+    display: grid;
+    gap: 0;
+    grid-template-columns: 1fr;
+    background: var(--he-bg-surface);
+    border-radius: 1.25rem;
+    box-shadow: var(--he-shadow-sm);
+    overflow: hidden;
+}
+.he-stat {
+    container-type: inline-size;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.85rem 1.1rem;
+    min-width: 0;
+}
+.he-stat + .he-stat { border-top: 1px solid rgba(0, 0, 0, 0.05); }
+/* icon · label inline in the compact rows; the wide query below reverses it
+   (label left, icon right) to match the approved card look. */
+.he-stat__head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+}
+.he-stat__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    position: relative;
+}
+.he-stat__icon::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    filter: blur(8px);
+    z-index: -1;
+}
+.he-stat__label {
+    font-size: var(--he-text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--he-text-muted);
+    min-width: 0;
+}
+.he-stat__value {
+    margin-left: auto;
+    font-weight: 700;
+    font-size: 1.15rem;
+    white-space: nowrap;          /* a figure NEVER wraps mid-digit (4.10) */
+    font-feature-settings: 'tnum';
+    font-variant-numeric: tabular-nums;
+}
+.he-stat--hero {
+    background: var(--he-gradient-mesh, linear-gradient(135deg, #1e1b4b, #312e81));
+    color: #fff;
+}
+.he-stat--hero .he-stat__label { color: rgba(255, 255, 255, 0.75); }
+.he-stat--hero + .he-stat { border-top: none; }
+
+@container he-stats (min-width: 700px) {
+    .he-stats__grid {
+        grid-template-columns: repeat(var(--he-stats-cols, 3), 1fr);
+        gap: 1rem;
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+    }
+    .he-stat {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--he-bg-surface);
+        border-radius: 1.25rem;
+        box-shadow: var(--he-shadow-sm);
+    }
+    .he-stat + .he-stat { border-top: none; }
+    .he-stat__head {
+        flex-direction: row-reverse;
+        justify-content: space-between;
+        margin-bottom: 0.85rem;
+    }
+    .he-stat__icon { width: 40px; height: 40px; font-size: 0.9rem; }
+    .he-stat__value {
+        margin-left: 0;
+        /* Fluid against THIS card: ~19px in a 210px card, capped at 26px.
+           The number resizes; it never wraps and never overflows. */
+        font-size: clamp(1.15rem, 9cqi, 1.65rem);
+    }
+    .he-stat--hero { background: var(--he-gradient-mesh, linear-gradient(135deg, #1e1b4b, #312e81)); }
+}
+
+/* ── Page head ────────────────────────────────────────────────────────────
+   Title + subtitle left, ONE primary action right (desktop only — phones
+   get the FAB, never a wrapped header button). The approved mobile type
+   scale: the title GROWS on phones. nowrap: the action never drops under
+   the heading; the subtitle wraps instead. */
+.he-page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 1rem;
+}
+.he-page-head > div:first-child { min-width: 0; }
+.he-page-head .btn { flex-shrink: 0; }
+.he-page-title {
+    font-size: 1.6rem;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+.he-page-sub { color: var(--he-text-muted); margin-bottom: 0; }
+@media (max-width: 576px) {
+    .he-page-title { font-size: 2.2rem; line-height: 1.5; }
+    .he-page-sub { font-size: 1rem; line-height: 1.5; }
+}
+
 /* ── Icon action buttons + action rows ────────────────────────────────────
    Promoted from the Finance Board's page-local styles the moment a second
    page (Expenses, W6.2) needed them — rule 0: two hand-rolled copies is one

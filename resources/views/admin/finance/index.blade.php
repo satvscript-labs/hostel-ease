@@ -8,10 +8,9 @@
        owner approved it; W6.1 adds the standard search/filter, the fragment
        containers, the surfaced flows' sheets, and a bespoke phone layout. */
 
-    .fin-page-title { font-size: 1.6rem; letter-spacing: -0.01em; }
-
     /* Dropdown-over-list rule (design law §4.2): the filter row owns a
-       dropdown and sits above both lists — lift the whole row. */
+       dropdown and sits above both lists — lift the whole row. NEVER inside
+       a container-type element (containment creates a stacking context). */
     .fin-filter-row { position: relative; z-index: 30; }
 
     /* Transparent fragment-swap boundary (§4.3): the status select re-renders
@@ -19,46 +18,57 @@
        on purpose — swapping it would drop typing focus mid-keystroke. */
     #fin-filter-aux { display: contents; }
 
-    /* ── Desktop list row ──────────────────────────────────────────────────
-       A real grid, not Bootstrap columns. The old row sized every money block
-       from its own content, so ₹1,000.00 and ₹27,000.00 started at different
-       x-positions on adjacent rows and the eye had nothing to follow — that's
-       what read as "cluttered". Fixed tracks + tabular numerals mean the three
-       figures line up down the whole list, and the actions get one settled
-       column instead of elbowing the numbers. */
+    /* ── List rows — three renderings, measured by CONTAINER width (§4.9;
+       the lists sit beside a fixed sidebar, so viewport media queries lie
+       about the room they actually have):
+
+         ≥880px container  one-line grid. The info zone has a real FLOOR
+                           (minmax 240px) — below the floor the row reflows,
+                           it never crushes a name to "N…" (§4.10).
+         640–879.98px      two-line reflow: identity on top, money below,
+                           actions anchored right across both.
+         <640px            the bespoke phone card (.he-cq-card).
+
+       Money cells are fixed-width + tabular so figures align down the list. */
     .fin-row {
-        display: grid;
-        grid-template-columns:
-            minmax(0, 1.6fr)                /* student */
-            minmax(0, 1.3fr)                /* title */
-            repeat(3, minmax(96px, 116px))  /* amount · paid · balance */
-            auto;                           /* status + actions */
         align-items: center;
-        column-gap: 1.25rem;
+        gap: 0.75rem 1rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "info  acts"
+            "money acts";
+    }
+    .fin-c-info { grid-area: info; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .fin-c-info > .fin-c-text { display: flex; gap: 1rem; flex: 1; min-width: 0; }
+    .fin-c-info .fin-c-block { flex: 1 1 50%; min-width: 0; }
+    .fin-row-money { grid-area: money; display: flex; justify-content: flex-end; gap: 1.5rem; }
+    .fin-row-acts {
+        grid-area: acts;
+        display: flex; align-items: center; justify-content: flex-end;
+        gap: 0.5rem;
+        padding-left: 1rem;
+        border-left: 1px solid rgba(0, 0, 0, 0.06);
+        align-self: stretch;
+    }
+    @container (min-width: 880px) {
+        .fin-row {
+            grid-template-columns: minmax(240px, 1fr) auto auto;
+            grid-template-areas: "info money acts";
+            column-gap: 1.25rem;
+        }
+        .fin-row-acts { padding-left: 1.25rem; align-self: center; }
     }
     .fin-row-num {
+        min-width: 96px;
         text-align: right;
         font-feature-settings: 'tnum';
         font-variant-numeric: tabular-nums;
+        white-space: nowrap; /* a figure never wraps mid-digit (§4.10) */
     }
     .fin-row-lbl {
         font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.06em; color: var(--he-text-muted);
         margin-bottom: 0.15rem;
-    }
-    /* One quiet container for the actions — separated from the numbers by a
-       hairline so the row reads "data | what you can do about it".
-       (The buttons themselves are the canonical .he-icon-btn / .he-act-row
-       family — promoted to _premium.scss in W6.2 when Expenses needed them.) */
-    .fin-row-acts {
-        display: flex; align-items: center; justify-content: flex-end;
-        gap: 0.5rem;
-        padding-left: 1.25rem;
-        border-left: 1px solid rgba(0, 0, 0, 0.06);
-    }
-    @media (max-width: 1299.98px) {
-        .fin-row { column-gap: 0.85rem; }
-        .fin-row-acts { padding-left: 0.85rem; }
     }
 
     /* Phone: Collect left (capped — a full-bleed green bar is a shouty way
@@ -195,85 +205,57 @@
        here stretches the select any more: it must stay square on a phone. */
 
     @media (max-width: 576px) {
-        .fin-page-title { font-size: 2.2rem; line-height: 1.5; }
-        .fin-page-sub { font-size: 1rem; line-height: 1.5; }
         .fin-list { padding-bottom: 5rem; } /* clear the FAB */
-
-        /* Stat tiles: density pass (mobile rule 4) — the desktop shell is
-           roomy; on phones each tile compacts into one [icon+label | value]
-           row so all three fit one screen with the tabs. */
-        .fin-tile .card-body {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 0.75rem; padding: 0.85rem 1rem;
-        }
-        .fin-tile .card-body > div:first-child {
-            display: flex; flex-direction: row-reverse; align-items: center;
-            justify-content: flex-end; gap: 0.6rem; margin-bottom: 0 !important;
-        }
-        .fin-tile .tile-icon-wrapper { width: 34px !important; height: 34px !important; font-size: 0.8rem; }
-        .fin-tile .h2 { font-size: 1.3rem; margin-bottom: 0 !important; }
-        .fin-tile-hero .card-body { padding: 1rem 1.1rem; }
-        .fin-tile-hero .display-6 { font-size: 1.6rem; }
     }
+    /* Heading + stat tiles are the canonical .he-page-head / .he-stats
+       patterns now (design law §4.9/§4.10): the tiles measure their
+       CONTAINER — cards when there's room, one compact row-panel when not —
+       and the old ≤576px tile pass is gone because it was viewport-based
+       and the 577–991px band it ignored is where the giant stacked cards
+       came from. */
 </style>
 
 <div x-data="financeBoard()" @tab-changed.window="switchTab($event.detail, false)" class="page-enter">
 
-    <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+    <div class="he-page-head mb-4">
         <div>
-            <h1 class="fin-page-title fw-bold mb-1">{{ __('Finance Board') }}</h1>
-            <p class="fin-page-sub text-secondary mb-0">{{ __('Manage invoices, due balances, and transactions in one place.') }}</p>
+            <h1 class="he-page-title">{{ __('Finance Board') }}</h1>
+            <p class="he-page-sub">{{ __('Manage invoices, due balances, and transactions in one place.') }}</p>
         </div>
-        {{-- Desktop action; phones get the FAB. --}}
-        <div class="d-none d-sm-flex gap-2">
-            <button type="button" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" @click="openModal()">
-                <i class="fa-solid fa-plus me-1"></i> {{ __('New Invoice') }}
-            </button>
-        </div>
+        {{-- ≥md only — below that the FAB is the action; a header button on a
+             phone just wraps under the title (§4.10). --}}
+        <button type="button" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm d-none d-md-inline-flex align-items-center" @click="openModal()">
+            <i class="fa-solid fa-plus me-1"></i> {{ __('New Invoice') }}
+        </button>
     </div>
 
     {{-- Stat tiles — whole-book totals (server-computed, never affected by
-         search/pagination). Shell design kept per owner sign-off. --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card h-100 border-0 fin-tile fin-tile-hero" style="background: var(--he-gradient-mesh); color: #fff; overflow: hidden; position: relative; border-radius: 1.25rem;">
-                <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 50% 50%, rgba(147, 51, 234, 0.3) 0%, transparent 50%); opacity: 0.5;"></div>
-                <div class="card-body p-4 position-relative z-1 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="badge bg-white text-dark mb-3" style="background: rgba(255,255,255,0.1) !important; backdrop-filter: blur(4px); color: #fff !important; border: 1px solid rgba(255,255,255,0.2);">
-                            <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> {{ __('Total Outstanding') }}
-                        </div>
-                        <h2 class="display-6 fw-bold mb-0 text-white" style="font-feature-settings: 'tnum';">{{ hostelease_money($totals['outstanding']) }}</h2>
-                    </div>
+         search/pagination). Canonical .he-stats (§4.9): side-by-side cards
+         when the CONTAINER is wide, one compact row-panel when it isn't —
+         which is what a phone, a narrow window, and a desktop squeezed by
+         the sidebar all actually are. --}}
+    <div class="he-stats mb-4">
+        <div class="he-stats__grid" style="--he-stats-cols: 3;">
+            <div class="he-stat he-stat--hero">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: rgba(255, 255, 255, 0.15); color: #fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="he-stat__label">{{ __('Total Outstanding') }}</div>
                 </div>
+                <div class="he-stat__value">{{ hostelease_money($totals['outstanding']) }}</div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 border-0 shadow-sm fin-tile" style="border-radius: 1.25rem; background: #fff;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('Total Collected') }}</div>
-                        <div class="tile-icon-wrapper" style="width: 40px; height: 40px; border-radius: 50%; background: var(--he-success-soft); color: var(--he-success); display: flex; align-items: center; justify-content: center; position: relative;">
-                            <i class="fa-solid fa-sack-dollar"></i>
-                            <div style="position: absolute; inset: 0; background: inherit; filter: blur(8px); z-index: -1;"></div>
-                        </div>
-                    </div>
-                    <div class="h2 mb-0 fw-bold text-success" style="font-feature-settings: 'tnum';">{{ hostelease_money($totals['collected']) }}</div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-success-soft); color: var(--he-success);"><i class="fa-solid fa-sack-dollar"></i></div>
+                    <div class="he-stat__label">{{ __('Total Collected') }}</div>
                 </div>
+                <div class="he-stat__value text-success">{{ hostelease_money($totals['collected']) }}</div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 border-0 shadow-sm fin-tile" style="border-radius: 1.25rem; background: #fff;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('Total Invoiced') }}</div>
-                        <div class="tile-icon-wrapper" style="width: 40px; height: 40px; border-radius: 50%; background: var(--he-info-soft); color: var(--he-info); display: flex; align-items: center; justify-content: center; position: relative;">
-                            <i class="fa-solid fa-file-invoice-dollar"></i>
-                            <div style="position: absolute; inset: 0; background: inherit; filter: blur(8px); z-index: -1;"></div>
-                        </div>
-                    </div>
-                    <div class="h2 mb-0 fw-bold text-dark" style="font-feature-settings: 'tnum';">{{ hostelease_money($totals['invoiced']) }}</div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-info-soft); color: var(--he-info);"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                    <div class="he-stat__label">{{ __('Total Invoiced') }}</div>
                 </div>
+                <div class="he-stat__value">{{ hostelease_money($totals['invoiced']) }}</div>
             </div>
         </div>
     </div>
@@ -342,7 +324,10 @@
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          style="display: none;" class="fin-list">
-        <div id="invoice-list" data-fragment-container>
+        {{-- he-adaptive: rows measure THIS container's width (§4.9), so the
+             one-line / two-line / phone-card tiers respond to the room the
+             list really has — sidebar included. --}}
+        <div id="invoice-list" data-fragment-container class="he-adaptive">
             @include('admin.finance._invoices')
         </div>
     </div>
@@ -353,7 +338,7 @@
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          style="display: none;" class="fin-list">
-        <div id="transaction-list" data-fragment-container>
+        <div id="transaction-list" data-fragment-container class="he-adaptive">
             @include('admin.finance._transactions')
         </div>
     </div>

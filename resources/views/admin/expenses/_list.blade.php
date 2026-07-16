@@ -39,9 +39,12 @@
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-3 p-lg-4">
 
-                {{-- ═══ Desktop / tablet-landscape row ═══ --}}
-                <div class="d-none d-lg-grid exp-row">
-                    <div class="d-flex align-items-center gap-3" style="min-width: 0;">
+                {{-- ═══ Wide / reflow row (container-tiered, §4.9/§4.10) ═══
+                     Info flexes with a floor; the meta cells are grid columns
+                     when wide (display:contents) and one flex line when the
+                     row reflows; the amount never wraps. --}}
+                <div class="he-cq-wide exp-row">
+                    <div class="exp-c-info">
                         <div class="exp-cat-avatar flex-shrink-0"><i class="fa-solid fa-{{ $icon }}"></i></div>
                         <div style="min-width: 0;">
                             <div class="fw-bold text-dark lh-sm text-truncate">{{ $expense->title }}</div>
@@ -54,30 +57,32 @@
                         </div>
                     </div>
 
-                    <div>
-                        <div class="exp-row-lbl">{{ __('Date') }}</div>
-                        <div class="fw-semibold text-dark small">{{ $expense->expense_date->format('d M Y') }}</div>
-                    </div>
+                    <div class="exp-row-meta">
+                        <div class="exp-cell-date">
+                            <div class="exp-row-lbl">{{ __('Date') }}</div>
+                            <div class="fw-semibold text-dark small text-nowrap">{{ $expense->expense_date->format('d M Y') }}</div>
+                        </div>
 
-                    <div>
-                        <div class="exp-row-lbl">{{ __('Mode') }}</div>
-                        <div class="fw-semibold text-dark small">{{ $modeLabel }}</div>
-                    </div>
+                        <div class="exp-cell-mode" style="min-width: 0;">
+                            <div class="exp-row-lbl">{{ __('Mode') }}</div>
+                            <div class="fw-semibold text-dark small text-truncate">{{ $modeLabel }}</div>
+                        </div>
 
-                    <div>
-                        <span class="badge bg-light text-secondary border rounded-pill px-3 py-2">
-                            <i class="fa-solid fa-{{ $icon }} me-1 opacity-75"></i>{{ $catLabel }}
-                        </span>
-                        @if($expense->isSalaryLinked())
-                            <span class="exp-auto-chip" title="{{ __('Mirrors a staff salary payment') }}">
-                                <i class="fa-solid fa-rotate"></i>{{ __('Auto') }}
+                        <div class="exp-cell-cat text-nowrap">
+                            <span class="badge bg-light text-secondary border rounded-pill px-3 py-2">
+                                <i class="fa-solid fa-{{ $icon }} me-1 opacity-75"></i>{{ $catLabel }}
                             </span>
-                        @endif
-                    </div>
+                            @if($expense->isSalaryLinked())
+                                <span class="exp-auto-chip" title="{{ __('Mirrors a staff salary payment') }}">
+                                    <i class="fa-solid fa-rotate"></i>{{ __('Auto') }}
+                                </span>
+                            @endif
+                        </div>
 
-                    <div class="exp-row-num">
-                        <div class="exp-row-lbl">{{ __('Amount') }}</div>
-                        <div class="fw-bold text-danger">&minus;{{ hostelease_money($expense->amount) }}</div>
+                        <div class="exp-row-num">
+                            <div class="exp-row-lbl">{{ __('Amount') }}</div>
+                            <div class="fw-bold text-danger">&minus;{{ hostelease_money($expense->amount) }}</div>
+                        </div>
                     </div>
 
                     <div class="exp-row-acts">
@@ -101,8 +106,8 @@
                     </div>
                 </div>
 
-                {{-- ═══ Bespoke phone card ═══ --}}
-                <div class="d-lg-none">
+                {{-- ═══ Bespoke phone card (container <640px, §4.9) ═══ --}}
+                <div class="he-cq-card">
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <div class="exp-cat-avatar exp-cat-avatar--sm flex-shrink-0"><i class="fa-solid fa-{{ $icon }}"></i></div>
                         <div class="flex-grow-1" style="min-width: 0;">

@@ -9,12 +9,8 @@
        sections 4.2/4.7). W6.2 full redesign, replacing the pre-design-system
        page wholesale. */
 
-    /* Page heading — the Finance Board's approved mobile type scale (title
-       grows on phones, it doesn't shrink). */
-    .exp-page-title { font-size: 1.6rem; letter-spacing: -0.01em; }
+    /* Heading is the canonical .he-page-head; tiles are .he-stats (§4.9). */
     @media (max-width: 576px) {
-        .exp-page-title { font-size: 2.2rem; line-height: 1.5; }
-        .exp-page-sub { font-size: 1rem; line-height: 1.5; }
         #expense-list { padding-bottom: 5rem; } /* clear the FAB */
     }
 
@@ -29,17 +25,8 @@
        focus. */
     #exp-filter-aux { display: contents; }
 
-    /* Summary tiles (white premium, colour carried by the icon + number). */
-    .exp-tile { border-radius: 1.25rem; background: var(--he-bg-surface); }
-    .exp-tile-ic {
-        width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
-        display: flex; align-items: center; justify-content: center;
-        position: relative;
-    }
-    .exp-tile-ic::after {
-        content: ''; position: absolute; inset: 0;
-        background: inherit; filter: blur(8px); z-index: -1;
-    }
+    /* Summary tiles are the canonical .he-stats (§4.9) — cards when the
+       container is wide, one compact row-panel when it isn't. */
 
     /* Date-range chips: a styled premium chip with the NATIVE date input
        stretched invisibly across it — clicks land on the input itself, so
@@ -113,27 +100,56 @@
     }
     .exp-cat-chip.active i, .exp-cat-chip.active .exp-chip-amt { color: rgba(255, 255, 255, 0.85); }
 
-    /* Desktop list grid: fixed date/mode/amount tracks so values align down
-       the whole list (the W6.1 fin-row lesson — content-sized columns are
-       what read as "cluttered"). */
+    /* ── List rows — container-tiered (§4.9/§4.10), same grammar as the
+       Finance Board:
+         ≥880px container  one line: info | date | mode | category | amount | acts.
+                           Info has a FLOOR; fixed tabular cells keep values
+                           aligned down the list.
+         640–879.98px      two lines: info on top, the meta cells collapse to
+                           one flex line below (amount pushed right), actions
+                           anchored right across both.
+         <640px            the bespoke phone card (.he-cq-card).
+       .exp-row-meta is display:contents when wide — its cells ARE the grid
+       columns — and becomes the second line's flex row when reflowed. */
     .exp-row {
-        display: grid;
-        grid-template-columns: minmax(0, 2.1fr) 110px 120px minmax(150px, 1.1fr) 130px auto;
         align-items: center;
-        column-gap: 1rem;
+        gap: 0.75rem 1rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "info acts"
+            "meta acts";
     }
-    .exp-row-num { text-align: right; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
-    .exp-row-lbl {
-        font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--he-text-muted); margin-bottom: 0.15rem;
-    }
+    .exp-c-info { grid-area: info; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .exp-row-meta { grid-area: meta; display: flex; align-items: center; gap: 1.25rem; min-width: 0; }
+    .exp-row-meta .exp-row-num { margin-left: auto; }
     .exp-row-acts {
+        grid-area: acts;
         display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;
         padding-left: 1rem;
         border-left: 1px solid rgba(0, 0, 0, 0.06);
+        align-self: stretch;
     }
-    @media (max-width: 1299.98px) {
-        .exp-row { column-gap: 0.75rem; grid-template-columns: minmax(0, 2fr) 100px 105px minmax(130px, 1fr) 120px auto; }
+    @container (min-width: 880px) {
+        .exp-row {
+            grid-template-columns: minmax(220px, 1fr) 110px 110px minmax(140px, auto) 120px auto;
+            grid-template-areas: "info date mode cat amount acts";
+            column-gap: 1rem;
+        }
+        .exp-row-meta { display: contents; }
+        .exp-cell-date { grid-area: date; }
+        .exp-cell-mode { grid-area: mode; }
+        .exp-cell-cat { grid-area: cat; }
+        .exp-row-meta .exp-row-num { grid-area: amount; margin-left: 0; }
+        .exp-row-acts { align-self: center; }
+    }
+    .exp-row-num {
+        text-align: right;
+        font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums;
+        white-space: nowrap; /* a figure never wraps mid-digit (§4.10) */
+    }
+    .exp-row-lbl {
+        font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--he-text-muted); margin-bottom: 0.15rem;
     }
 
     .exp-cat-avatar {
@@ -180,13 +196,13 @@
 <div class="page-enter" x-data="expenseBoard()">
 
     {{-- ══ Header ══ --}}
-    <div class="d-flex align-items-center justify-content-between gap-3 mb-4 stagger-1">
+    <div class="he-page-head mb-4 stagger-1">
         <div>
-            <h1 class="exp-page-title fw-bold mb-1">{{ __('Expenses & Outflows') }}</h1>
-            <p class="exp-page-sub text-secondary mb-0">{{ __('Every rupee out, and what\'s left of what came in.') }}</p>
+            <h1 class="he-page-title">{{ __('Expenses & Outflows') }}</h1>
+            <p class="he-page-sub">{{ __('Every rupee out, and what\'s left of what came in.') }}</p>
         </div>
-        {{-- Desktop action; phones get the FAB. --}}
-        <button type="button" class="btn btn-premium rounded-pill px-4 fw-semibold shadow-sm tactile-btn d-none d-md-inline-flex align-items-center flex-shrink-0"
+        {{-- Desktop action; phones get the FAB (never a wrapped header button). --}}
+        <button type="button" class="btn btn-premium rounded-pill px-4 fw-semibold shadow-sm tactile-btn d-none d-md-inline-flex align-items-center"
                 @click="openCreate()">
             <i class="fa-solid fa-plus me-2"></i>{{ __('Log Expense') }}
         </button>
@@ -204,41 +220,31 @@
                 {{ $from->format('d M Y') }} &ndash; {{ $to->format('d M Y') }}
             </span>
         </div>
-        <div class="row g-3 mb-4 stagger-2">
-            <div class="col-md-4">
-                <div class="card exp-tile h-100 border-0 shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('Income') }} <span class="opacity-50">· {{ __('cash in') }}</span></div>
-                            <div class="exp-tile-ic" style="background: var(--he-success-soft, rgba(34,197,94,0.12)); color: var(--he-success, #16a34a);"><i class="fa-solid fa-arrow-trend-up"></i></div>
-                        </div>
-                        <div class="h2 mb-0 fw-bold text-success" style="font-feature-settings: 'tnum';">{{ hostelease_money($summary['income']) }}</div>
+        @php $profitable = $summary['profit'] >= 0; @endphp
+        <div class="he-stats mb-4 stagger-2">
+            <div class="he-stats__grid" style="--he-stats-cols: 3;">
+                <div class="he-stat">
+                    <div class="he-stat__head">
+                        <div class="he-stat__icon" style="background: var(--he-success-soft, rgba(34,197,94,0.12)); color: var(--he-success, #16a34a);"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                        <div class="he-stat__label">{{ __('Income') }} <span class="opacity-50">· {{ __('cash in') }}</span></div>
                     </div>
+                    <div class="he-stat__value text-success">{{ hostelease_money($summary['income']) }}</div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card exp-tile h-100 border-0 shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('Expenses') }}</div>
-                            <div class="exp-tile-ic" style="background: var(--he-danger-soft); color: var(--he-danger);"><i class="fa-solid fa-arrow-trend-down"></i></div>
-                        </div>
-                        <div class="h2 mb-0 fw-bold text-danger" style="font-feature-settings: 'tnum';">{{ hostelease_money($summary['expense']) }}</div>
+                <div class="he-stat">
+                    <div class="he-stat__head">
+                        <div class="he-stat__icon" style="background: var(--he-danger-soft); color: var(--he-danger);"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                        <div class="he-stat__label">{{ __('Expenses') }}</div>
                     </div>
+                    <div class="he-stat__value text-danger">{{ hostelease_money($summary['expense']) }}</div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                @php $profitable = $summary['profit'] >= 0; @endphp
-                <div class="card exp-tile h-100 border-0 shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ $profitable ? __('Net Profit') : __('Net Loss') }}</div>
-                            <div class="exp-tile-ic" style="background: {{ $profitable ? 'var(--he-primary-soft)' : 'var(--he-warning-soft, rgba(245,158,11,0.12))' }}; color: {{ $profitable ? 'var(--he-primary)' : 'var(--he-warning, #b45309)' }};">
-                                <i class="fa-solid fa-{{ $profitable ? 'scale-balanced' : 'scale-unbalanced-flip' }}"></i>
-                            </div>
+                <div class="he-stat">
+                    <div class="he-stat__head">
+                        <div class="he-stat__icon" style="background: {{ $profitable ? 'var(--he-primary-soft)' : 'var(--he-warning-soft, rgba(245,158,11,0.12))' }}; color: {{ $profitable ? 'var(--he-primary)' : 'var(--he-warning, #b45309)' }};">
+                            <i class="fa-solid fa-{{ $profitable ? 'scale-balanced' : 'scale-unbalanced-flip' }}"></i>
                         </div>
-                        <div class="h2 mb-0 fw-bold {{ $profitable ? 'text-primary' : 'text-warning-emphasis' }}" style="font-feature-settings: 'tnum';">{{ hostelease_money($summary['profit']) }}</div>
+                        <div class="he-stat__label">{{ $profitable ? __('Net Profit') : __('Net Loss') }}</div>
                     </div>
+                    <div class="he-stat__value {{ $profitable ? 'text-primary' : 'text-warning-emphasis' }}">{{ hostelease_money($summary['profit']) }}</div>
                 </div>
             </div>
         </div>
@@ -320,8 +326,9 @@
         @endif
     </div>
 
-    {{-- ══ The list (fragment container: pagination swaps in place, 4.3) ══ --}}
-    <div id="expense-list" data-fragment-container>
+    {{-- ══ The list (fragment container: pagination swaps in place, 4.3;
+         he-adaptive: rows measure THIS container, sidebar included, 4.9) ══ --}}
+    <div id="expense-list" data-fragment-container class="he-adaptive">
         @include('admin.expenses._list')
     </div>
 

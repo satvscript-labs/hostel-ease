@@ -34,37 +34,42 @@
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-3 p-lg-4">
 
-                {{-- ═══ Desktop / tablet-landscape row ═══
-                     .fin-row is a grid with FIXED money tracks, so Amount /
-                     Paid / Balance line up down the whole list instead of each
-                     row placing them wherever its own digits happen to end. --}}
-                <div class="d-none d-lg-grid fin-row">
-                    <div class="d-flex align-items-center gap-3" style="min-width: 0;">
+                {{-- ═══ Wide / reflow row (container-tiered, §4.9/§4.10) ═══
+                     Three zones: info (flexible, truncates — but the ROW
+                     reflows to two lines before info can crush), money (fixed
+                     tabular cells so figures align down the list), actions.
+                     Every text line that can truncate carries text-truncate —
+                     the per-character phone-number wrap was a missing nowrap. --}}
+                <div class="he-cq-wide fin-row">
+                    <div class="fin-c-info">
                         <div class="avatar bg-light text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
                             {{ substr($invoice->student->name, 0, 1) }}
                         </div>
-                        <div style="min-width: 0;">
-                            <div class="fw-bold text-dark lh-sm text-truncate">{{ $invoice->student->name }}</div>
-                            <div class="text-muted small lh-sm">{{ hostelease_phone($invoice->student->mobile) }}</div>
+                        <div class="fin-c-text">
+                            <div class="fin-c-block">
+                                <div class="fw-bold text-dark lh-sm text-truncate">{{ $invoice->student->name }}</div>
+                                <div class="text-muted small lh-sm text-truncate">{{ hostelease_phone($invoice->student->mobile) }}</div>
+                            </div>
+                            <div class="fin-c-block">
+                                <div class="text-dark fw-semibold lh-sm text-truncate">{{ $invoice->title }}</div>
+                                <div class="text-muted small text-uppercase lh-sm text-truncate" style="letter-spacing: 0.04em;">{{ $invoice->type }} &bull; {{ $invoice->created_at->format('d M Y') }}</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div style="min-width: 0;">
-                        <div class="text-dark fw-semibold lh-sm text-truncate">{{ $invoice->title }}</div>
-                        <div class="text-muted small text-uppercase lh-sm" style="letter-spacing: 0.04em;">{{ $invoice->type }} &bull; {{ $invoice->created_at->format('d M Y') }}</div>
-                    </div>
-
-                    <div class="fin-row-num">
-                        <div class="fin-row-lbl">{{ __('Amount') }}</div>
-                        <div class="fw-bold text-dark">{{ hostelease_money($invoice->amount) }}</div>
-                    </div>
-                    <div class="fin-row-num">
-                        <div class="fin-row-lbl">{{ __('Paid') }}</div>
-                        <div class="fw-bold text-success">{{ hostelease_money($invoice->paid_amount) }}</div>
-                    </div>
-                    <div class="fin-row-num">
-                        <div class="fin-row-lbl">{{ __('Balance') }}</div>
-                        <div class="fw-bold {{ $invoice->balance > 0 ? 'text-danger' : 'text-muted' }}">{{ hostelease_money($invoice->balance) }}</div>
+                    <div class="fin-row-money">
+                        <div class="fin-row-num">
+                            <div class="fin-row-lbl">{{ __('Amount') }}</div>
+                            <div class="fw-bold text-dark">{{ hostelease_money($invoice->amount) }}</div>
+                        </div>
+                        <div class="fin-row-num">
+                            <div class="fin-row-lbl">{{ __('Paid') }}</div>
+                            <div class="fw-bold text-success">{{ hostelease_money($invoice->paid_amount) }}</div>
+                        </div>
+                        <div class="fin-row-num">
+                            <div class="fin-row-lbl">{{ __('Balance') }}</div>
+                            <div class="fw-bold {{ $invoice->balance > 0 ? 'text-danger' : 'text-muted' }}">{{ hostelease_money($invoice->balance) }}</div>
+                        </div>
                     </div>
 
                     <div class="fin-row-acts">
@@ -91,8 +96,8 @@
                     </div>
                 </div>
 
-                {{-- ═══ Bespoke phone card ═══ --}}
-                <div class="d-lg-none">
+                {{-- ═══ Bespoke phone card (container <640px, §4.9) ═══ --}}
+                <div class="he-cq-card">
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <div class="avatar bg-light text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
                             {{ substr($invoice->student->name, 0, 1) }}
