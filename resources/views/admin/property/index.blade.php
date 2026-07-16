@@ -229,27 +229,88 @@
         color: #b45309;
     }
 
-    /* Spotlight Assign Modal */
-    .spotlight-backdrop {
-        position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); z-index: 2000;
-        display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh;
+    /* ── Move sheets (W6.4) ─────────────────────────────────────────────────
+       The old bespoke "spotlight" panel is gone — assign/transfer/release now
+       share the canonical .custom-overlay anatomy (section 5), so they're
+       bottom sheets on phones for free. Only the move-specific bits live here. */
+
+    /* Scrollable option list (assign's student search). The picker-based
+       transfer uses .he-picker instead — it needs placement (4.7). */
+    .mv-list {
+        max-height: 46vh;
+        overflow-y: auto;
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        border-radius: var(--he-radius-md);
+        padding: 0.3rem;
     }
-    .spotlight-panel {
-        width: 100%; max-width: 600px; background: rgba(255,255,255,0.95); backdrop-filter: blur(30px);
-        border-radius: 1.5rem; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.5);
+    .mv-option {
+        display: flex; align-items: center; gap: 0.75rem; width: 100%;
+        padding: 0.6rem 0.7rem; border: none; background: none; text-align: left;
+        border-radius: var(--he-radius-sm); cursor: pointer;
+        transition: background 0.15s var(--ease-out-expo);
     }
-    .spotlight-input-container { position: relative; border-bottom: 1px solid rgba(0,0,0,0.1); }
-    .spotlight-input {
-        width: 100%; padding: 1.5rem 1.5rem 1.5rem 4rem; font-size: 1.25rem; border: none; background: transparent; outline: none;
+    .mv-option:hover { background: var(--he-primary-soft); }
+    .mv-avatar { width: 38px; height: 38px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+    .mv-plan-tag {
+        font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+        padding: 0.2rem 0.55rem; border-radius: var(--he-radius-full);
+        background: var(--he-bg-canvas); color: var(--he-text-muted);
+        font-feature-settings: 'tnum';
     }
-    .spotlight-input-container i { position: absolute; left: 1.5rem; top: 50%; transform: translateY(-50%); font-size: 1.25rem; color: var(--he-primary); }
-    .spotlight-results { max-height: 400px; overflow-y: auto; padding: 0.5rem; }
-    .spotlight-item {
-        display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1rem; cursor: pointer; transition: all 0.2s;
+    .mv-empty { padding: 2rem 1rem; text-align: center; color: var(--he-text-muted); font-size: 0.85rem; }
+
+    /* The chosen student — the search collapses into this. */
+    .mv-picked {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.6rem 0.7rem;
+        background: var(--he-bg-canvas);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: var(--he-radius-md);
     }
-    .spotlight-item:hover { background: rgba(79, 70, 229, 0.1); }
-    .spotlight-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+
+    /* From → To route strip on transfer. */
+    .mv-route {
+        display: flex; align-items: center; gap: 0.85rem;
+        padding: 0.7rem 0.9rem;
+        background: var(--he-bg-canvas);
+        border-radius: var(--he-radius-md);
+    }
+    .mv-route-cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+    .mv-route-lbl {
+        font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--he-text-muted);
+    }
+    .mv-ac-chip {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        padding: 0.1rem 0.45rem; border-radius: var(--he-radius-full);
+        background: var(--he-info-soft); color: var(--he-info);
+        font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    }
+
+    /* Old plan → new plan, stated plainly. */
+    .mv-delta {
+        display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+        padding: 0.55rem 0.85rem;
+        background: var(--he-warning-soft, rgba(245, 158, 11, 0.12));
+        border-radius: var(--he-radius-md);
+        font-size: 0.85rem; font-weight: 700;
+        font-feature-settings: 'tnum';
+    }
+    .mv-delta i { color: var(--he-text-muted); }
+    .mv-delta-old { color: var(--he-text-muted); text-decoration: line-through; }
+    .mv-delta-new { color: var(--he-warning, #b45309); }
+
+    .mv-note {
+        background: var(--he-info-soft); color: var(--he-info);
+        border-radius: var(--he-radius-md);
+        padding: 0.55rem 0.85rem; font-size: 0.8rem; font-weight: 600;
+    }
+    .mv-warn {
+        background: var(--he-warning-soft, rgba(245, 158, 11, 0.12));
+        color: var(--he-warning, #b45309);
+        border-radius: var(--he-radius-md);
+        padding: 0.55rem 0.85rem; font-size: 0.8rem; font-weight: 600;
+    }
 
     /* Slide-over Panel (Alpine) */
     .slide-over-backdrop {
@@ -431,14 +492,11 @@
         .bed-maintenance .maintenance-text { font-size: 0.75rem; }
         .bed-maintenance .maintenance-bed-label { margin-left: auto; font-size: 0.72rem; }
 
-        /* Spotlight quick-assign: near full-width sheet from the top,
-           inputs at 16px so iOS doesn't zoom. */
-        .spotlight-backdrop { padding-top: 6vh; padding-left: 0.75rem; padding-right: 0.75rem; }
-        .spotlight-panel { max-width: 100%; border-radius: 1.25rem; }
-        .spotlight-input { font-size: 16px; padding: 1.15rem 1.15rem 1.15rem 3.25rem; }
-        .spotlight-input-container i { left: 1.15rem; font-size: 1.1rem; }
-        .spotlight-results { max-height: 55vh; }
-        .spotlight-item { padding: 0.75rem; }
+        /* The move sheets are canonical .custom-overlay modals, so they're
+           already bottom sheets on phones (section 5) — only the student list
+           needs reining in so the confirm button stays reachable. */
+        .mv-list { max-height: 40vh; }
+        .mv-route { flex-wrap: wrap; }
 
         /* Details slide-over is already full-width; tighten its padding so it
            reads dense like an app screen, not a roomy desktop panel. */
@@ -454,7 +512,7 @@
 @endpush
 
 @section('content')
-<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), {{ (int) hostelease_max_room_sharing() }}, @js(hostelease_sharing_labels()))" class="page-enter pb-5" @keydown.window.escape="spotlight.open = false; transferOpen = false; releaseOpen = false; feeGate.open = false; closeDetails()">
+<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), @js($vacantBeds), @js(config('hostelease.fee_frequencies')))" class="page-enter pb-5" @keydown.window.escape="closeAssign(); closeTransfer(); releaseOpen = false; bedStatus.open = false; closeDetails()">
     
     <!-- Header -->
     <div class="pb-header flex-wrap gap-3">
@@ -529,15 +587,20 @@
                     <div class="bed-grid">
                         @foreach($room->beds as $bed)
                             @if(in_array($bed->status, ['available', 'empty', 'reserved']))
-                                <div class="bed-tile bed-empty" 
-                                     @click="openSpotlight('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
-                                     title="Manage Bed">
+                                <div class="bed-tile bed-empty"
+                                     @click="openAssign({{ Illuminate\Support\Js::from([
+                                         'bedId' => $bed->id,
+                                         'room' => (string) $room->room_number,
+                                         'bed' => (string) $bed->bed_number,
+                                         'isAc' => $room->isAc(),
+                                     ]) }})"
+                                     title="Assign a student">
                                      <i class="fa-solid fa-circle-plus"></i>
                                      <span class="bed-status-text">{{ $bed->bed_number }} AVAILABLE</span>
                                 </div>
                             @elseif($bed->status === 'maintenance')
-                                <div class="bed-tile bed-maintenance" 
-                                     @click="openSpotlight('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
+                                <div class="bed-tile bed-maintenance"
+                                     @click="openBedStatus('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
                                      title="Manage Bed">
                                      <div class="d-flex align-items-center gap-2">
                                         <i class="fa-solid fa-wrench"></i>
@@ -560,6 +623,11 @@
                                          'join_date' => $assignment->join_date->format('d M Y'),
                                          'join_date_raw' => $assignment->join_date->toDateString(),
                                          'duration' => $assignment->durationInDays(),
+                                         'room_is_ac' => $room->isAc(),
+                                         // The student's CURRENT plan, so a transfer opens
+                                         // pre-filled from their profile (W6.4 fix).
+                                         'fee_amount' => (float) ($student->fee_amount ?? 0),
+                                         'fee_frequency' => $student->fee_frequency ?? '',
                                      ]) }})"
                                      title="{{ $student->name }}">
                                     <img src="{{ $student->photo_url ?: 'https://ui-avatars.com/api/?name='.urlencode($student->name).'&background=fee2e2&color=ef4444' }}" class="occupant-avatar">
@@ -580,159 +648,183 @@
         @endforeach
     </div>
 
-    <!-- Spotlight Quick Assign Modal -->
+    {{-- ═══════════════ Assign — the Move sheet (W6.4 rebuild) ═══════════════
+         Scrapped: the old "spotlight" (a bespoke panel that existed nowhere
+         else) plus the separate Fee-Plan gate that PUT the plan by fetch and
+         THEN submitted a hidden form — two round-trips, and a plan could save
+         while the assignment failed.
+
+         Now: ONE canonical sheet, ONE atomic POST, progressive disclosure.
+         Pick a student and the search collapses into a pill, revealing the
+         stay: date, AC meter (required for AC rooms), and the plan — because
+         every room has its own cost, so a move is always a re-pricing.
+
+         The plan is PREFILLED from the room's own rent × the frequency
+         multiplier, so the usual path is: pick → glance → Confirm. Room and
+         sharing PREFERENCES are deliberately absent — they're hints for
+         FINDING a room, meaningless once you're pointing at this bed. --}}
     <template x-teleport="body">
-        <div x-show="spotlight.open" class="spotlight-backdrop" x-cloak x-transition.opacity>
-            <div class="spotlight-panel" @click.away="spotlight.open = false" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
-                <div class="bg-primary text-white p-3 text-center fw-bold">
-                    Managing Bed <span x-text="spotlight.room"></span>/<span x-text="spotlight.bed"></span>
-                </div>
-                
-                <template x-if="spotlight.status === 'empty' || spotlight.status === 'available'">
-                    <div>
-                        <div class="spotlight-input-container">
-                            <i class="fa-solid fa-search"></i>
-                            <input type="text" x-model="spotlight.query" class="spotlight-input" placeholder="Type a student name to assign..." x-ref="spotlightInput" @keydown.escape="spotlight.open = false">
-                        </div>
-                        <div class="spotlight-results">
-                            <template x-for="student in filteredStudents" :key="student.id">
-                                <div class="spotlight-item" @click="confirmAssignment(student)">
-                                    <img :src="student.photo_url || 'https://ui-avatars.com/api/?name='+encodeURI(student.name)+'&background=2563eb&color=fff'" class="spotlight-avatar">
-                                    <div>
-                                        <div class="fw-bold fs-5" x-text="student.name"></div>
-                                        <div class="small text-muted" x-text="student.mobile"></div>
-                                    </div>
-                                    <div class="ms-auto text-primary opacity-50"><i class="fa-solid fa-arrow-right"></i></div>
-                                </div>
-                            </template>
-                            <div x-show="filteredStudents.length === 0" class="p-5 text-center text-muted">
-                                <i class="fa-solid fa-user-slash fs-1 opacity-25 mb-3"></i>
-                                <h5>No unassigned students found.</h5>
-                                <p class="small">Try a different search or register a new student.</p>
-                            </div>
-                        </div>
-                    </div>
-                </template>
+        <div class="custom-overlay-backdrop" x-show="assign.open" x-transition.opacity @click="closeAssign()" x-cloak style="display: none;">
+            <form method="POST" action="{{ route('admin.property.assign') }}" data-ring-required
+                  class="custom-overlay-modal" :class="{ 'is-open': assign.open }" x-show="assign.open" x-transition.opacity @click.stop
+                  style="display: none;" @submit="planChipsGuard($event, 'assignFreqChips', assign.frequency) && (assign.submitting = true)">
+                @csrf
+                <input type="hidden" name="bed_id" :value="assign.bedId">
+                <input type="hidden" name="student_id" :value="assign.studentId">
 
-                <template x-if="spotlight.status !== 'empty' && spotlight.status !== 'available'">
-                    <div class="p-5 text-center text-muted">
-                        <i class="fa-solid fa-lock fs-1 opacity-25 mb-3"></i>
-                        <h5>This bed is currently <span class="text-uppercase text-warning fw-bold" x-text="spotlight.status"></span>.</h5>
-                        <p class="small">You must mark it as available before assigning a student.</p>
-                    </div>
-                </template>
-
-                <div class="bg-light p-3 border-top d-flex justify-content-center gap-2">
-                    <template x-if="spotlight.status === 'empty' || spotlight.status === 'available'">
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" @click="markBedStatus('maintenance')">
-                                <i class="fa-solid fa-wrench me-1"></i> Mark as Maintenance
-                            </button>
-                        </div>
-                    </template>
-                    <template x-if="spotlight.status === 'maintenance' || spotlight.status === 'reserved'">
-                        <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-bold shadow-sm" @click="markBedStatus('empty')">
-                            <i class="fa-solid fa-check me-1"></i> Mark as Available
-                        </button>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Hidden Form for Assignment -->
-    <form id="assignForm" action="{{ route('admin.property.assign') }}" method="POST" class="d-none">
-        @csrf
-        <input type="hidden" name="bed_id" x-model="spotlight.bedId">
-        <input type="hidden" name="student_id" x-model="spotlight.studentId">
-    </form>
-
-    <!-- Fee Plan Gate — shown before assignment when the picked student has
-         no fee_amount/fee_frequency set yet. Saving completes straight into
-         the bed assignment, no second click. -->
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="feeGate.open" x-transition.opacity @click="feeGate.open = false" x-cloak style="display: none;">
-            <form @submit.prevent="saveFeeGate()" class="custom-overlay-modal" :class="{ 'is-open': feeGate.open }" x-show="feeGate.open" x-transition.opacity @click.stop style="display: none; max-width: 480px;">
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0">
-                        <i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i>
-                        <span class="ms-1">Set Fee Plan</span>
+                        <i class="fa-solid fa-user-plus" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">{{ __('Assign Bed') }}</span>
+                        <div class="fs-6 fw-normal text-muted mt-1">
+                            {{ __('Room') }} <span x-text="assign.room"></span> · {{ __('Bed') }} <span x-text="assign.bed"></span>
+                            <span class="mv-ac-chip ms-1" x-show="assign.isAc"><i class="fa-solid fa-snowflake"></i>{{ __('AC') }}</span>
+                        </div>
                     </h5>
-                    <button type="button" class="btn-close" @click="feeGate.open = false"></button>
+                    <button type="button" class="btn-close" @click="closeAssign()"></button>
                 </div>
+
                 <div class="custom-overlay-body">
-                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex gap-3 align-items-start">
-                        <i class="fa-solid fa-circle-info fs-5 mt-1"></i>
-                        <div class="small">
-                            No fee plan set for <strong x-text="feeGate.student ? feeGate.student.name : 'this student'"></strong> yet — set it to complete the assignment.
-                        </div>
-                    </div>
 
-                    {{-- Room Preference --}}
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Room Preference</label>
-                        <div class="chip-group">
-                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === '' }" @click="feeGate.form.room_preference = ''">Any</button>
-                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === 'AC' }" @click="feeGate.form.room_preference = 'AC'">AC</button>
-                            <button type="button" class="chip" :class="{ active: feeGate.form.room_preference === 'Non-AC' }" @click="feeGate.form.room_preference = 'Non-AC'">Non-AC</button>
-                        </div>
-                    </div>
-
-                    {{-- Sharing — a stepper, not a chip list. Chips (or a scrolling chip
-                         strip) grow wider or need scrolling as the hostel's own room-
-                         sharing ceiling grows (see Layout Builder → Room Settings); a
-                         stepper's footprint never changes whether the range is 1–4 or
-                         1–40. Stepping below 1 lands on "Any". --}}
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Sharing</label>
-                        <div class="sharing-control">
-                            <button type="button" class="sharing-btn" @click="feeGate.sharingValue = Math.max(0, feeGate.sharingValue - 1)">
-                                <i class="fa-solid fa-minus"></i>
+                    {{-- ── Step 1: who ── --}}
+                    <div class="mb-4" x-show="!assign.student" x-cloak>
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Student') }} <span class="text-danger">*</span></label>
+                        <div class="he-search he-search--clearable mb-3">
+                            <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" x-model="assign.query" x-ref="assignSearch" class="he-search__input"
+                                   placeholder="{{ __('Search an unassigned student…') }}" @keydown.escape="closeAssign()">
+                            <button type="button" class="he-search__clear" x-show="assign.query" x-cloak @click="assign.query = ''">
+                                <i class="fa-solid fa-xmark"></i>
                             </button>
-                            <div class="sharing-readout">
-                                <div class="fs-6 fw-bold" x-show="feeGate.sharingValue === 0" x-text="'Any'"></div>
-                                <div class="fs-6 fw-bold" x-show="feeGate.sharingValue > 0" x-text="sharingLabels[feeGate.sharingValue - 1]"></div>
+                        </div>
+                        <div class="mv-list">
+                            <template x-for="s in assignCandidates" :key="s.id">
+                                <button type="button" class="mv-option" @click="pickStudent(s)">
+                                    <img class="mv-avatar" :src="s.photo_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(s.name) + '&background=eef2ff&color=4f46e5'" alt="">
+                                    <span class="flex-grow-1" style="min-width: 0;">
+                                        <span class="d-block fw-bold text-dark text-truncate" x-text="s.name"></span>
+                                        <span class="d-block small text-muted text-truncate" x-text="s.mobile"></span>
+                                    </span>
+                                    <span class="mv-plan-tag flex-shrink-0"
+                                          x-text="s.fee_amount > 0 ? '₹' + fmt(s.fee_amount) + ' · ' + s.fee_frequency : '{{ __('no plan yet') }}'"></span>
+                                </button>
+                            </template>
+                            <div class="mv-empty" x-show="assignCandidates.length === 0">
+                                <i class="fa-solid fa-user-slash opacity-25 mb-2 d-block fs-3"></i>
+                                {{ __('No unassigned students match.') }}
                             </div>
-                            <button type="button" class="sharing-btn" @click="feeGate.sharingValue = Math.min(maxSharing, feeGate.sharingValue + 1)">
-                                <i class="fa-solid fa-plus"></i>
+                        </div>
+                    </div>
+
+                    {{-- ── Step 2: the stay (revealed once a student is picked) ── --}}
+                    <div x-show="assign.student" x-cloak>
+                        {{-- Selected student, one click to change --}}
+                        <div class="mv-picked mb-4">
+                            <img class="mv-avatar" :src="assign.student?.photo_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(assign.student?.name ?? '') + '&background=eef2ff&color=4f46e5'" alt="">
+                            <span class="flex-grow-1" style="min-width: 0;">
+                                <span class="d-block fw-bold text-dark text-truncate" x-text="assign.student?.name"></span>
+                                <span class="d-block small text-muted text-truncate" x-text="assign.student?.mobile"></span>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-white border rounded-pill px-3 fw-semibold flex-shrink-0" @click="clearStudent()">
+                                {{ __('Change') }}
                             </button>
                         </div>
-                    </div>
 
-                    {{-- Fee Structure --}}
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Fee Structure <span class="text-danger">*</span></label>
-                        <div class="chip-group">
-                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'monthly' }" @click="feeGate.form.fee_frequency = 'monthly'">Monthly</button>
-                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'semester' }" @click="feeGate.form.fee_frequency = 'semester'">Semester</button>
-                            <button type="button" class="chip" :class="{ active: feeGate.form.fee_frequency === 'yearly' }" @click="feeGate.form.fee_frequency = 'yearly'">Yearly</button>
+                        <div class="row gx-3">
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Join Date') }} <span class="text-danger">*</span></label>
+                                <input type="date" name="join_date" x-model="assign.joinDate" class="form-control bg-light" max="{{ now()->toDateString() }}" required>
+                            </div>
+                            {{-- Required for AC rooms (W6.3): this reading anchors every
+                                 future AC bill to real consumption. --}}
+                            <div class="col-md-6 mb-4" x-show="assign.isAc">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                                    <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('AC Meter Now') }} <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="meter_reading" x-model.number="assign.meterReading" class="form-control bg-light fw-bold"
+                                       min="0" step="0.01" :required="assign.isAc" :disabled="!assign.isAc" placeholder="{{ __('Read the room meter') }}">
+                            </div>
                         </div>
-                        <div class="text-danger small mt-1" x-show="feeGate.errors.fee_frequency" x-text="feeGate.errors.fee_frequency && feeGate.errors.fee_frequency[0]"></div>
-                    </div>
 
-                    {{-- Amount --}}
-                    <div class="mb-2">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">Amount <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light text-muted fw-bold">₹</span>
-                            <input type="number" x-model="feeGate.form.fee_amount" class="form-control bg-light fw-bold text-dark" min="0" step="0.01" placeholder="0.00">
+                        <hr class="opacity-10 my-4">
+                        <h6 class="fw-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">{{ __('Fee Plan') }}</h6>
+                        <p class="text-muted small mb-3" x-text="assign.student?.fee_amount > 0
+                            ? '{{ __('Their current plan — keep it or set what they\'ll pay from here.') }}'
+                            : '{{ __('What will this student pay, and how often?') }}'"></p>
+
+                        <div class="mb-3">
+                            <div class="chip-group" x-ref="assignFreqChips">
+                                <template x-for="(label, key) in frequencies" :key="'af-' + key">
+                                    <button type="button" class="chip" :class="{ active: assign.frequency === key }"
+                                            @click="assign.frequency = key" x-text="label"></button>
+                                </template>
+                            </div>
+                            <input type="hidden" name="fee_frequency" :value="assign.frequency">
                         </div>
-                        <div class="text-danger small mt-1" x-show="feeGate.errors.fee_amount" x-text="feeGate.errors.fee_amount && feeGate.errors.fee_amount[0]"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Amount') }} <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                                <input type="number" name="fee_amount" x-model.number="assign.amount" class="form-control bg-light fw-bold text-dark"
+                                       min="0" step="0.01" required placeholder="0.00">
+                                <span class="input-group-text bg-light text-muted small" x-show="assign.frequency" x-text="perLabel(assign.frequency)"></span>
+                            </div>
+                        </div>
+
+                        <div class="mv-note" x-show="assign.student && !assign.student.fee_amount" x-cloak>
+                            <i class="fa-solid fa-receipt me-1"></i>{{ __('Their first invoice is raised on this plan when you confirm.') }}
+                        </div>
                     </div>
                 </div>
+
                 <div class="custom-overlay-footer bg-light">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="feeGate.open = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :disabled="feeGate.saving">
-                        <span x-show="!feeGate.saving"><i class="fa-solid fa-check me-2"></i>Save &amp; Assign</span>
-                        <span x-show="feeGate.saving"><i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...</span>
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="closeAssign()">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
+                            :disabled="!assign.student || assign.submitting">
+                        <i class="fa-solid fa-check me-2"></i>{{ __('Confirm Assignment') }}
                     </button>
                 </div>
             </form>
         </div>
     </template>
 
+    {{-- Bed status (maintenance / available) — its own small sheet now that
+         the assign flow no longer carries a footer full of unrelated verbs. --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="bedStatus.open" x-transition.opacity @click="bedStatus.open = false" x-cloak style="display: none;">
+            <div class="custom-overlay-modal" :class="{ 'is-open': bedStatus.open }" x-show="bedStatus.open" x-transition.opacity @click.stop style="display: none; max-width: 420px;">
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid fa-bed" style="color: var(--he-primary);"></i>
+                        <span class="ms-1">{{ __('Bed') }} <span x-text="bedStatus.room"></span>/<span x-text="bedStatus.bed"></span></span>
+                    </h5>
+                    <button type="button" class="btn-close" @click="bedStatus.open = false"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <p class="text-muted mb-4">
+                        {{ __('This bed is') }} <span class="fw-bold text-warning text-uppercase" x-text="bedStatus.status"></span>.
+                        {{ __('Mark it available to assign a student.') }}
+                    </p>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success rounded-pill px-4 fw-bold flex-grow-1"
+                                x-show="bedStatus.status === 'maintenance' || bedStatus.status === 'reserved'"
+                                @click="markBedStatus('empty')">
+                            <i class="fa-solid fa-check me-1"></i> {{ __('Mark as Available') }}
+                        </button>
+                        <button type="button" class="btn btn-outline-warning rounded-pill px-4 fw-bold flex-grow-1"
+                                x-show="bedStatus.status === 'empty' || bedStatus.status === 'available'"
+                                @click="markBedStatus('maintenance')">
+                            <i class="fa-solid fa-wrench me-1"></i> {{ __('Mark as Maintenance') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <!-- Hidden Form for Status Update -->
-    <form id="statusForm" :action="'/admin/beds/' + spotlight.bedId + '/status'" method="POST" class="d-none">
+    <form id="statusForm" :action="'/admin/beds/' + bedStatus.bedId + '/status'" method="POST" class="d-none">
         @csrf @method('PATCH')
         <input type="hidden" name="status" id="statusInput">
     </form>
@@ -816,51 +908,184 @@
         </div>
     </template>
 
-    <!-- Transfer & Release — canonical custom-overlay anatomy (matches the
-         fee-gate modal above; Alpine-driven, no Bootstrap). Both become
-         bottom sheets on mobile via the system rule in _premium.scss. -->
+    {{-- ═══════════════ Transfer — the Move sheet (W6.4 rebuild) ═══════════
+         Scrapped: the raw <select> of every vacant bed and a form that never
+         asked what the move actually costs — which is why a student could be
+         moved from a ₹5,000 Non-AC room into an ₹8,000 AC room and keep being
+         billed ₹5,000 forever.
+
+         Now: a real picker (room, floor, AC, rent, sharing), both AC meters
+         when they apply, and the plan RE-PRICED from the destination room —
+         with the old→new delta stated plainly. Progressive disclosure: the
+         stay only appears once a destination is chosen. --}}
     <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="transferOpen" x-transition.opacity @click="transferOpen = false" x-cloak style="display: none;">
-            <form class="custom-overlay-modal" :class="{ 'is-open': transferOpen }" x-show="transferOpen" @click.stop
-                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST" style="display: none; max-width: 480px;">
+        <div class="custom-overlay-backdrop" x-show="transfer.open" x-transition.opacity @click="closeTransfer()" x-cloak style="display: none;">
+            <form class="custom-overlay-modal" :class="{ 'is-open': transfer.open }" x-show="transfer.open" x-transition.opacity @click.stop data-ring-required
+                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST"
+                  style="display: none;" @submit="planChipsGuard($event, 'transferFreqChips', transfer.frequency) && (transfer.submitting = true)">
                 @csrf @method('PATCH')
+                <input type="hidden" name="bed_id" :value="transfer.bedId">
+
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0">
                         <i class="fa-solid fa-right-left" style="color: var(--he-primary);"></i>
-                        <span class="ms-1">Transfer Student</span>
+                        <span class="ms-1">{{ __('Transfer Student') }}</span>
+                        <div class="fs-6 fw-normal text-muted mt-1" x-text="panels.details.data.student_name"></div>
                     </h5>
-                    <button type="button" class="btn-close" @click="transferOpen = false"></button>
+                    <button type="button" class="btn-close" @click="closeTransfer()"></button>
                 </div>
+
                 <div class="custom-overlay-body">
-                    <p class="text-muted">Move <strong x-text="panels.details.data.student_name"></strong> to a new bed.</p>
-
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Select New Bed</label>
-                        <select name="bed_id" class="glass-input" required>
-                            <option value="">Choose an available bed...</option>
-                            @foreach($allFloors as $f)
-                                <optgroup label="{{ $f->name }}">
-                                    @foreach($f->rooms as $r)
-                                        @foreach($r->beds as $b)
-                                            @if($b->status === 'available' || $b->status === 'empty')
-                                                <option value="{{ $b->id }}">Room {{ $r->room_number }} - Bed {{ $b->bed_number }}</option>
-                                            @endif
-                                        @endforeach
-                                    @endforeach
-                                </optgroup>
-                            @endforeach
-                        </select>
+                    {{-- From → To --}}
+                    <div class="mv-route mb-4">
+                        <div class="mv-route-cell">
+                            <span class="mv-route-lbl">{{ __('From') }}</span>
+                            <span class="fw-bold text-dark">
+                                {{ __('Room') }} <span x-text="panels.details.room"></span>/<span x-text="panels.details.bed"></span>
+                                <span class="mv-ac-chip" x-show="panels.details.data.room_is_ac"><i class="fa-solid fa-snowflake"></i>{{ __('AC') }}</span>
+                            </span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right-long text-muted flex-shrink-0"></i>
+                        <div class="mv-route-cell">
+                            <span class="mv-route-lbl">{{ __('To') }}</span>
+                            <span class="fw-bold" :class="transfer.target ? 'text-dark' : 'text-muted'">
+                                <template x-if="transfer.target">
+                                    <span>
+                                        {{ __('Room') }} <span x-text="transfer.target.room"></span>/<span x-text="transfer.target.bed"></span>
+                                        <span class="mv-ac-chip" x-show="transfer.target.is_ac"><i class="fa-solid fa-snowflake"></i>{{ __('AC') }}</span>
+                                    </span>
+                                </template>
+                                <span x-show="!transfer.target">{{ __('choose below') }}</span>
+                            </span>
+                        </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Transfer Date</label>
-                        <input type="date" name="join_date" class="glass-input" value="{{ now()->toDateString() }}" required>
+                    {{-- Destination picker --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('New Bed') }} <span class="text-danger">*</span></label>
+                        <div class="he-picker" :class="{ 'is-open': transfer.pickerOpen }" @click.outside.capture="transfer.pickerOpen = false">
+                            <button type="button" class="he-picker-trigger" x-ref="transferTrigger" @click="toggleTransferPicker()">
+                                <span class="d-flex align-items-center gap-2 text-truncate">
+                                    <span class="he-picker-avatar" style="width: 28px; height: 28px; font-size: 0.75rem;" x-show="transfer.target"><i class="fa-solid fa-bed"></i></span>
+                                    <span :class="transfer.target ? 'fw-semibold text-dark' : 'text-muted'" x-text="transferLabel"></span>
+                                </span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="he-picker-panel" x-ref="transferPanel" x-show="transfer.pickerOpen" x-transition.opacity x-cloak style="display: none;">
+                                <div class="he-picker-search">
+                                    <input type="text" x-model="transfer.query" x-ref="transferSearch"
+                                           class="form-control form-control-sm bg-light border-0" placeholder="{{ __('Search room, bed or floor…') }}">
+                                </div>
+                                <div class="he-picker-list">
+                                    <template x-for="b in transferCandidates" :key="b.id">
+                                        <button type="button" class="he-picker-option" @click="pickTargetBed(b)">
+                                            <span class="he-picker-avatar" :style="b.is_ac ? 'background: var(--he-info-soft); color: var(--he-info);' : ''">
+                                                <i class="fa-solid" :class="b.is_ac ? 'fa-snowflake' : 'fa-bed'"></i>
+                                            </span>
+                                            {{-- No price here: a room's rent is NOT the
+                                                 student's fee (owner — the fee is asked, not
+                                                 derived). The picker shows only what helps
+                                                 choose a bed: where it is, how full, AC or not. --}}
+                                            <span class="flex-grow-1" style="min-width: 0;">
+                                                <span class="d-block fw-bold text-dark text-truncate">
+                                                    {{ __('Room') }} <span x-text="b.room"></span> · <span x-text="b.bed"></span>
+                                                </span>
+                                                <span class="d-block small text-muted text-truncate"
+                                                      x-text="(b.floor ?? '') + (b.sharing ? ' · ' + b.sharing + '-{{ __('sharing') }}' : '')"></span>
+                                            </span>
+                                            <span class="text-end flex-shrink-0 small" style="line-height: 1.25;">
+                                                <span class="d-block fw-bold" :class="b.is_ac ? 'text-info' : 'text-muted'" x-text="b.is_ac ? '{{ __('AC') }}' : '{{ __('Non-AC') }}'"></span>
+                                            </span>
+                                        </button>
+                                    </template>
+                                    <div class="he-picker-empty" x-show="transferCandidates.length === 0">{{ __('No vacant beds match') }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- The stay — revealed once a destination exists --}}
+                    <div x-show="transfer.target" x-cloak>
+                        <div class="row gx-3">
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Transfer Date') }} <span class="text-danger">*</span></label>
+                                <input type="date" name="join_date" x-model="transfer.date" class="form-control bg-light" required>
+                            </div>
+                        </div>
+
+                        {{-- Two meters can be involved (W6.3): the room being left caps
+                             this student's AC share there; the room being entered
+                             starts them at the real number. --}}
+                        <div class="row gx-3" x-show="panels.details.data.room_is_ac || transfer.target?.is_ac">
+                            <div class="col-md-6 mb-4" x-show="panels.details.data.room_is_ac">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                                    <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('Old Room Meter') }} <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="old_meter_reading" min="0" step="0.01" class="form-control bg-light fw-bold"
+                                       :required="panels.details.data.room_is_ac" :disabled="!panels.details.data.room_is_ac"
+                                       placeholder="{{ __('Meter of the room being left') }}">
+                            </div>
+                            <div class="col-md-6 mb-4" x-show="transfer.target?.is_ac">
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">
+                                    <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('New Room Meter') }} <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="meter_reading" min="0" step="0.01" class="form-control bg-light fw-bold"
+                                       :required="transfer.target?.is_ac" :disabled="!transfer.target?.is_ac"
+                                       placeholder="{{ __('Meter of the new room') }}">
+                            </div>
+                        </div>
+
+                        <hr class="opacity-10 my-4">
+                        <h6 class="fw-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">{{ __('Fee Plan') }}</h6>
+                        <p class="text-muted small mb-3">{{ __('Their current plan — what will they pay from here on?') }}</p>
+
+                        {{-- The change, stated plainly. --}}
+                        <div class="mv-delta mb-3" x-show="planChanged" x-cloak>
+                            <span class="mv-delta-old" x-text="'₹' + fmt(transfer.oldAmount) + ' ' + perLabel(transfer.oldFrequency)"></span>
+                            <i class="fa-solid fa-arrow-right-long"></i>
+                            <span class="mv-delta-new" x-text="'₹' + fmt(transfer.amount || 0) + ' ' + perLabel(transfer.frequency)"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="chip-group" x-ref="transferFreqChips">
+                                <template x-for="(label, key) in frequencies" :key="'tf-' + key">
+                                    <button type="button" class="chip" :class="{ active: transfer.frequency === key }"
+                                            @click="transfer.frequency = key" x-text="label"></button>
+                                </template>
+                            </div>
+                            <input type="hidden" name="fee_frequency" :value="transfer.frequency">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Amount') }} <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                                <input type="number" name="fee_amount" x-model.number="transfer.amount" class="form-control bg-light fw-bold text-dark"
+                                       min="0" step="0.01" required placeholder="0.00">
+                                <span class="input-group-text bg-light text-muted small" x-show="transfer.frequency" x-text="perLabel(transfer.frequency)"></span>
+                            </div>
+                        </div>
+
+                        {{-- Unchanged plan: a nudge, not a blocker — plenty of moves
+                             are same-price, but this step exists precisely because
+                             rooms usually aren't. --}}
+                        <div class="mv-warn" x-show="planUnchangedWarning" x-cloak>
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('The plan is unchanged. If this room costs differently, update it now — billing follows this number.') }}
+                        </div>
+
+                        {{-- Owner decision (W6.4): plan-forward-only. Say so, so the
+                             money behaviour is never a surprise. --}}
+                        <div class="mv-note" x-show="planChanged" x-cloak>
+                            <i class="fa-solid fa-circle-info me-1"></i>{{ __('The new rate applies from their next billing cycle. Existing invoices are left exactly as issued — no refund, no new bill.') }}
+                        </div>
                     </div>
                 </div>
-                <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="transferOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
-                        <i class="fa-solid fa-right-left me-2"></i>Transfer Now
+
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="closeTransfer()">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
+                            :disabled="!transfer.target || transfer.submitting">
+                        <i class="fa-solid fa-right-left me-2"></i>{{ __('Transfer Now') }}
                     </button>
                 </div>
             </form>
@@ -869,7 +1094,7 @@
 
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="releaseOpen" x-transition.opacity @click="releaseOpen = false" x-cloak style="display: none;">
-            <form class="custom-overlay-modal" :class="{ 'is-open': releaseOpen }" x-show="releaseOpen" @click.stop
+            <form class="custom-overlay-modal" :class="{ 'is-open': releaseOpen }" x-show="releaseOpen" @click.stop data-ring-required
                   :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST" style="display: none; max-width: 480px;">
                 @csrf @method('PATCH')
                 <div class="custom-overlay-header">
@@ -884,7 +1109,18 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Leave Date</label>
-                        <input type="date" name="leave_date" class="glass-input" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
+                        <input type="date" name="leave_date" class="form-control bg-light" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
+                    </div>
+
+                    {{-- W6.3: the meter at move-out caps this student's AC share
+                         at what they were actually present for. --}}
+                    <div class="mb-4" x-show="panels.details.data.room_is_ac" x-cloak>
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">
+                            <i class="fa-solid fa-bolt text-warning me-1"></i>AC Meter Reading Now <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="meter_reading" min="0" step="0.01" class="form-control bg-light"
+                               :required="panels.details.data.room_is_ac" :disabled="!panels.details.data.room_is_ac"
+                               placeholder="Read the room's meter before releasing">
                     </div>
 
                     <label class="form-check p-3 bg-danger-subtle rounded-3 d-flex align-items-center m-0" for="markLeft" style="cursor: pointer;">
@@ -908,149 +1144,196 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('propertyBoard', (firstFloorId, studentsList, maxSharing = 7, sharingLabels = []) => ({
+    /**
+     * Property Board (W6.4 rebuild).
+     *
+     * Assign, transfer and release are the same event — an occupancy change —
+     * so they share one grammar here: pick a destination/student, then
+     * confirm the stay (date · AC meter · plan). Each move is ALSO a
+     * re-pricing, because each room has its own cost: the plan is prefilled
+     * from the room's own rent and posted with the move, atomically.
+     *
+     * Gone with the old flow: the bespoke "spotlight" panel, the fee-gate's
+     * fetch-then-submit double round-trip, and room/sharing PREFERENCES —
+     * which are hints for FINDING a room and mean nothing once you're
+     * pointing at a specific bed. They live on the student profile.
+     */
+    Alpine.data('propertyBoard', (firstFloorId, studentsList, vacantBeds, frequencies) => ({
         activeFloorId: firstFloorId,
         searchQuery: '',
         students: studentsList,
-        maxSharing,
-        sharingLabels,
+        vacantBeds,
+        frequencies,
 
-        spotlight: {
-            open: false,
-            query: '',
-            bedId: '',
-            studentId: '',
-            room: '',
-            bed: ''
+        // --- Assign sheet ---
+        assign: {
+            open: false, submitting: false,
+            bedId: '', room: '', bed: '', isAc: false,
+            query: '', student: null, studentId: '',
+            joinDate: @json(now()->toDateString()),
+            meterReading: '',
+            frequency: 'monthly', amount: '',
         },
+
+        // --- Transfer sheet ---
+        transfer: {
+            open: false, submitting: false,
+            pickerOpen: false, query: '', target: null, bedId: '',
+            date: @json(now()->toDateString()),
+            frequency: 'monthly', amount: '',
+            oldAmount: 0, oldFrequency: 'monthly',
+        },
+
+        // --- Bed status sheet ---
+        bedStatus: { open: false, bedId: '', room: '', bed: '', status: '' },
 
         panels: {
             details: {
                 open: false, bedId: '', room: '', bed: '',
-                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '' }
+                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, fee_amount: 0, fee_frequency: '' }
             }
         },
 
-        // Transfer & Release overlays (canonical custom-overlay, Alpine-driven).
-        transferOpen: false,
         releaseOpen: false,
 
-        feeGate: {
-            open: false,
-            student: null,
-            saving: false,
-            errors: {},
-            sharingValue: 0, // 0 = "Any"; 1..maxSharing indexes into sharingLabels
-            form: { room_preference: '', sharing_preference: '', fee_frequency: '', fee_amount: '' },
+        // ── Shared plan helpers ──
+        // There is ONE plan per student: what they pay, and how often. It is
+        // ASKED, never derived — a fee is not room rent × a multiplier, and
+        // the system has no business inventing an amount nobody agreed to.
+        // Existing values are shown so they can be kept or changed.
+        perLabel(freq) {
+            return freq === 'yearly' ? @json(__('/ year')) : (freq === 'semester' ? @json(__('/ semester')) : @json(__('/ month')));
         },
-        
-        get filteredStudents() {
-            if (!this.spotlight.query) return this.students;
-            const q = this.spotlight.query.toLowerCase().trim();
-            return this.students.filter(s => 
-                s.name.toLowerCase().includes(q) || 
-                (s.mobile && s.mobile.includes(q))
-            );
+        fmt(v) { return Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
+
+        // The frequency chips aren't a validatable input (the value posts via
+        // a hidden field), so an empty one can't ring itself — §4.4's
+        // dependency case: ring the chips rather than fail silently.
+        planChipsGuard(event, chipsRef, freq) {
+            if (freq) return true;
+            event.preventDefault();
+            window.heRing?.(this.$refs[chipsRef]?.querySelectorAll('.chip') ?? [], 'danger');
+            return false;
         },
-        
+
         roomMatchesSearch(roomNum, occupants) {
             if (!this.searchQuery) return true;
             const q = this.searchQuery.toLowerCase().trim();
             if (roomNum.toLowerCase().includes(q)) return true;
-            for (let name of occupants) {
-                if (name.toLowerCase().includes(q)) return true;
-            }
-            return false;
-        },
-        
-        openSpotlight(bedId, room, bed, bedStatus) {
-            this.spotlight.bedId = bedId;
-            this.spotlight.room = room;
-            this.spotlight.bed = bed;
-            this.spotlight.status = bedStatus;
-            this.spotlight.query = '';
-            this.spotlight.studentId = '';
-            this.spotlight.open = true;
+            return occupants.some(name => name.toLowerCase().includes(q));
         },
 
-        confirmAssignment(student) {
-            if (!student.fee_amount || !student.fee_frequency) {
-                this.openFeeGate(student);
-                return;
-            }
-            this.spotlight.studentId = student.id;
-            this.$nextTick(() => {
-                document.getElementById('assignForm').submit();
+        // ── Assign ──
+        get assignCandidates() {
+            const q = this.assign.query.trim().toLowerCase();
+            if (!q) return this.students;
+            return this.students.filter(s => s.name.toLowerCase().includes(q) || (s.mobile && s.mobile.includes(q)));
+        },
+
+        openAssign(bed) {
+            this.assign = {
+                ...this.assign,
+                open: true, submitting: false,
+                bedId: bed.bedId, room: bed.room, bed: bed.bed, isAc: bed.isAc,
+                query: '', student: null, studentId: '',
+                joinDate: @json(now()->toDateString()),
+                meterReading: '',
+                frequency: '', amount: '',
+            };
+            document.body.style.overflow = 'hidden';
+            this.$nextTick(() => this.$refs.assignSearch?.focus());
+        },
+        closeAssign() {
+            this.assign.open = false;
+            document.body.style.overflow = '';
+        },
+        pickStudent(s) {
+            this.assign.student = s;
+            this.assign.studentId = s.id;
+            // Show what they already have, if anything — otherwise it stays
+            // blank and gets asked. Nothing is computed on their behalf.
+            this.assign.frequency = s.fee_frequency || '';
+            this.assign.amount = s.fee_amount > 0 ? Number(s.fee_amount) : '';
+        },
+        clearStudent() {
+            this.assign.student = null;
+            this.assign.studentId = '';
+            this.$nextTick(() => this.$refs.assignSearch?.focus());
+        },
+
+        // ── Transfer ──
+        get transferCandidates() {
+            const q = this.transfer.query.trim().toLowerCase();
+            if (!q) return this.vacantBeds;
+            return this.vacantBeds.filter(b =>
+                b.room.toLowerCase().includes(q)
+                || b.bed.toLowerCase().includes(q)
+                || (b.floor ?? '').toLowerCase().includes(q));
+        },
+        get transferLabel() {
+            if (!this.transfer.target) return @json(__('Choose a vacant bed…'));
+            const t = this.transfer.target;
+            // Room · bed · AC-ness — never rent (a room's rent isn't the fee).
+            return @json(__('Room')) + ' ' + t.room + ' · ' + t.bed + ' · ' + (t.is_ac ? @json(__('AC')) : @json(__('Non-AC')));
+        },
+        get planChanged() {
+            return this.transfer.target
+                && (Number(this.transfer.amount) !== Number(this.transfer.oldAmount)
+                    || this.transfer.frequency !== this.transfer.oldFrequency);
+        },
+        // Not a blocker — plenty of moves are same-price. Just don't let an
+        // unchanged plan slip past unnoticed, since the whole reason this
+        // step exists is that rooms cost different amounts.
+        get planUnchangedWarning() {
+            return this.transfer.target && this.transfer.amount !== '' && !this.planChanged;
+        },
+
+        openTransfer() {
+            const d = this.panels.details.data;
+            this.closeDetails();
+            this.transfer = {
+                ...this.transfer,
+                open: true, submitting: false,
+                pickerOpen: false, query: '', target: null, bedId: '',
+                date: @json(now()->toDateString()),
+                // Their current plan, shown as-is to keep or change. Not a
+                // suggestion, not derived from anything — just what's on file.
+                oldAmount: Number(d.fee_amount) || 0,
+                oldFrequency: d.fee_frequency || '',
+                frequency: d.fee_frequency || '',
+                amount: Number(d.fee_amount) > 0 ? Number(d.fee_amount) : '',
+            };
+            document.body.style.overflow = 'hidden';
+        },
+        closeTransfer() {
+            this.transfer.open = false;
+            document.body.style.overflow = '';
+        },
+        toggleTransferPicker() {
+            this.transfer.pickerOpen = !this.transfer.pickerOpen;
+            // Measure once visible (law 4.7): open into the space that
+            // exists — never grow the page a scrollbar.
+            if (this.transfer.pickerOpen) this.$nextTick(() => {
+                window.hePlaceMenu?.(this.$refs.transferTrigger, this.$refs.transferPanel);
+                this.$refs.transferSearch?.focus();
             });
         },
-
-        openFeeGate(student) {
-            this.feeGate.student = student;
-            this.feeGate.errors = {};
-            this.feeGate.saving = false;
-            this.feeGate.form = {
-                room_preference: student.room_preference || '',
-                sharing_preference: student.sharing_preference || '',
-                fee_frequency: student.fee_frequency || '',
-                fee_amount: student.fee_amount || '',
-            };
-            // Reverse-map the stored label back to the stepper's number; an
-            // unrecognized/legacy value (indexOf -1) safely falls back to "Any".
-            this.feeGate.sharingValue = student.sharing_preference
-                ? Math.max(0, this.sharingLabels.indexOf(student.sharing_preference) + 1)
-                : 0;
-            this.feeGate.open = true;
+        pickTargetBed(b) {
+            this.transfer.target = b;
+            this.transfer.bedId = b.id;
+            this.transfer.pickerOpen = false;
         },
 
-        async saveFeeGate() {
-            this.feeGate.saving = true;
-            this.feeGate.errors = {};
-            this.feeGate.form.sharing_preference = this.feeGate.sharingValue > 0
-                ? this.sharingLabels[this.feeGate.sharingValue - 1]
-                : '';
-
-            const payload = { ...this.feeGate.form };
-
-            try {
-                const res = await fetch(`/admin/students/${this.feeGate.student.id}/fee-settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (res.status === 422) {
-                    const data = await res.json();
-                    this.feeGate.errors = data.errors || {};
-                    this.feeGate.saving = false;
-                    return;
-                }
-                if (!res.ok) throw new Error('Save failed');
-
-                // Keep the in-memory student record in sync, then complete the assignment.
-                const s = this.feeGate.student;
-                s.fee_amount = payload.fee_amount;
-                s.fee_frequency = payload.fee_frequency;
-                s.room_preference = payload.room_preference;
-                s.sharing_preference = payload.sharing_preference;
-
-                this.feeGate.open = false;
-                this.spotlight.studentId = s.id;
-                this.$nextTick(() => document.getElementById('assignForm').submit());
-            } catch (e) {
-                console.error(e);
-                this.feeGate.saving = false;
-            }
+        // ── Bed status ──
+        openBedStatus(bedId, room, bed, status) {
+            this.bedStatus = { open: true, bedId, room, bed, status };
         },
-
         markBedStatus(status) {
             document.getElementById('statusInput').value = status;
-            document.getElementById('statusForm').submit();
+            this.$nextTick(() => document.getElementById('statusForm').submit());
         },
-        
+
+        // ── Occupant details ──
         openDetails(bedId, room, bed, data) {
             this.panels.details.bedId = bedId;
             this.panels.details.room = room;
@@ -1058,16 +1341,9 @@ document.addEventListener('alpine:init', () => {
             this.panels.details.data = data;
             this.panels.details.open = true;
         },
-
         closeDetails() {
             this.panels.details.open = false;
         },
-
-        openTransfer() {
-            this.closeDetails();
-            this.transferOpen = true;
-        },
-
         openRelease() {
             this.closeDetails();
             this.releaseOpen = true;

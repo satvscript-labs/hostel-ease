@@ -28,51 +28,9 @@
     /* Summary tiles are the canonical .he-stats (§4.9) — cards when the
        container is wide, one compact row-panel when it isn't. */
 
-    /* Date-range chips: a styled premium chip with the NATIVE date input
-       stretched invisibly across it — clicks land on the input itself, so
-       the picker opens without any JS. Value readout is Alpine (x-text), so
-       nothing here needs fragment-swapping. */
-    .exp-date {
-        position: relative; overflow: hidden; flex-shrink: 0;
-        display: flex; align-items: center; gap: 0.6rem;
-        padding: 0.45rem 0.9rem 0.45rem 0.55rem;
-        background: var(--he-bg-surface);
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        border-radius: var(--he-radius-full);
-        transition: border-color 0.2s var(--ease-out-expo);
-    }
-    .exp-date:hover { border-color: var(--he-primary); }
-    .exp-date input[type="date"] {
-        position: absolute; inset: 0; width: 100%; height: 100%;
-        opacity: 0; cursor: pointer; z-index: 2;
-    }
-    /* Desktop browsers only open the calendar from the tiny indicator icon —
-       clicking the field body just focuses it, which made the chip look dead
-       on PC. Stretch the indicator across the whole input so every click IS
-       an indicator click (the showPicker() call on the input is the
-       belt-and-braces for non-WebKit engines). */
-    .exp-date input[type="date"]::-webkit-calendar-picker-indicator {
-        position: absolute; inset: 0; width: 100%; height: 100%;
-        cursor: pointer; opacity: 0;
-    }
-    .exp-date-ic {
-        width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-        display: flex; align-items: center; justify-content: center;
-        background: var(--he-primary-soft); color: var(--he-primary);
-        font-size: 0.75rem;
-    }
-    .exp-date-lbl {
-        display: block; font-size: 0.6rem; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 0.5px;
-        color: var(--he-text-muted); line-height: 1.1;
-    }
-    /* Phones: the chip collapses to a square icon (same move as
-       icon-only-mobile on x-he-select) — the active range stays readable in
-       the list header, which fragment-swaps with the data. */
-    @media (max-width: 767.98px) {
-        .exp-date { width: 46px; height: 46px; padding: 0; justify-content: center; }
-        .exp-date .exp-date-txt { display: none; }
-    }
+    /* Date-range chips are the canonical .he-datechip now — promoted to
+       _premium.scss when AC Bills became the second page needing them
+       (rule 0). Value readout stays Alpine (x-text), never fragment-swapped. */
 
     /* Category spend strip: each chip is a real filter (data-fragment
        anchor). Scrolls sideways on phones instead of wrapping the page. */
@@ -268,23 +226,23 @@
                 </button>
             </div>
 
-            <div class="exp-date" title="{{ __('From date') }}">
+            <div class="he-datechip" title="{{ __('From date') }}">
                 <input type="date" name="from" x-model="fromDate" max="{{ now()->toDateString() }}"
                        @click="try { $el.showPicker() } catch (e) {}"
                        @change="$el.form.requestSubmit()" aria-label="{{ __('From date') }}">
-                <span class="exp-date-ic"><i class="fa-solid fa-calendar-day"></i></span>
-                <span class="exp-date-txt">
-                    <span class="exp-date-lbl">{{ __('From') }}</span>
+                <span class="he-datechip__ic"><i class="fa-solid fa-calendar-day"></i></span>
+                <span class="he-datechip__txt">
+                    <span class="he-datechip__lbl">{{ __('From') }}</span>
                     <span class="fw-bold small text-dark" style="line-height: 1.1;" x-text="fmtDate(fromDate)"></span>
                 </span>
             </div>
-            <div class="exp-date" title="{{ __('To date') }}">
+            <div class="he-datechip" title="{{ __('To date') }}">
                 <input type="date" name="to" x-model="toDate" max="{{ now()->toDateString() }}"
                        @click="try { $el.showPicker() } catch (e) {}"
                        @change="$el.form.requestSubmit()" aria-label="{{ __('To date') }}">
-                <span class="exp-date-ic"><i class="fa-solid fa-calendar-check"></i></span>
-                <span class="exp-date-txt">
-                    <span class="exp-date-lbl">{{ __('To') }}</span>
+                <span class="he-datechip__ic"><i class="fa-solid fa-calendar-check"></i></span>
+                <span class="he-datechip__txt">
+                    <span class="he-datechip__lbl">{{ __('To') }}</span>
                     <span class="fw-bold small text-dark" style="line-height: 1.1;" x-text="fmtDate(toDate)"></span>
                 </span>
             </div>

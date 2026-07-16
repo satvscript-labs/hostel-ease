@@ -306,32 +306,10 @@ class StudentController extends Controller
                 ->with('success', 'Plan changed and prorated invoice generated successfully.');
         }
 
-        // Otherwise just update and generate initial
+        // Otherwise just update and generate the initial invoice (shared with
+        // the move flow's assign step since W6.4 — one implementation).
         $student->update($data);
-        
-        if ($student->join_date && $student->invoices()->count() === 0) {
-            $monthYear = $student->join_date->format('M Y');
-            $period = $data['fee_frequency'] === 'monthly' ? "Rent for $monthYear" : ucfirst($data['fee_frequency']) . " Fee";
-            
-            $monthsToAdd = 1;
-            if ($data['fee_frequency'] === 'semester') {
-                $monthsToAdd = 6;
-            } elseif ($data['fee_frequency'] === 'yearly') {
-                $monthsToAdd = 12;
-            }
-            $cycleEnd = $student->join_date->copy()->addMonthsNoOverflow($monthsToAdd)->subDay();
-
-            Invoice::create([
-                'student_id' => $student->id,
-                'type' => 'fee',
-                'title' => 'Initial ' . $period,
-                'amount' => $data['fee_amount'],
-                'billing_cycle_start' => $student->join_date,
-                'billing_cycle_end' => $cycleEnd,
-                'due_date' => $student->join_date,
-                'status' => 'pending',
-            ]);
-        }
+        $prorationService->generateInitialInvoice($student->refresh());
 
         $this->logger->log('student.fee_settings', "Updated fee settings for {$student->name}", $student);
 

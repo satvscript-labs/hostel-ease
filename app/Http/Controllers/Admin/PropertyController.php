@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Bed;
 use App\Models\BedAssignment;
 use App\Models\Floor;
+use App\Models\Room;
 use App\Models\Student;
 use App\Services\ActivityLogger;
 use App\Services\BedAssignmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PropertyController extends Controller
@@ -35,12 +37,23 @@ class PropertyController extends Controller
             $q->orderByRaw('CAST(SUBSTRING(bed_number, 2) AS UNSIGNED)');
         }, 'rooms.beds.activeAssignment.student'])->ordered()->get();
 
-        // Also fetch floors again just for the transfer dropdown, grouped correctly
-        $allFloors = Floor::ordered()
-            ->with(['rooms' => fn ($q) => $q->orderBy('room_number')
-                ->with(['beds' => fn ($b) => $b->whereIn('status', ['empty', 'available'])
-                    ->orderByRaw('CAST(SUBSTRING(bed_number, 2) AS UNSIGNED)')])])
-            ->get();
+        // Vacant beds for the transfer sheet's picker (W6.4). A flat payload
+        // rather than a nested <select>: the picker shows what the move
+        // actually depends on — room, floor, AC, rent (which prices the new
+        // plan) and how full the room is.
+        $vacantBeds = Bed::with('room.floor')
+            ->whereIn('status', ['empty', 'available'])
+            ->get()
+            ->sortBy(fn ($b) => [$b->room?->floor?->sort_order ?? 0, $b->room?->room_number, $b->bed_number])
+            ->map(fn (Bed $b) => [
+                'id' => $b->id,
+                'bed' => (string) $b->bed_number,
+                'room' => (string) $b->room?->room_number,
+                'floor' => $b->room?->floor?->name,
+                'is_ac' => (bool) $b->room?->isAc(),
+                'rent' => (float) ($b->room?->rent ?? 0),
+                'sharing' => (int) ($b->room?->sharing ?? 0),
+            ])->values();
 
         // 2. Global stats for the Bento dashboard header
         $totalBeds = Bed::count();
@@ -56,7 +69,7 @@ class PropertyController extends Controller
 
         return view('admin.property.index', compact(
             'floors',
-            'allFloors',
+            'vacantBeds',
             'totalBeds',
             'occupied',
             'vacant',
@@ -65,20 +78,44 @@ class PropertyController extends Controller
         ));
     }
 
-    public function assign(Request $request): RedirectResponse
+    /**
+     * Assign a student to a bed — plan and all, in one atomic request (W6.4).
+     *
+     * The old flow PUT the fee plan to a separate endpoint via fetch, then
+     * submitted this form: two round-trips, and a plan could save while the
+     * assignment failed. The plan is now part of the move itself.
+     */
+    public function assign(Request $request, \App\Services\ProrationService $proration): RedirectResponse
     {
         $data = $request->validate([
             'student_id' => ['required', 'integer', 'exists:students,id'],
             'bed_id' => ['required', 'integer', 'exists:beds,id'],
+            'join_date' => ['nullable', 'date'],
+            'meter_reading' => ['nullable', 'numeric', 'min:0'],
+            // Every move is a re-pricing — each room has its own cost, so the
+            // plan is confirmed on the way in, never assumed (owner, W6.4).
+            'fee_frequency' => ['required', 'string', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
+            'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
         ]);
 
         $student = Student::findOrFail($data['student_id']);
         $bed = Bed::with('room')->findOrFail($data['bed_id']);
 
+        // W6.3 (owner decision: REQUIRED for AC rooms): the meter at move-in
+        // is the anchor that makes every future AC bill split exact instead
+        // of day-estimated. Checked here, not in the rules array — which room
+        // the bed belongs to isn't known until the bed is loaded.
+        $this->requireMeterReading($bed->room, $data['meter_reading'] ?? null, 'meter_reading');
+
         $assignment = $this->service->assign($student, $bed, $data);
 
+        // Their first bill, exactly as the profile's plan editor would raise
+        // it (shared implementation). No-ops when they already have invoices.
+        $proration->generateInitialInvoice($student->refresh());
+
         $this->logger->log('assignment.create',
-            "Assigned {$student->name} to {$bed->room->room_number}/{$bed->bed_number}", $assignment);
+            "Assigned {$student->name} to {$bed->room->room_number}/{$bed->bed_number} at "
+            .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $assignment);
 
         return redirect()->route('admin.property.index')
             ->with('success', "{$student->name} assigned to bed {$bed->bed_number}.");
@@ -89,12 +126,17 @@ class PropertyController extends Controller
         $data = $request->validate([
             'leave_date' => ['nullable', 'date', 'after_or_equal:'.$assignment->join_date->toDateString()],
             'mark_student_left' => ['nullable', 'boolean'],
+            'meter_reading' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $assignment->loadMissing('bed.room');
+        $this->requireMeterReading($assignment->bed->room, $data['meter_reading'] ?? null, 'meter_reading');
 
         $this->service->release(
             $assignment,
             $data['leave_date'] ?? null,
             $request->boolean('mark_student_left'),
+            isset($data['meter_reading']) ? (float) $data['meter_reading'] : null,
         );
 
         $this->logger->log('assignment.release',
@@ -108,14 +150,47 @@ class PropertyController extends Controller
         $data = $request->validate([
             'bed_id' => ['required', 'integer'],
             'join_date' => ['required', 'date'],
+            'meter_reading' => ['nullable', 'numeric', 'min:0'],       // the room being ENTERED
+            'old_meter_reading' => ['nullable', 'numeric', 'min:0'],   // the room being LEFT
+            // A transfer is a re-pricing: the new room has its own cost, and
+            // billing must not keep charging the old room's rate (owner, W6.4
+            // — this silence is what let a student be billed for a room they
+            // no longer occupied).
+            'fee_frequency' => ['required', 'string', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
+            'fee_amount' => ['required', 'numeric', 'min:0', 'max:9999999'],
         ]);
 
         $target = Bed::with('room')->findOrFail($data['bed_id']);
+        $assignment->loadMissing('bed.room', 'student');
+
+        // A transfer can touch TWO meters (W6.3): the old room's reading caps
+        // what the student bears there; the new room's reading starts them.
+        $this->requireMeterReading($assignment->bed->room, $data['old_meter_reading'] ?? null, 'old_meter_reading');
+        $this->requireMeterReading($target->room, $data['meter_reading'] ?? null, 'meter_reading');
+
+        // Plan-forward-only (owner decision, W6.4): the new rate applies from
+        // the next billing cycle. No proration, no credit, no new invoice —
+        // the current invoice stands as issued. The move sheet says so before
+        // you confirm, so the money behaviour is never a surprise.
         $this->service->transfer($assignment, $target, $data);
 
         $this->logger->log('assignment.transfer',
-            "Transferred {$assignment->student->name} to {$target->room->room_number}/{$target->bed_number}", $target);
+            "Transferred {$assignment->student->name} to {$target->room->room_number}/{$target->bed_number} at "
+            .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $target);
 
         return redirect()->route('admin.property.index')->with('success', 'Student transferred successfully.');
+    }
+
+    /**
+     * W6.3, owner decision: an occupancy change in an AC room MUST record
+     * the meter — that reading is what keeps the AC bill split honest.
+     */
+    protected function requireMeterReading(?Room $room, $reading, string $field): void
+    {
+        if ($room?->room_type === 'ac' && ($reading === null || $reading === '')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => __('Room :room is an AC room — enter its current meter reading for this move (it keeps the AC bill split exact).', ['room' => $room->room_number]),
+            ]);
+        }
     }
 }

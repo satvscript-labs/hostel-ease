@@ -15,6 +15,44 @@ class ProrationService
         protected ActivityLogger $logger
     ) {}
 
+    /**
+     * The student's FIRST fee invoice for their current plan.
+     *
+     * Extracted from StudentController::updateFeeSettings in W6.4 so the move
+     * flow (assign) and the profile's plan editor generate it identically —
+     * one implementation, no drift. Returns null when it isn't warranted
+     * (no join date, or the student already has invoices), so callers can
+     * simply call it and trust the guard.
+     */
+    public function generateInitialInvoice(Student $student): ?Invoice
+    {
+        if (! $student->join_date || $student->invoices()->count() > 0) {
+            return null;
+        }
+
+        $frequency = $student->fee_frequency ?? 'monthly';
+        $period = $frequency === 'monthly'
+            ? 'Rent for '.$student->join_date->format('M Y')
+            : ucfirst($frequency).' Fee';
+
+        $monthsToAdd = match ($frequency) {
+            'semester' => 6,
+            'yearly' => 12,
+            default => 1,
+        };
+
+        return Invoice::create([
+            'student_id' => $student->id,
+            'type' => 'fee',
+            'title' => 'Initial '.$period,
+            'amount' => $student->fee_amount,
+            'billing_cycle_start' => $student->join_date,
+            'billing_cycle_end' => $student->join_date->copy()->addMonthsNoOverflow($monthsToAdd)->subDay(),
+            'due_date' => $student->join_date,
+            'status' => 'pending',
+        ]);
+    }
+
     public function preview(Student $student, float $newFeeAmount, string $newFrequency)
     {
         $lastInvoice = $student->invoices()->where('type', 'fee')->latest('due_date')->first();

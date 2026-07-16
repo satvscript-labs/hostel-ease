@@ -40,7 +40,12 @@ class HostelEaseGenerateInvoices extends Command
         // Board's bulk Hostel Fee flow (with a covered-until warning as the
         // memory aid). The initial invoice on plan save is untouched — that's
         // an explicit owner action with a proration preview.
+        // has('activeAssignment') (W6.4, owner-approved): rent is for a BED.
+        // Without this, a student released from their bed but not marked
+        // "left" kept accruing monthly rent for a room they no longer
+        // occupied — money invented out of an empty seat.
         $students = Student::where('status', 'active')
+            ->has('activeAssignment')
             ->where('fee_frequency', 'monthly')
             ->whereNotNull('fee_amount')
             ->whereNotNull('join_date')

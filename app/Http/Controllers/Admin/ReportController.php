@@ -21,6 +21,9 @@ class ReportController extends Controller
         'pending' => ['Pending Fees', false],
         'expenses' => ['Expenses by Category', true],
         'expense_monthly' => ['Expenses by Month', true],
+        // Surfaced in W6.3 — acReport() was implemented and tested since the
+        // AC module shipped, but absent from this list, so no UI could reach it.
+        'ac' => ['AC Bills', true],
     ];
 
     public function __construct(protected ReportService $reports)
@@ -49,6 +52,7 @@ class ReportController extends Controller
             'pending' => $this->reports->pendingFees(),
             'expenses' => $this->reports->expensesByCategory($from, $to),
             'expense_monthly' => $this->reports->expensesByMonth($from, $to),
+            'ac' => $this->reports->acReport($from, $to),
         };
 
         $title = $label.' Report';

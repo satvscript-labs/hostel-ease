@@ -217,8 +217,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 // Payment modes
                 Route::resource('payment-modes', PaymentModeController::class)->only(['index', 'store', 'update', 'destroy']);
 
-                // AC Bills
-                Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'destroy']);
+                // AC Bills (W6.3: preview feeds the modal's live summary from
+                // the same split service store() uses; update recomputes the
+                // day-ledger; unit-rate persists the hostel default)
+                Route::post('ac-bills/preview', [AcBillController::class, 'preview'])->name('ac-bills.preview');
+                Route::patch('ac-bills/unit-rate', [AcBillController::class, 'saveUnitRate'])->name('ac-bills.unit-rate');
+                Route::resource('ac-bills', AcBillController::class)->only(['index', 'store', 'update', 'destroy']);
 
                 // Expense Management
                 Route::get('expenses', [\App\Http\Controllers\Admin\ExpenseController::class, 'index'])->name('expenses.index');

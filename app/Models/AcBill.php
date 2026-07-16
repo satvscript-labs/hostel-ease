@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AcBill extends Model
 {
-    use HasFactory, BelongsToHostel;
+    use BelongsToHostel, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'hostel_id',
@@ -20,7 +21,11 @@ class AcBill extends Model
         'current_reading',
         'total_units',
         'unit_price',
-        'total_amount'
+        'total_amount',
+        // The persisted day-ledger explanation (W6.3): who occupied the room,
+        // for which days, bearing what share — stored at generation time so
+        // the bill keeps telling its own story even after assignments change.
+        'split_breakdown',
     ];
 
     protected function casts(): array
@@ -32,6 +37,7 @@ class AcBill extends Model
             'total_units' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'split_breakdown' => 'array',
         ];
     }
 

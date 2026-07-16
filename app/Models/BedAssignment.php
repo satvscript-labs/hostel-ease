@@ -18,6 +18,17 @@ class BedAssignment extends Model
         'student_id',
         'join_date',
         'leave_date',
+        // AC meter readings captured at the occupancy change (W6.3): the
+        // anchors that make the AC bill split exact instead of day-estimated.
+        // Null on non-AC rooms and on rows from before the feature.
+        'join_meter_reading',
+        'leave_meter_reading',
+        // The room's rent AT THE TIME OF THIS STAY. Room rents change; the
+        // history of what a stay was worth shouldn't change with them.
+        // (There is deliberately NO fee_amount/fee_frequency here: the
+        // 2026_07_06 recreate_student_fees_flow migration moved the fee plan
+        // to `students` and dropped those columns — the student holds one
+        // current plan, re-confirmed on every move. See W6.4.)
         'monthly_rent',
         'is_active',
         'remarks',
@@ -28,15 +39,11 @@ class BedAssignment extends Model
         return [
             'join_date' => 'date',
             'leave_date' => 'date',
+            'join_meter_reading' => 'decimal:2',
+            'leave_meter_reading' => 'decimal:2',
             'monthly_rent' => 'decimal:2',
-            'fee_amount' => 'decimal:2',
             'is_active' => 'boolean',
         ];
-    }
-
-    public function feeFrequencyLabel(): string
-    {
-        return config('hostelease.fee_frequencies.'.$this->fee_frequency, ucfirst((string) $this->fee_frequency));
     }
 
     public function bed(): BelongsTo
