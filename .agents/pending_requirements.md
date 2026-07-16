@@ -152,3 +152,7 @@ Recommend deriving, not denormalising, unless profiling says otherwise.
 **Action Required:** None now — the AC flow ships without it. When picked up: confirm the three
 open questions above, then build `AcMeterService` + wire the four call-sites. Additive, no schema
 change, no migration, no data backfill.
+
+## 5. Reverse Transaction (Research Pending)
+
+- {PS: i want you to Research this entire thing and i want a system that when we reverse a transaction it just simple should not ask confirmation and reverse the thing ... in some cases you would have collected money and might keep it even after reversing ... so we ask what most app asks, that is, if reverse to original payment methods... or transfer money to credit and keep money ... so i want you to Research this and give me your side of suggestions and way to tackle this thing. [after Research replace this point with your research and suggestions and all]}

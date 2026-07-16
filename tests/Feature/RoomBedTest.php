@@ -40,7 +40,7 @@ class RoomBedTest extends TestCase
             'room_type' => 'non_ac',
             'sharing' => 3,
             'rent' => 5000,
-        ])->assertRedirect(route('admin.rooms.index'));
+        ])->assertRedirect(route('admin.property.index'));
 
         $room = Room::where('room_number', '101')->firstOrFail();
         $this->assertSame(3, $room->beds()->count());

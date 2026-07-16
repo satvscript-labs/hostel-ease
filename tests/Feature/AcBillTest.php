@@ -236,6 +236,80 @@ class AcBillTest extends TestCase
         $this->assertSame(0, AcBill::count());
     }
 
+    /**
+     * The owner's hardest case: two AC rooms, two students SWAP rooms in the
+     * exact middle of the month. Each must pay, in each room, only for the
+     * units THAT ROOM's meter burned while they were in it — never a day-slice
+     * of either room's month, and never anything derived from the other room.
+     *
+     * July 2026 (31 days). Swap on the 16th.
+     *   Room 301: meter 1000 → 1100 (100u × ₹10 = ₹1,000). At the swap: 1030.
+     *             Amit burned 30u (1st–16th), Bala 70u (16th–31st).
+     *   Room 302: meter 2000 → 2050 (50u × ₹10 = ₹500). At the swap: 2040.
+     *             Bala burned 40u (1st–16th), Amit 10u (16th–31st).
+     *
+     * Note the asymmetry is the whole point: both stayed exactly half the
+     * month in each room, but the halves cost wildly different amounts. A
+     * day-based split would bill each ₹500 + ₹250; the meter says otherwise.
+     */
+    public function test_two_rooms_mid_month_swap_bills_each_room_on_its_own_meter(): void
+    {
+        $amit = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Amit',
+            'mobile' => '9200000001', 'occupation_type' => 'student', 'status' => 'active']);
+        $bala = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Bala',
+            'mobile' => '9200000002', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $roomA = Room::create(['hostel_id' => $this->hostel->id, 'floor_id' => $this->floor->id,
+            'room_number' => '401', 'room_type' => 'ac', 'sharing' => 2, 'rent' => 6000]);
+        $roomB = Room::create(['hostel_id' => $this->hostel->id, 'floor_id' => $this->floor->id,
+            'room_number' => '402', 'room_type' => 'ac', 'sharing' => 2, 'rent' => 6000]);
+        app(BedGenerator::class)->sync($roomA);
+        app(BedGenerator::class)->sync($roomB);
+
+        $stay = fn (Room $r, Student $s, $join, $leave, $joinRead, $leaveRead) => BedAssignment::create([
+            'hostel_id' => $this->hostel->id, 'bed_id' => $r->beds->first()->id, 'student_id' => $s->id,
+            'join_date' => $join, 'leave_date' => $leave,
+            'join_meter_reading' => $joinRead, 'leave_meter_reading' => $leaveRead,
+            'is_active' => $leave === null,
+        ]);
+
+        // Amit: room A until the swap, then room B. Bala: the mirror image.
+        // (The second bed is used for the incoming stay so one bed never holds
+        // two rows — same shape the transfer flow produces.)
+        $stay($roomA, $amit, '2026-06-01', '2026-07-16', null, 1030);
+        $stay($roomB, $amit, '2026-07-16', null, 2040, null);
+        $stay($roomB, $bala, '2026-06-01', '2026-07-16', null, 2040);
+        $stay($roomA, $bala, '2026-07-16', null, 1030, null);
+        // Bala's incoming room-A stay must sit on the OTHER bed.
+        BedAssignment::where('student_id', $bala->id)->where('join_date', '2026-07-16')
+            ->update(['bed_id' => $roomA->beds[1]->id]);
+        BedAssignment::where('student_id', $amit->id)->where('join_date', '2026-07-16')
+            ->update(['bed_id' => $roomB->beds[1]->id]);
+
+        $this->generate($roomA, ['2026-07'], [1100], prev: 1000)->assertSessionHas('success');
+        $this->generate($roomB, ['2026-07'], [2050], prev: 2000)->assertSessionHas('success');
+
+        $sharesIn = fn (Room $r) => Invoice::whereHas('acBill', fn ($q) => $q->where('room_id', $r->id))
+            ->with('student')->get()->mapWithKeys(fn ($i) => [$i->student->name => (float) $i->amount]);
+
+        // Room 401: Amit's 30 units vs Bala's 70 — not ₹500 apiece.
+        $a = $sharesIn($roomA);
+        $this->assertEquals(300.0, $a['Amit']);
+        $this->assertEquals(700.0, $a['Bala']);
+        $this->assertEquals(1000.0, array_sum($a->all()));
+
+        // Room 402: Bala's 40 units vs Amit's 10 — not ₹250 apiece.
+        $b = $sharesIn($roomB);
+        $this->assertEquals(400.0, $b['Bala']);
+        $this->assertEquals(100.0, $b['Amit']);
+        $this->assertEquals(500.0, array_sum($b->all()));
+
+        // Each student's total across both rooms, and nothing invented.
+        $this->assertEquals(400.0, $a['Amit'] + $b['Amit']);
+        $this->assertEquals(1100.0, $a['Bala'] + $b['Bala']);
+        $this->assertEquals(1500.0, (float) Invoice::where('type', 'ac')->sum('amount'));
+    }
+
     public function test_edit_recomputes_shares_and_updates_invoices(): void
     {
         $month = now()->subMonth()->format('Y-m');

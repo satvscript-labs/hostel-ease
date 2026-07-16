@@ -386,17 +386,22 @@ class DemoHostelSeeder extends Seeder
         }
         
         // --- AC BILLS ---
+        // A real, fully-formed bill for each stock AC room: generated through
+        // the SAME split service the app uses, so it carries genuine
+        // per-student invoices and a stored breakdown. The old seeder wrote a
+        // bare AcBill row with no invoices — a bill nobody owed, which made
+        // the list show "0 students / ₹0 collected" and the expandable row
+        // empty.
         foreach ($acRooms as $acRoom) {
-            AcBill::create([
-                'hostel_id' => $hostel->id,
-                'room_id' => $acRoom->id,
-                'bill_month' => now()->subMonth()->format('Y-m'),
-                'previous_reading' => 100,
-                'current_reading' => 250,
-                'total_units' => 150,
-                'unit_price' => 10.0,
-                'total_amount' => 1500,
-            ]);
+            $this->generateAcBill($hostel, $acRoom, now()->subMonth(), prev: 100, curr: 250, rate: 10.0);
+        }
+
+        // --- AC TEST SCENARIOS (W6.3) ---
+        // Purpose-built occupancy + meter history for hand-testing the split.
+        // Only the primary branch gets these, so the numbers in
+        // _artifact/ui_ux_audit/03_testing_w6.3.md are unambiguous.
+        if (! str_contains($hostel->name, 'Girls')) {
+            $this->seedAcScenarios($hostel);
         }
 
         // --- STAFF & ATTENDANCE & SALARY ---
@@ -523,5 +528,163 @@ class DemoHostelSeeder extends Seeder
         ]);
 
         return $hostel;
+    }
+
+    /**
+     * Generate a REAL AC bill — same split service, same invoice shape the
+     * controller produces. Seeded bills must be indistinguishable from ones
+     * the app made, or they teach the tester the wrong thing.
+     */
+    protected function generateAcBill(Hostel $hostel, Room $room, \Illuminate\Support\Carbon $month, float $prev, float $curr, float $rate): ?AcBill
+    {
+        $units = $curr - $prev;
+        $amount = round($units * $rate, 2);
+        $monthStart = $month->copy()->startOfMonth();
+
+        $breakdown = app(\App\Services\AcBillSplitService::class)
+            ->split($room, $monthStart, $amount, $prev, $curr);
+
+        if ($breakdown['students'] === []) {
+            return null; // nobody in the room that month — nothing to bill
+        }
+
+        $bill = AcBill::create([
+            'hostel_id' => $hostel->id,
+            'room_id' => $room->id,
+            'bill_month' => $monthStart->format('Y-m-d'),
+            'previous_reading' => $prev,
+            'current_reading' => $curr,
+            'total_units' => $units,
+            'unit_price' => $rate,
+            'total_amount' => $amount,
+            'split_breakdown' => $breakdown,
+        ]);
+
+        foreach ($breakdown['students'] as $s) {
+            \App\Models\Invoice::create([
+                'hostel_id' => $hostel->id,
+                'student_id' => $s['student_id'],
+                'type' => 'ac',
+                'ac_bill_id' => $bill->id,
+                'title' => "AC Bill — {$monthStart->format('M Y')} (Room {$room->room_number}) · {$s['days']} of {$breakdown['days_in_month']} days",
+                'amount' => $s['share'],
+                'status' => 'pending',
+                'due_date' => now()->addDays(15)->toDateString(),
+                'is_generated_by_system' => true,
+            ]);
+        }
+
+        return $bill;
+    }
+
+    /**
+     * AC split test scenarios (W6.3) — occupancy + meter history planted for
+     * LAST MONTH, deliberately left UNBILLED so the tester generates each bill
+     * through the UI and checks the shares against the expected numbers in
+     * _artifact/ui_ux_audit/03_testing_w6.3.md.
+     *
+     * The readings are chosen so a day-based split and a metered split give
+     * VERY different answers — that gap is what proves the meter is being
+     * honoured. Every number here is mirrored in the testing doc; change one,
+     * change both.
+     */
+    protected function seedAcScenarios(Hostel $hostel): void
+    {
+        $floor = Floor::firstOrCreate(
+            ['hostel_id' => $hostel->id, 'name' => 'Second Floor (AC Test Lab)'],
+            ['sort_order' => 2]
+        );
+
+        $month = now()->subMonth()->startOfMonth();  // the month under test
+        $mid = $month->copy()->day(16);              // every scenario swaps/joins on the 16th
+        $before = $month->copy()->subMonths(2);      // "already living here" join date
+
+        $room = function (string $number, int $sharing) use ($hostel, $floor): Room {
+            $r = Room::firstOrCreate(
+                ['hostel_id' => $hostel->id, 'room_number' => $number],
+                ['floor_id' => $floor->id, 'room_type' => 'ac', 'sharing' => $sharing, 'rent' => 5000]
+            );
+            app(\App\Services\BedGenerator::class)->sync($r);
+
+            return $r->fresh('beds');
+        };
+
+        $n = 0;
+        $student = function (string $name) use ($hostel, &$n): Student {
+            $n++;
+
+            return Student::firstOrCreate(
+                ['hostel_id' => $hostel->id, 'mobile' => '9770000'.str_pad((string) ($hostel->id * 100 + $n), 3, '0', STR_PAD_LEFT)],
+                ['name' => $name, 'occupation_type' => 'student', 'status' => 'active',
+                    'city' => 'Ahmedabad', 'state' => 'Gujarat',
+                    'join_date' => now()->subMonths(3), 'fee_amount' => 5000, 'fee_frequency' => 'monthly']
+            );
+        };
+
+        $stay = function (Room $r, int $bedIndex, Student $s, $join, $leave, ?float $joinRead, ?float $leaveRead) use ($hostel) {
+            BedAssignment::create([
+                'hostel_id' => $hostel->id,
+                'bed_id' => $r->beds[$bedIndex]->id,
+                'student_id' => $s->id,
+                'join_date' => $join,
+                'leave_date' => $leave,
+                'join_meter_reading' => $joinRead,
+                'leave_meter_reading' => $leaveRead,
+                'is_active' => $leave === null,
+                // The stay records the room's rent at the time; the FEE PLAN
+                // lives on the student (one current plan, re-confirmed on
+                // every move — see W6.4), not on the assignment.
+                'monthly_rent' => $r->rent,
+            ]);
+            $r->beds[$bedIndex]->update(['status' => $leave === null ? 'occupied' : 'empty']);
+        };
+
+        // ── AC-1 · Room 501 — baseline: three occupants, full month.
+        // Generate 1000 → 1100 @ ₹10 = ₹1,000 → 333.34 / 333.33 / 333.33.
+        $r1 = $room('501', 3);
+        foreach (['Arjun Nair', 'Bhavesh Shah', 'Chirag Patel'] as $i => $name) {
+            $stay($r1, $i, $student($name), $before, null, null, null);
+        }
+
+        // ── AC-2 · Room 502 — THE OWNER'S EXAMPLE: front-loaded usage.
+        // Deepak all month; Esha joins on the 16th at meter 1030.
+        // Generate 1000 → 1035 @ ₹10 = ₹350. Days 1–15 burned 30u (Deepak
+        // alone = ₹300); days 16–end burned 5u (shared = ₹25 each).
+        // Deepak ₹325 · Esha ₹25 — NOT ₹175 each, and NOT a day-split.
+        $r2 = $room('502', 2);
+        $stay($r2, 0, $student('Deepak Rana'), $before, null, null, null);
+        $stay($r2, 1, $student('Esha Mehta'), $mid, null, 1030.0, null);
+
+        // ── AC-3 · Rooms 503 + 504 — THE SWAP (the hardest case).
+        // Farhan starts in 503, Gita in 504; they trade rooms on the 16th.
+        //   503: generate 2000 → 2100 @ ₹10 = ₹1,000; swap meter 2030.
+        //        Farhan 30u = ₹300 · Gita 70u = ₹700
+        //   504: generate 3000 → 3050 @ ₹10 = ₹500; swap meter 3040.
+        //        Gita 40u = ₹400 · Farhan 10u = ₹100
+        // Both stayed exactly half the month in each room, yet owe wildly
+        // different amounts — because each room's meter says so.
+        $r3 = $room('503', 2);
+        $r4 = $room('504', 2);
+        $farhan = $student('Farhan Qureshi');
+        $gita = $student('Gita Joshi');
+        $stay($r3, 0, $farhan, $before, $mid, null, 2030.0);   // 503 → out at 2030
+        $stay($r4, 1, $farhan, $mid, null, 3040.0, null);      // → into 504 at 3040
+        $stay($r4, 0, $gita, $before, $mid, null, 3040.0);     // 504 → out at 3040
+        $stay($r3, 1, $gita, $mid, null, 2030.0, null);        // → into 503 at 2030
+
+        // ── AC-4 · Room 505 — NO reading (legacy/skipped): day-estimate.
+        // Hari all month; Ishan joins on the 16th with NO meter reading.
+        // Generate 1000 → 1100 @ ₹10 = ₹1,000. Nothing anchors the 16th, so
+        // the split falls back to days AND says so in the note.
+        $r5 = $room('505', 2);
+        $stay($r5, 0, $student('Hari Menon'), $before, null, null, null);
+        $stay($r5, 1, $student('Ishan Bhatt'), $mid, null, null, null);
+
+        // ── AC-5 · Room 506 — departed + empty stretch.
+        // Jaya occupies the 1st–10th then leaves (meter 4020); room sits empty
+        // after. Generate 4000 → 4050 @ ₹10 = ₹500. Jaya bears ALL of it (the
+        // hostel never eats an AC bill) with an empty-days note.
+        $r6 = $room('506', 2);
+        $stay($r6, 0, $student('Jaya Iyer'), $before, $month->copy()->day(10), null, 4020.0);
     }
 }

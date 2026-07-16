@@ -58,12 +58,27 @@ class RoomSharingUpdateTest extends TestCase
     {
         // This is the sequence that produced SQLSTATE[23000] before the fix:
         // shrink soft-deletes beds, growing back must restore them, not re-insert.
+        //
+        // Grows to the hostel's MAXIMUM sharing rather than a hardcoded 8:
+        // this asked for 8 and had been failing with a 422 ever since a cap of
+        // 7 was introduced — the request never reached the code under test. The
+        // bug is about restoring soft-deleted beds, not about any one number.
+        $max = hostelease_max_room_sharing();
+
         $this->putSharing(1)->assertOk();
         $this->assertSame(1, $this->room->fresh()->beds()->count());
 
-        $this->putSharing(8)->assertOk()->assertJson(['success' => true]);
-        $this->assertSame(8, $this->room->fresh()->sharing);
-        $this->assertSame(8, $this->room->fresh()->beds()->count());
+        $this->putSharing($max)->assertOk()->assertJson(['success' => true]);
+        $this->assertSame($max, $this->room->fresh()->sharing);
+        $this->assertSame($max, $this->room->fresh()->beds()->count());
+    }
+
+    /** The cap is real: one above the maximum is refused, not silently clamped. */
+    public function test_sharing_above_the_hostel_maximum_is_rejected(): void
+    {
+        $this->putSharing(hostelease_max_room_sharing() + 1)->assertStatus(422);
+
+        $this->assertSame(3, $this->room->fresh()->sharing); // untouched
     }
 
     public function test_repeated_shrink_grow_cycles_stay_consistent(): void

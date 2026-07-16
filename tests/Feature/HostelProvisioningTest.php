@@ -31,11 +31,32 @@ class HostelProvisioningTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('hostels', ['name' => 'Test Hostel']);
-        $this->assertDatabaseHas('users', ['mobile' => '9876543210', 'role' => 'hostel_admin']);
+        // Normalised on the way in, so the login lookup can find it — this
+        // asserted the raw '9876543210' and passed while the owner it created
+        // was unable to log in at all (fixed W6.3-followup).
+        $this->assertDatabaseHas('users', ['mobile' => '+919876543210', 'role' => 'hostel_admin']);
         $this->assertDatabaseHas('subscriptions', ['hostel_id' => $result['hostel']->id, 'amount' => 5000]);
 
         // The generated password actually authenticates the admin.
         $this->assertTrue(Hash::check($result['password'], $result['admin']->password));
+    }
+
+    /**
+     * The whole point of provisioning: the owner it hands you can sign in.
+     * Nothing asserted this end-to-end, which is how a login-breaking mobile
+     * mismatch survived in a fully "passing" suite.
+     */
+    public function test_provisioned_owner_can_actually_log_in(): void
+    {
+        $result = app(HostelService::class)->provision([
+            'name' => 'Login Hostel', 'owner_name' => 'Owner', 'mobile' => '9876500123',
+            'plan' => 'yearly', 'status' => 'active',
+        ]);
+
+        $this->post('/login', ['mobile' => '9876500123', 'password' => $result['password']])
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($result['admin']);
     }
 
     public function test_super_admin_can_create_hostel_via_http_and_sees_credentials(): void

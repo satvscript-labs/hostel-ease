@@ -21,30 +21,11 @@ class RoomController extends Controller
     ) {
     }
 
-    public function index(): View
-    {
-        $rooms = Room::with('floor')
-            ->withCount([
-                'beds',
-                'beds as occupied_beds_count' => fn ($q) => $q->where('status', 'occupied'),
-            ])
-            ->get()
-            ->sortBy([['floor.sort_order', 'asc'], ['room_number', 'asc']]);
-
-        return view('admin.rooms.index', compact('rooms'));
-    }
-
-    public function create(): View
-    {
-        $floors = Floor::ordered()->get();
-
-        if ($floors->isEmpty()) {
-            return view('admin.rooms.create', ['floors' => $floors])
-                ->with('warning', 'Add a floor first.');
-        }
-
-        return view('admin.rooms.create', compact('floors'));
-    }
+    // index() and create() lived here until W6.3-followup: neither was routed
+    // (the resource registers only store/update/destroy) and neither's view
+    // existed any more — rooms are managed on the Property Board. They were
+    // dead code whose only remaining effect was making the redirects below
+    // point at a route that doesn't exist.
 
     public function store(StoreRoomRequest $request)
     {
@@ -63,7 +44,12 @@ class RoomController extends Controller
             ]);
             return response()->json(['success' => true, 'room' => $room]);
         }
-        return redirect()->route('admin.rooms.index')
+        // The Property Board is where rooms live now. This said
+        // route('admin.rooms.index') — which hasn't existed for some time, so
+        // any non-JSON create threw RouteNotFoundException (a 500). The board
+        // posts via AJAX and takes the branch above, which is the only reason
+        // it went unnoticed.
+        return redirect()->route('admin.property.index')
             ->with('success', "Room {$room->room_number} created with {$result['created']} beds.");
     }
 
@@ -108,7 +94,7 @@ class RoomController extends Controller
             $msg .= " {$result['keptBlocked']} bed(s) kept (in use) - free them to reduce sharing further.";
         }
 
-        return redirect()->route('admin.rooms.index')->with('success', $msg);
+        return redirect()->route('admin.property.index')->with('success', $msg);
     }
 
     public function destroy(Request $request, Room $room)

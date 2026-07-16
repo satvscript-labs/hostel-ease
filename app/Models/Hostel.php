@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -58,6 +59,18 @@ class Hostel extends Model
             'subscription_end' => 'date',
             'settings' => 'array',
         ];
+    }
+
+    /**
+     * Normalised for the same reason as User::mobile — and it must match that
+     * one exactly: provisioning finds an existing owner with
+     * `User::where('mobile', $hostel->mobile)`, so if the two models stored
+     * different shapes, a second branch for the same owner would fail to link
+     * and silently mint a duplicate admin login instead.
+     */
+    protected function mobile(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => hostelease_phone($value));
     }
 
     public function users(): HasMany

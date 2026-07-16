@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -39,6 +40,24 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * The mobile IS the login username, so it must be stored in exactly ONE
+     * shape or a user simply cannot sign in.
+     *
+     * It wasn't: LoginController normalises what you type to +91XXXXXXXXXX and
+     * looks that up, and UserController/StaffController stored that shape — but
+     * HostelService::provision() stored whatever it was handed. Provision a
+     * hostel with a plain 10-digit mobile (the natural way to type one) and the
+     * owner login it created could NEVER authenticate. Normalising here, at the
+     * boundary every write crosses, makes that unrepresentable rather than
+     * relying on each caller to remember. Idempotent — callers already passing
+     * +91… are unaffected.
+     */
+    protected function mobile(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => hostelease_phone($value));
     }
 
     public function hostel(): BelongsTo

@@ -26,22 +26,58 @@ class StudentTest extends TestCase
         Tenant::set($this->hostel->id);
     }
 
+    /**
+     * A complete intake, as the form actually sends it. Student records grew a
+     * full KYC set (father's mobile, aadhaar + its scan, address, college…);
+     * this test still posted four fields, so every submission bounced on
+     * validation — and `assertRedirect()` happily passed on the bounce-back,
+     * leaving the real failure to surface as "no Student found" two lines later.
+     */
+    protected function validIntake(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Test Student',
+            'mobile' => '98765 43210',
+            'father_mobile' => '98765 43211',
+            'aadhaar' => '1234 5678 9012',
+            'aadhaar_file' => UploadedFile::fake()->image('aadhaar.jpg'),
+            'address' => '12 MG Road',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'occupation_type' => 'student',
+            'college' => 'Nirma University',
+            'field_of_study' => 'Computer Engineering',
+            'join_date' => now()->toDateString(),
+            'status' => 'active',
+        ], $overrides);
+    }
+
     public function test_admin_can_create_a_student_with_photo(): void
     {
         Storage::fake('public');
 
-        $this->actingAs($this->admin)->post(route('admin.students.store'), [
-            'name' => 'Test Student',
-            'mobile' => '98765 43210',          // formatting stripped to 10 digits
-            'occupation_type' => 'student',
-            'status' => 'active',
+        $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([
             'photo' => UploadedFile::fake()->image('avatar.jpg'),
-        ])->assertRedirect();
+        ]))->assertSessionHasNoErrors()->assertRedirect();
 
         $student = Student::firstOrFail();
-        $this->assertSame('9876543210', $student->mobile);
+        // Stored E.164, not bare digits: typed-in spacing is normalised away
+        // and the country code is part of the stored value.
+        $this->assertSame('+919876543210', $student->mobile);
+        $this->assertSame('123456789012', $student->aadhaar);
         $this->assertNotNull($student->photo);
         Storage::disk('public')->assertExists($student->photo);
+    }
+
+    /** A student without a college is not a student record we accept. */
+    public function test_student_occupation_requires_college_and_field_of_study(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([
+            'college' => null,
+            'field_of_study' => null,
+        ]))->assertSessionHasErrors(['college', 'field_of_study']);
+
+        $this->assertSame(0, Student::count());
     }
 
     public function test_invalid_mobile_is_rejected(): void

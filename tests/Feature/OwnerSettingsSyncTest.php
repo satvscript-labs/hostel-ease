@@ -66,7 +66,9 @@ class OwnerSettingsSyncTest extends TestCase
         $owner->refresh();
         $this->assertSame('Renamed Owner', $owner->name);
         $this->assertSame('owner@new.example', $owner->email);
-        $this->assertSame('9800000001', $owner->mobile); // unchanged
+        // Still the mobile it was seeded with — stored normalised (+91…),
+        // which is what the model now guarantees for every login.
+        $this->assertSame('+919800000001', $owner->mobile); // unchanged
     }
 
     public function test_locked_branch_creation_is_refused_and_creates_nothing(): void

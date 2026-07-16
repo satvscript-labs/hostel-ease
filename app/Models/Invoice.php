@@ -50,6 +50,12 @@ class Invoice extends Model
         return $this->belongsTo(Student::class);
     }
 
+    /** The AC bill this invoice is a share of (null for every other type). */
+    public function acBill(): BelongsTo
+    {
+        return $this->belongsTo(AcBill::class);
+    }
+
     public function payments(): BelongsToMany
     {
         return $this->belongsToMany(Payment::class, 'invoice_payment')
