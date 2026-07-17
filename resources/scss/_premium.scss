@@ -1720,6 +1720,68 @@ body {
     color: var(--he-text-muted);
 }
 
+/* ── Pay Salary sheet (W7.2) ──────────────────────────────────────────────
+   Lives here, not in a page's pushed <style>, because the sheet is included by
+   BOTH the Staff Board and the staff profile — and a class used by a second
+   page with its styles left behind on the first is §0.1's exact bug. */
+
+/* States a fact and gets out of the way. Never blocks: a second payment for
+   the same month is legitimate (advance, correction, held-back balance). */
+.sal-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--he-warning-soft, rgba(245, 158, 11, 0.12));
+    color: var(--he-warning, #b45309);
+    border-radius: var(--he-radius-md);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* The month's attendance, for information only — it never touches the amount. */
+.sal-att {
+    padding: 0.7rem 0.85rem;
+    background: var(--he-bg-canvas);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: var(--he-radius-md);
+}
+.sal-att__head {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--he-text-muted);
+    margin-bottom: 0.5rem;
+}
+.sal-att__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.sal-att__note {
+    font-size: 0.7rem;
+    color: var(--he-text-muted);
+    margin-top: 0.5rem;
+}
+.sal-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--he-radius-full);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--he-bg-surface-raised);
+    color: var(--he-text-muted);
+}
+.sal-chip b { font-variant-numeric: tabular-nums; }
+.sal-chip--present { background: var(--he-success-soft); color: var(--he-success); }
+.sal-chip--absent { background: var(--he-danger-soft); color: var(--he-danger); }
+.sal-chip--half-day { background: var(--he-warning-soft); color: #b45309; }
+.sal-chip--leave { background: var(--he-bg-surface-raised); color: var(--he-text-muted); }
+
 /* ── Pager ────────────────────────────────────────────────────────────────
    The app-wide pagination skin (views/vendor/pagination/premium.blade.php,
    registered as the default paginator view in AppServiceProvider — every

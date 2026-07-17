@@ -474,7 +474,7 @@ class DemoHostelSeeder extends Seeder
         // seeder wrote the salary alone, so demo payroll never reached
         // Expenses or Net Profit — precisely the bug the mirror exists to
         // prevent, sitting in the data we demo with.
-        $paySalary = function (Staff $member, $month, float $amount, string $mode) use ($hostel, $owner) {
+        $paySalary = function (Staff $member, $month, float $amount, string $mode, ?string $reference = null, ?string $notes = null) use ($hostel, $owner) {
             $paidOn = $month->copy()->endOfMonth()->min(now());
 
             $payment = StaffSalaryPayment::create([
@@ -484,6 +484,8 @@ class DemoHostelSeeder extends Seeder
                 'amount' => $amount,
                 'paid_on' => $paidOn,
                 'mode' => $mode,
+                'reference_number' => $reference,
+                'notes' => $notes,
             ]);
 
             Expense::create([
@@ -494,17 +496,25 @@ class DemoHostelSeeder extends Seeder
                 'expense_date' => $paidOn,
                 'paid_to' => $member->name,
                 'mode' => $mode,
+                'reference_number' => $reference,
+                'notes' => $notes,
                 'recorded_by' => $owner->id,
                 'staff_salary_payment_id' => $payment->id,
             ]);
         };
 
         $paySalary($staff1, now()->subMonths(2)->startOfMonth(), 12000, 'cash');
-        $paySalary($staff1, now()->subMonth()->startOfMonth(), 12000, 'upi');
+        // Cheque is a mode that DEMANDS a reference (W7.2). Nothing collected
+        // one before, so every seeded salary was untraceable by construction.
+        $paySalary($staff2, now()->subMonths(2)->startOfMonth(), 10000, 'cheque', 'CHQ-114520');
+        $paySalary($staff1, now()->subMonth()->startOfMonth(), 12000, 'upi', 'UPI-884230119927');
         $paySalary($staff2, now()->subMonth()->startOfMonth(), 10000, 'cash');
-        // This month: one paid, one still owed — so "Monthly Payroll" and
-        // "Paid This Month" differ, which is the whole point of showing both.
+        // This month: staff1 paid in full, staff2 only part-paid — so "Monthly
+        // Payroll" and "Paid This Month" differ (the point of showing both),
+        // and the Pay sheet's "already recorded" notice has something true to
+        // say when you go to pay Sita the balance.
         $paySalary($staff1, now()->startOfMonth(), 12000, 'cash');
+        $paySalary($staff2, now()->startOfMonth(), 4000, 'cash', null, 'Advance against this month');
 
         // --- EXPENSES ---
         Expense::create([

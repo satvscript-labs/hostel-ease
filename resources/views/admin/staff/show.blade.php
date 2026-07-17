@@ -3,114 +3,214 @@
 
 @push('styles')
 <style>
-    /* Page-local layout only — W7.1 full rebuild on the canonical system. The
-       old page was pre-design-system: a gradient-mesh hero, four screen-filling
-       stacked count cards on phones, and a salary timeline whose delete had a
-       raw confirm() on it. */
+    /* ══ Staff Profile — Account-360 design language ══
+       Matches the student profile: dark mesh hero with inline metrics, canonical
+       panel-cards, dashed info rows. The W7.1 rebuild put this page on the
+       design system but kept a plain two-column card layout, so it read a tier
+       below the student profile it sits beside. */
 
-    .st-id-card { display: flex; align-items: center; gap: 1rem; min-width: 0; }
-
-    /* Attendance counts — compact row-panel when the container is narrow,
-       four across when there's room (§4.9). Never four stacked hero cards. */
-    .st-counts { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    @container (min-width: 520px) { .st-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    .st-count {
-        background: var(--he-bg-surface);
-        border: 1px solid rgba(0, 0, 0, 0.05);
+    /* The hero must NOT clip: the ⋯ menu opens past its bottom edge. The glow
+       lives in its own clipped layer instead (same fix as the student page). */
+    .st-hero {
+        background: var(--he-gradient-mesh);
+        color: #fff;
         border-radius: var(--he-radius-lg);
-        padding: 0.85rem;
+        position: relative;
+    }
+    .st-hero-bg { position: absolute; inset: 0; z-index: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+    .st-hero-bg::after {
+        content: '';
+        position: absolute;
+        top: -40%; right: -8%;
+        width: 380px; height: 380px;
+        background: radial-gradient(circle, rgba(147, 51, 234, 0.35), transparent 70%);
+    }
+    .st-hero .dropdown-menu { z-index: 1080; }
+    .st-hero-avatar {
+        width: 76px; height: 76px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    }
+    .st-hero-meta { color: rgba(255, 255, 255, 0.6); font-size: 0.85rem; }
+    .st-metric-label { color: rgba(255, 255, 255, 0.55); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .st-metric-val {
+        font-size: 1.3rem; font-weight: 800; line-height: 1.15;
+        font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    /* Dashed identity rows — same as the student profile's .info-row. */
+    .st-info {
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+    }
+    .st-info:last-child { border-bottom: none; }
+    .st-info .lbl { color: var(--he-text-muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+    .st-info .val { font-weight: 700; color: var(--he-text-main); text-align: right; min-width: 0; }
+
+    /* Attendance counts — four across when there's room, two when there isn't
+       (§4.9: measured against the CONTAINER, never the viewport). */
+    .st-counts { display: grid; gap: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @container (min-width: 460px) { .st-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    .st-count {
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        border-radius: var(--he-radius-md);
+        padding: 0.7rem 0.5rem;
         text-align: center;
     }
     .st-count__value {
-        font-size: clamp(1.4rem, 7cqi, 1.9rem);
-        font-weight: 800;
-        line-height: 1.1;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
+        font-size: clamp(1.25rem, 6cqi, 1.7rem);
+        font-weight: 800; line-height: 1.1;
+        white-space: nowrap; font-variant-numeric: tabular-nums;
     }
     .st-count__label {
-        font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; margin-top: 0.15rem;
+        font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; margin-top: 0.1rem;
     }
 
-    /* Salary history rows — same container tiering as every other list. */
-    .st-pay-row {
-        align-items: center;
-        gap: 0.75rem 1rem;
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-            "info  acts"
-            "money acts";
+    /* Salary history rows */
+    .st-pay {
+        display: flex; align-items: center; gap: 0.85rem;
+        padding: 0.8rem 1.25rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        transition: background 0.2s var(--ease-out-expo);
     }
-    .st-pay-info { grid-area: info; display: flex; align-items: center; gap: 0.85rem; min-width: 0; }
-    .st-pay-money { grid-area: money; display: flex; justify-content: flex-end; align-items: center; gap: 1rem; }
-    .st-pay-acts {
-        grid-area: acts;
-        display: flex; align-items: center; justify-content: flex-end;
-        padding-left: 1rem;
-        border-left: 1px solid rgba(0, 0, 0, 0.06);
-        align-self: stretch;
-    }
-    @container (min-width: 560px) {
-        .st-pay-row {
-            grid-template-columns: minmax(180px, 1fr) auto auto;
-            grid-template-areas: "info money acts";
-        }
-        .st-pay-acts { align-self: center; }
-    }
-    .st-pay-amt { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-    .st-icon-dot {
-        width: 34px; height: 34px; flex-shrink: 0;
-        display: inline-flex; align-items: center; justify-content: center;
-        border-radius: 10px;
+    .st-pay:last-child { border-bottom: none; }
+    .st-pay:hover { background: var(--he-bg-surface-raised); }
+    .st-pay__ic {
+        width: 40px; height: 40px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: var(--he-radius-md);
         background: var(--he-success-soft); color: var(--he-success);
-        font-size: 0.8rem;
     }
+    .st-pay__amt { font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-    .st-fact { padding: 0.7rem 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
-    .st-fact:last-child { border-bottom: 0; }
-    .st-fact__label {
-        font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--he-text-muted); margin-bottom: 0.1rem;
-    }
-
-    /* Removed staff: the record stays readable, but every write is gone. */
-    .st-removed-banner {
-        display: flex; align-items: flex-start; gap: 0.6rem;
-        padding: 0.8rem 1rem;
+    .st-removed {
+        display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+        padding: 0.75rem 1rem;
         background: var(--he-danger-soft); color: var(--he-danger);
         border-radius: var(--he-radius-md);
         font-size: 0.85rem; font-weight: 600;
+    }
+
+    /* ── Mobile: rearrange for a phone ─────────────────────────── */
+    @media (max-width: 576px) {
+        .st-hero { border-radius: var(--he-radius-md); }
+        .st-hero-top { flex-direction: column; align-items: stretch !important; }
+        .st-hero-avatar { width: 60px; height: 60px; }
+        .st-hero h1 { font-size: 1.4rem; }
+        .st-hero-actions { width: 100%; }
+        .st-hero-actions .btn:not(.st-more-btn) { flex: 1; }
+        .st-metric-val { font-size: 1.05rem; }
+        .panel-head, .panel-body, .st-pay { padding-left: 1rem; padding-right: 1rem; }
     }
 </style>
 @endpush
 
 @section('content')
-<div class="page-enter" x-data="staffProfile()">
+<div class="page-enter" x-data="staffProfile()" @keydown.window.escape="close()">
 
-    <div class="he-page-head mb-4 stagger-1">
-        <div>
-            <h1 class="he-page-title">{{ $staff->name }}</h1>
-            <p class="he-page-sub">{{ $staff->designation ?: __('Staff Member') }}</p>
+    {{-- Back. NOT d-none d-md-* — that rule is for the page-head's one primary
+         ACTION (which the FAB replaces on phones). A back link is navigation:
+         hiding it below md left the phone with no way out of this page but the
+         browser's own button. Matches the student profile exactly. --}}
+    <a href="{{ route('admin.staff.index') }}" class="btn btn-sm btn-white rounded-pill px-3 mb-3 shadow-sm fw-semibold">
+        <i class="fa-solid fa-arrow-left me-1"></i> {{ __('Staff') }}
+    </a>
+
+    {{-- ══ Hero band ══ --}}
+    <div class="st-hero p-4 mb-4 shadow">
+        <div class="st-hero-bg"></div>
+        <div class="position-relative" style="z-index: 2;">
+            <div class="st-hero-top d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div class="d-flex align-items-center gap-3" style="min-width: 0;">
+                    <x-staff-avatar :staff="$staff" size="76" class="st-hero-avatar" />
+                    <div style="min-width: 0;">
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                            <h1 class="h3 fw-bold mb-0 text-truncate">{{ $staff->name }}</h1>
+                            @if($staff->trashed())
+                                <span class="badge bg-danger-subtle text-danger rounded-pill px-3 py-1">{{ __('Removed') }}</span>
+                            @elseif($staff->is_active)
+                                <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1">{{ __('Active') }}</span>
+                            @else
+                                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-1">{{ __('Inactive') }}</span>
+                            @endif
+                        </div>
+                        <div class="st-hero-meta d-flex flex-wrap align-items-center gap-3">
+                            <span><i class="fa-solid fa-briefcase me-1"></i>{{ $staff->designation ?: __('Staff Member') }}</span>
+                            @if($staff->mobile)
+                                <span><i class="fa-solid fa-phone me-1"></i>{{ hostelease_phone($staff->mobile) }}</span>
+                            @endif
+                            @if($staff->join_date)
+                                <span><i class="fa-solid fa-calendar me-1"></i>{{ __('Joined') }} {{ $staff->join_date->format('d M Y') }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @unless($staff->trashed())
+                    <div class="st-hero-actions d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-light text-success rounded-pill px-4 fw-bold shadow-sm"
+                                @click="$dispatch('pay-salary', {{ \Illuminate\Support\Js::from([
+                                    'action' => route('admin.staff.salary', $staff),
+                                    'name' => $staff->name,
+                                    'salary' => (float) $staff->monthly_salary,
+                                    'paid' => (object) ($payroll['paid'][$staff->id] ?? []),
+                                    'attendance' => (object) ($payroll['attendance'][$staff->id] ?? []),
+                                ]) }})">
+                            <i class="fa-solid fa-money-bill-wave me-2"></i>{{ __('Pay') }}
+                        </button>
+                        <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" @click="openEdit()">
+                            <i class="fa-solid fa-pen me-2"></i>{{ __('Edit') }}
+                        </button>
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-outline-light rounded-pill px-3 fw-bold st-more-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ __('More actions') }}">
+                                <i class="fa-solid fa-ellipsis"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2">
+                                <li>
+                                    <form method="POST" action="{{ route('admin.staff.destroy', $staff) }}" class="m-0"
+                                          data-confirm="{{ __('Remove :name from the directory? Their salary history and its expense entries stay on the books.', ['name' => $staff->name]) }}">
+                                        @csrf @method('DELETE')
+                                        <button class="dropdown-item rounded-3 py-2 text-danger">
+                                            <i class="fa-solid fa-trash me-2"></i>{{ __('Remove from directory') }}
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                @endunless
+            </div>
+
+            {{-- At-a-glance. "Payroll" is the monthly commitment, "Paid" is what
+                 actually went out this month — the gap is what's still owed. --}}
+            <div class="row g-3 mt-2 position-relative" style="z-index: 1;">
+                <div class="col-6 col-md">
+                    <div class="st-metric-label">{{ __('Monthly Salary') }}</div>
+                    <div class="st-metric-val">{{ hostelease_money($staff->monthly_salary) }}</div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="st-metric-label">{{ __('Paid') }} · {{ now()->format('M') }}</div>
+                    <div class="st-metric-val" style="color: #6ee7b7;">{{ hostelease_money($paidThisMonth) }}</div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="st-metric-label">{{ __('Present') }} · {{ now()->format('M') }}</div>
+                    <div class="st-metric-val">{{ $counts['present'] + $counts['half_day'] }} <span class="fs-6 opacity-50 fw-normal">{{ __('days') }}</span></div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="st-metric-label">{{ __('Paid Lifetime') }}</div>
+                    <div class="st-metric-val">{{ hostelease_money($paidLifetime) }}</div>
+                </div>
+            </div>
         </div>
-        <a href="{{ route('admin.staff.index') }}" class="btn btn-white border rounded-pill px-4 fw-semibold shadow-sm tactile-btn d-none d-md-inline-flex align-items-center">
-            <i class="fa-solid fa-arrow-left me-2"></i>{{ __('Directory') }}
-        </a>
     </div>
 
     @if($staff->trashed())
-        {{-- Owner decision (W7.1): removing a staff member keeps their salary
-             history and its expense mirrors — money that left is money that
-             left. The record stays readable here (and this is the only place a
-             mirrored expense can still be deleted from). --}}
-        <div class="st-removed-banner mb-4 stagger-2">
-            <i class="fa-solid fa-user-slash mt-1"></i>
-            <div>
-                <div>{{ __('This staff member has been removed from the directory.') }}</div>
-                <div class="fw-normal">{{ __('Their salary history below stays on the books. Restore them to make changes.') }}</div>
-            </div>
-            <form method="POST" action="{{ route('admin.staff.restore', $staff->id) }}" class="ms-auto">
+        <div class="st-removed mb-4">
+            <i class="fa-solid fa-user-slash"></i>
+            <span>{{ __('Removed from the directory. Salary history below stays on the books — restore to make changes.') }}</span>
+            <form method="POST" action="{{ route('admin.staff.restore', $staff->id) }}" class="ms-auto m-0">
                 @csrf
                 <button class="btn btn-sm btn-white border rounded-pill fw-bold px-3 text-nowrap tactile-btn">
                     <i class="fa-solid fa-rotate-left me-1"></i>{{ __('Restore') }}
@@ -121,154 +221,102 @@
 
     <div class="row g-4">
         {{-- ══ Left: identity ══ --}}
-        <div class="col-lg-4 stagger-2">
-            <div class="card border-0 shadow-sm rounded-4 mb-4">
-                <div class="card-body p-4">
-                    <div class="st-id-card mb-4">
-                        <x-staff-avatar :staff="$staff" size="64" />
-                        <div style="min-width: 0;">
-                            <div class="fw-bold text-dark fs-5 text-truncate">{{ $staff->name }}</div>
-                            <div>
-                                @if($staff->trashed())
-                                    <span class="badge bg-danger-subtle text-danger rounded-pill px-2 py-1">{{ __('Removed') }}</span>
-                                @elseif($staff->is_active)
-                                    <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">{{ __('Active') }}</span>
-                                @else
-                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1">{{ __('Inactive') }}</span>
-                                @endif
-                            </div>
-                        </div>
+        <div class="col-lg-4">
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-id-card me-2" style="color: var(--he-primary);"></i>{{ __('Details') }}</h6>
+                </div>
+                <div class="panel-body py-2">
+                    <div class="st-info">
+                        <span class="lbl">{{ __('Mobile') }}</span>
+                        <span class="val">
+                            @if($staff->mobile)<x-mobile-link :mobile="$staff->mobile" />@else<span class="text-muted fw-normal">—</span>@endif
+                        </span>
                     </div>
-
-                    <div class="st-fact">
-                        <div class="st-fact__label">{{ __('Mobile') }}</div>
-                        <div class="fw-semibold text-dark">
-                            @if($staff->mobile)<x-mobile-link :mobile="$staff->mobile" />@else<span class="text-muted">—</span>@endif
-                        </div>
-                    </div>
-                    <div class="st-fact">
-                        <div class="st-fact__label">{{ __('Monthly Salary') }}</div>
-                        <div class="fw-bold text-dark" style="font-variant-numeric: tabular-nums;">{{ hostelease_money($staff->monthly_salary) }}</div>
-                    </div>
-                    <div class="st-fact">
-                        <div class="st-fact__label">{{ __('Join Date') }}</div>
-                        <div class="fw-semibold text-dark">{{ $staff->join_date ? $staff->join_date->format('d M Y') : __('Not specified') }}</div>
-                    </div>
-                    <div class="st-fact">
-                        <div class="st-fact__label">{{ __('Address') }}</div>
-                        <div class="text-dark">{{ $staff->address ?: __('Not specified') }}</div>
-                    </div>
-                    <div class="st-fact">
-                        <div class="st-fact__label">{{ __('Aadhaar') }}</div>
-                        <div class="fw-semibold text-dark d-flex align-items-center gap-2 flex-wrap">
+                    <div class="st-info">
+                        <span class="lbl">{{ __('Aadhaar') }}</span>
+                        <span class="val d-flex align-items-center gap-2 justify-content-end flex-wrap">
                             <span style="font-variant-numeric: tabular-nums;">{{ $staff->aadhaar_number ?: '—' }}</span>
                             @if($staff->aadhaar_file)
                                 <a href="{{ Storage::disk('public')->url($staff->aadhaar_file) }}" target="_blank" rel="noopener"
                                    class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 text-decoration-none">
-                                    <i class="fa-solid fa-file-image me-1"></i>{{ __('View card') }}
+                                    <i class="fa-solid fa-file-image me-1"></i>{{ __('View') }}
                                 </a>
                             @endif
-                        </div>
+                        </span>
                     </div>
-
-                    @unless($staff->trashed())
-                        <div class="d-flex gap-2 mt-4">
-                            <button type="button" class="btn btn-premium rounded-pill fw-semibold flex-grow-1 shadow-sm tactile-btn" @click="editOpen = true; document.body.style.overflow = 'hidden'">
-                                <i class="fa-solid fa-user-pen me-2"></i>{{ __('Edit') }}
-                            </button>
-                            <form method="POST" action="{{ route('admin.staff.destroy', $staff) }}" class="m-0"
-                                  data-confirm="{{ __('Remove :name from the directory? Their salary history and its expense entries stay on the books.', ['name' => $staff->name]) }}">
-                                @csrf @method('DELETE')
-                                <button class="he-icon-btn he-icon-btn--lg is-danger" title="{{ __('Remove staff') }}" aria-label="{{ __('Remove staff') }}">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </form>
+                    <div class="st-info">
+                        <span class="lbl">{{ __('Address') }}</span>
+                        <span class="val text-truncate">{{ $staff->address ?: '—' }}</span>
+                    </div>
+                    @if($staff->notes)
+                        <div class="st-info">
+                            <span class="lbl">{{ __('Notes') }}</span>
+                            <span class="val fw-normal text-truncate">{{ $staff->notes }}</span>
                         </div>
-                    @endunless
+                    @endif
                 </div>
             </div>
         </div>
 
         {{-- ══ Right: attendance + payroll ══ --}}
-        <div class="col-lg-8 stagger-3 he-adaptive">
-            <div class="d-flex align-items-center gap-2 mb-3">
-                <div class="st-icon-dot" style="background: var(--he-primary-soft); color: var(--he-primary);"><i class="fa-solid fa-chart-pie"></i></div>
-                <h5 class="fw-bold text-dark mb-0">{{ __('Attendance') }} <span class="text-muted fw-normal fs-6">· {{ now()->format('F Y') }}</span></h5>
-            </div>
-
-            <div class="st-counts mb-4">
-                @foreach([
-                    ['present', __('Present'), 'success'],
-                    ['absent', __('Absent'), 'danger'],
-                    ['half_day', __('Half Day'), 'warning'],
-                    ['leave', __('Leave'), 'secondary'],
-                ] as [$key, $label, $color])
-                    <div class="st-count">
-                        <div class="st-count__value text-{{ $color }}">{{ $counts[$key] }}</div>
-                        <div class="st-count__label text-{{ $color }}">{{ $label }}</div>
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                <div class="d-flex align-items-center gap-2" style="min-width: 0;">
-                    <div class="st-icon-dot"><i class="fa-solid fa-money-check-dollar"></i></div>
-                    <h5 class="fw-bold text-dark mb-0 text-truncate">{{ __('Salary History') }}</h5>
+        <div class="col-lg-8 he-adaptive">
+            <div class="panel-card mb-4">
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-clipboard-user me-2" style="color: var(--he-primary);"></i>{{ __('Attendance') }}</h6>
+                    <span class="text-muted small fw-semibold">{{ now()->format('F Y') }}</span>
                 </div>
-                @unless($staff->trashed())
-                    <button type="button" class="btn btn-sm btn-success rounded-pill fw-bold px-3 text-nowrap shadow-sm tactile-btn"
-                            @click="openPay({{ \Illuminate\Support\Js::from([
-                                'action' => route('admin.staff.salary', $staff),
-                                'name' => $staff->name,
-                                'salary' => (float) $staff->monthly_salary,
-                            ]) }})">
-                        <i class="fa-solid fa-plus me-1"></i>{{ __('Pay Salary') }}
-                    </button>
-                @endunless
+                <div class="panel-body">
+                    <div class="st-counts">
+                        @foreach([
+                            ['present', __('Present'), 'success'],
+                            ['absent', __('Absent'), 'danger'],
+                            ['half_day', __('Half Day'), 'warning'],
+                            ['leave', __('Leave'), 'secondary'],
+                        ] as [$key, $label, $color])
+                            <div class="st-count">
+                                <div class="st-count__value text-{{ $color }}">{{ $counts[$key] }}</div>
+                                <div class="st-count__label text-{{ $color }}">{{ $label }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             </div>
 
-            <div class="d-flex flex-column gap-2">
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-money-check-dollar me-2" style="color: var(--he-success);"></i>{{ __('Salary History') }}</h6>
+                    <span class="text-muted small fw-semibold">{{ $payments->count() }} {{ trans_choice('entry|entries', $payments->count()) }}</span>
+                </div>
                 @forelse($payments as $p)
-                    <div class="card border-0 shadow-sm rounded-4">
-                        <div class="card-body p-3">
-                            <div class="st-pay-row d-grid">
-                                <div class="st-pay-info">
-                                    <div class="st-icon-dot"><i class="fa-solid fa-money-bill-wave"></i></div>
-                                    <div style="min-width: 0;">
-                                        <div class="fw-bold text-dark text-truncate">{{ $p->salary_month->format('F Y') }}</div>
-                                        <div class="text-muted small text-truncate">
-                                            {{ __('Paid') }} {{ $p->paid_on->format('d M Y') }} · {{ $modeNames[$p->mode] ?? ucfirst($p->mode) }}
-                                            @if($p->reference_number) · {{ $p->reference_number }} @endif
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="st-pay-money">
-                                    <span class="st-pay-amt text-success fs-5">{{ hostelease_money($p->amount) }}</span>
-                                </div>
-
-                                <div class="st-pay-acts">
-                                    {{-- Deleting the salary takes its expense mirror
-                                         with it (W6.2). Reachable even for a removed
-                                         staff member — otherwise the mirror would be
-                                         un-deletable from both sides. --}}
-                                    <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff->id, $p->id]) }}" class="m-0"
-                                          data-confirm="{{ __('Delete this salary entry? Its matching expense entry is removed too.') }}">
-                                        @csrf @method('DELETE')
-                                        <button class="he-icon-btn is-danger" title="{{ __('Delete salary entry') }}" aria-label="{{ __('Delete salary entry') }}">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                    <div class="st-pay">
+                        <div class="st-pay__ic"><i class="fa-solid fa-money-bill-wave"></i></div>
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <div class="fw-bold text-dark text-truncate">{{ $p->salary_month->format('F Y') }}</div>
+                            <div class="text-muted small text-truncate">
+                                {{ $p->paid_on->format('d M Y') }} · {{ $modeNames[$p->mode] ?? ucfirst($p->mode) }}@if($p->reference_number) · {{ $p->reference_number }}@endif
                             </div>
                             @if($p->notes)
-                                <div class="text-muted small mt-2 ps-1 text-truncate">{{ $p->notes }}</div>
+                                <div class="text-muted small text-truncate fst-italic">{{ $p->notes }}</div>
                             @endif
                         </div>
+                        <span class="st-pay__amt text-success">{{ hostelease_money($p->amount) }}</span>
+                        {{-- Deleting the salary takes its expense mirror with it
+                             (W6.2). Reachable even for a removed staff member —
+                             otherwise the mirror is stranded un-deletable. --}}
+                        <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff->id, $p->id]) }}" class="m-0"
+                              data-confirm="{{ __('Delete this salary entry? Its matching expense entry is removed too.') }}">
+                            @csrf @method('DELETE')
+                            <button class="he-icon-btn is-danger" title="{{ __('Delete salary entry') }}" aria-label="{{ __('Delete salary entry') }}">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 @empty
-                    <x-he-empty-state icon="file-invoice-dollar" title="{{ __('No salary paid yet') }}"
-                        subtitle="{{ __('Recorded salary payments appear here and in Expenses.') }}" />
+                    <div class="panel-body">
+                        <x-he-empty-state icon="file-invoice-dollar" title="{{ __('No salary paid yet') }}"
+                            subtitle="{{ __('Recorded payments appear here and in Expenses.') }}" />
+                    </div>
                 @endforelse
             </div>
         </div>
@@ -366,17 +414,15 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('staffProfile', () => ({
         editOpen: false,
-        payOpen: false,
-        p: { action: '', name: '', salary: 0, amount: 0 },
 
-        openPay(payload) {
-            this.p = { ...payload, amount: payload.salary };
-            this.payOpen = true;
+        openEdit() {
+            this.editOpen = true;
             document.body.style.overflow = 'hidden';
         },
 
+        // The Pay Salary sheet owns itself — this page just $dispatches to it.
         close() {
-            this.editOpen = this.payOpen = false;
+            this.editOpen = false;
             document.body.style.overflow = '';
         },
     }));

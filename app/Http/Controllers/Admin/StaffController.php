@@ -27,6 +27,15 @@ class StaffController extends Controller
         'aadhaar_file' => ['staff/documents', 1600],
     ];
 
+    /**
+     * How many months back the Pay Salary sheet can show an attendance summary
+     * for (current month + the previous ones). Salary is paid for the current
+     * or a recent month; beyond this the sheet says nothing rather than
+     * guessing, because "no attendance marked" and "we didn't load it" are
+     * different facts and must not look the same.
+     */
+    private const ATTENDANCE_WINDOW_MONTHS = 3;
+
     public function __construct(
         protected ActivityLogger $logger,
         protected ImageService $imageService,
@@ -98,9 +107,57 @@ class StaffController extends Controller
         // that copy and missed this one.
         $paymentModes = PaymentMode::active()->ordered()->get();
 
+        $payroll = $this->payrollMeta($staff->pluck('id'));
+
         return view('admin.staff.index', compact(
-            'staff', 'summary', 'date', 'roster', 'marks', 'paymentModes', 'search', 'status'
+            'staff', 'summary', 'date', 'roster', 'marks', 'paymentModes', 'search', 'status', 'payroll'
         ));
+    }
+
+    /**
+     * The two things the Pay Salary sheet needs to say something useful, for
+     * every staff member on the page (W7.2).
+     *
+     * Both are INFORMATIONAL. Neither decides an amount and neither blocks a
+     * payment — the owner decides, the system reports (standing rule).
+     */
+    protected function payrollMeta($staffIds): array
+    {
+        $staffIds = collect($staffIds);
+
+        // Already paid, per staff member per salary month. A second payment for
+        // the same month is legitimate — an advance, a correction, a held-back
+        // balance — so this only ever warns. Not windowed: salary rows are a
+        // dozen a year per person.
+        $paid = [];
+        foreach (StaffSalaryPayment::whereIn('staff_id', $staffIds)->get(['staff_id', 'salary_month', 'amount']) as $p) {
+            $ym = $p->salary_month->format('Y-m');
+            $paid[$p->staff_id][$ym] = round(($paid[$p->staff_id][$ym] ?? 0) + (float) $p->amount, 2);
+        }
+
+        // Attendance for the months you can realistically be paying for.
+        // Aggregated in SQL (COUNT + GROUP BY — portable; a `strftime` month
+        // grouping would not be) so this is ~48 rows per month rather than one
+        // row per person per day.
+        $window = [];
+        $attendance = [];
+        for ($i = self::ATTENDANCE_WINDOW_MONTHS - 1; $i >= 0; $i--) {
+            $month = now()->startOfMonth()->subMonths($i);
+            $ym = $month->format('Y-m');
+            $window[] = $ym;
+
+            $rows = StaffAttendance::whereIn('staff_id', $staffIds)
+                ->whereBetween('date', [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()])
+                ->selectRaw('staff_id, status, COUNT(*) as marked')
+                ->groupBy('staff_id', 'status')
+                ->get();
+
+            foreach ($rows as $row) {
+                $attendance[$row->staff_id][$ym][$row->status] = (int) $row->marked;
+            }
+        }
+
+        return ['paid' => $paid, 'attendance' => $attendance, 'window' => $window];
     }
 
     public function store(Request $request): RedirectResponse
@@ -193,14 +250,23 @@ class StaffController extends Controller
 
         $payments = $staff->salaryPayments()->latest('salary_month')->latest('paid_on')->get();
 
+        // Hero metrics. Summed from the rows already loaded — no extra queries.
+        $paidThisMonth = (float) $payments
+            ->filter(fn ($p) => $p->salary_month->between($monthStart, $monthEnd))
+            ->sum('amount');
+        $paidLifetime = (float) $payments->sum('amount');
+
         // Salary rows store the mode CODE; resolve names once rather than per
         // row, and keep showing a mode that has since been deactivated.
         $modeNames = PaymentMode::pluck('name', 'code');
 
         $paymentModes = PaymentMode::active()->ordered()->get();
 
+        $payroll = $this->payrollMeta([$staff->id]);
+
         return view('admin.staff.show', compact(
-            'staff', 'counts', 'attendance', 'payments', 'paymentModes', 'modeNames'
+            'staff', 'counts', 'attendance', 'payments', 'paymentModes', 'modeNames', 'payroll',
+            'paidThisMonth', 'paidLifetime'
         ));
     }
 
@@ -237,14 +303,29 @@ class StaffController extends Controller
     public function paySalary(Request $request, Staff $staff): RedirectResponse
     {
         $data = $request->validate([
-            'salary_month' => ['required', 'date_format:Y-m'],
+            // A salary month in the future is money for work not yet done —
+            // and it silently breaks the "already paid" warning, which keys on
+            // this month.
+            'salary_month' => ['required', 'date_format:Y-m', 'before_or_equal:'.now()->format('Y-m')],
             'amount' => ['required', 'numeric', 'min:1', 'max:9999999'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             // Was a free string — salaries now spend through the same tenant
             // payment_modes vocabulary as every other outflow (W6.2).
             'mode' => ['required', Rule::in(PaymentMode::active()->pluck('code')->all())],
-            'reference_number' => ['nullable', 'string', 'max:100'],
+            // A cheque salary with no cheque number is a payment the record
+            // can't trace (W7.2). The column and the fillable existed all
+            // along; nothing ever collected it. Same rule Collect Payment has
+            // enforced since W6.1 — modes declare whether they need one.
+            'reference_number' => [
+                Rule::requiredIf(fn () => (bool) optional(
+                    PaymentMode::active()->where('code', $request->mode)->first()
+                )->requires_reference),
+                'nullable', 'string', 'max:100',
+            ],
             'notes' => ['nullable', 'string', 'max:255'],
+        ], [
+            'reference_number.required' => 'A reference number is required for this payment mode.',
+            'salary_month.before_or_equal' => 'Salary cannot be recorded for a future month.',
         ]);
 
         $month = Carbon::parse($data['salary_month'].'-01')->startOfMonth();

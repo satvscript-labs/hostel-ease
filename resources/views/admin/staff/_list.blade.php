@@ -15,10 +15,15 @@
     @forelse($staff as $s)
         @php
             $removed = $s->trashed();
+            // The sheet owns its own scope and opens on this event — the page
+            // only has to say who and how much (W7.2). `paid`/`attendance` are
+            // keyed by 'YYYY-MM'; cast so an empty set is {} in JS, not [].
             $payload = \Illuminate\Support\Js::from([
                 'action' => route('admin.staff.salary', $s),
                 'name' => $s->name,
                 'salary' => (float) $s->monthly_salary,
+                'paid' => (object) ($payroll['paid'][$s->id] ?? []),
+                'attendance' => (object) ($payroll['attendance'][$s->id] ?? []),
             ]);
         @endphp
         <div class="card border-0 shadow-sm rounded-4 {{ $removed ? 'opacity-75' : '' }}">
@@ -76,7 +81,7 @@
                             </form>
                         @else
                             <button type="button" class="btn btn-sm btn-success rounded-pill fw-bold px-3 text-nowrap" style="min-height: 36px;"
-                                    @click="openPay({{ $payload }})">
+                                    @click="$dispatch('pay-salary', {{ $payload }})">
                                 <i class="fa-solid fa-money-bill-wave me-1"></i>{{ __('Pay') }}
                             </button>
                             {{-- No "open profile" button: the name IS the link. --}}
@@ -135,7 +140,7 @@
                             </form>
                         @else
                             <button type="button" class="btn btn-success rounded-pill fw-bold px-4" style="min-height: 44px;"
-                                    @click="openPay({{ $payload }})">
+                                    @click="$dispatch('pay-salary', {{ $payload }})">
                                 <i class="fa-solid fa-money-bill-wave me-1"></i>{{ __('Pay Salary') }}
                             </button>
                             <div class="he-act-right">

@@ -287,8 +287,6 @@ document.addEventListener('alpine:init', () => {
         searchTerm: @json($search ?? ''),
 
         addOpen: false,
-        payOpen: false,
-        p: { action: '', name: '', salary: 0, amount: 0 },
 
         switchTab(newTab, updateUrl = true) {
             if (newTab === this.tab) return;
@@ -315,16 +313,9 @@ document.addEventListener('alpine:init', () => {
             document.body.style.overflow = 'hidden';
         },
 
-        // Their contracted salary is the amount you almost always mean — it's a
-        // starting point that's fully editable, NOT a derived figure.
-        openPay(payload) {
-            this.p = { ...payload, amount: payload.salary };
-            this.payOpen = true;
-            document.body.style.overflow = 'hidden';
-        },
-
+        // The Pay Salary sheet owns itself — rows just $dispatch('pay-salary').
         close() {
-            this.addOpen = this.payOpen = false;
+            this.addOpen = false;
             document.body.style.overflow = '';
         },
     }));

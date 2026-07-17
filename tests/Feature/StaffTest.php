@@ -260,6 +260,124 @@ class StaffTest extends TestCase
         ])->assertSessionHasErrors('paid_on');
     }
 
+    public function test_future_salary_months_are_rejected(): void
+    {
+        $this->post(route('admin.staff.salary', $this->staff()), [
+            'salary_month' => now()->addMonth()->format('Y-m'), 'amount' => 12000,
+            'paid_on' => now()->toDateString(), 'mode' => 'cash',
+        ])->assertSessionHasErrors('salary_month');
+    }
+
+    // ── W7.2: reference numbers, duplicate warning, attendance summary ───
+
+    /**
+     * A cheque salary with no cheque number is a payment the record cannot
+     * trace. The column and the fillable existed all along and nothing ever
+     * collected it — Collect Payment has enforced this since W6.1.
+     */
+    public function test_modes_that_require_a_reference_refuse_to_pay_without_one(): void
+    {
+        $staff = $this->staff();
+
+        $this->post(route('admin.staff.salary', $staff), [
+            'salary_month' => now()->format('Y-m'), 'amount' => 12000,
+            'paid_on' => now()->toDateString(), 'mode' => 'cheque',
+        ])->assertSessionHasErrors('reference_number');
+        $this->assertSame(0, StaffSalaryPayment::count());
+
+        $this->post(route('admin.staff.salary', $staff), [
+            'salary_month' => now()->format('Y-m'), 'amount' => 12000,
+            'paid_on' => now()->toDateString(), 'mode' => 'cheque',
+            'reference_number' => 'CHQ-889112',
+        ])->assertSessionHas('success');
+
+        // It reaches the salary row AND its expense mirror — a reference that
+        // only lands on one of the two makes the pair contradict each other.
+        $this->assertDatabaseHas('staff_salary_payments', ['reference_number' => 'CHQ-889112']);
+        $this->assertDatabaseHas('expenses', ['reference_number' => 'CHQ-889112', 'category' => 'staff_salary']);
+    }
+
+    public function test_modes_that_do_not_require_a_reference_still_pay_without_one(): void
+    {
+        $this->post(route('admin.staff.salary', $this->staff()), [
+            'salary_month' => now()->format('Y-m'), 'amount' => 12000,
+            'paid_on' => now()->toDateString(), 'mode' => 'cash',
+        ])->assertSessionHas('success');
+
+        $this->assertSame(1, StaffSalaryPayment::count());
+    }
+
+    /**
+     * A second payment for the same month is legitimate (advance, correction,
+     * held-back balance) so it must never be blocked — but the sheet has to
+     * SAY what's already recorded, keyed by month.
+     */
+    public function test_already_paid_totals_are_exposed_per_month_and_never_block(): void
+    {
+        $staff = $this->staff();
+        $this->salary($staff, ['amount' => 5000, 'salary_month' => now()->startOfMonth()]);
+        $this->salary($staff, ['amount' => 3000, 'salary_month' => now()->startOfMonth()]);
+        $this->salary($staff, ['amount' => 9000, 'salary_month' => now()->subMonth()->startOfMonth()]);
+
+        $payroll = $this->get(route('admin.staff.index'))->assertOk()->viewData('payroll');
+
+        $this->assertEquals(8000.0, $payroll['paid'][$staff->id][now()->format('Y-m')]);
+        $this->assertEquals(9000.0, $payroll['paid'][$staff->id][now()->subMonth()->format('Y-m')]);
+
+        // Warned about, not prevented.
+        $this->post(route('admin.staff.salary', $staff), [
+            'salary_month' => now()->format('Y-m'), 'amount' => 4000,
+            'paid_on' => now()->toDateString(), 'mode' => 'cash',
+        ])->assertSessionHas('success');
+
+        $this->assertSame(4, StaffSalaryPayment::count());
+    }
+
+    /**
+     * The summary is INFORMATIONAL — it must report what was marked and never
+     * derive an amount from it.
+     */
+    public function test_attendance_summary_is_exposed_per_month_within_the_window(): void
+    {
+        $staff = $this->staff();
+        $month = now()->startOfMonth();
+
+        foreach (['present', 'present', 'present', 'absent', 'half_day', 'leave'] as $i => $status) {
+            StaffAttendance::create(['hostel_id' => $this->hostel->id, 'staff_id' => $staff->id,
+                'date' => $month->copy()->addDays($i), 'status' => $status]);
+        }
+
+        $payroll = $this->get(route('admin.staff.index'))->assertOk()->viewData('payroll');
+        $summary = $payroll['attendance'][$staff->id][now()->format('Y-m')];
+
+        $this->assertSame(3, $summary['present']);
+        $this->assertSame(1, $summary['absent']);
+        $this->assertSame(1, $summary['half_day']);
+        $this->assertSame(1, $summary['leave']);
+
+        // The window is what lets the sheet tell "nobody marked it" apart from
+        // "we didn't load it" — without it, silence and zero look identical.
+        $this->assertContains(now()->format('Y-m'), $payroll['window']);
+        $this->assertNotContains(now()->subMonths(6)->format('Y-m'), $payroll['window']);
+    }
+
+    public function test_payroll_meta_never_leaks_another_hostels_figures(): void
+    {
+        $mine = $this->staff();
+        $this->salary($mine, ['amount' => 12000]);
+
+        $other = Hostel::factory()->create();
+        $theirs = Staff::create(['hostel_id' => $other->id, 'name' => 'Not Mine',
+            'mobile' => '9700000002', 'monthly_salary' => 5000, 'is_active' => true]);
+        StaffSalaryPayment::create(['hostel_id' => $other->id, 'staff_id' => $theirs->id,
+            'salary_month' => now()->startOfMonth(), 'amount' => 5000, 'paid_on' => now(), 'mode' => 'cash']);
+
+        $payroll = $this->get(route('admin.staff.index'))->assertOk()->viewData('payroll');
+
+        $this->assertArrayHasKey($mine->id, $payroll['paid']);
+        $this->assertArrayNotHasKey($theirs->id, $payroll['paid']);
+    }
+
     public function test_deleting_a_salary_takes_its_expense_mirror_with_it(): void
     {
         $staff = $this->staff();
