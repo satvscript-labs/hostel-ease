@@ -238,7 +238,7 @@
                         <span class="val d-flex align-items-center gap-2 justify-content-end flex-wrap">
                             <span style="font-variant-numeric: tabular-nums;">{{ $staff->aadhaar_number ?: '—' }}</span>
                             @if($staff->aadhaar_file)
-                                <a href="{{ Storage::disk('public')->url($staff->aadhaar_file) }}" target="_blank" rel="noopener"
+                                <a href="{{ route('admin.files.show', ['staff', $staff->id, 'aadhaar_file']) }}" target="_blank" rel="noopener"
                                    class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 text-decoration-none">
                                     <i class="fa-solid fa-file-image me-1"></i>{{ __('View') }}
                                 </a>

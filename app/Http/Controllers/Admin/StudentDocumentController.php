@@ -31,14 +31,15 @@ class StudentDocumentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $directory = "students/documents/{$student->id}";
-        
+        // Private disk, tenant + student scoped (P2). PDFs stored as-is.
+        $directory = "students/{$student->hostel_id}/documents/{$student->id}";
+
         // If it's an image (not a pdf), compress it
         if (str_starts_with($file->getMimeType(), 'image/')) {
             $processed = $this->imageService->compressAndConvertToWebp($file, 1600, 1600, 80);
-            $path = $this->storageService->store($processed['content'], $directory, 'public', $processed['extension']);
+            $path = $this->storageService->store($processed['content'], $directory, 'private', $processed['extension']);
         } else {
-            $path = $this->storageService->store($file, $directory, 'public');
+            $path = $this->storageService->store($file, $directory, 'private');
         }
 
         $document = $student->documents()->create([
@@ -59,7 +60,8 @@ class StudentDocumentController extends Controller
     {
         abort_unless($document->student_id === $student->id, 404);
 
-        $this->storageService->delete($document->file_path, 'public');
+        // purge: the file may be on either disk during the P2→P3 window.
+        $this->storageService->purge($document->file_path);
         $document->delete();
 
         $this->logger->log('document.delete', "Deleted document for {$student->name}", $student);

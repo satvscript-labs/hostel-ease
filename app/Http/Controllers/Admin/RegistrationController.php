@@ -61,6 +61,14 @@ class RegistrationController extends Controller
             'occupation_type' => $registration->occupation_type,
             'join_date' => $registration->joining_date,
             'photo' => $registration->photo,
+            // D2 (private-disk): carry the Aadhaar the applicant uploaded on the
+            // public form over to the student. Before this it was required,
+            // stored, and then dropped here — so a stranger uploaded their
+            // national ID and the app kept it forever, unused. Now it becomes
+            // the student's Aadhaar on record. The path is shared with the
+            // registration row (as `photo` already is); the P3 migration keys
+            // on distinct paths so one file, two rows is handled.
+            'aadhaar_file' => $registration->aadhaar_file,
             'status' => 'active',
         ]);
 

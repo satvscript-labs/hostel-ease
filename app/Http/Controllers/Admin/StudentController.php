@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\PaymentService;
 use App\Services\ImageService;
 use App\Services\StorageService;
+use App\Support\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -96,14 +97,17 @@ class StudentController extends Controller
     {
         $data = $request->validated();
 
+        // Private disk + tenant-scoped paths (P2). aadhaar moves out of the
+        // shared students/documents dir into its own students/{h}/aadhaar,
+        // leaving students/{h}/documents for StudentDocument (plan §3.4).
         if ($request->hasFile('photo')) {
             $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
-            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/photos', 'private', $processed['extension']);
         }
 
         if ($request->hasFile('aadhaar_file')) {
             $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
-            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/documents', 'public', $processed['extension']);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/aadhaar', 'private', $processed['extension']);
         }
 
         $student = Student::create($data);
@@ -250,20 +254,22 @@ class StudentController extends Controller
     {
         $data = $request->validated();
 
+        // purge() clears the old file from whichever disk holds it — public if
+        // it predates P2, private if not (see StorageService::purge).
         if ($request->hasFile('photo')) {
             if ($student->photo) {
-                $this->storageService->delete($student->photo, 'public');
+                $this->storageService->purge($student->photo);
             }
             $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
-            $data['photo'] = $this->storageService->store($processed['content'], 'students/photos', 'public', $processed['extension']);
+            $data['photo'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/photos', 'private', $processed['extension']);
         }
 
         if ($request->hasFile('aadhaar_file')) {
             if ($student->aadhaar_file) {
-                $this->storageService->delete($student->aadhaar_file, 'public');
+                $this->storageService->purge($student->aadhaar_file);
             }
             $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
-            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/documents', 'public', $processed['extension']);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/aadhaar', 'private', $processed['extension']);
         }
 
         $student->update($data);

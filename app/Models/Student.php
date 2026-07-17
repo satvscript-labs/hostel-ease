@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class Student extends Model
 {
@@ -74,10 +73,15 @@ class Student extends Model
         return $this->hasMany(Invoice::class);
     }
 
+    /**
+     * Private-disk P2: a real photo is served through the guarded file route
+     * (SecureFileController — auth + tenant scope), never a public Storage URL.
+     * The ui-avatars fallback for students with no photo is unchanged.
+     */
     public function getPhotoUrlAttribute(): string
     {
         return $this->photo
-            ? Storage::disk('public')->url($this->photo)
+            ? route('admin.files.show', ['student', $this->id, 'photo'])
             : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=C7D2FE&color=3730A3&bold=true&font-size=0.4&rounded=true';
     }
 

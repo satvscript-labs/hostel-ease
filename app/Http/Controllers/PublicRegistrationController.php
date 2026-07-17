@@ -56,14 +56,18 @@ class PublicRegistrationController extends Controller
             'aadhaar_file' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
 
+        // Private disk (P2). This is the PUBLIC, unauthenticated form — before
+        // this, a stranger's Aadhaar landed on a permanent public URL. It now
+        // has no URL at all; only an admin of this hostel can view it, through
+        // SecureFileController. Scoped under the hostel the token belongs to.
         if ($request->hasFile('photo')) {
             $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
-            $data['photo'] = $this->storageService->store($processed['content'], 'registrations/photos', 'public', $processed['extension']);
+            $data['photo'] = $this->storageService->store($processed['content'], 'registrations/'.$hostel->id.'/photos', 'private', $processed['extension']);
         }
 
         if ($request->hasFile('aadhaar_file')) {
             $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1200, 1200, 85);
-            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'registrations/aadhaar', 'public', $processed['extension']);
+            $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'registrations/'.$hostel->id.'/aadhaar', 'private', $processed['extension']);
         }
 
         StudentRegistration::create($data + ['hostel_id' => $hostel->id, 'status' => 'pending']);

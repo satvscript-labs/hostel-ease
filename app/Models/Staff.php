@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class Staff extends Model
 {
@@ -45,11 +44,16 @@ class Staff extends Model
      * The photo was uploaded, compressed on the way in, and replaced on edit —
      * and never once displayed: both pages drew an initial-letter avatar
      * instead. Write-only since the field was added (fixed W7.1).
+     *
+     * Returns the guarded file ROUTE, not a Storage::url() (private-disk P2):
+     * the file has no public URL any more — it's streamed by
+     * SecureFileController after auth + tenant scope. The route is stable
+     * across the P3 move, so nothing here changes when the bytes relocate.
      */
     protected function photoUrl(): Attribute
     {
         return Attribute::get(fn () => $this->photo
-            ? Storage::disk('public')->url($this->photo)
+            ? route('admin.files.show', ['staff', $this->id, 'photo'])
             : null);
     }
 

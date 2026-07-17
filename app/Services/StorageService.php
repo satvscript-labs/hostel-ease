@@ -50,4 +50,22 @@ class StorageService
             Storage::disk($disk)->delete($path);
         }
     }
+
+    /**
+     * Remove a file wherever it lives.
+     *
+     * During the private-disk migration a stored path may point at EITHER disk:
+     * a file uploaded before P2 is on public, one uploaded after is on private.
+     * So replacing or deleting a file has to clean both, or the old copy is
+     * left behind as an unreferenced orphan. `delete()` no-ops when the file
+     * isn't on that disk, so this is safe on both.
+     *
+     * Collapses to a plain private delete at P4, when the public disk is
+     * removed from config entirely (owner decision D5).
+     */
+    public function purge(string $path): void
+    {
+        $this->delete($path, 'private');
+        $this->delete($path, 'public');
+    }
 }

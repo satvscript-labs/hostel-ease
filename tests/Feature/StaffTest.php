@@ -31,6 +31,9 @@ class StaffTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Uploads land on 'private' now (P2); 'public' is faked too because
+        // purge() cleans both during the migration window.
+        Storage::fake('private');
         Storage::fake('public');
 
         $this->hostel = Hostel::factory()->create();
@@ -78,6 +81,41 @@ class StaffTest extends TestCase
         $this->assertDatabaseHas('staff', [
             'name' => 'Sita Devi', 'mobile' => '+919876543210', 'aadhaar_number' => '123456789012',
         ]);
+
+        // P2: the Aadhaar lands on the PRIVATE disk, tenant-scoped, and NOT on
+        // the public web-root disk. This is the whole point of the migration.
+        $staff = Staff::where('name', 'Sita Devi')->firstOrFail();
+        $this->assertStringStartsWith("staff/{$this->hostel->id}/aadhaar/", $staff->aadhaar_file);
+        Storage::disk('private')->assertExists($staff->aadhaar_file);
+        Storage::disk('public')->assertMissing($staff->aadhaar_file);
+    }
+
+    /** photo_url is the guarded route now, never a public Storage URL (P2). */
+    public function test_the_staff_photo_url_is_the_guarded_route(): void
+    {
+        $staff = $this->staff(['photo' => 'staff/1/photos/p.webp']);
+
+        $this->assertSame(route('admin.files.show', ['staff', $staff->id, 'photo']), $staff->photo_url);
+
+        $noPhoto = $this->staff(['photo' => null, 'mobile' => '9800000044']);
+        $this->assertNull($noPhoto->photo_url);
+    }
+
+    /** Replacing a file cleans the old one off WHICHEVER disk holds it — a
+     *  pre-P2 file is still on public, so purge must reach there. */
+    public function test_replacing_a_photo_purges_the_old_file_from_the_public_disk(): void
+    {
+        Storage::disk('public')->put('staff/legacy/old.webp', 'OLD');
+        $staff = $this->staff(['photo' => 'staff/legacy/old.webp']);
+
+        $this->put(route('admin.staff.update', $staff), [
+            'name' => $staff->name, 'mobile' => '9800000001',
+            'aadhaar_number' => '123456789012', 'monthly_salary' => 13000, 'is_active' => '1',
+            'photo' => UploadedFile::fake()->image('new.jpg'),
+        ])->assertSessionHas('success');
+
+        Storage::disk('public')->assertMissing('staff/legacy/old.webp');
+        Storage::disk('private')->assertExists($staff->fresh()->photo);
     }
 
     public function test_future_join_dates_are_rejected(): void

@@ -22,10 +22,17 @@ use Illuminate\View\View;
 
 class StaffController extends Controller
 {
-    /** field => [storage directory, max dimension] */
+    /**
+     * field => [storage directory template, max dimension].
+     *
+     * %d is the hostel id (private-disk migration P2): scoping every upload
+     * under its own tenant makes a cross-tenant path a 404 on disk rather than
+     * a silent hit. Files live on the PRIVATE disk now, reachable only through
+     * admin.files.show — never a public URL.
+     */
     private const IMAGE_FIELDS = [
-        'photo' => ['staff/photos', 800],
-        'aadhaar_file' => ['staff/documents', 1600],
+        'photo' => ['staff/%d/photos', 800],
+        'aadhaar_file' => ['staff/%d/aadhaar', 1600],
     ];
 
     /**
@@ -235,7 +242,7 @@ class StaffController extends Controller
         $data = $this->validateStaff($request);
 
         foreach (self::IMAGE_FIELDS as $field => [$dir, $size]) {
-            $data[$field] = $this->storeImage($request, $field, $dir, $size);
+            $data[$field] = $this->storeImage($request, $field, sprintf($dir, Tenant::id()), $size);
         }
 
         // hostel_id is auto-filled by BelongsToHostel on create.
@@ -257,9 +264,12 @@ class StaffController extends Controller
         foreach (self::IMAGE_FIELDS as $field => [$dir, $size]) {
             unset($data[$field]);
 
-            if ($path = $this->storeImage($request, $field, $dir, $size)) {
+            if ($path = $this->storeImage($request, $field, sprintf($dir, Tenant::id()), $size)) {
                 if ($staff->{$field}) {
-                    $this->storageService->delete($staff->{$field}, 'public');
+                    // purge, not delete: the old file may still be on the public
+                    // disk (uploaded before P2) or on private (after) — clean
+                    // wherever it is, or it orphans.
+                    $this->storageService->purge($staff->{$field});
                 }
                 $data[$field] = $path;
             }
@@ -497,7 +507,7 @@ class StaffController extends Controller
 
         $processed = $this->imageService->compressAndConvertToWebp($request->file($field), $maxDimension, $maxDimension, 80);
 
-        return $this->storageService->store($processed['content'], $directory, 'public', $processed['extension']);
+        return $this->storageService->store($processed['content'], $directory, 'private', $processed['extension']);
     }
 
     protected function validateStaff(Request $request, ?Staff $staff = null): array

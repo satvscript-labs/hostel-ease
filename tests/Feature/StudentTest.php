@@ -21,6 +21,13 @@ class StudentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // validIntake() posts a fake Aadhaar upload, so every store test writes
+        // a file. Fake both disks suite-wide so nothing lands on the real
+        // filesystem — pre-P2 these tests were writing real images into
+        // public/storage on every run.
+        Storage::fake('private');
+        Storage::fake('public');
+
         $this->hostel = Hostel::factory()->create();
         $this->admin = User::factory()->create(['hostel_id' => $this->hostel->id, 'role' => 'hostel_admin']);
         Tenant::set($this->hostel->id);
@@ -54,8 +61,6 @@ class StudentTest extends TestCase
 
     public function test_admin_can_create_a_student_with_photo(): void
     {
-        Storage::fake('public');
-
         $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([
             'photo' => UploadedFile::fake()->image('avatar.jpg'),
         ]))->assertSessionHasNoErrors()->assertRedirect();
@@ -65,8 +70,17 @@ class StudentTest extends TestCase
         // and the country code is part of the stored value.
         $this->assertSame('+919876543210', $student->mobile);
         $this->assertSame('123456789012', $student->aadhaar);
-        $this->assertNotNull($student->photo);
-        Storage::disk('public')->assertExists($student->photo);
+
+        // P2: photo + Aadhaar land on the PRIVATE disk under the tenant, never
+        // on the public web-root disk; Aadhaar sits in its own dir, split off
+        // from documents (plan §3.4).
+        $this->assertStringStartsWith("students/{$this->hostel->id}/photos/", $student->photo);
+        $this->assertStringStartsWith("students/{$this->hostel->id}/aadhaar/", $student->aadhaar_file);
+        Storage::disk('private')->assertExists($student->photo);
+        Storage::disk('public')->assertMissing($student->photo);
+
+        // photo_url is the guarded route now, not a public Storage URL.
+        $this->assertSame(route('admin.files.show', ['student', $student->id, 'photo']), $student->photo_url);
     }
 
     /** A student without a college is not a student record we accept. */

@@ -416,7 +416,7 @@
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 flex-shrink-0">
-                                    <a href="{{ Storage::disk('public')->url($doc->file_path) }}" target="_blank" class="btn btn-white border text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                    <a href="{{ route('admin.files.show', ['document', $doc->id, 'file_path']) }}" target="_blank" rel="noopener" class="btn btn-white border text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
                                     <form action="{{ route('admin.students.documents.destroy', [$student, $doc]) }}" method="POST" class="d-inline" data-confirm="Delete this document?">

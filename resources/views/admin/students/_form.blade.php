@@ -123,7 +123,7 @@
         <div class="premium-panel p-4 text-center mt-0">
             <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">Aadhaar Card <span class="text-danger">*</span></h3>
             <label class="photo-upload-wrap mb-3 d-block mx-auto" style="border-radius: 10px;">
-                <img src="{{ $student?->aadhaar_file ? Storage::disk('public')->url($student->aadhaar_file) : 'https://ui-avatars.com/api/?name=Doc&background=f1f5f9&color=94a3b8' }}" id="aadhaarPreview" alt="Aadhaar">
+                <img src="{{ $student?->aadhaar_file ? route('admin.files.show', ['student', $student->id, 'aadhaar_file']) : 'https://ui-avatars.com/api/?name=Doc&background=f1f5f9&color=94a3b8' }}" id="aadhaarPreview" alt="Aadhaar">
                 <div class="upload-overlay" style="border-radius: 6px;">
                     <div class="text-center">
                         <i class="fa-solid fa-file-arrow-up fs-4 mb-1"></i>
