@@ -1685,6 +1685,41 @@ body {
     margin-left: auto;
 }
 
+/* ── Phone money block ────────────────────────────────────────────────────
+   One figure per row, label left / value right — the phone-card rendering of
+   a money set (§4.10 rule 3: reflow, never crush a figure into a column).
+
+   Promoted from Finance's page-local .fin-money-* on discovery that Security
+   Deposits' _list ALREADY used those class names (W6.4) while the styles only
+   ever existed inside admin/finance/index.blade.php's @push('styles') — so the
+   deposits phone card was rendering completely unstyled: no panel, no row
+   rules, no tabular figures. A pushed <style> block is scoped to the page that
+   pushes it; a class used by a second page has to live here. That is rule 0,
+   and this is what breaking it looks like. */
+.he-money-list {
+    background: var(--he-bg-canvas);
+    border-radius: var(--he-radius-md);
+    padding: 0.35rem 0.85rem;
+    font-feature-settings: 'tnum';
+    font-variant-numeric: tabular-nums;
+}
+.he-money-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+}
+.he-money-row + .he-money-row { border-top: 1px solid rgba(0, 0, 0, 0.05); }
+.he-money-row > :last-child { white-space: nowrap; } /* figures never wrap */
+.he-money-lbl {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--he-text-muted);
+}
+
 /* ── Pager ────────────────────────────────────────────────────────────────
    The app-wide pagination skin (views/vendor/pagination/premium.blade.php,
    registered as the default paginator view in AppServiceProvider — every

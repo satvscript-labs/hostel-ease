@@ -20,6 +20,31 @@ Before writing markup for a dropdown, modal, stat tile, empty state, or skeleton
 
 Full usage for each is in section 6 below. **If a page's need doesn't fit one of these** (e.g. a select needs type-ahead search over hundreds of options, or a dropdown's value must drive live client-side filtering via an external Alpine scope), it's fine to hand-write Alpine for that specific case — that's a real, different requirement, not "reinventing the wheel." Just don't hand-roll a *plain* dropdown/modal/stat-card/empty-state/skeleton when the component already does the job.
 
+### 0.1 A class used by a SECOND page moves to `_premium.scss` — the same day
+
+A page-local `@push('styles')` block is scoped to **the page that pushes it**. It does not exist on any
+other page. So the moment you copy a class *name* out of one page and use it on another, that markup
+renders with **no styles at all** — and nothing warns you. It isn't a 404, a console error, or a failing
+test; the page just quietly looks wrong, and only at the width where that markup appears.
+
+This is not hypothetical. `.fin-money-list` / `.fin-money-row` / `.fin-money-lbl` were defined inside
+`admin/finance/index.blade.php`'s pushed block. W6.4's Security Deposits `_list` used all three. The
+deposits phone card therefore shipped with its money block completely unstyled — no panel, no row
+rules, no tabular figures — and nobody saw it, because it only renders below the 640px container tier.
+It was found in W7.1 only because Staff was about to become the third user. (Now `.he-money-*`, here.)
+
+The rule, then:
+
+- **One page uses it** → page-local `@push('styles')` is correct. Keep it there.
+- **A second page needs it** → it is design-system surface. Move it to `_premium.scss`, rename off the
+  first page's prefix (`fin-` → `he-`), and update the original. Two hand-rolled copies is one too many
+  (rule 0) — but a *shared name with unshared styles* is worse than a copy, because a copy at least works.
+- **Before reusing any `.xx-*` class you saw on another page, check where it's defined.** If the answer
+  is "in that page's `<style>` block", you cannot use it. Promote it first.
+
+The tell is the prefix: a page-scoped class is named after its page (`.fin-`, `.sd-`, `.st-`, `.exp-`).
+If you're typing another page's prefix into your markup, stop — that's this bug, in the act.
+
 ---
 
 ## 1. Liquid Motion Standard & iOS Smoothness

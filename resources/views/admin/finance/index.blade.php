@@ -89,22 +89,8 @@
        amount goes, "Collect" stays. Never wraps, never half-clips. */
     .fin-collect.is-fit-short .fin-collect-amt { display: none; }
 
-    /* Phone money block: one value per row (mobile rule 3). */
-    .fin-money-list {
-        background: var(--he-bg-canvas);
-        border-radius: var(--he-radius-md);
-        padding: 0.35rem 0.85rem;
-        font-feature-settings: 'tnum';
-    }
-    .fin-money-row {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0.35rem 0;
-    }
-    .fin-money-row + .fin-money-row { border-top: 1px solid rgba(0, 0, 0, 0.05); }
-    .fin-money-lbl {
-        font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.5px; color: var(--he-text-muted);
-    }
+    /* Phone money block: now .he-money-* in _premium.scss — it lived here and
+       Security Deposits used the class names without the styles (W7.1). */
 
     /* ── New Invoice: multi-select pills + live summary (W6.1 redesign) ── */
 

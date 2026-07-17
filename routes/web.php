@@ -264,9 +264,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             // --- New module: Staff (salary + attendance) ---
             Route::middleware('access:staff')->group(function () {
                 Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
-                Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show']);
+                Route::post('staff/{staff}/restore', [\App\Http\Controllers\Admin\StaffController::class, 'restore'])
+                    ->whereNumber('staff')->name('staff.restore');
+                Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show'])
+                    // Removing a staff member keeps their salary history (owner
+                    // decision, W7.1), so their profile must stay reachable —
+                    // it is the ONLY place a salary's expense mirror can be
+                    // deleted from (Expenses refuses and points here). Without
+                    // withTrashed the mirror would be un-deletable from both
+                    // sides the moment its staff member was removed.
+                    ->withTrashed(['show']);
                 Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
-                Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])->name('staff.salary.destroy');
+                Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])
+                    ->withTrashed()->name('staff.salary.destroy');
             });
 
             // --- New module: Users & roles (sub-users) ---

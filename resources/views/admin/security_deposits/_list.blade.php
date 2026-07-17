@@ -112,18 +112,18 @@
                         </span>
                     </div>
 
-                    <div class="fin-money-list mb-2">
-                        <div class="fin-money-row">
-                            <span class="fin-money-lbl">{{ __('Deposit') }}</span>
+                    <div class="he-money-list mb-2">
+                        <div class="he-money-row">
+                            <span class="he-money-lbl">{{ __('Deposit') }}</span>
                             <span class="fw-bold">{{ hostelease_money($deposit->amount) }}</span>
                         </div>
                         @if(! $held)
-                            <div class="fin-money-row">
-                                <span class="fin-money-lbl">{{ __('Refunded') }}</span>
+                            <div class="he-money-row">
+                                <span class="he-money-lbl">{{ __('Refunded') }}</span>
                                 <span class="fw-bold text-success">{{ hostelease_money($deposit->refunded_amount) }}</span>
                             </div>
-                            <div class="fin-money-row">
-                                <span class="fin-money-lbl">{{ __('Deducted') }}</span>
+                            <div class="he-money-row">
+                                <span class="he-money-lbl">{{ __('Deducted') }}</span>
                                 <span class="fw-bold {{ (float) $deposit->deducted_amount > 0 ? 'text-danger' : 'text-muted' }}">{{ hostelease_money($deposit->deducted_amount) }}</span>
                             </div>
                         @endif

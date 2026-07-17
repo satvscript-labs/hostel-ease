@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Staff extends Model
 {
@@ -26,6 +28,29 @@ class Staff extends Model
             'join_date' => 'date',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Normalised at the boundary every write crosses, same as User/Hostel
+     * (W6.4). StaffController hand-rolled its own +91 concat, so anything
+     * written from elsewhere — the seeder, a test, a future importer — stored
+     * a different shape and searching by mobile silently missed it.
+     */
+    protected function mobile(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => hostelease_phone($value));
+    }
+
+    /**
+     * The photo was uploaded, compressed on the way in, and replaced on edit —
+     * and never once displayed: both pages drew an initial-letter avatar
+     * instead. Write-only since the field was added (fixed W7.1).
+     */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::get(fn () => $this->photo
+            ? Storage::disk('public')->url($this->photo)
+            : null);
     }
 
     public function attendances(): HasMany

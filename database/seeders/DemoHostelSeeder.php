@@ -408,12 +408,18 @@ class DemoHostelSeeder extends Seeder
             $this->seedCustodyScenarios($hostel, $owner);
         }
 
-        // --- STAFF & ATTENDANCE & SALARY ---
+        // --- STAFF, ATTENDANCE & PAYROLL (W7.1) ---
+        // Mobiles were '77000000'.$hostel->id — NINE digits. Harmless while
+        // nothing normalised them; now that Staff has the +91 mutator (like
+        // User/Hostel) they'd persist as a malformed +91770000001.
+        $stMobile = fn (int $n) => '98'.str_pad((string) $hostel->id, 2, '0', STR_PAD_LEFT)
+            .str_pad((string) $n, 6, '0', STR_PAD_LEFT);
+
         $staff1 = Staff::create([
             'hostel_id' => $hostel->id,
             'name' => 'Govind Watchman',
             'designation' => 'Security Guard',
-            'mobile' => '77000000' . $hostel->id,
+            'mobile' => $stMobile(1),
             'monthly_salary' => 12000,
             'join_date' => now()->subMonths(5),
             'is_active' => true,
@@ -422,31 +428,83 @@ class DemoHostelSeeder extends Seeder
             'hostel_id' => $hostel->id,
             'name' => 'Sita Cleaner',
             'designation' => 'Housekeeping',
-            'mobile' => '77000011' . $hostel->id,
+            'mobile' => $stMobile(2),
             'monthly_salary' => 10000,
             'join_date' => now()->subMonths(3),
             'is_active' => true,
         ]);
+        // Still on file, off the attendance roster — gives the directory's
+        // status filter something to actually find.
+        Staff::create([
+            'hostel_id' => $hostel->id,
+            'name' => 'Ravi Former-Cook',
+            'designation' => 'Cook',
+            'mobile' => $stMobile(3),
+            'monthly_salary' => 9000,
+            'join_date' => now()->subMonths(14),
+            'is_active' => false,
+            'notes' => 'Left at the end of last season.',
+        ]);
 
-        // Attendance
-        for ($i = 1; $i <= 5; $i++) {
+        // A real mix across the current month, not five identical "present"
+        // rows: the profile's four counters and the Present-days column say
+        // nothing when every row is the same.
+        $pattern = ['present', 'present', 'absent', 'present', 'half_day', 'present', 'leave', 'present'];
+        foreach ($pattern as $i => $status) {
+            $day = now()->startOfMonth()->addDays($i);
+            if ($day->isFuture()) {
+                break;
+            }
+
             StaffAttendance::create([
                 'hostel_id' => $hostel->id,
                 'staff_id' => $staff1->id,
-                'date' => now()->subDays($i),
-                'status' => 'present',
+                'date' => $day,
+                'status' => $status,
+            ]);
+            StaffAttendance::create([
+                'hostel_id' => $hostel->id,
+                'staff_id' => $staff2->id,
+                'date' => $day,
+                'status' => $status === 'absent' ? 'present' : $status,
             ]);
         }
 
-        // Salary
-        StaffSalaryPayment::create([
-            'hostel_id' => $hostel->id,
-            'staff_id' => $staff1->id,
-            'amount' => 12000,
-            'salary_month' => now()->subMonth()->startOfMonth(),
-            'paid_on' => now()->subDays(5),
-            'mode' => 'cash',
-        ]);
+        // Salary + its expense mirror are ONE fact recorded twice (W6.2). The
+        // seeder wrote the salary alone, so demo payroll never reached
+        // Expenses or Net Profit — precisely the bug the mirror exists to
+        // prevent, sitting in the data we demo with.
+        $paySalary = function (Staff $member, $month, float $amount, string $mode) use ($hostel, $owner) {
+            $paidOn = $month->copy()->endOfMonth()->min(now());
+
+            $payment = StaffSalaryPayment::create([
+                'hostel_id' => $hostel->id,
+                'staff_id' => $member->id,
+                'salary_month' => $month,
+                'amount' => $amount,
+                'paid_on' => $paidOn,
+                'mode' => $mode,
+            ]);
+
+            Expense::create([
+                'hostel_id' => $hostel->id,
+                'category' => 'staff_salary',
+                'title' => "Salary — {$member->name} · {$month->format('M Y')}",
+                'amount' => $amount,
+                'expense_date' => $paidOn,
+                'paid_to' => $member->name,
+                'mode' => $mode,
+                'recorded_by' => $owner->id,
+                'staff_salary_payment_id' => $payment->id,
+            ]);
+        };
+
+        $paySalary($staff1, now()->subMonths(2)->startOfMonth(), 12000, 'cash');
+        $paySalary($staff1, now()->subMonth()->startOfMonth(), 12000, 'upi');
+        $paySalary($staff2, now()->subMonth()->startOfMonth(), 10000, 'cash');
+        // This month: one paid, one still owed — so "Monthly Payroll" and
+        // "Paid This Month" differ, which is the whole point of showing both.
+        $paySalary($staff1, now()->startOfMonth(), 12000, 'cash');
 
         // --- EXPENSES ---
         Expense::create([

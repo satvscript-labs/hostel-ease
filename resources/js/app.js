@@ -379,13 +379,31 @@ export function placeMenu(trigger, menu) {
     if (menu._hePlacing) return;
     menu._hePlacing = true;
 
-    const reposition = () => {
+    const reposition = (event) => {
         if (!menu.isConnected || menu.offsetParent === null) {
             window.removeEventListener('resize', reposition);
             window.removeEventListener('scroll', reposition, true);
             menu._hePlacing = false;
             return;
         }
+
+        // A scroll INSIDE the menu is the menu doing exactly what place() just
+        // asked of it (clamp the height, scroll the content). Re-placing on it
+        // is fatal, and silently so:
+        //
+        //   place() clears max-height to re-measure the default position → the
+        //   menu briefly fits its own content → nothing overflows → the browser
+        //   clamps scrollTop to 0 → max-height goes back on, scrollTop stays 0.
+        //
+        // Every wheel tick therefore snapped the list back to the top, so any
+        // menu tall enough to need scrolling could not be scrolled AT ALL. The
+        // scrollbar was right there, and dragging it did nothing. The capture
+        // listener is what makes this reachable: scroll events don't bubble,
+        // but capture sees them on the way DOWN to any target, menu included.
+        //
+        // Only re-place when something ELSE moved the trigger.
+        if (event?.target instanceof Node && menu.contains(event.target)) return;
+
         place();
     };
 

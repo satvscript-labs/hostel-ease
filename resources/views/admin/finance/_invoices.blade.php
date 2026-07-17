@@ -110,17 +110,17 @@
                     </div>
 
                     {{-- Money: one value per row, full width (mobile rule 3). --}}
-                    <div class="fin-money-list mb-2">
-                        <div class="fin-money-row">
-                            <span class="fin-money-lbl">{{ __('Amount') }}</span>
+                    <div class="he-money-list mb-2">
+                        <div class="he-money-row">
+                            <span class="he-money-lbl">{{ __('Amount') }}</span>
                             <span class="fw-bold">{{ hostelease_money($invoice->amount) }}</span>
                         </div>
-                        <div class="fin-money-row">
-                            <span class="fin-money-lbl">{{ __('Paid') }}</span>
+                        <div class="he-money-row">
+                            <span class="he-money-lbl">{{ __('Paid') }}</span>
                             <span class="fw-bold text-success">{{ hostelease_money($invoice->paid_amount) }}</span>
                         </div>
-                        <div class="fin-money-row">
-                            <span class="fin-money-lbl">{{ __('Balance') }}</span>
+                        <div class="he-money-row">
+                            <span class="he-money-lbl">{{ __('Balance') }}</span>
                             <span class="fw-bold {{ $invoice->balance > 0 ? 'text-danger' : 'text-muted' }}">{{ hostelease_money($invoice->balance) }}</span>
                         </div>
                     </div>

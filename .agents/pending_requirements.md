@@ -153,11 +153,56 @@ Recommend deriving, not denormalising, unless profiling says otherwise.
 open questions above, then build `AcMeterService` + wire the four call-sites. Additive, no schema
 change, no migration, no data backfill.
 
-## 5. Reverse Transaction (Research Pending)
+## 5. Identity Documents Are On A Public Disk (Deferred by decision — W7.1, own phase)
+
+**Status:** Raised and deferred in W7.1 with the owner. Not a W7 regression — it is how the app has
+always stored documents — but staff Aadhaar is the most sensitive data in the product, so it is
+recorded here rather than left as folklore.
+
+**What's actually wrong.** Staff photos and Aadhaar cards are written to the **`public` disk**
+(`StaffController::storeImage` → `StorageService::store(..., 'public', ...)`), and student documents
+go the same way (`StudentDocumentController::store`). That is not a folder name — it is a
+behaviour: the file is served straight off the web server at `/storage/...`, so **none of the app's
+guards ever run**. SetTenant, `role:`/`access:` middleware, route-model binding, the TenantScope —
+all of it is bypassed, because the request never reaches PHP. Anyone holding the URL can open the
+file, logged in or not, tenant or not. The Aadhaar *number* is also stored as plain text in
+`staff.aadhaar_number`.
+
+The realistic exposure is not filename brute force (the names are random enough). It is that **the
+URL is the only credential, and URLs leak**: pasted into WhatsApp, left in browser history on a
+shared front-desk PC, cached by a proxy, sent in a `Referer` header to a third party, harvested by
+a browser extension. Once out, the link works forever, for anyone, and cannot be revoked — deleting
+the file is the only remedy, and nothing is logged, because the app never saw the request.
+
+**The fix (its own phase — deliberately NOT folded into a UI rebuild):**
+
+1. Move both `staff/*` and `students/*` to a **private** disk (outside the web root).
+2. Add an authenticated streaming route per document type — resolve the model (tenant scope applies),
+   authorize, then `Storage::disk('private')->response($path)`. The controller becomes the guard.
+3. Data migration: physically relocate existing files and rewrite the stored paths. Not reversible
+   by hand — needs a real migration + a dry-run.
+4. Replace every `Storage::disk('public')->url(...)` call in the views with the new route (staff
+   profile, student documents).
+5. Consider encrypting `aadhaar_number` at rest (`encrypted` cast) and masking it in the UI
+   (`XXXX XXXX 9012`) — a number displayed in full to every sub-user is its own exposure.
+
+**Why deferred (owner agreed):** fixing staff alone leaves the larger student pile exposed while
+feeling done, and a file-relocation migration tangled into a page rebuild means debugging both at
+once if either half breaks. It wants its own phase and its own testing.
+
+**Worth stating plainly:** India's DPDP Act 2023 treats Aadhaar as sensitive personal data. This is
+*defer and schedule*, not *ignore*.
+
+**Action Required:** schedule as its own phase. No decisions blocked — the shape above is settled;
+only step 5 (encrypt/mask) is a judgment call worth confirming when picked up.
+
+---
+
+## 6. Reverse Transaction (Research Pending)
 
 - {PS: i want you to Research this entire thing and i want a system that when we reverse a transaction it just simple should not ask confirmation and reverse the thing ... in some cases you would have collected money and might keep it even after reversing ... so we ask what most app asks, that is, if reverse to original payment methods... or transfer money to credit and keep money ... so i want you to Research this and give me your side of suggestions and way to tackle this thing. [after Research replace this point with your research and suggestions and all]}
 
-## 6. Minor UI Changes
+## 7. Minor UI Changes
 
 1. in mobile ui, only use short forms rather then full "45 minutes ago"
 2. fix mobile ui, raws in tablet view is not a good UI, they are inconsistent, elements are not aligned (might be aligned coding wise but atleast in terms of view they are not aligned)
