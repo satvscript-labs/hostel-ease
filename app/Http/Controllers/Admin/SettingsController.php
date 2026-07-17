@@ -59,6 +59,19 @@ class SettingsController extends Controller
 
         $myBranches = Hostel::whereIn('id', $accessibleIds)->orderBy('name')->get();
 
+        // Branch card micro-stats (W9). Raw DB, NOT the models: Bed/Student
+        // carry the tenant global scope, which silently filters every count to
+        // the ACTIVE branch — the other cards would all read 0.
+        $bedStats = \Illuminate\Support\Facades\DB::table('beds')
+            ->whereIn('hostel_id', $accessibleIds)
+            ->selectRaw("hostel_id, COUNT(*) total, SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) occupied")
+            ->groupBy('hostel_id')->get()->keyBy('hostel_id');
+        $studentStats = \Illuminate\Support\Facades\DB::table('students')
+            ->whereIn('hostel_id', $accessibleIds)->whereNull('deleted_at')
+            ->where('status', 'active')
+            ->selectRaw('hostel_id, COUNT(*) n')
+            ->groupBy('hostel_id')->pluck('n', 'hostel_id');
+
         // Account context — the one anchor every branch renews against.
         $account = $this->accountBilling->accountFor($owner);
 
@@ -70,6 +83,8 @@ class SettingsController extends Controller
             'roleAccess' => config('hostelease.role_access'),
             'userBranches' => $myBranches,
             'myBranches' => $myBranches,
+            'bedStats' => $bedStats,
+            'studentStats' => $studentStats,
             'account' => $account,
             'activeHostelId' => Tenant::id(),
             'razorpayEnabled' => $this->razorpay->isConfigured(),

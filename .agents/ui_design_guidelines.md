@@ -465,6 +465,58 @@ only the content the dropdown floats above (lists, tile grids).
 Viewport media queries remain correct for things that genuinely follow the *window*: the sidebar
 itself, the FAB, the page title scale, modal sizing.
 
+### 4.11 List rows ALIGN — the list owns the columns (subgrid), phones get iOS rows
+
+Two row sins, found across every audit-era list at once (owner review, W9):
+
+1. **Per-row grids drift.** When each row is its own grid, every row sizes its own columns —
+   so badges, chips and action buttons land at a slightly different x in every row, and the list
+   reads ragged even though each row is individually "correct". **Vertical alignment must be
+   structural, not luck:** the LIST declares `display:grid` with the one column template, and each
+   row inherits it with `grid-column: 1 / -1; display:grid; grid-template-columns: subgrid`.
+   Table alignment, card looks. (Settings' `.su-list`/`.su-row` is the reference.)
+   Mind the tier override trap: a phone-tier `grid-template-columns` on the row must be
+   RE-overridden back to `subgrid` inside the wide container block, or the wide tier silently
+   stops aligning.
+
+2. **Phone rows are not shrunken desktop rows.** Chips piles, badge stacks and inline icon-button
+   rows all wrap, collide, or crush at 344px (Galaxy Fold cover ≈ the narrowest real screen).
+   The phone tier is the **iOS inset-list row**: leading avatar, a title line, ONE secondary
+   TEXT line (`role · branch, branch` — text truncates; chips don't), a status dot, and a single
+   trailing **⋯** that opens a **bottom action sheet** (slide-up, grab handle, full-width thumb
+   rows, same forms + `data-confirm` as desktop). Actions never render inline on the phone tier.
+
+3. **Bespoke rows are legitimate — this is a toolkit, not a uniform.** Rows already carrying
+   their own working, unique mobile design KEEP it. Some rows hold too much for the iOS
+   single-line shape; some have elements no other list has. What every row must take from the
+   system is the underlying discipline — subgrid-aligned columns on the wide tier, the explicit
+   shrink chain, actions off the phone tier where density demands it — blended into that page's
+   own design, not a forced lookalike.
+
+4. **The TABLET tier is the real systemic gap — it must be DESIGNED, never inherited.** (Owner
+   diagnosis, W9.) Every audit-era list flips wide↔card at the 640px container tier and upgrades
+   to a one-line grid at ≥880. The **640–880 band — precisely a tablet, and a sidebar-squeezed
+   desktop — is where most rows break**: the wide grid stays active but doesn't fit, so left
+   elements cling left, right elements cling right, and whatever's between wraps ad hoc. That
+   band is only correct where a page explicitly AUTHORED its middle state as a two-line reflow
+   (Finance `_invoices`, Security Deposits — identity on top, data below, actions anchored across
+   both, §4.10 rule 3). The rule: **a row has three states or it has two designed states — it
+   never has a squeezed state.** When building or migrating any list, style the 640–880 band
+   deliberately and test AT ~700px container width, not just phone and full desktop.
+
+5. **The `min-width:auto` trap — the shrink chain must be explicit at EVERY level.** A flex or
+   grid CHILD refuses to shrink below its content unless `min-width: 0` is set on it — and on
+   every wrapper between it and the text. Miss one level and the longest row silently shoves its
+   trailing siblings (status dot, ⋯ button) off the right edge of the screen, while every
+   short-text row looks perfect — so the bug hides until real data arrives. Two rules:
+   - `class="min-w-0"` now works (defined in `_premium.scss` — **Bootstrap never shipped it**;
+     for months every usage in this codebase was silently a no-op), but a row SYSTEM must not
+     depend on a utility class: bake `min-width: 0` into the row's own CSS (`.su-text` pattern).
+   - **Verify with the longest seeded row at 344px and 428px**, not the average one. Truncation
+     that only the widest data exercises is untested truncation.
+
+Rollout to the other audit-era lists is tracked as pending_requirements §8.
+
 ### 4.10 Nothing crushes — floors, nowrap figures, reflow
 
 Three rules, one principle: **when space runs out, the layout changes shape; it never mangles its

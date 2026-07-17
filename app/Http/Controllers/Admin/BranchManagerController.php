@@ -34,6 +34,33 @@ class BranchManagerController extends Controller
 
 
 
+    /**
+     * Rename a branch (W9 — owners previously couldn't rename their own
+     * branches anywhere). Deliberately name-and-address ONLY: status, owner,
+     * billing and subscription fields belong to Super Admin, and this route
+     * must never grow into a side door for them.
+     */
+    public function rename(Request $request, Hostel $hostel): RedirectResponse
+    {
+        // Only the ACCOUNT OWNER of this branch may rename it — not co-admins,
+        // not staff, and never another account's owner.
+        abort_unless($hostel->owner_id === $request->user()->id, 404);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $old = $hostel->name;
+        $hostel->update($data);
+
+        $this->logger->log('branch.rename', "Branch renamed — '{$old}' → '{$hostel->name}'", $hostel);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'branches'])
+            ->with('success', 'Branch details updated.');
+    }
+
     public function store(Request $request): RedirectResponse
     {
         // Production lock (P4 item 15): branch creation has billing consequences

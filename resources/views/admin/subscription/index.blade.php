@@ -35,7 +35,25 @@
 
 @push('styles')
 <style>
-    .sub-hero { border-radius: 1.4rem; position: relative; overflow: hidden; color:#fff; }
+    /* The hero measures ITSELF (container units), so its metrics shrink as a
+       whole instead of wrapping mid-figure on phones (§4.10 rule 2). Safe to
+       contain: nothing inside floats a dropdown (§4.9 warning). */
+    .sub-hero { border-radius: 1.4rem; position: relative; overflow: hidden; color:#fff; container-type: inline-size; }
+    .sub-metric, .sub-hero .h4 { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: clamp(0.95rem, 3.6cqi + 0.3rem, 1.5rem); }
+    /* Asymmetric metric grid: short values (Branches, Term) take the space
+       they need; long ones (date, money) get the remainder. Two paired rows
+       on phones, one four-across row when the hero is wide. */
+    .sub-metrics { display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: 0.85rem 1.25rem; }
+    .sub-metric-lbl { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255, 255, 255, 0.55); white-space: nowrap; }
+    @container (min-width: 560px) {
+        .sub-metrics { grid-template-columns: auto minmax(0, 1.2fr) auto minmax(0, 1.2fr); column-gap: 2rem; }
+    }
+    /* Lock notice (W9): a glass CARD, not a cramped pill — it holds a sentence,
+       and a sentence needs a surface, an icon anchor, and room to wrap. */
+    .sub-lock { display:flex; align-items:flex-start; gap:.7rem; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:.75rem .95rem; backdrop-filter:blur(10px); max-width:340px; }
+    .sub-lock-ic { width:34px; height:34px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.18); font-size:.85rem; }
+    .sub-lock-title { font-weight:800; font-size:.8rem; line-height:1.25; }
+    .sub-lock-sub { font-size:.7rem; opacity:.75; line-height:1.35; }
     .sub-hero-bg { position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:0; pointer-events:none; }
     .sub-hero-bg::after { content:''; position:absolute; top:-40%; right:-8%; width:420px; height:420px; background:radial-gradient(circle, rgba(147,51,234,0.4), transparent 70%); }
     .hero-active  { background: var(--he-gradient-mesh, linear-gradient(135deg,#0f172a,#1e1b4b)); }
@@ -61,9 +79,12 @@
 
 @section('content')
 <div class="page-enter" x-data="ownerSubscription()">
-    <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">My Subscription</h1>
-        <p class="text-muted mb-0 small">Renew every branch together, on one date, in one payment.</p>
+    {{-- Standard page head (W9 mobile pass): title scale follows the system. --}}
+    <div class="he-page-head mb-4">
+        <div>
+            <h1 class="he-page-title">{{ __('My Subscription') }}</h1>
+            <p class="he-page-sub">{{ __('Renew every branch together, on one date, in one payment.') }}</p>
+        </div>
     </div>
 
     {{-- ── Status hero ── --}}
@@ -100,21 +121,29 @@
                     <a href="tel:" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>Contact support</a>
                 @elseif(! $selfServe)
                     {{-- Production lock: supervised billing (P4 item 15). --}}
-                    <div class="d-flex align-items-center gap-2 bg-white bg-opacity-10 rounded-pill px-3 py-2" style="backdrop-filter: blur(8px);">
-                        <i class="fa-solid fa-shield-halved"></i>
-                        <span class="small fw-semibold">Renewals are handled by HostelEase support</span>
+                    <div class="sub-lock">
+                        <span class="sub-lock-ic"><i class="fa-solid fa-shield-halved"></i></span>
+                        <span>
+                            <span class="sub-lock-title d-block">{{ __('Managed by HostelEase') }}</span>
+                            <span class="sub-lock-sub d-block">{{ __('Renewals and new branches are set up for you — contact support anytime.') }}</span>
+                        </span>
                     </div>
                 @endif
             </div>
 
-            <div class="row g-3 mt-2">
-                <div class="col-6 col-md-3"><div class="text-white-50 small text-uppercase" style="letter-spacing:.5px;">Branches</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
-                <div class="col-6 col-md-3"><div class="text-white-50 small text-uppercase" style="letter-spacing:.5px;">{{ $status === AccountStatus::Trial ? 'Trial ends' : 'Renews on' }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
-                <div class="col-6 col-md-3"><div class="text-white-50 small text-uppercase" style="letter-spacing:.5px;">Term</div><div class="h4 fw-bold mb-0">{{ $account->period?->label() ?? 'Yearly' }}</div></div>
-                <div class="col-6 col-md-3">
-                    <div class="text-white-50 small text-uppercase" style="letter-spacing:.5px;">Next total</div>
+            {{-- Metric grid: ASYMMETRIC columns (owner). Branches and Term are
+                 short (a digit, a word) — dates and money are long. Equal
+                 halves starved the long pair on a 344px Fold; auto|1fr gives
+                 each side what it actually needs. One grid on phones, four
+                 across when the hero is wide. --}}
+            <div class="sub-metrics mt-3">
+                <div><div class="sub-metric-lbl">Branches</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
+                <div><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? 'Trial ends' : 'Renews on' }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
+                <div><div class="sub-metric-lbl">Term</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->label() ?? 'Yearly' }}</div></div>
+                <div>
+                    <div class="sub-metric-lbl">Next total</div>
                     <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($q['final']) }}</div>
-                    @if($q['discount'] > 0)<div class="small text-white-50">Discount applied −{{ hostelease_money($q['discount']) }}</div>@endif
+                    @if($q['discount'] > 0)<div class="small text-white-50" style="white-space:nowrap;">Discount −{{ hostelease_money($q['discount']) }}</div>@endif
                 </div>
             </div>
         </div>

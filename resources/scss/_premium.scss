@@ -1685,6 +1685,16 @@ body {
     margin-left: auto;
 }
 
+/* ── min-width utility ────────────────────────────────────────────────────
+   Bootstrap 5 ships NO min-width utilities, yet this codebase has been writing
+   class="min-w-0" for months — every one was silently a no-op. That's the
+   flex/grid min-width:auto trap (W9 owner find): a flex or grid CHILD refuses
+   to shrink below its content unless min-width:0 is set at EVERY nesting
+   level, so long text pushes its siblings (status dots, ⋯ buttons) clean off
+   the screen while short rows look fine. Defined once here, every existing
+   usage starts working. */
+.min-w-0 { min-width: 0 !important; }
+
 /* ── Phone money block ────────────────────────────────────────────────────
    One figure per row, label left / value right — the phone-card rendering of
    a money set (§4.10 rule 3: reflow, never crush a figure into a column).

@@ -28,37 +28,50 @@
             @php($activeId = \App\Support\Tenant::id())
             @php($activeBranch = $branches->firstWhere('id', $activeId))
             <div class="dropdown">
-                <button class="topbar-action-btn" data-bs-toggle="dropdown" title="{{ __('Switch Branch') }}">
-                    <i class="fa-solid fa-code-branch"></i>
+                {{-- W9: the switcher SAYS which branch you're in (desktop) — an
+                     owner running several branches shouldn't have to open a
+                     menu to know where a payment is about to land. Icon-only
+                     below lg, per the owner's call. --}}
+                <button class="topbar-branch" data-bs-toggle="dropdown" title="{{ __('Switch Branch') }}">
+                    <span class="topbar-branch-ic"><i class="fa-solid fa-code-branch"></i></span>
+                    <span class="topbar-branch-txt d-none d-lg-flex">
+                        <span class="topbar-branch-lbl">{{ __('Branch') }}</span>
+                        <span class="topbar-branch-name">{{ \Illuminate\Support\Str::limit(optional($activeBranch)->name ?? __('Branch'), 18) }}</span>
+                    </span>
+                    <i class="fa-solid fa-chevron-down d-none d-lg-inline topbar-branch-chev"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 py-2">
-                    <li>
-                        <h6 class="dropdown-header text-uppercase small fw-bold text-primary">{{ __('Current Branch') }}</h6>
+                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-2" style="min-width: 260px;">
+                    {{-- Identity header — same language as the account menu (W9). --}}
+                    <li class="px-2 pb-2 mb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background: var(--he-bg-canvas, #f8fafc);">
+                            <span class="rounded-3 d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 38px; height: 38px; background: var(--he-gradient-pop, linear-gradient(135deg, #4f46e5, #9333ea));"><i class="fa-solid fa-hotel"></i></span>
+                            <div class="min-w-0">
+                                <div class="text-uppercase fw-bold text-muted" style="font-size: 0.58rem; letter-spacing: 0.5px;">{{ __('Current Branch') }}</div>
+                                <div class="fw-bold text-dark text-truncate" style="font-size: 0.88rem;">{{ optional($activeBranch)->name ?? 'Branch' }}</div>
+                            </div>
+                        </div>
                     </li>
-                    <li>
-                        <div class="px-3 py-1 fw-bold text-dark mb-2">{{ \Illuminate\Support\Str::limit(optional($activeBranch)->name ?? 'Branch', 20) }}</div>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
                     @foreach($branches as $b)
                         @if($activeId != $b->id)
                             <li>
-                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ route('branch.switch', $b) }}">
-                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
-                                        <i class="fa-solid fa-building text-secondary" style="font-size: 0.8rem;"></i>
+                                <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2" href="{{ route('branch.switch', $b) }}">
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center flex-shrink-0" style="width: 28px; height: 28px;">
+                                        <i class="fa-solid fa-building text-secondary" style="font-size: 0.75rem;"></i>
                                     </div>
-                                    {{ $b->name }}
+                                    <span class="fw-semibold small text-truncate">{{ $b->name }}</span>
+                                    <i class="fa-solid fa-right-left ms-auto text-muted" style="font-size: 0.6rem;"></i>
                                 </a>
                             </li>
                         @endif
                     @endforeach
                     @if($user->isHostelAdmin())
-                    <li><hr class="dropdown-divider"></li>
+                    <li><hr class="dropdown-divider my-2"></li>
                     <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-bold" href="{{ route('admin.settings.index', ['tab' => 'branches']) }}">
-                            <div class="bg-primary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
-                                <i class="fa-solid fa-layer-group text-primary" style="font-size: 0.8rem;"></i>
+                        <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2 text-primary fw-bold" href="{{ route('admin.settings.index', ['tab' => 'branches']) }}">
+                            <div class="bg-primary bg-opacity-10 rounded d-flex align-items-center justify-content-center flex-shrink-0" style="width: 28px; height: 28px;">
+                                <i class="fa-solid fa-layer-group text-primary" style="font-size: 0.75rem;"></i>
                             </div>
-                            {{ __('Manage Branches') }}
+                            <span class="small">{{ __('Manage Branches') }}</span>
                         </a>
                     </li>
                     @endif
@@ -126,14 +139,37 @@
 
         {{-- User Profile --}}
         <div class="dropdown ms-1">
-            <div class="topbar-avatar" data-bs-toggle="dropdown" title="{{ $user->name }}">
-                {{ strtoupper(substr($user->name, 0, 1)) }}
-            </div>
-            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-2" style="min-width: 240px;">
-                <li class="px-3 py-2 mb-2 border-bottom">
-                    <div class="fw-bold text-dark text-truncate">{{ $user->name }}</div>
-                    <div class="small text-muted">{{ hostelease_phone($user->mobile) }}</div>
+            {{-- W9: name + role ride beside the avatar on desktop — the account
+                 control reads as a person, not an anonymous circle. --}}
+            <button class="topbar-account" data-bs-toggle="dropdown" title="{{ $user->name }}">
+                <span class="topbar-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                <span class="topbar-account-txt d-none d-lg-flex">
+                    <span class="topbar-account-name">{{ \Illuminate\Support\Str::limit($user->name, 16) }}</span>
+                    <span class="topbar-account-role">{{ config('hostelease.roles.'.$user->role) ?? config('hostelease.staff_roles.'.$user->role, ucfirst($user->role)) }}</span>
+                </span>
+                <i class="fa-solid fa-chevron-down d-none d-lg-inline topbar-branch-chev"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-2" style="min-width: 250px;">
+                {{-- Identity header — gradient avatar, same language as Settings. --}}
+                <li class="px-2 pb-2 mb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background: var(--he-bg-canvas, #f8fafc);">
+                        <span class="rounded-3 d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0" style="width: 38px; height: 38px; background: var(--he-gradient-pop, linear-gradient(135deg, #4f46e5, #9333ea));">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                        <div class="min-w-0">
+                            <div class="fw-bold text-dark text-truncate" style="font-size: 0.88rem;">{{ $user->name }}</div>
+                            <div class="small text-muted text-truncate">{{ hostelease_phone($user->mobile) }}</div>
+                        </div>
+                    </div>
                 </li>
+                @if($user->isHostelAdmin())
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2" href="{{ route('admin.settings.index') }}">
+                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-secondary" style="width: 28px; height: 28px;">
+                            <i class="fa-solid fa-gear" style="font-size: 0.75rem;"></i>
+                        </div>
+                        <span class="fw-semibold small">{{ __('Settings') }}</span>
+                    </a>
+                </li>
+                @endif
                 <li>
                     <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2" href="{{ route('profile.password') }}">
                         <div class="bg-light rounded d-flex align-items-center justify-content-center text-secondary" style="width: 28px; height: 28px;">
@@ -157,6 +193,51 @@
 </header>
 
 <style>
+    /* ─── Branch switcher + account triggers (W9) ─────────────
+       Desktop: labelled premium pills — the chrome SAYS which branch and who.
+       Below lg both collapse to their icon/avatar (the d-none d-lg-* spans). */
+    /* Rounded RECTANGLES, not pills: the topbar's geometry is 10–14px squircles
+       (search 14px, action buttons + avatar 10px) — a 9999px pill wrapping a
+       rounded-square avatar clashed. 12px sits between its neighbours. */
+    .topbar-branch, .topbar-account {
+        display: flex; align-items: center; gap: 0.55rem;
+        /* Quiet white + hairline (owner): the raised grey fill read as a heavy
+           slab next to the airy action icons — the search bar earns its fill
+           because it IS an input; these are buttons. */
+        border: 1.5px solid rgba(0, 0, 0, 0.07);
+        background: var(--he-bg-surface, #fff);
+        border-radius: 12px;
+        padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+        transition: all 0.25s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+        cursor: pointer;
+    }
+    .topbar-branch:hover, .topbar-account:hover,
+    .topbar-branch[aria-expanded="true"], .topbar-account[aria-expanded="true"] {
+        border-color: rgba(79, 70, 229, 0.35);
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.12);
+        transform: translateY(-1px);
+    }
+    .topbar-branch:active, .topbar-account:active { transform: translateY(0) scale(0.97); }
+    .topbar-branch-ic {
+        width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--he-primary-soft, rgba(79, 70, 229, 0.1));
+        color: var(--he-primary, #4f46e5); font-size: 0.8rem;
+    }
+    .topbar-branch-txt, .topbar-account-txt { flex-direction: column; align-items: flex-start; line-height: 1.15; min-width: 0; }
+    .topbar-branch-lbl, .topbar-account-role {
+        font-size: 0.58rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.5px; color: var(--he-text-muted, #64748b);
+    }
+    .topbar-branch-name, .topbar-account-name {
+        font-size: 0.8rem; font-weight: 700; color: var(--he-text-main, #0f172a);
+        white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topbar-branch-chev { font-size: 0.55rem; color: var(--he-text-muted, #64748b); }
+    @media (max-width: 991.98px) {
+        .topbar-branch, .topbar-account { border: 0; background: transparent; padding: 0.2rem; }
+    }
+
     /* ─── Topbar Shell ────────────────────────────────────── */
     .he-topbar {
         position: sticky;

@@ -186,15 +186,21 @@
         </a>
         @endif
 
-        {{-- User Card --}}
+        {{-- User Card (W9): interactive — the card is the identity anchor, so
+             it carries the two things you reach for at the bottom of a nav:
+             who am I (proper role label, not a raw column) and get me out. --}}
         <div class="sidebar-user-card">
             <div class="sidebar-user-avatar">
                 {{ strtoupper(substr($user->name, 0, 1)) }}
             </div>
             <div class="sidebar-user-info">
-                <span class="sidebar-user-name">{{ Str::limit($user->name, 16) }}</span>
-                <span class="sidebar-user-role">{{ $user->isSuperAdmin() ? 'Super Admin' : ucfirst(str_replace('_', ' ', $user->role)) }}</span>
+                <span class="sidebar-user-name">{{ Str::limit($user->name, 14) }}</span>
+                <span class="sidebar-user-role">{{ $user->isSuperAdmin() ? __('Super Admin') : (config('hostelease.roles.'.$user->role) ?? config('hostelease.staff_roles.'.$user->role, ucfirst(str_replace('_', ' ', $user->role)))) }}</span>
             </div>
+            <button type="button" class="sidebar-user-logout" title="{{ __('Logout') }}" aria-label="{{ __('Logout') }}"
+                    onclick="document.getElementById('logout-form').submit()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
         </div>
     </div>
 </aside>
@@ -203,6 +209,18 @@
      SIDEBAR STYLES — Ultra Premium Design System
 ═══════════════════════════════════════════════════════════════ --}}
 <style>
+    /* ─── User-card logout (W9) ───────────────────────────── */
+    .sidebar-user-logout {
+        margin-left: auto; flex-shrink: 0;
+        width: 32px; height: 32px; border: 0; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.55);
+        font-size: 0.8rem;
+        transition: all 0.2s var(--sb-smooth, ease);
+    }
+    .sidebar-user-logout:hover { background: rgba(239, 68, 68, 0.9); color: #fff; }
+    .sidebar-user-logout:active { transform: scale(0.92); }
+
     /* ─── Easing Tokens ───────────────────────────────────── */
     :root {
         --sb-spring: cubic-bezier(0.25, 1, 0.5, 1);

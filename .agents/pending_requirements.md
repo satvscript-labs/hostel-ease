@@ -230,7 +230,59 @@ wanted; the W8 report-page skeleton makes each one a small standalone slice.
 - **Payroll report** — salary paid per month/staff vs contracted (W7.2 data). Proposed, not picked.
 - **Moves & Churn** — joins vs leaves per month from bed_assignments. Proposed, not picked.
 
-## 8. Minor UI Changes
+## 8. Aligned Row System — Rollout To Every Audit-Era List (Owner, Jul-18)
+
+**Status:** Law written (`ui_design_guidelines.md` §4.11), reference implementation shipped
+(Settings → Team & access, W9). Rollout to the remaining lists pending.
+
+**The owner's finding, verbatim intent:** every list built during the UI audit suffers the same two
+flaws — (1) on PC, row segments are not vertically aligned ("everything is dependent on what's on
+the left and what's on the right"), because each row is its own grid sizing its own columns; and
+(2) on phones the rows are shrunken desktop rows — chip piles and inline icon buttons that wrap,
+collide with the FAB, and break outright at 344px (Galaxy Z Fold cover screen). Wrapping is not
+acceptable; horizontal scrolling is not acceptable.
+
+**The system (see §4.11 for the full law):**
+- **PC:** the LIST owns one grid column template; rows inherit via `grid-template-columns: subgrid`
+  → every badge/chip/action column starts at the same x in every row. Structural, not luck.
+- **Phone:** iOS inset-list rows — avatar, title, ONE truncating secondary TEXT line (never chips),
+  status dot, one trailing ⋯ opening a bottom action sheet (grab handle, thumb rows, same forms +
+  data-confirm). Actions never inline.
+
+**Pitfall found on the reference implementation itself (owner, 428px test) — every migration must
+check for it:** the `min-width:auto` trap. Flex/grid children never shrink below their content
+unless `min-width: 0` is set at EVERY nesting level; one missed wrapper and the longest row pushes
+its status dot and ⋯ button off-screen while short rows look fine — so it hides until real data
+arrives. Also discovered: `class="min-w-0"` was a **no-op across the entire codebase** (Bootstrap
+never shipped that utility; it's now defined in `_premium.scss`). Rule for each migrated list:
+bake `min-width:0` into the row's own CSS (`.su-text` pattern), never rely on the utility class,
+and **verify with the longest seeded row at 344px and 428px**, not the average one.
+
+**Scope refinements (owner, Jul-18 — read before migrating anything):**
+
+1. **Bespoke rows stay.** Rows that already carry their own working, unique mobile UI keep it —
+   not every row can or should look the same. Some rows hold too much for the iOS single-line
+   shape; some have elements no other list has. Each page BLENDS the system's discipline
+   (subgrid-aligned wide columns, explicit shrink chain, actions off the phone tier where dense)
+   into its own design. The rollout is not homogenisation.
+
+2. **The primary target is the TABLET tier (640–880px container), not the phone tier.** Survey
+   finding (Jul-18): every audit-era list flips wide↔card at 640 and upgrades to one-line at 880 —
+   so in the 640–880 band (a tablet, or a sidebar-squeezed desktop) most rows run the wide grid
+   *squeezed*: left elements cling left, right cling right, the middle wraps ad hoc. Only pages
+   that explicitly authored a middle state are correct there (Finance `_invoices`, Security
+   Deposits — two-line reflow, actions anchored). **Per-page deliverable #1 is therefore: design
+   the 640–880 state deliberately** (§4.11 rule 4 — "a row never has a squeezed state"), and test
+   at ~700px container width. The subgrid alignment + phone sheet are deliverables #2/#3 where
+   they fit the page.
+
+**Lists to migrate** (audit-era):
+Finance `_invoices`/`_transactions`, Expenses `_list`, AC Bills records, Security Deposits `_list`,
+Pocket Money `_list`, Staff `_list`, Students index rows, Front Desk visitors/complaints,
+Registrations. Each is a page-local change; do them opportunistically per page touched, or as one
+dedicated pass.
+
+## 9. Minor UI Changes
 
 1. in mobile ui, only use short forms rather then full "45 minutes ago"
 2. fix mobile ui, raws in tablet view is not a good UI, they are inconsistent, elements are not aligned (might be aligned coding wise but atleast in terms of view they are not aligned)

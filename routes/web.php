@@ -95,6 +95,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::middleware('role:hostel_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
         Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
+        Route::patch('branches/{hostel}/rename', [\App\Http\Controllers\Admin\BranchManagerController::class, 'rename'])->name('branches.rename');
         Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
         Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
 
