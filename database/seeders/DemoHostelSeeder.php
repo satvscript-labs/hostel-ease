@@ -360,7 +360,10 @@ class DemoHostelSeeder extends Seeder
                 ], [
                     'amount' => 5000,
                     'payment_mode_id' => PaymentMode::where('hostel_id', $hostel->id)->first()->id ?? 1,
-                    'receipt_number' => "SD-{$hostel->id}-{$student->id}",
+                    // Same shape SecurityDepositController::nextReceiptNumber()
+                    // produces (SD-{hostel}-00001) — seeded rows must be
+                    // indistinguishable from ones the app made.
+                    'receipt_number' => "SD-{$hostel->id}-".str_pad((string) ($idx + 1), 5, '0', STR_PAD_LEFT),
                     'collected_on' => $student->join_date,
                     'created_by' => $owner->id,
                 ]);
@@ -402,6 +405,7 @@ class DemoHostelSeeder extends Seeder
         // _artifact/ui_ux_audit/03_testing_w6.3.md are unambiguous.
         if (! str_contains($hostel->name, 'Girls')) {
             $this->seedAcScenarios($hostel);
+            $this->seedCustodyScenarios($hostel, $owner);
         }
 
         // --- STAFF & ATTENDANCE & SALARY ---
@@ -575,6 +579,71 @@ class DemoHostelSeeder extends Seeder
         }
 
         return $bill;
+    }
+
+    /**
+     * W6.4 custody scenarios — the states the three money-custody pages have
+     * to render but that ordinary demo data never produces: a settled
+     * deposit, a leaver who still holds money, a lent-out (negative) wallet,
+     * and payment modes on both sides of the delete/deactivate guard.
+     *
+     * Without these the Refunded/Deducted tiles read ₹0 forever, the revert
+     * button never appears, the "Departed with money" filter matches nothing,
+     * and every mode card looks identical.
+     */
+    protected function seedCustodyScenarios(Hostel $hostel, User $owner): void
+    {
+        $mode = PaymentMode::where('hostel_id', $hostel->id)->value('id');
+
+        // ── A SETTLED deposit: ₹5,000 = ₹4,000 back + ₹1,000 kept.
+        // Satisfies the full-settlement rule exactly (refunded + deducted ==
+        // amount), which is what the app now enforces on every refund.
+        $leaver = Student::firstOrCreate(
+            ['hostel_id' => $hostel->id, 'mobile' => '9760000001'],
+            ['name' => 'Rohit Kulkarni', 'occupation_type' => 'student', 'status' => 'left',
+                'city' => 'Ahmedabad', 'state' => 'Gujarat',
+                'join_date' => now()->subMonths(8), 'leave_date' => now()->subMonths(1),
+                'fee_amount' => 5000, 'fee_frequency' => 'monthly']
+        );
+        \App\Models\SecurityDeposit::firstOrCreate(
+            ['hostel_id' => $hostel->id, 'student_id' => $leaver->id],
+            [
+                'amount' => 5000, 'status' => 'refunded', 'payment_mode_id' => $mode,
+                'receipt_number' => "SD-{$hostel->id}-90001",
+                'collected_on' => now()->subMonths(8),
+                'refunded_on' => now()->subMonths(1),
+                'refunded_amount' => 4000, 'deducted_amount' => 1000,
+                'refund_note' => 'Mattress damage deducted; balance returned in cash.',
+                'created_by' => $owner->id,
+            ]
+        );
+
+        // ── A leaver who still HOLDS pocket money: the row the old page hid
+        // while its footer total still counted the balance.
+        foreach ([['deposit', 3000, 'Initial deposit'], ['withdraw', 1200, 'Canteen']] as [$type, $amt, $note]) {
+            PocketMoneyTransaction::create(['hostel_id' => $hostel->id, 'student_id' => $leaver->id,
+                'type' => $type, 'amount' => $amt, 'note' => $note, 'created_by' => $owner->id]);
+        }
+
+        // ── A LENT-OUT wallet (negative balance) — allowed by design, and the
+        // "Lent Out" filter needs something to match.
+        $borrower = Student::where('hostel_id', $hostel->id)->where('status', 'active')->orderBy('id')->first();
+        if ($borrower) {
+            PocketMoneyTransaction::create(['hostel_id' => $hostel->id, 'student_id' => $borrower->id,
+                'type' => 'withdraw', 'amount' => 3000, 'note' => 'Emergency cash advance',
+                'created_by' => $owner->id]);
+        }
+
+        // ── Payment modes on both sides of the W6.4 guard: one INACTIVE (still
+        // naming its history), one NEVER USED (the only kind that may delete).
+        PaymentMode::firstOrCreate(
+            ['hostel_id' => $hostel->id, 'code' => 'old_wallet'],
+            ['name' => 'Paytm Wallet (retired)', 'is_active' => false, 'requires_reference' => true, 'sort_order' => 90]
+        );
+        PaymentMode::firstOrCreate(
+            ['hostel_id' => $hostel->id, 'code' => 'demand_draft'],
+            ['name' => 'Demand Draft', 'is_active' => true, 'requires_reference' => true, 'sort_order' => 91]
+        );
     }
 
     /**
