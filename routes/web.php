@@ -166,6 +166,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->prefix('admin')->name('admin.')->group(function () {
             Route::get('dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
+            /*
+             * The only way to read an uploaded file (Aadhaar, photo, agreement).
+             * Deliberately NOT inside an `access:` group: it serves several
+             * areas, so the controller checks the right one per source against
+             * the same rule the middleware uses. See SecureFileController and
+             * _artifact/ui_ux_audit/05_private_disk_plan.md.
+             */
+            Route::get('files/{source}/{id}/{field}', [\App\Http\Controllers\Admin\SecureFileController::class, 'show'])
+                ->whereNumber('id')
+                ->whereAlpha('source')
+                ->where('field', '[a-z_]+')
+                ->name('files.show');
+
             // --- Module 1: Property Board ---
             Route::middleware('access:property')->group(function () {
                 Route::get('property', [\App\Http\Controllers\Admin\PropertyController::class, 'index'])->name('property.index');

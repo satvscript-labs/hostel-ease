@@ -196,6 +196,23 @@ once if either half breaks. It wants its own phase and its own testing.
 **Action Required:** schedule as its own phase. No decisions blocked — the shape above is settled;
 only step 5 (encrypt/mask) is a judgment call worth confirming when picked up.
 
+**Full plan written 2026-07-17 → `_artifact/ui_ux_audit/05_private_disk_plan.md`** (phases P1–P5,
+complete verified inventory, the migration command's copy-verify-rewrite design, tests, and the five
+open decisions). Three findings there change the shape and are worth knowing even if this never gets
+picked up:
+
+- The **public registration form marks an Aadhaar image `required`, stores it on a public URL, and
+  nothing in the app ever reads it** — `approve()` copies only `photo`. Maximum liability, zero
+  benefit. Fix it or stop collecting it; both beat today.
+- `approve()` **shares one photo path across two rows** (`student_registrations.photo` and
+  `students.photo`), so any path rewrite must key on distinct paths, not rows. (It also means
+  deleting a student's photo silently breaks the registration's — live today, unrelated.)
+- `config/filesystems.php` still carries a `links` entry mapping `public_path('storage')` →
+  `storage_path('app/public')`, while the `public` disk's root **is** `public_path('storage')`.
+  `php artisan storage:link --force` would replace that real directory — holding every upload — with
+  a symlink and orphan the lot. Inert only because nobody has run it. **Delete the entry regardless
+  of whether this phase happens.**
+
 ---
 
 ## 6. Reverse Transaction (Research Pending)
