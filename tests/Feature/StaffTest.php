@@ -101,12 +101,11 @@ class StaffTest extends TestCase
         $this->assertNull($noPhoto->photo_url);
     }
 
-    /** Replacing a file cleans the old one off WHICHEVER disk holds it — a
-     *  pre-P2 file is still on public, so purge must reach there. */
-    public function test_replacing_a_photo_purges_the_old_file_from_the_public_disk(): void
+    /** Replacing a photo deletes the old private file and writes the new one. */
+    public function test_replacing_a_photo_deletes_the_old_private_file(): void
     {
-        Storage::disk('public')->put('staff/legacy/old.webp', 'OLD');
-        $staff = $this->staff(['photo' => 'staff/legacy/old.webp']);
+        Storage::disk('private')->put("staff/{$this->hostel->id}/photos/old.webp", 'OLD');
+        $staff = $this->staff(['photo' => "staff/{$this->hostel->id}/photos/old.webp"]);
 
         $this->put(route('admin.staff.update', $staff), [
             'name' => $staff->name, 'mobile' => '9800000001',
@@ -114,7 +113,7 @@ class StaffTest extends TestCase
             'photo' => UploadedFile::fake()->image('new.jpg'),
         ])->assertSessionHas('success');
 
-        Storage::disk('public')->assertMissing('staff/legacy/old.webp');
+        Storage::disk('private')->assertMissing("staff/{$this->hostel->id}/photos/old.webp");
         Storage::disk('private')->assertExists($staff->fresh()->photo);
     }
 

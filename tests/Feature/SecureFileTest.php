@@ -184,17 +184,18 @@ class SecureFileTest extends TestCase
     }
 
     /**
-     * P2 ships before the files move (P3), so a path still living on the legacy
-     * public disk has to resolve through here too — otherwise every existing
-     * document 404s the moment the views switch over.
+     * P4: the legacy public-disk fallback is gone. A file that somehow lives
+     * only on public (never migrated) must NOT be served — it is a 404, same as
+     * any other missing file. This is the guarantee that closing the door
+     * actually closed it.
      */
-    public function test_a_legacy_file_still_on_the_public_disk_is_served(): void
+    public function test_a_file_only_on_the_legacy_public_disk_is_not_served(): void
     {
         Storage::disk('private')->delete('staff/photos/face.webp');
         Storage::disk('public')->put('staff/photos/face.webp', 'OLD-FACE-BYTES');
 
-        $res = $this->actingAs($this->owner)->get($this->url('staff', $this->staff->id, 'photo'))->assertOk();
-
-        $this->assertSame('OLD-FACE-BYTES', $res->streamedContent());
+        $this->actingAs($this->owner)
+            ->get($this->url('staff', $this->staff->id, 'photo'))
+            ->assertNotFound();
     }
 }

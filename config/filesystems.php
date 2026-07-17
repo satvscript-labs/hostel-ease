@@ -33,26 +33,28 @@ return [
         ],
 
         /*
-         * DEPRECATED — being emptied by the private-disk migration
-         * (_artifact/ui_ux_audit/05_private_disk_plan.md). Nothing new may be
-         * written here; it exists only until the last legacy file has moved,
-         * then it is deleted from this config entirely (owner decision D5) so
-         * that reaching for 'public' throws instead of silently leaking.
+         * The 'public' disk is intentionally DISABLED (private-disk migration
+         * P4, owner decision D5). Every upload in this app is personal data and
+         * now lives on the 'private' disk, served through SecureFileController.
          *
-         * Files here are served by the WEB SERVER, straight off disk, before
-         * PHP runs — so auth, SetTenant, TenantScope, route binding and the
-         * activity log are all bypassed. The URL is the only credential.
+         * Why a bogus driver instead of deleting the key or setting it null:
+         *  · Laravel 11 merges the framework's DEFAULT filesystems config
+         *    underneath this file, and that default defines a real 'public'
+         *    disk — so just removing the key lets a working disk reappear.
+         *  · null can't be used either: the framework's serveFiles() iterates
+         *    every disk at boot and requires each to be an array, so null
+         *    crashes the whole app on boot.
+         * A disk with an unregistered driver satisfies boot (it's an array with
+         * a 'driver' key, and shouldServeFiles only skips it) yet makes any
+         * actual use — Storage::disk('public')->put(...) — throw
+         * "Driver [disabled] is not supported". So the old mistake fails loudly
+         * instead of silently writing a file the web server could hand out.
+         *
+         * The files this disk once held were migrated by
+         * hostelease:privatise-uploads (P3) and public/storage emptied by
+         * hostelease:purge-public-uploads (P4). Do not re-enable it.
          */
-        'public' => [
-            'driver' => 'local',
-            // Write public uploads straight into public/storage so no symlink is
-            // needed — shared hosts (e.g. Hostinger) disable symlink()/exec().
-            'root' => public_path('storage'),
-            'url' => env('APP_URL').'/storage',
-            'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
-        ],
+        'public' => ['driver' => 'disabled'],
 
         's3' => [
             'driver' => 's3',

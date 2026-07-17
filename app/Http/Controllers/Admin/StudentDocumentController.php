@@ -60,8 +60,7 @@ class StudentDocumentController extends Controller
     {
         abort_unless($document->student_id === $student->id, 404);
 
-        // purge: the file may be on either disk during the P2→P3 window.
-        $this->storageService->purge($document->file_path);
+        $this->storageService->delete($document->file_path);
         $document->delete();
 
         $this->logger->log('document.delete', "Deleted document for {$student->name}", $student);

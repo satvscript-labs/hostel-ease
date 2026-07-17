@@ -28,9 +28,8 @@ use Symfony\Component\HttpFoundation\Response;
  * the web root, and this controller is the guard: resolve → tenant-scope →
  * authorise → stream.
  *
- * Part of P1 (_artifact/ui_ux_audit/05_private_disk_plan.md). Serving from the
- * legacy public disk as a fallback is P2's job — until the migration runs, old
- * paths still resolve there.
+ * Introduced in P1 (_artifact/ui_ux_audit/05_private_disk_plan.md); the legacy
+ * public-disk fallback that carried P2/P3 is now removed (P4) — private only.
  */
 class SecureFileController extends Controller
 {
@@ -110,19 +109,14 @@ class SecureFileController extends Controller
     }
 
     /**
-     * Stream from the private disk, falling back to the legacy public disk for
-     * files the migration hasn't moved yet (P3). The fallback is deleted in P4,
-     * along with the public disk itself.
+     * Stream from the private disk. The P2/P3 fallback to the legacy public disk
+     * is gone (P4): every file has been migrated, the public disk no longer
+     * exists in config, and a path that isn't on private is simply a 404.
      */
     private function stream(Request $request, string $path): Response
     {
         $disk = Storage::disk('private');
-
-        if (! $disk->exists($path)) {
-            $legacy = Storage::disk('public');
-            abort_unless($legacy->exists($path), 404);
-            $disk = $legacy;
-        }
+        abort_unless($disk->exists($path), 404);
 
         // Weak-compare the client's tag: browsers may send W/"..." back.
         $etag = '"'.md5($path.'|'.$disk->lastModified($path).'|'.$disk->size($path)).'"';
@@ -138,8 +132,8 @@ class SecureFileController extends Controller
             return response('', 304, $headers);
         }
 
-        // ->response() streams and sets Content-Type from the file, so the one
-        // PDF in student_documents serves inline correctly alongside the webps.
+        // ->response() streams and sets Content-Type from the file itself, so
+        // the image opens inline in the browser tab.
         return $disk->response($path, null, $headers);
     }
 }

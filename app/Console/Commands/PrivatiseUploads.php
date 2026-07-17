@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -28,6 +29,10 @@ use Illuminate\Support\Facades\Storage;
  * Keyed on DISTINCT PATHS, not rows: approve() shares one file across two rows
  * (a registration's photo/Aadhaar becomes the student's — plan §3.2), so a file
  * is copied once and every row that referenced it is rewritten together.
+ *
+ * Reads public/storage as a PHYSICAL folder (File + public_path), not through a
+ * 'public' disk: P4 removes that disk from config, and this command runs before
+ * P4 in the same codebase, so it must not depend on it.
  */
 class PrivatiseUploads extends Command
 {
@@ -78,7 +83,6 @@ class PrivatiseUploads extends Command
         }
 
         $private = Storage::disk('private');
-        $public = Storage::disk('public');
 
         $report = [
             'moved' => 0, 'already_private' => 0, 'rows_rewritten' => 0,
@@ -89,7 +93,11 @@ class PrivatiseUploads extends Command
         //    it's unaffected by anything rewritten below. Reported, never
         //    deleted — the stray .jpg names in registrations/photos look like
         //    an older code path and deserve human eyes (plan §6).
-        foreach ($public->allFiles() as $file) {
+        //
+        //    public/storage is addressed as a PHYSICAL folder (File + public_path),
+        //    NOT through a 'public' disk — that disk is removed from config by P4,
+        //    and this command must keep working after that (it runs before it).
+        foreach ($this->publicFiles() as $file) {
             // Skip framework housekeeping (.gitignore etc.) — those are not
             // uploads and flagging them as orphans is just noise.
             if (str_starts_with(basename($file), '.')) {
@@ -104,14 +112,14 @@ class PrivatiseUploads extends Command
         foreach ($refs as $path => $owners) {
             // A file P2 already wrote (or a prior run moved) lives on private and
             // not on public. Nothing to do.
-            if ($private->exists($path) && ! $public->exists($path)) {
+            if ($private->exists($path) && ! $this->publicExists($path)) {
                 $report['already_private']++;
 
                 continue;
             }
 
             // The row points at a file that is on neither disk.
-            if (! $public->exists($path)) {
+            if (! $this->publicExists($path)) {
                 $report['missing'][] = ['path' => $path, 'owners' => $owners];
 
                 continue;
@@ -142,7 +150,7 @@ class PrivatiseUploads extends Command
                 continue;
             }
 
-            if (! $this->copyVerify($public, $private, $path, $target)) {
+            if (! $this->copyVerify($private, $path, $target)) {
                 $report['mismatches'][] = ['path' => $path, 'target' => $target];
 
                 continue;
@@ -178,10 +186,10 @@ class PrivatiseUploads extends Command
      * content hash match. On any mismatch, remove the partial copy so a re-run
      * starts clean, and return false.
      */
-    private function copyVerify($public, $private, string $path, string $target): bool
+    private function copyVerify($private, string $path, string $target): bool
     {
-        $bytes = $public->get($path);
-        if ($bytes === null) {
+        $bytes = @file_get_contents($this->publicPath($path));
+        if ($bytes === false) {
             return false;
         }
 
@@ -195,6 +203,31 @@ class PrivatiseUploads extends Command
         }
 
         return true;
+    }
+
+    /** Absolute path of a stored path inside the public/storage folder. */
+    private function publicPath(string $path): string
+    {
+        return public_path('storage/'.$path);
+    }
+
+    private function publicExists(string $path): bool
+    {
+        return is_file($this->publicPath($path));
+    }
+
+    /** Every file under public/storage, as forward-slashed paths relative to it. */
+    private function publicFiles(): array
+    {
+        $root = public_path('storage');
+        if (! is_dir($root)) {
+            return [];
+        }
+
+        return array_map(
+            fn ($file) => str_replace('\\', '/', ltrim(substr($file->getPathname(), strlen($root)), '\\/')),
+            File::allFiles($root)
+        );
     }
 
     /**

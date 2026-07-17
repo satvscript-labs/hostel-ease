@@ -254,11 +254,9 @@ class StudentController extends Controller
     {
         $data = $request->validated();
 
-        // purge() clears the old file from whichever disk holds it — public if
-        // it predates P2, private if not (see StorageService::purge).
         if ($request->hasFile('photo')) {
             if ($student->photo) {
-                $this->storageService->purge($student->photo);
+                $this->storageService->delete($student->photo);
             }
             $processed = $this->imageService->compressAndConvertToWebp($request->file('photo'), 800, 800, 80);
             $data['photo'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/photos', 'private', $processed['extension']);
@@ -266,7 +264,7 @@ class StudentController extends Controller
 
         if ($request->hasFile('aadhaar_file')) {
             if ($student->aadhaar_file) {
-                $this->storageService->purge($student->aadhaar_file);
+                $this->storageService->delete($student->aadhaar_file);
             }
             $processed = $this->imageService->compressAndConvertToWebp($request->file('aadhaar_file'), 1600, 1600, 80);
             $data['aadhaar_file'] = $this->storageService->store($processed['content'], 'students/'.Tenant::id().'/aadhaar', 'private', $processed['extension']);

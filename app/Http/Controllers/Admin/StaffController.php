@@ -266,10 +266,7 @@ class StaffController extends Controller
 
             if ($path = $this->storeImage($request, $field, sprintf($dir, Tenant::id()), $size)) {
                 if ($staff->{$field}) {
-                    // purge, not delete: the old file may still be on the public
-                    // disk (uploaded before P2) or on private (after) — clean
-                    // wherever it is, or it orphans.
-                    $this->storageService->purge($staff->{$field});
+                    $this->storageService->delete($staff->{$field});
                 }
                 $data[$field] = $path;
             }

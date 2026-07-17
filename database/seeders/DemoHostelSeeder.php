@@ -282,7 +282,16 @@ class DemoHostelSeeder extends Seeder
 
         $toOccupy = (int) ceil(count($studentPool) * 0.6);
         $enrolledStudents = [];
-        
+
+        // A real image placeholder on the PRIVATE disk, so the demo's documents
+        // actually open through SecureFileController instead of 404-ing on a
+        // path that was never written (the app accepts images only — no PDFs).
+        // One per hostel, shared by that hostel's demo docs; each row is still
+        // authorised independently by the controller. New-shape path so it sits
+        // where a real upload would (private-disk P2/P4).
+        $docPlaceholder = "students/{$hostel->id}/documents/sample-aadhaar.png";
+        \Illuminate\Support\Facades\Storage::disk('private')->put($docPlaceholder, $this->demoIdImage());
+
         foreach (array_slice($studentPool, 0, $toOccupy) as $idx => $slot) {
             $mobileSuffix = $hostel->id . str_pad((string) $idx, 2, '0', STR_PAD_LEFT);
             $student = Student::firstOrCreate(
@@ -304,10 +313,10 @@ class DemoHostelSeeder extends Seeder
             );
             $enrolledStudents[] = $student;
 
-            // Documents
+            // Documents — a real, viewable placeholder on the private disk.
             StudentDocument::firstOrCreate(
                 ['student_id' => $student->id, 'type' => 'aadhaar'],
-                ['file_path' => 'dummy/aadhaar.pdf', 'hostel_id' => $hostel->id]
+                ['file_path' => $docPlaceholder, 'hostel_id' => $hostel->id]
             );
 
             BedAssignment::firstOrCreate(
@@ -624,6 +633,44 @@ class DemoHostelSeeder extends Seeder
      * controller produces. Seeded bills must be indistinguishable from ones
      * the app made, or they teach the tester the wrong thing.
      */
+    /**
+     * A small, real, viewable placeholder image (bytes) for demo documents.
+     * Drawn with GD when it's available (a labelled card), with a tiny embedded
+     * PNG as a fallback so seeding never depends on the GD extension.
+     */
+    protected function demoIdImage(): string
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        if (function_exists('imagecreatetruecolor')) {
+            $img = imagecreatetruecolor(440, 280);
+            $bg = imagecolorallocate($img, 79, 70, 229);      // brand indigo
+            $panel = imagecolorallocate($img, 255, 255, 255);
+            $ink = imagecolorallocate($img, 15, 23, 42);
+            $muted = imagecolorallocate($img, 100, 116, 139);
+            imagefilledrectangle($img, 0, 0, 440, 280, $bg);
+            imagefilledrectangle($img, 20, 20, 420, 260, $panel);
+            imagestring($img, 5, 40, 50, 'HOSTELEASE', $ink);
+            imagestring($img, 5, 40, 80, 'DEMO ID DOCUMENT', $muted);
+            imagestring($img, 4, 40, 140, 'Sample Aadhaar - not real data', $muted);
+            imagestring($img, 3, 40, 200, 'Served via SecureFileController', $muted);
+            ob_start();
+            imagepng($img);
+            $cached = (string) ob_get_clean();
+            imagedestroy($img);
+
+            return $cached;
+        }
+
+        // Fallback: a minimal valid 1x1 PNG.
+        return $cached = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+        );
+    }
+
     protected function generateAcBill(Hostel $hostel, Room $room, \Illuminate\Support\Carbon $month, float $prev, float $curr, float $rate): ?AcBill
     {
         $units = $curr - $prev;
