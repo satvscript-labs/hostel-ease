@@ -329,8 +329,10 @@ class DemoHostelSeeder extends Seeder
 
             $slot['bed']->update(['status' => 'occupied']);
 
-            // Invoices and payments
-            for ($m = 0; $m < 2; $m++) {
+            // Invoices and payments — three months so the WHOLE history window
+            // (attendance/expenses reach back two full months) has income too;
+            // otherwise a quarter P&L shows a fake all-loss first month.
+            for ($m = 0; $m < 3; $m++) {
                 $monthDate = now()->subMonths($m)->startOfMonth();
                 $type = $student->occupation_type === 'working' ? 'rent' : 'fee';
                 $title = $type === 'rent' ? 'Rent - ' . $monthDate->format('M Y') : 'Semester Fee - S' . ($m + 1);
@@ -348,15 +350,24 @@ class DemoHostelSeeder extends Seeder
                     ]
                 );
 
+                // Scattered across the month (day 2–24, deterministic) and
+                // across four modes — so Collections has a real daily spread
+                // and Income-by-Mode has more than two bars. W8 seeder pass:
+                // everything used to land on day 6, cash/upi only.
+                $mode = ['cash', 'upi', 'cheque', 'rtgs'][($idx + $m) % 4];
                 app(\App\Services\PaymentService::class)->record([
                     'hostel_id' => $hostel->id,
                     'student_id' => $student->id,
                     'amount' => $invoice->amount,
                     'payment_type' => 'full',
-                    'mode' => ['cash', 'upi'][$m % 2],
-                    'paid_on' => $monthDate->copy()->addDays(6),
+                    'mode' => $mode,
+                    // Scatter, capped at yesterday — a receipt dated in the
+                    // future is a record of something that hasn't happened.
+                    'paid_on' => $monthDate->copy()->addDays(2 + (($idx * 7 + $m * 11) % 23))->min(now()->subDay()),
                     'collected_by' => $owner->id,
-                    'reference_number' => "RCPT-{$hostel->id}-{$student->id}-{$m}",
+                    'reference_number' => in_array($mode, ['cheque', 'rtgs'])
+                        ? strtoupper($mode).'-'.(400100 + $idx * 13 + $m)
+                        : "RCPT-{$hostel->id}-{$student->id}-{$m}",
                 ]);
             }
 
@@ -455,44 +466,34 @@ class DemoHostelSeeder extends Seeder
             'notes' => 'Left at the end of last season.',
         ]);
 
-        // A real mix, and on the RECENT days — the W7.3 week strip shows the
-        // last 7, so marks stranded at the start of the month would leave it
-        // looking like attendance had never been taken at all.
+        // EVERY day, two full months back through yesterday (W8 seeder pass —
+        // dense, testable history). Deterministic: Sundays are leave, a fixed
+        // rhythm of absents/half-days breaks up the green.
         //
-        // TODAY is deliberately left unmarked: that's the state the page is
-        // built around, so "Mark all present" has something to do the moment
-        // you open it. Yesterday backwards, stopping at this month's start so
-        // the profile's month counters stay meaningful.
-        // Index i is i+1 days ago, so i=0..5 land inside the visible 7-day
-        // strip (today is its 7th slot). Anything past i=5 is only reachable by
-        // paging back a week.
-        $pattern = ['present', 'absent', 'present', 'half_day', 'present', 'leave', 'present', 'present', 'present'];
-        foreach ($pattern as $i => $status) {
-            $day = now()->subDays($i + 1)->startOfDay();
-            if ($day->lt(now()->startOfMonth())) {
-                break;
-            }
-
+        // TODAY stays unmarked ("Mark all present" must have work the moment
+        // the page opens), and Sita is skipped 3 days ago so the week strip
+        // keeps its amber partial-day dot — "someone was missed" is the whole
+        // reason the strip exists.
+        $day = now()->copy()->subMonthsNoOverflow(2)->startOfMonth();
+        for ($i = 0; $day->lt(now()->startOfDay()); $day->addDay(), $i++) {
             StaffAttendance::create([
                 'hostel_id' => $hostel->id,
                 'staff_id' => $staff1->id,
-                'date' => $day,
-                'status' => $status,
+                'date' => $day->copy(),
+                'status' => $day->isSunday() ? 'leave'
+                    : ($i % 11 === 4 ? 'absent' : ($i % 13 === 7 ? 'half_day' : 'present')),
             ]);
 
-            // Sita is left unmarked on ONE day inside the strip, so it shows a
-            // PARTIAL (amber) dot. All-marked and none-marked alone never
-            // demonstrate what the third dot state is for — and "someone was
-            // missed" is the whole reason the strip exists.
-            if ($i === 2) {
-                continue;
+            if ($day->isSameDay(now()->subDays(3))) {
+                continue; // Sita unmarked → the amber dot
             }
 
             StaffAttendance::create([
                 'hostel_id' => $hostel->id,
                 'staff_id' => $staff2->id,
-                'date' => $day,
-                'status' => $status === 'absent' ? 'present' : $status,
+                'date' => $day->copy(),
+                'status' => $day->isSunday() ? 'leave'
+                    : ($i % 9 === 5 ? 'absent' : ($i % 17 === 3 ? 'half_day' : 'present')),
             ]);
         }
 
@@ -606,6 +607,9 @@ class DemoHostelSeeder extends Seeder
             ]);
         }
 
+        // --- TWO-MONTH DAILY HISTORY (W8) ---
+        $this->seedDailyHistory($hostel, $owner, $enrolledStudents);
+
         // --- NOTIFICATIONS ---
         Notification::create([
             'hostel_id' => $hostel->id,
@@ -633,6 +637,156 @@ class DemoHostelSeeder extends Seeder
      * controller produces. Seeded bills must be indistinguishable from ones
      * the app made, or they teach the tester the wrong thing.
      */
+    /**
+     * Two months of day-by-day operational history (W8 seeder pass).
+     *
+     * The point: every report and list page should have a real spread to show
+     * — Collections a daily rhythm, P&L two full months, Dues genuine aging
+     * buckets, Front Desk a populated log — instead of one row per concept.
+     * Deterministic (modular rhythms, no rand) so reseeds are comparable.
+     */
+    protected function seedDailyHistory(Hostel $hostel, User $owner, array $students): void
+    {
+        if ($students === []) {
+            return;
+        }
+
+        $start = now()->copy()->subMonthsNoOverflow(2)->startOfMonth();
+        $categories = [
+            ['electricity', 'Electricity top-up', 'State Electricity Board', 1800],
+            ['maintenance', 'Repairs & upkeep', 'Local Handyman', 900],
+            ['groceries', 'Mess groceries', 'Wholesale Mart', 2600],
+            ['water', 'Water tanker', 'Aqua Supplier', 700],
+            ['internet', 'Broadband', 'Fibernet ISP', 1200],
+            ['cleaning', 'Housekeeping supplies', 'CleanCo', 550],
+        ];
+        $purposes = ['Family visit', 'Parcel drop', 'Study group', 'Local guardian', 'Friend'];
+        $issues = [
+            ['maintenance', 'Leaky tap in washroom', 'medium'],
+            ['wifi', 'Slow internet on floor', 'high'],
+            ['food', 'Dinner served late', 'low'],
+            ['cleaning', 'Corridor not swept', 'low'],
+            ['electricity', 'Socket sparking', 'high'],
+        ];
+
+        $day = $start->copy();
+        for ($i = 0; $day->lt(now()->startOfDay()); $day->addDay(), $i++) {
+            // An expense every 3rd day, cycling categories — P&L and the
+            // Expenses report get a real month-by-month shape.
+            if ($i % 3 === 0) {
+                [$cat, $title, $payee, $base] = $categories[($i / 3) % count($categories)];
+                Expense::create([
+                    'hostel_id' => $hostel->id,
+                    'category' => $cat,
+                    'title' => $title,
+                    'amount' => $base + (($i * 37) % 400),
+                    'expense_date' => $day->copy(),
+                    'paid_to' => $payee,
+                    'mode' => ['cash', 'upi'][$i % 2],
+                    'recorded_by' => $owner->id,
+                ]);
+            }
+
+            // A small PAID charge most days (canteen, guest meal, late fine…)
+            // so Collections shows a genuine day-by-day rhythm, not just the
+            // monthly fee spikes. Invoice + payment + pivot, ledger-consistent.
+            if ($i % 2 === 0) {
+                $s = $students[($i / 2) % count($students)];
+                $amount = 80 + (($i * 23) % 240);
+                $charge = \App\Models\Invoice::create([
+                    'hostel_id' => $hostel->id,
+                    'student_id' => $s->id,
+                    'type' => 'other',
+                    'title' => ['Canteen charge', 'Guest meal', 'Laundry', 'Late fine'][$i % 4],
+                    'amount' => $amount,
+                    'paid_amount' => $amount,
+                    'status' => 'paid',
+                    'due_date' => $day->copy(),
+                ]);
+                $paid = Payment::create([
+                    'hostel_id' => $hostel->id,
+                    'student_id' => $s->id,
+                    'receipt_number' => "DH-{$hostel->id}-".str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                    'amount' => $amount,
+                    'mode' => ['cash', 'upi', 'cash', 'upi', 'cheque'][$i % 5],
+                    'reference_number' => $i % 5 === 4 ? 'CHQ-'.(500000 + $i) : null,
+                    'paid_on' => $day->copy(),
+                    'collected_by' => $owner->id,
+                ]);
+                $paid->invoices()->attach($charge->id, ['amount' => $amount]);
+            }
+
+            // 1–2 visitors most days; all but today's checked out.
+            if ($i % 2 === 0 || $i % 5 === 0) {
+                $s = $students[$i % count($students)];
+                $in = $day->copy()->addHours(10 + ($i % 8));
+                Visitor::create([
+                    'hostel_id' => $hostel->id,
+                    'student_id' => $s->id,
+                    'name' => 'Visitor of '.explode(' ', $s->name)[0],
+                    'mobile' => '98'.str_pad((string) (10000000 + $i * 977 + $hostel->id), 8, '0', STR_PAD_LEFT),
+                    'purpose' => $purposes[$i % count($purposes)],
+                    'check_in' => $in,
+                    'check_out' => $in->copy()->addMinutes(45 + ($i % 4) * 30),
+                ]);
+            }
+
+            // ~2 complaints a week, most resolved 1–3 days later.
+            if ($i % 4 === 1) {
+                [$cat, $title, $priority] = $issues[$i % count($issues)];
+                $resolved = $i % 3 !== 0;
+                // created_at is NOT fillable — set it after create or every
+                // complaint silently dates "now" and resolution times lie.
+                Complaint::create([
+                    'hostel_id' => $hostel->id,
+                    'student_id' => $students[($i + 1) % count($students)]->id,
+                    'title' => $title,
+                    'category' => $cat,
+                    'description' => $title.' — reported at the front desk.',
+                    'priority' => $priority,
+                    'status' => $resolved ? 'resolved' : ($i % 6 === 5 ? 'in_progress' : 'open'),
+                    'resolution' => $resolved ? 'Fixed and confirmed with the student.' : null,
+                    'resolved_at' => $resolved ? $day->copy()->addDays(1 + ($i % 3)) : null,
+                    'created_by' => $owner->id,
+                ])->forceFill(['created_at' => $day->copy()->addHours(9)])->saveQuietly();
+            }
+
+            // Weekly pocket money rhythm for two students.
+            if ($day->isMonday()) {
+                foreach (array_slice($students, 0, 2) as $k => $s) {
+                    PocketMoneyTransaction::create([
+                        'hostel_id' => $hostel->id,
+                        'student_id' => $s->id,
+                        'type' => $i % 3 === 0 && $k === 0 ? 'withdraw' : 'deposit',
+                        'amount' => 300 + ($i % 4) * 100,
+                        'note' => 'Weekly '.($i % 3 === 0 && $k === 0 ? 'withdrawal' : 'allowance'),
+                        'created_by' => $owner->id,
+                    ])->forceFill(['created_at' => $day->copy()->addHours(11)])->saveQuietly();
+                }
+            }
+        }
+
+        // Aged dues — one per aging bucket, so the Dues & Aging report shows
+        // all four columns instead of a single bar. Small "other" charges so
+        // they don't distort the fee ledger.
+        foreach ([
+            ['Laundry damage', 450, now()->addDays(10)],   // current
+            ['Mess balance', 650, now()->subDays(12)],     // 1–30
+            ['Late fine', 350, now()->subDays(45)],        // 31–60
+            ['Old key deposit', 500, now()->subDays(95)],  // 60+
+        ] as $j => [$title, $amount, $due]) {
+            \App\Models\Invoice::create([
+                'hostel_id' => $hostel->id,
+                'student_id' => $students[$j % count($students)]->id,
+                'type' => 'other',
+                'title' => $title,
+                'amount' => $amount,
+                'status' => 'pending',
+                'due_date' => $due,
+            ]);
+        }
+    }
+
     /**
      * A small, real, viewable placeholder image (bytes) for demo documents.
      * Drawn with GD when it's available (a labelled card), with a tiny embedded

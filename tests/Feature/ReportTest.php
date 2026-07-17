@@ -44,7 +44,8 @@ class ReportTest extends TestCase
         $this->assertEquals(5000, $data['total']);
     }
 
-    public function test_pending_report_lists_only_students_with_balance(): void
+    /** W8: pendingFees() became duesAging() — same core promise, one query. */
+    public function test_dues_report_lists_only_students_with_balance(): void
     {
         $owing = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'Owing', 'mobile' => '9000000002',
             'occupation_type' => 'student', 'status' => 'active']);
@@ -56,7 +57,7 @@ class ReportTest extends TestCase
         Invoice::create(['hostel_id' => $this->hostel->id, 'student_id' => $clear->id, 'type' => 'fee',
             'title' => 'Semester 1 Fee', 'amount' => 5000, 'paid_amount' => 5000, 'status' => 'paid']);
 
-        $data = app(ReportService::class)->pendingFees();
+        $data = app(ReportService::class)->duesAging();
 
         $this->assertCount(1, $data['rows']);
         $this->assertSame('Owing', $data['rows'][0][0]);

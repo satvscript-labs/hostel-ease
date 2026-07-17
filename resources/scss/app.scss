@@ -15,7 +15,7 @@ $font-family-sans-serif: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe U
 
 @import "~bootstrap/scss/bootstrap";
 
-// Select2 + DataTables (Bootstrap 5 themes)
+// Select2 (Bootstrap 5 theme). DataTables removed in W8 — Reports was its last user.
 @import "select2/dist/css/select2.min.css";
 
 // Premium Liquid UI overrides

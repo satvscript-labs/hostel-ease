@@ -6,7 +6,8 @@ import $ from './jquery-global';
 import * as bootstrap from 'bootstrap';
 import Swal from 'sweetalert2';
 import Chart from 'chart.js/auto';
-import 'datatables.net-bs5';
+// datatables.net removed in W8 — Reports was its last user; every table is now
+// server-aggregated/paginated, so client-side table JS added nothing but bytes.
 import 'select2';
 
 window.bootstrap = bootstrap;
@@ -39,15 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
         a.addEventListener('click', () => { if (window.innerWidth < 992) closeSidebar(); }));
     // Reset state if resized up to desktop
     window.addEventListener('resize', () => { if (window.innerWidth >= 992) closeSidebar(); });
-
-    // Initialise DataTables (guarded so a plugin issue can't break the page)
-    try {
-        $('table[data-datatable]').each(function () {
-            $(this).DataTable({ responsive: true, pageLength: 25, order: [] });
-        });
-    } catch (e) {
-        console.error('DataTables init failed:', e);
-    }
 
     // Initialise Select2 (guarded)
     try {

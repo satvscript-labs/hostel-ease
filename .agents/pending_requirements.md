@@ -219,7 +219,18 @@ picked up:
 
 - {PS: i want you to Research this entire thing and i want a system that when we reverse a transaction it just simple should not ask confirmation and reverse the thing ... in some cases you would have collected money and might keep it even after reversing ... so we ask what most app asks, that is, if reverse to original payment methods... or transfer money to credit and keep money ... so i want you to Research this and give me your side of suggestions and way to tackle this thing. [after Research replace this point with your research and suggestions and all]}
 
-## 7. Minor UI Changes
+## 7. Report Candidates Proposed But Not (Yet) Approved (W8, Jul-17)
+
+**Status:** Owner undecided — "I don't know yet if we should go for it or not." Take up whenever
+wanted; the W8 report-page skeleton makes each one a small standalone slice.
+
+- **Front Desk report** — visitors per day + complaint resolution times (data exists).
+- **Deposits custody ledger** — exportable held/refunded/deducted history (page shows live totals;
+  the report adds history + export).
+- **Payroll report** — salary paid per month/staff vs contracted (W7.2 data). Proposed, not picked.
+- **Moves & Churn** — joins vs leaves per month from bed_assignments. Proposed, not picked.
+
+## 8. Minor UI Changes
 
 1. in mobile ui, only use short forms rather then full "45 minutes ago"
 2. fix mobile ui, raws in tablet view is not a good UI, they are inconsistent, elements are not aligned (might be aligned coding wise but atleast in terms of view they are not aligned)
