@@ -446,13 +446,21 @@ class DemoHostelSeeder extends Seeder
             'notes' => 'Left at the end of last season.',
         ]);
 
-        // A real mix across the current month, not five identical "present"
-        // rows: the profile's four counters and the Present-days column say
-        // nothing when every row is the same.
-        $pattern = ['present', 'present', 'absent', 'present', 'half_day', 'present', 'leave', 'present'];
+        // A real mix, and on the RECENT days — the W7.3 week strip shows the
+        // last 7, so marks stranded at the start of the month would leave it
+        // looking like attendance had never been taken at all.
+        //
+        // TODAY is deliberately left unmarked: that's the state the page is
+        // built around, so "Mark all present" has something to do the moment
+        // you open it. Yesterday backwards, stopping at this month's start so
+        // the profile's month counters stay meaningful.
+        // Index i is i+1 days ago, so i=0..5 land inside the visible 7-day
+        // strip (today is its 7th slot). Anything past i=5 is only reachable by
+        // paging back a week.
+        $pattern = ['present', 'absent', 'present', 'half_day', 'present', 'leave', 'present', 'present', 'present'];
         foreach ($pattern as $i => $status) {
-            $day = now()->startOfMonth()->addDays($i);
-            if ($day->isFuture()) {
+            $day = now()->subDays($i + 1)->startOfDay();
+            if ($day->lt(now()->startOfMonth())) {
                 break;
             }
 
@@ -462,6 +470,15 @@ class DemoHostelSeeder extends Seeder
                 'date' => $day,
                 'status' => $status,
             ]);
+
+            // Sita is left unmarked on ONE day inside the strip, so it shows a
+            // PARTIAL (amber) dot. All-marked and none-marked alone never
+            // demonstrate what the third dot state is for — and "someone was
+            // missed" is the whole reason the strip exists.
+            if ($i === 2) {
+                continue;
+            }
+
             StaffAttendance::create([
                 'hostel_id' => $hostel->id,
                 'staff_id' => $staff2->id,

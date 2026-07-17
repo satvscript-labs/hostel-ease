@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\ImageService;
 use App\Services\StorageService;
 use App\Support\Tenant;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -94,10 +95,8 @@ class StaffController extends Controller
             'paid_this_month' => (float) StaffSalaryPayment::whereBetween('salary_month', [$monthStart, $monthEnd])->sum('amount'),
         ];
 
-        // --- Attendance tab (rebuilt in W7.3; reads unchanged here) ---
-        $date = $request->filled('date') ? Carbon::parse($request->date('date'))->toDateString() : now()->toDateString();
-        $roster = Staff::where('is_active', true)->orderBy('name')->get();
-        $marks = StaffAttendance::whereDate('date', $date)->get()->keyBy('staff_id');
+        // --- Attendance tab (W7.3) ---
+        $attendance = $this->attendanceBoard($request);
 
         // Feeds the Pay Salary sheet. The Directory tab's copy hardcoded
         // cash/upi/bank while paySalary() validates against the tenant's real
@@ -110,8 +109,79 @@ class StaffController extends Controller
         $payroll = $this->payrollMeta($staff->pluck('id'));
 
         return view('admin.staff.index', compact(
-            'staff', 'summary', 'date', 'roster', 'marks', 'paymentModes', 'search', 'status', 'payroll'
+            'staff', 'summary', 'attendance', 'paymentModes', 'search', 'status', 'payroll'
         ));
+    }
+
+    /**
+     * Everything the Attendance tab needs, in two queries (W7.3).
+     *
+     * The whole visible week ships at once rather than one day at a time, for
+     * two reasons: the day strip can only show which days were missed if it
+     * knows about all of them, and switching days then costs nothing — no
+     * round-trip, no spinner, no losing your place.
+     */
+    protected function attendanceBoard(Request $request): array
+    {
+        $today = now()->startOfDay();
+
+        // rescue(): a hand-edited ?date=garbage would otherwise throw out of
+        // Carbon::parse and 500 the whole Staff Board, attendance tab or not.
+        $date = rescue(
+            fn () => Carbon::parse($request->input('date'))->startOfDay(),
+            $today,
+            false
+        );
+
+        // Marking a future day is meaningless — you cannot know yet. The strip
+        // simply never renders one (it ends at today), which is a better guard
+        // than an error message: the wrong thing isn't reachable. saveAttendance
+        // enforces it server-side regardless.
+        if ($date->gt($today)) {
+            $date = $today;
+        }
+
+        // On today, today sits at the right-hand end (the last 7 days — what
+        // you're actually here to do). Browsing history, the selected day sits
+        // near the middle so its neighbours are reachable in one tap.
+        $stripEnd = $date->copy()->addDays(3)->min($today);
+        $stripStart = $stripEnd->copy()->subDays(6);
+
+        $roster = Staff::where('is_active', true)->orderBy('name')->get();
+
+        // One extra day back so "Copy previous day" always has its source
+        // locally, even when the selected day is the strip's first.
+        $marks = StaffAttendance::whereBetween('date', [
+            $stripStart->copy()->subDay()->toDateString(),
+            $stripEnd->toDateString(),
+        ])->get(['staff_id', 'date', 'status']);
+
+        $byDay = [];
+        foreach ($marks as $mark) {
+            $byDay[$mark->date->format('Y-m-d')][(string) $mark->staff_id] = $mark->status;
+        }
+
+        // Every strip day gets a key, present or not: the client must be able to
+        // tell "loaded, nobody marked" from "not loaded" (they look identical
+        // otherwise, and one of them is a lie).
+        $strip = [];
+        for ($d = $stripStart->copy(); $d->lte($stripEnd); $d->addDay()) {
+            $key = $d->format('Y-m-d');
+            $strip[] = ['date' => $key, 'dow' => $d->format('D'), 'day' => $d->format('j'), 'is_today' => $d->eq($today)];
+            $byDay[$key] ??= (object) [];
+        }
+
+        return [
+            'date' => $date->toDateString(),
+            'label' => $date->isSameDay($today) ? __('Today') : $date->format('l, j M Y'),
+            'strip' => $strip,
+            'marks' => $byDay,
+            'roster' => $roster,
+            'prev' => $date->copy()->subDays(7)->toDateString(),
+            'next' => $date->copy()->addDays(7)->min($today)->toDateString(),
+            'today' => $today->toDateString(),
+            'at_today' => $date->eq($today),
+        ];
     }
 
     /**
@@ -239,12 +309,8 @@ class StaffController extends Controller
         $monthStart = now()->startOfMonth()->toDateString();
         $monthEnd = now()->endOfMonth()->toDateString();
 
-        $attendance = $staff->attendances()
-            ->whereBetween('date', [$monthStart, $monthEnd])
-            ->orderBy('date')->get();
-
         $counts = ['present' => 0, 'absent' => 0, 'half_day' => 0, 'leave' => 0];
-        foreach ($attendance as $a) {
+        foreach ($staff->attendances()->whereBetween('date', [$monthStart, $monthEnd])->get(['status']) as $a) {
             $counts[$a->status]++;
         }
 
@@ -265,28 +331,55 @@ class StaffController extends Controller
         $payroll = $this->payrollMeta([$staff->id]);
 
         return view('admin.staff.show', compact(
-            'staff', 'counts', 'attendance', 'payments', 'paymentModes', 'modeNames', 'payroll',
+            'staff', 'counts', 'payments', 'paymentModes', 'modeNames', 'payroll',
             'paidThisMonth', 'paidLifetime'
         ));
     }
 
-    public function saveAttendance(Request $request): RedirectResponse
+    /**
+     * Save a BATCH of marks for one day (W7.3). The page auto-saves, so this is
+     * called with only what actually changed, and answers JSON.
+     *
+     * THE bug this replaces: the old form rendered every unmarked person with
+     * "Present" pre-selected and posted a status for ALL of them — so opening a
+     * past date and pressing Save stamped the entire roster present for a day
+     * nobody had reviewed. Attendance you never took looked identical to
+     * attendance you did. Now nothing is implied: a person with no mark has no
+     * row, the page says "not marked" in as many words, and only marks the
+     * owner actually made are ever sent.
+     */
+    public function saveAttendance(Request $request): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
-            'date' => ['required', 'date'],
-            'status' => ['required', 'array'],
-            // The keys are staff ids straight off the form — unvalidated, they
-            // let a crafted POST write attendance rows against ANOTHER
-            // hostel's staff (W7.1). Same class as the W6.4 tenant fixes.
-            'status.*' => ['required', Rule::in(['present', 'absent', 'half_day', 'leave'])],
+            // You cannot know whether someone turned up tomorrow.
+            'date' => ['required', 'date', 'before_or_equal:today'],
+            'marks' => ['required', 'array'],
+            // null clears a mark — un-marking has to be possible, or a mis-tap
+            // that auto-saved is permanent.
+            'marks.*' => ['nullable', Rule::in(['present', 'absent', 'half_day', 'leave'])],
+        ], [
+            'date.before_or_equal' => 'Attendance cannot be marked for a future date.',
         ]);
 
         $date = Carbon::parse($data['date'])->startOfDay();
 
+        // The keys are staff ids straight off the client — unvalidated, they let
+        // a crafted request write rows against ANOTHER hostel's staff (W7.1).
+        // Same class as the W6.4 tenant fixes.
         $ownIds = Staff::where('is_active', true)->pluck('id')->flip();
 
-        foreach ($data['status'] as $staffId => $status) {
+        $saved = 0;
+        $cleared = 0;
+
+        foreach ($data['marks'] as $staffId => $status) {
             if (! $ownIds->has((int) $staffId)) {
+                continue;
+            }
+
+            if (blank($status)) {
+                $cleared += StaffAttendance::where('staff_id', (int) $staffId)
+                    ->whereDate('date', $date)->delete();
+
                 continue;
             }
 
@@ -294,6 +387,11 @@ class StaffController extends Controller
                 ['staff_id' => (int) $staffId, 'date' => $date],
                 ['hostel_id' => Tenant::id(), 'status' => $status],
             );
+            $saved++;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['saved' => $saved, 'cleared' => $cleared]);
         }
 
         return redirect()->route('admin.staff.index', ['tab' => 'attendance', 'date' => $date->toDateString()])

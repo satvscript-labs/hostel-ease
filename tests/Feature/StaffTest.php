@@ -193,9 +193,9 @@ class StaffTest extends TestCase
     }
 
     /**
-     * saveAttendance loops the form's `status[<id>]` keys. Unvalidated, a
-     * crafted POST writes attendance rows against ANOTHER hostel's staff —
-     * junk data at best, a unique-constraint 500 at worst.
+     * saveAttendance loops the client's `marks` keys. Unvalidated, a crafted
+     * request writes attendance rows against ANOTHER hostel's staff — junk data
+     * at best, a unique-constraint 500 at worst.
      */
     public function test_attendance_ignores_staff_ids_from_another_hostel(): void
     {
@@ -205,13 +205,171 @@ class StaffTest extends TestCase
         $theirs = Staff::create(['hostel_id' => $other->id, 'name' => 'Not Mine',
             'mobile' => '9700000001', 'monthly_salary' => 1000, 'is_active' => true]);
 
-        $this->post(route('admin.staff.attendance.save'), [
+        $this->postJson(route('admin.staff.attendance.save'), [
             'date' => now()->toDateString(),
-            'status' => [$mine->id => 'present', $theirs->id => 'absent'],
-        ])->assertRedirect();
+            'marks' => [$mine->id => 'present', $theirs->id => 'absent'],
+        ])->assertOk();
 
         $this->assertDatabaseHas('staff_attendances', ['staff_id' => $mine->id, 'status' => 'present']);
         $this->assertDatabaseMissing('staff_attendances', ['staff_id' => $theirs->id]);
+    }
+
+    // ── W7.3: attendance ─────────────────────────────────────────────────
+
+    /**
+     * THE bug (F4). The old page rendered every unmarked person with "Present"
+     * pre-selected and posted a status for ALL of them, so opening a past date
+     * and pressing Save stamped the whole roster present for a day nobody had
+     * reviewed — attendance you never took looked identical to attendance you
+     * did. Now only what actually changed is ever sent, and a person with no
+     * mark has no row.
+     */
+    public function test_only_the_marks_actually_sent_are_written(): void
+    {
+        $marked = $this->staff(['name' => 'Marked', 'mobile' => '9811111111']);
+        $untouched = $this->staff(['name' => 'Untouched', 'mobile' => '9822222222']);
+
+        $this->postJson(route('admin.staff.attendance.save'), [
+            'date' => now()->toDateString(),
+            'marks' => [$marked->id => 'absent'],
+        ])->assertOk()->assertJson(['saved' => 1]);
+
+        $this->assertDatabaseHas('staff_attendances', ['staff_id' => $marked->id, 'status' => 'absent']);
+        // Nobody invented a "present" for the person nobody looked at.
+        $this->assertDatabaseMissing('staff_attendances', ['staff_id' => $untouched->id]);
+        $this->assertSame(1, StaffAttendance::count());
+    }
+
+    /** Auto-save means a mis-tap is already persisted — un-marking must work. */
+    public function test_a_mark_can_be_cleared(): void
+    {
+        $staff = $this->staff();
+        StaffAttendance::create(['hostel_id' => $this->hostel->id, 'staff_id' => $staff->id,
+            'date' => now()->toDateString(), 'status' => 'present']);
+
+        $this->postJson(route('admin.staff.attendance.save'), [
+            'date' => now()->toDateString(),
+            'marks' => [$staff->id => null],
+        ])->assertOk()->assertJson(['cleared' => 1]);
+
+        $this->assertSame(0, StaffAttendance::count());
+    }
+
+    public function test_re_marking_the_same_day_updates_rather_than_duplicates(): void
+    {
+        $staff = $this->staff();
+        $date = now()->toDateString();
+
+        $this->postJson(route('admin.staff.attendance.save'), ['date' => $date, 'marks' => [$staff->id => 'present']]);
+        $this->postJson(route('admin.staff.attendance.save'), ['date' => $date, 'marks' => [$staff->id => 'leave']])->assertOk();
+
+        $this->assertSame(1, StaffAttendance::count());
+        $this->assertDatabaseHas('staff_attendances', ['staff_id' => $staff->id, 'status' => 'leave']);
+    }
+
+    /** You cannot know whether someone turned up tomorrow. */
+    public function test_attendance_cannot_be_marked_for_a_future_date(): void
+    {
+        $staff = $this->staff();
+
+        $this->postJson(route('admin.staff.attendance.save'), [
+            'date' => now()->addDay()->toDateString(),
+            'marks' => [$staff->id => 'present'],
+        ])->assertStatus(422);
+
+        $this->assertSame(0, StaffAttendance::count());
+    }
+
+    public function test_an_unknown_status_is_rejected(): void
+    {
+        $this->postJson(route('admin.staff.attendance.save'), [
+            'date' => now()->toDateString(),
+            'marks' => [$this->staff()->id => 'holiday'],
+        ])->assertStatus(422);
+    }
+
+    /**
+     * The strip ships the whole visible week so it can show which days were
+     * MISSED without opening each one — and it must never offer a future day.
+     */
+    public function test_the_board_ships_the_visible_week_and_never_a_future_day(): void
+    {
+        $staff = $this->staff();
+        StaffAttendance::create(['hostel_id' => $this->hostel->id, 'staff_id' => $staff->id,
+            'date' => now()->subDays(2)->toDateString(), 'status' => 'present']);
+
+        $board = $this->get(route('admin.staff.index', ['tab' => 'attendance']))->assertOk()->viewData('attendance');
+
+        $this->assertCount(7, $board['strip']);
+        $this->assertSame(now()->toDateString(), $board['date']);
+        $this->assertTrue($board['at_today']);
+
+        foreach ($board['strip'] as $day) {
+            $this->assertLessThanOrEqual(now()->toDateString(), $day['date'], 'The strip must never offer a future day.');
+        }
+
+        // Every strip day is keyed even when empty: "loaded, nobody marked" and
+        // "not loaded" must not look the same to the client.
+        foreach ($board['strip'] as $day) {
+            $this->assertArrayHasKey($day['date'], $board['marks']);
+        }
+        $this->assertSame('present', $board['marks'][now()->subDays(2)->toDateString()][(string) $staff->id]);
+    }
+
+    /** A future ?date is clamped, not obeyed — and never 500s on garbage. */
+    public function test_the_board_clamps_a_future_or_invalid_date(): void
+    {
+        $this->staff();
+
+        $future = $this->get(route('admin.staff.index', ['tab' => 'attendance', 'date' => now()->addYear()->toDateString()]))
+            ->assertOk()->viewData('attendance');
+        $this->assertSame(now()->toDateString(), $future['date']);
+
+        $garbage = $this->get(route('admin.staff.index', ['tab' => 'attendance', 'date' => 'not-a-date']))
+            ->assertOk()->viewData('attendance');
+        $this->assertSame(now()->toDateString(), $garbage['date']);
+    }
+
+    /** Browsing history centres the day so its neighbours are one tap away. */
+    public function test_browsing_history_centres_the_selected_day_in_the_strip(): void
+    {
+        $this->staff();
+        $target = now()->subDays(20)->toDateString();
+
+        $board = $this->get(route('admin.staff.index', ['tab' => 'attendance', 'date' => $target]))
+            ->assertOk()->viewData('attendance');
+
+        $this->assertSame($target, $board['date']);
+        $this->assertFalse($board['at_today']);
+        $this->assertContains($target, array_column($board['strip'], 'date'));
+        // 3 days either side.
+        $this->assertSame(now()->subDays(23)->toDateString(), $board['strip'][0]['date']);
+        $this->assertSame(now()->subDays(17)->toDateString(), $board['strip'][6]['date']);
+    }
+
+    /** Only active staff take attendance — the roster is the same list the
+     *  save endpoint validates against. */
+    public function test_the_roster_holds_only_active_staff(): void
+    {
+        $this->staff(['name' => 'Working', 'mobile' => '9833333333']);
+        $this->staff(['name' => 'Not Working', 'mobile' => '9844444444', 'is_active' => false]);
+
+        $board = $this->get(route('admin.staff.index', ['tab' => 'attendance']))->assertOk()->viewData('attendance');
+
+        $this->assertCount(1, $board['roster']);
+        $this->assertSame('Working', $board['roster']->first()->name);
+    }
+
+    public function test_an_inactive_staff_member_cannot_be_marked(): void
+    {
+        $inactive = $this->staff(['is_active' => false]);
+
+        $this->postJson(route('admin.staff.attendance.save'), [
+            'date' => now()->toDateString(),
+            'marks' => [$inactive->id => 'present'],
+        ])->assertOk()->assertJson(['saved' => 0]);
+
+        $this->assertSame(0, StaffAttendance::count());
     }
 
     // ── Payroll + the expense mirror ─────────────────────────────────────
