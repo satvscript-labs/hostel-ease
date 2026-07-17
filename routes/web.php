@@ -239,6 +239,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 // Security Deposits
                 Route::get('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'index'])->name('security-deposits.index');
                 Route::post('security-deposits', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'store'])->name('security-deposits.store');
+                Route::patch('security-deposits/{securityDeposit}', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'update'])->name('security-deposits.update');
                 Route::post('security-deposits/{securityDeposit}/refund', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'refund'])->name('security-deposits.refund');
                 Route::post('security-deposits/{securityDeposit}/revert-refund', [\App\Http\Controllers\Admin\SecurityDepositController::class, 'revertRefund'])->name('security-deposits.revert-refund');
             });

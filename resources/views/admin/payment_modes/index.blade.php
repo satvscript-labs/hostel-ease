@@ -1,293 +1,218 @@
 @extends('layouts.app')
-@section('title', 'Payment Modes')
+@section('title', __('Payment Modes'))
 
-@section('content')
+@push('styles')
 <style>
-    /* Hero Header */
-    .pm-hero {
-        background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
-        border-radius: 1.5rem;
-        padding: 2.5rem 2rem 4rem;
-        color: white;
-        margin-bottom: -2.5rem;
-        position: relative;
-        overflow: hidden;
-    }
-    .pm-hero::after {
-        content: '';
-        position: absolute;
-        top: -20px; right: 10%;
-        width: 200px; height: 200px;
-        background: rgba(255,255,255,0.05);
-        border-radius: 50%;
-        filter: blur(20px);
-    }
-    
-    /* Grid & Cards */
-    .pm-grid {
+    /* Page-local layout only — W6.4 full redesign. Modes are LOAD-BEARING:
+       collections, expenses, salaries and deposits all validate against the
+       active ones, so this page explains itself and the guards guard. */
+
+    /* Card grid: auto-fill, floored — cards never crush (§4.10), the grid
+       just reflows. */
+    .pmx-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1.5rem;
-        position: relative;
-        z-index: 10;
-    }
-    
-    .pm-card {
-        background: #fff;
-        border-radius: 1.25rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow: hidden;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .pm-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 30px rgba(0,0,0,0.08);
-    }
-    
-    .pm-card-header {
-        padding: 1.5rem 1.5rem 1rem;
-        display: flex;
-        align-items: center;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
         gap: 1rem;
     }
-    .pm-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 1rem;
-        background: #f1f5f9;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        color: var(--he-primary);
-        flex-shrink: 0;
-    }
-    
-    .pm-body {
-        padding: 0 1.5rem 1.5rem;
-        flex-grow: 1;
-    }
-    
-    .pm-actions {
-        border-top: 1px solid #f1f5f9;
-        padding: 1rem 1.5rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #f8fafc;
-    }
-    
-    /* Add New Card */
-    .pm-card-add {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        border: 2px dashed #cbd5e1;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        padding: 3rem 1.5rem;
-        color: #64748b;
-        transition: all 0.3s;
-    }
-    .pm-card-add:hover {
-        border-color: var(--he-primary);
-        color: var(--he-primary);
-        background: #fff;
-    }
-    .pm-card-add i {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    /* Inline Form Styling */
-    .pm-form-inline {
-        background: #fff;
+    .pmx-card {
+        background: var(--he-bg-surface);
+        border: 1px solid rgba(0, 0, 0, 0.06);
         border-radius: 1.25rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        padding: 1.5rem;
-        animation: formFadeIn 0.3s ease-out forwards;
+        box-shadow: var(--he-shadow-sm);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
     }
-    @keyframes formFadeIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
+    .pmx-card.is-inactive { opacity: 0.65; }
+    .pmx-ic {
+        width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--he-primary-soft); color: var(--he-primary);
+        font-size: 1rem;
     }
-    .pm-form-inline .form-control {
-        border-radius: 0.75rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        padding: 0.75rem 1rem;
+    .pmx-meta {
+        display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
     }
-    .pm-form-inline .form-control:focus {
-        background: #fff;
-        border-color: var(--he-primary);
-        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    .pmx-usage {
+        display: inline-flex; align-items: center; gap: 0.35rem;
+        padding: 0.25rem 0.65rem;
+        background: var(--he-bg-canvas);
+        border-radius: var(--he-radius-full);
+        font-size: 0.72rem; font-weight: 700; color: var(--he-text-muted);
+        font-feature-settings: 'tnum';
     }
 </style>
+@endpush
 
-<div x-data="paymentModes()" class="page-enter">
-    
-    <!-- Hero Banner -->
-    <div class="pm-hero stagger-1">
-        <h1 class="h3 fw-bold mb-1">Payment Modes</h1>
-        <p class="mb-0 opacity-75">Configure the methods available for fee collection</p>
+@section('content')
+<div class="page-enter" x-data="paymentModes()">
+
+    <div class="he-page-head mb-4 stagger-1">
+        <div>
+            <h1 class="he-page-title">{{ __('Payment Modes') }}</h1>
+            <p class="he-page-sub">{{ __('How money moves — these modes power collections, expenses, salaries and deposits.') }}</p>
+        </div>
+        <button type="button" class="btn btn-premium rounded-pill px-4 fw-semibold shadow-sm tactile-btn d-none d-md-inline-flex align-items-center"
+                @click="openAdd()">
+            <i class="fa-solid fa-plus me-2"></i>{{ __('Add Mode') }}
+        </button>
     </div>
 
-    <!-- Grid -->
-    <div class="pm-grid stagger-2">
-        
-        <!-- Quick Add Card (Triggers Form) -->
-        <div class="pm-card pm-card-add" x-show="!isAdding" @click="isAdding = true" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) 0.05s both;">
-            <i class="fa-solid fa-plus-circle"></i>
-            <h5 class="fw-bold mb-0">Add New Mode</h5>
-            <p class="small text-muted mt-1 text-center">Create a new payment method</p>
-        </div>
-        
-        <!-- Add Form (Inline) -->
-        <div class="pm-form-inline" x-show="isAdding" x-cloak>
-            <form method="POST" action="{{ route('admin.payment-modes.store') }}">
+    <div class="pmx-grid stagger-2">
+        @foreach($modes as $m)
+            @php
+                $used = $usage[$m->id] ?? 0;
+                $editPayload = \Illuminate\Support\Js::from([
+                    'action' => route('admin.payment-modes.update', $m),
+                    'name' => $m->name,
+                    'req' => (bool) $m->requires_reference,
+                    'active' => (bool) $m->is_active,
+                    'used' => $used,
+                ]);
+            @endphp
+            <div class="pmx-card {{ $m->is_active ? '' : 'is-inactive' }}">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="pmx-ic"><i class="fa-solid fa-money-bill-wave"></i></div>
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <div class="fw-bold text-dark text-truncate fs-6">{{ $m->name }}</div>
+                        <div class="text-muted small text-truncate">{{ $m->code }}</div>
+                    </div>
+                    <span class="badge rounded-pill px-2 py-1 flex-shrink-0 {{ $m->is_active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">
+                        {{ $m->is_active ? __('Active') : __('Inactive') }}
+                    </span>
+                </div>
+
+                <div class="pmx-meta">
+                    <span class="pmx-usage" title="{{ __('Payments, expenses, salaries and deposits recorded with this mode') }}">
+                        <i class="fa-solid fa-receipt"></i>
+                        {{ $used > 0 ? __(':n record(s)', ['n' => number_format($used)]) : __('Never used') }}
+                    </span>
+                    @if($m->requires_reference)
+                        <span class="pmx-usage" style="color: var(--he-warning, #b45309); background: var(--he-warning-soft, rgba(245,158,11,0.12));">
+                            <i class="fa-solid fa-hashtag"></i>{{ __('Needs reference no.') }}
+                        </span>
+                    @endif
+                </div>
+
+                <div class="he-act-row mt-auto">
+                    <button type="button" class="btn btn-sm btn-white border rounded-pill fw-bold px-3" style="min-height: 36px;" @click="openEdit({{ $editPayload }})">
+                        <i class="fa-solid fa-pen me-1"></i>{{ __('Edit') }}
+                    </button>
+                    <div class="he-act-right">
+                        @if($used === 0)
+                            <form action="{{ route('admin.payment-modes.destroy', $m) }}" method="POST" class="m-0"
+                                  data-confirm="{{ __('Delete payment mode “:name”? It has never been used, so nothing references it.', ['name' => $m->name]) }}">
+                                @csrf @method('DELETE')
+                                <button class="he-icon-btn is-danger" title="{{ __('Delete') }}" aria-label="{{ __('Delete') }}"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        @else
+                            {{-- History keeps its labels (owner decision): a used
+                                 mode deactivates via Edit, it never deletes. --}}
+                            <span class="he-icon-btn opacity-50" title="{{ __('In use on :n record(s) — deactivate it instead; history keeps its label.', ['n' => number_format($used)]) }}">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
+    <template x-teleport="body">
+        <button type="button" class="fab" @click="openAdd()" title="{{ __('Add Mode') }}">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+    </template>
+
+    {{-- ══ Add sheet ══ --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click="close()" x-cloak style="display: none;">
+            <form method="POST" action="{{ route('admin.payment-modes.store') }}" data-ring-required
+                  class="custom-overlay-modal" :class="{ 'is-open': addOpen }" x-show="addOpen" x-transition.opacity @click.stop style="display: none; max-width: 460px;">
                 @csrf
-                <div class="d-flex align-items-center mb-4">
-                    <div class="pm-icon bg-primary text-white me-3"><i class="fa-solid fa-bolt"></i></div>
-                    <h5 class="fw-bold mb-0">New Mode</h5>
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-money-bill-wave" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Add Payment Mode') }}</span></h5>
+                    <button type="button" class="btn-close" @click="close()"></button>
                 </div>
-                
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">Mode Name <span class="text-danger">*</span></label>
-                    <input type="text" name="name" class="form-control" placeholder="e.g. UPI, Bank Transfer" required x-ref="addNameInput">
+                <div class="custom-overlay-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Name') }} <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control bg-light" required maxlength="60" placeholder="{{ __('e.g. PhonePe, Bank Transfer') }}">
+                        <div class="form-text small">{{ __('Available immediately in collections, expenses, salaries and deposits.') }}</div>
+                    </div>
+                    <label class="d-flex align-items-center gap-2 mb-2">
+                        <input type="checkbox" name="requires_reference" value="1" class="form-check-input m-0">
+                        <span class="fw-semibold small">{{ __('Requires a reference / transaction number') }}</span>
+                    </label>
                 </div>
-                
-                <div class="form-check form-switch mb-4">
-                    <input class="form-check-input" type="checkbox" role="switch" name="requires_reference" value="1" id="addRef">
-                    <label class="form-check-label small fw-bold text-dark" for="addRef">Requires Reference No.</label>
-                    <div class="form-text mt-1 text-muted small">Check this if the mode needs a UTR/Transaction ID during collection.</div>
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-grow-1 rounded-pill fw-bold">Save Mode</button>
-                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="isAdding = false">Cancel</button>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="close()">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i>{{ __('Add Mode') }}</button>
                 </div>
             </form>
         </div>
+    </template>
 
-        <!-- Loop existing modes -->
-        @forelse($modes as $m)
-        <div class="pm-card-wrapper" style="perspective: 1000px; animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min(($loop->index + 1) * 0.05, 0.5) }}s both;">
-            
-            <!-- View State -->
-            <div class="pm-card" x-show="editingId !== {{ $m->id }}">
-                <div class="pm-card-header">
-                    <div class="pm-icon {!! $m->is_active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' !!}">
-                        <i class="fa-solid fa-money-bill-transfer"></i>
+    {{-- ══ Edit sheet ══ --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="editOpen" x-transition.opacity @click="close()" x-cloak style="display: none;">
+            <form method="POST" :action="e.action" data-ring-required
+                  class="custom-overlay-modal" :class="{ 'is-open': editOpen }" x-show="editOpen" x-transition.opacity @click.stop style="display: none; max-width: 460px;">
+                @csrf @method('PUT')
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-pen" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Edit Payment Mode') }}</span></h5>
+                    <button type="button" class="btn-close" @click="close()"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Name') }} <span class="text-danger">*</span></label>
+                        <input type="text" name="name" x-model="e.name" class="form-control bg-light" required maxlength="60">
                     </div>
-                    <div>
-                        <h5 class="fw-bold mb-0 text-dark">{{ $m->name }}</h5>
-                        <span class="badge {{ $m->is_active ? 'bg-success' : 'bg-secondary' }} rounded-pill px-2 mt-1" style="font-size: 0.65rem;">
-                            {{ $m->is_active ? 'Active' : 'Inactive' }}
-                        </span>
+                    <label class="d-flex align-items-center gap-2 mb-3">
+                        <input type="checkbox" name="requires_reference" value="1" class="form-check-input m-0" :checked="e.req">
+                        <span class="fw-semibold small">{{ __('Requires a reference / transaction number') }}</span>
+                    </label>
+                    <label class="d-flex align-items-center gap-2 mb-2">
+                        <input type="checkbox" name="is_active" value="1" class="form-check-input m-0" :checked="e.active">
+                        <span class="fw-semibold small">{{ __('Active — offered on every money form') }}</span>
+                    </label>
+                    <div class="form-text small mt-2" x-show="e.used > 0" x-cloak>
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        <span x-text="e.used.toLocaleString('en-IN') + ' {{ __('recorded transaction(s) keep this label either way.') }}'"></span>
                     </div>
                 </div>
-                
-                <div class="pm-body">
-                    <div class="p-3 bg-light rounded-3 mt-2 border">
-                        <div class="d-flex justify-content-between align-items-center small">
-                            <span class="text-muted fw-semibold">Code:</span>
-                            <span class="fw-bold text-dark">{{ $m->code }}</span>
-                        </div>
-                        <hr class="my-2 border-secondary opacity-10">
-                        <div class="d-flex justify-content-between align-items-center small">
-                            <span class="text-muted fw-semibold">Requires Reference:</span>
-                            @if($m->requires_reference)
-                                <span class="badge bg-warning text-dark rounded-pill"><i class="fa-solid fa-check me-1"></i>Yes</span>
-                            @else
-                                <span class="badge bg-light text-muted border rounded-pill">No</span>
-                            @endif
-                        </div>
-                    </div>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="close()">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i>{{ __('Save Changes') }}</button>
                 </div>
-                
-                <div class="pm-actions">
-                    <button type="button" class="btn btn-sm btn-light fw-bold text-primary rounded-pill px-3 shadow-sm border" @click="editingId = {{ $m->id }}">
-                        <i class="fa-solid fa-pen me-1"></i> Edit
-                    </button>
-                    <form action="{{ route('admin.payment-modes.destroy', $m) }}" method="POST" data-confirm="Delete payment mode &quot;{{ $m->name }}&quot;?">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="btn btn-sm btn-light fw-bold text-danger rounded-pill shadow-sm border">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Edit Form (Inline) -->
-            <div class="pm-form-inline" x-show="editingId === {{ $m->id }}" x-cloak>
-                <form method="POST" action="{{ route('admin.payment-modes.update', $m) }}">
-                    @csrf @method('PUT')
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="pm-icon bg-warning text-dark me-3"><i class="fa-solid fa-pen"></i></div>
-                        <h5 class="fw-bold mb-0">Edit Mode</h5>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Mode Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" value="{{ $m->name }}" required>
-                    </div>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" role="switch" name="requires_reference" value="1" id="editRef{{ $m->id }}" {{ $m->requires_reference ? 'checked' : '' }}>
-                        <label class="form-check-label small fw-bold text-dark" for="editRef{{ $m->id }}">Requires Reference No.</label>
-                    </div>
-
-                    <div class="form-check form-switch mb-4">
-                        <input class="form-check-input" type="checkbox" role="switch" name="is_active" value="1" id="editAct{{ $m->id }}" {{ $m->is_active ? 'checked' : '' }}>
-                        <label class="form-check-label small fw-bold text-dark" for="editAct{{ $m->id }}">Is Active</label>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary flex-grow-1 rounded-pill fw-bold">Update</button>
-                        <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="editingId = null">Cancel</button>
-                    </div>
-                </form>
-            </div>
-            
+            </form>
         </div>
-        @empty
-            @if(count($modes) === 0)
-                <div class="col-span-full">
-                    <div class="alert alert-info border-info-subtle rounded-4 py-3">
-                        <i class="fa-solid fa-info-circle me-2"></i> No payment modes have been created yet. Click "Add New Mode" to start!
-                    </div>
-                </div>
-            @endif
-        @endforelse
-    </div>
+    </template>
+
 </div>
 
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('paymentModes', () => ({
-        isAdding: false,
-        editingId: null,
-        
-        init() {
-            this.$watch('isAdding', val => {
-                if(val) {
-                    this.editingId = null;
-                    this.$nextTick(() => { this.$refs.addNameInput.focus(); });
-                }
-            });
-            this.$watch('editingId', val => {
-                if(val !== null) this.isAdding = false;
-            });
-        }
+        addOpen: false,
+        editOpen: false,
+        e: { action: '', name: '', req: false, active: true, used: 0 },
+
+        openAdd() {
+            this.addOpen = true;
+            document.body.style.overflow = 'hidden';
+        },
+        openEdit(payload) {
+            this.e = payload;
+            this.editOpen = true;
+            document.body.style.overflow = 'hidden';
+        },
+        close() {
+            this.addOpen = this.editOpen = false;
+            document.body.style.overflow = '';
+        },
     }));
 });
 </script>

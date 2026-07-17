@@ -1,285 +1,204 @@
 @extends('layouts.app')
-@section('title', 'Pocket Money — '.$student->name)
+@section('title', __('Pocket Money').' — '.$student->name)
+
+@push('styles')
+<style>
+    /* Page-local layout only — W6.4 full redesign of the wallet page. */
+
+    /* The wallet hero — the one sanctioned gradient accent on this page
+       (same family as .he-stat--hero). */
+    .pw-wallet {
+        background: var(--he-gradient-mesh, linear-gradient(135deg, #1e1b4b, #312e81));
+        border-radius: 1.25rem;
+        color: #fff;
+        padding: 1.75rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--he-shadow-lg);
+        container-type: inline-size;
+    }
+    .pw-wallet::after {
+        content: '';
+        position: absolute; top: -40px; right: -40px;
+        width: 140px; height: 140px; border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        pointer-events: none;
+    }
+    .pw-wallet-balance {
+        font-size: clamp(1.6rem, 8cqi, 2.4rem); /* fluid, never wraps (§4.10) */
+        font-weight: 800;
+        white-space: nowrap;
+        font-feature-settings: 'tnum';
+        line-height: 1.2;
+    }
+
+    /* Transaction rows. */
+    .pwt-ic {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.9rem;
+    }
+    .pwt-ic.is-deposit { background: var(--he-success-soft, rgba(34,197,94,0.12)); color: var(--he-success, #16a34a); }
+    .pwt-ic.is-withdraw { background: var(--he-danger-soft); color: var(--he-danger); }
+    .pwt-amount {
+        text-align: right;
+        font-weight: 700;
+        font-feature-settings: 'tnum';
+        white-space: nowrap; /* figures never wrap (§4.10) */
+    }
+</style>
+@endpush
 
 @section('content')
-<style>
-    /* Digital Wallet Card */
-    .wallet-card {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        border-radius: 1.5rem;
-        padding: 2.5rem;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 20px 40px rgba(30, 58, 138, 0.2);
-    }
-    .wallet-card::before {
-        content: '';
-        position: absolute;
-        top: -50px; right: -50px;
-        width: 150px; height: 150px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.1);
-        pointer-events: none;
-    }
-    .wallet-card::after {
-        content: '';
-        position: absolute;
-        bottom: -30px; right: 40px;
-        width: 100px; height: 100px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.05);
-        pointer-events: none;
-    }
-    .wallet-label {
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        opacity: 0.8;
-        font-size: 0.85rem;
-        margin-bottom: 0.5rem;
-    }
-    .wallet-balance {
-        font-size: 3.5rem;
-        font-weight: 800;
-        line-height: 1;
-        margin-bottom: 1.5rem;
-    }
-    .wallet-owner {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid rgba(255,255,255,0.2);
-    }
-    .wallet-avatar {
-        width: 40px; height: 40px;
-        border-radius: 50%;
-        border: 2px solid rgba(255,255,255,0.5);
-    }
+<div class="page-enter" x-data="pocketWallet()">
 
-    /* Action Widget */
-    .action-widget {
-        background: #fff;
-        border-radius: 1.5rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.02);
-        overflow: hidden;
-    }
-    .action-tabs {
-        display: flex;
-        background: #f8fafc;
-        padding: 0.5rem;
-        gap: 0.5rem;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .action-tab {
-        flex: 1;
-        padding: 0.75rem;
-        text-align: center;
-        font-weight: 700;
-        border-radius: 1rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        color: #64748b;
-    }
-    .action-tab.active-deposit { background: #d1fae5; color: #047857; }
-    .action-tab.active-withdraw { background: #fef08a; color: #b45309; }
-    .action-body { padding: 1.5rem; }
+    <a href="{{ route('admin.pocket-money.index') }}" class="btn btn-sm btn-white rounded-pill px-3 mb-3 shadow-sm fw-semibold">
+        <i class="fa-solid fa-arrow-left me-1"></i> {{ __('Pocket Money') }}
+    </a>
 
-    /* Timeline */
-    .timeline {
-        position: relative;
-        padding-left: 2rem;
-    }
-    .timeline::before {
-        content: '';
-        position: absolute;
-        top: 0; bottom: 0; left: 0.75rem;
-        width: 2px;
-        background: #e2e8f0;
-    }
-    .timeline-item {
-        position: relative;
-        margin-bottom: 1.5rem;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 1rem;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.01);
-    }
-    .timeline-icon {
-        position: absolute;
-        left: -2.35rem;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 32px; height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 0.85rem;
-        border: 3px solid #fff;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .bg-deposit { background: #10b981; transition: all 0.2s; }
-    .bg-deposit:hover { background: #059669; }
-    .bg-withdraw { background: #f59e0b; transition: all 0.2s; }
-    .bg-withdraw:hover { background: #d97706; }
-</style>
-
-<div class="page-enter" x-data="{ tab: 'deposit', amount: 0, balance: {{ $balance }}, showLendingWarning: false, lendingConfirmed: false }">
-    <style>
-        .lending-warning {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border: 1px solid #f59e0b;
-            border-radius: 0.75rem;
-            padding: 0.85rem 1rem;
-            margin-bottom: 1rem;
-            animation: fadeUp 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-        }
-        .lending-warning .warning-icon {
-            color: #b45309;
-            font-size: 1.1rem;
-        }
-        .negative-balance { color: #ef4444 !important; }
-    </style>
-    
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-        <h1 class="h4 fw-bold mb-0">Pocket Money Manager</h1>
-        <a href="{{ route('admin.pocket-money.index') }}" class="btn btn-light rounded-pill px-3 fw-bold shadow-sm border">
-            <i class="fa-solid fa-arrow-left me-1"></i> Directory
-        </a>
-    </div>
-
-    <div class="row g-4">
-        <!-- LEFT COLUMN: Wallet & Actions -->
-        <div class="col-lg-5 col-xl-4">
-            
-            <!-- Digital Wallet Card -->
-            <div class="wallet-card mb-4">
-                <div class="wallet-label">Current Balance</div>
-                <div class="wallet-balance {{ $balance < 0 ? 'negative-balance' : '' }}">{{ hostelease_money($balance) }}</div>
-                <div class="wallet-owner">
-                    <img src="{{ $student->photo_url }}" class="wallet-avatar" alt="Avatar">
-                    <div>
-                        <div class="fw-bold" style="line-height:1.2">{{ $student->name }}</div>
-                        <div class="small opacity-75">Student ID: {{ $student->id }}</div>
+    {{-- ══ Wallet hero + quick stats ══ --}}
+    <div class="row g-3 mb-4 stagger-1">
+        <div class="col-lg-6">
+            <div class="pw-wallet h-100">
+                <div class="d-flex align-items-center gap-3 position-relative" style="z-index: 1;">
+                    <img src="{{ $student->photo_url ?: 'https://ui-avatars.com/api/?name='.urlencode($student->name).'&background=312e81&color=fff' }}"
+                         class="rounded-circle flex-shrink-0" style="width: 52px; height: 52px; object-fit: cover; border: 2px solid rgba(255,255,255,0.3);" alt="">
+                    <div style="min-width: 0;">
+                        <a href="{{ route('admin.students.show', $student) }}" class="fw-bold text-white text-decoration-none d-block text-truncate fs-5">{{ $student->name }}</a>
+                        <div class="small text-truncate" style="color: rgba(255,255,255,0.7);">
+                            {{ hostelease_phone($student->mobile) }}
+                            @if($student->status !== 'active') · <span class="text-warning fw-bold">{{ __('Left the hostel') }}</span>@endif
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Segmented Action Widget -->
-            <div class="action-widget">
-                <div class="action-tabs">
-                    <div class="action-tab" :class="{ 'active-deposit': tab === 'deposit' }" @click="tab = 'deposit'">
-                        <i class="fa-solid fa-arrow-down me-1"></i> Deposit
-                    </div>
-                    <div class="action-tab" :class="{ 'active-withdraw': tab === 'withdraw' }" @click="tab = 'withdraw'">
-                        <i class="fa-solid fa-arrow-up me-1"></i> Withdraw
-                    </div>
-                </div>
-                
-                <div class="action-body">
-                    <form method="POST" action="{{ route('admin.pocket-money.store', $student) }}">
-                        @csrf
-                        <input type="hidden" name="type" :value="tab">
-                        
-                        <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">Amount <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold border-end-0">{{ config('hostelease.currency') }}</span>
-                                <input type="number" step="0.01" name="amount" class="form-control border-start-0 ps-0 fw-bold fs-5" placeholder="0.00" required x-model.number="amount" @input="showLendingWarning = (tab === 'withdraw' && amount > balance); lendingConfirmed = false;">
-                            </div>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-bold small text-muted">Note (Optional)</label>
-                            <input type="text" name="note" class="form-control" placeholder="e.g. Monthly allowance, Medical expense...">
-                        </div>
-                        
-                        {{-- Lending Warning --}}
-                        <template x-if="showLendingWarning && tab === 'withdraw'">
-                            <div class="lending-warning">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="fa-solid fa-triangle-exclamation warning-icon mt-1"></i>
-                                    <div>
-                                        <div class="fw-bold small text-dark">Lending Warning</div>
-                                        <div class="small" style="color: #92400e;">
-                                            This withdrawal of <strong x-text="'{{ config('hostelease.currency') }}' + amount.toFixed(2)"></strong> exceeds the current balance of <strong>{{ hostelease_money($balance) }}</strong>.
-                                            The student will have a negative balance (borrowing) of <strong x-text="'{{ config('hostelease.currency') }}' + (balance - amount).toFixed(2)"></strong>.
-                                        </div>
-                                        <label class="d-flex align-items-center gap-2 mt-2 small fw-bold cursor-pointer" style="color: #b45309;">
-                                            <input type="checkbox" x-model="lendingConfirmed" class="form-check-input m-0" style="border-color: #f59e0b;">
-                                            I understand, proceed with lending
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <button type="submit" class="btn w-100 rounded-pill py-2 fw-bold text-white fs-6 shadow-sm" :class="tab === 'deposit' ? 'bg-deposit' : 'bg-withdraw'" :disabled="showLendingWarning && !lendingConfirmed">
-                            <span x-show="tab === 'deposit'"><i class="fa-solid fa-plus me-1"></i> Add Funds</span>
-                            <span x-show="tab === 'withdraw' && !showLendingWarning"><i class="fa-solid fa-minus me-1"></i> Deduct Funds</span>
-                            <span x-show="tab === 'withdraw' && showLendingWarning"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Lend Funds</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-        </div>
-
-        <!-- RIGHT COLUMN: Timeline -->
-        <div class="col-lg-7 col-xl-8">
-            <div class="card stat-card border-0 shadow-sm h-100">
-                <div class="card-body p-4 p-xl-5">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center">
-                        <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i> Transaction History
-                    </h5>
-                    
-                    @if(count($transactions) > 0)
-                        <div class="timeline">
-                            @foreach($transactions as $t)
-                                <div class="timeline-item d-flex justify-content-between align-items-center">
-                                    <div class="timeline-icon {{ $t->type === 'deposit' ? 'bg-deposit' : 'bg-withdraw' }}">
-                                        <i class="fa-solid {{ $t->type === 'deposit' ? 'fa-arrow-down' : 'fa-arrow-up' }}"></i>
-                                    </div>
-                                    
-                                    <div>
-                                        <div class="fw-bold fs-5 text-dark {{ $t->type === 'deposit' ? 'text-success' : 'text-danger' }}">
-                                            {{ $t->type === 'deposit' ? '+' : '-' }}{{ hostelease_money($t->amount) }}
-                                        </div>
-                                        <div class="small text-muted fw-semibold mt-1">
-                                            {{ $t->note ?? 'No note provided' }}
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="text-end">
-                                        <div class="small fw-bold text-muted">{{ $t->created_at->format('M d, Y') }}</div>
-                                        <div class="small text-muted mb-2">{{ $t->created_at->format('h:i A') }}</div>
-                                        
-                                        <form action="{{ route('admin.pocket-money.destroy', [$student, $t]) }}" method="POST" data-confirm="Delete this transaction?">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-light text-danger rounded-pill px-3 shadow-sm border" title="Delete Transaction">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="text-center py-5">
-                            <i class="fa-solid fa-receipt d-block mb-3 text-muted opacity-50" style="font-size: 4rem;"></i>
-                            <h5 class="fw-bold text-dark">No Transactions Yet</h5>
-                            <p class="text-muted">Use the widget on the left to add or deduct funds.</p>
-                        </div>
+                <div class="mt-3 position-relative" style="z-index: 1;">
+                    <div class="small text-uppercase fw-bold mb-1" style="color: rgba(255,255,255,0.65); letter-spacing: 1px;">{{ __('Wallet Balance') }}</div>
+                    <div class="pw-wallet-balance {{ $balance < 0 ? 'text-warning' : '' }}">{{ hostelease_money($balance) }}</div>
+                    @if($balance < 0)
+                        <div class="small mt-1" style="color: rgba(255,255,255,0.75);"><i class="fa-solid fa-hand-holding-hand me-1"></i>{{ __('Lent to the student — they owe this back.') }}</div>
                     @endif
-                    
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="he-stats h-100">
+                <div class="he-stats__grid h-100" style="--he-stats-cols: 2;">
+                    <div class="he-stat">
+                        <div class="he-stat__head">
+                            <div class="he-stat__icon" style="background: var(--he-success-soft, rgba(34,197,94,0.12)); color: var(--he-success, #16a34a);"><i class="fa-solid fa-arrow-down"></i></div>
+                            <div class="he-stat__label">{{ __('Total Deposited') }}</div>
+                        </div>
+                        <div class="he-stat__value text-success">{{ hostelease_money($stats['deposited']) }}</div>
+                    </div>
+                    <div class="he-stat">
+                        <div class="he-stat__head">
+                            <div class="he-stat__icon" style="background: var(--he-danger-soft); color: var(--he-danger);"><i class="fa-solid fa-arrow-up"></i></div>
+                            <div class="he-stat__label">{{ __('Total Withdrawn') }}</div>
+                        </div>
+                        <div class="he-stat__value text-danger">{{ hostelease_money($stats['withdrawn']) }}</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    {{-- ══ Quick actions ══ --}}
+    <div class="d-flex gap-2 mb-4 stagger-2">
+        <button type="button" class="btn btn-success rounded-pill fw-bold px-4" style="min-height: 44px;" @click="open('deposit')">
+            <i class="fa-solid fa-plus me-1"></i>{{ __('Deposit') }}
+        </button>
+        <button type="button" class="btn btn-white border rounded-pill fw-bold px-4 text-danger" style="min-height: 44px;" @click="open('withdraw')">
+            <i class="fa-solid fa-minus me-1"></i>{{ __('Withdraw') }}
+        </button>
+    </div>
+
+    {{-- ══ Transactions (fragment container: pagination swaps in place, §4.3) ══ --}}
+    <div id="pwt-list" data-fragment-container class="he-adaptive stagger-3">
+        @include('admin.pocket_money._transactions')
+    </div>
+
+    {{-- ══ Record sheet — one form, two directions ══ --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="sheetOpen" x-transition.opacity @click="close()" x-cloak style="display: none;">
+            <form method="POST" action="{{ route('admin.pocket-money.store', $student) }}" data-ring-required
+                  class="custom-overlay-modal" :class="{ 'is-open': sheetOpen }" x-show="sheetOpen" x-transition.opacity @click.stop style="display: none;">
+                @csrf
+                <input type="hidden" name="type" :value="type">
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid" :class="type === 'deposit' ? 'fa-plus text-success' : 'fa-minus text-danger'"></i>
+                        <span class="ms-1" x-text="type === 'deposit' ? @js(__('Deposit Money')) : @js(__('Withdraw Money'))"></span>
+                        <div class="fs-6 fw-normal text-muted mt-1">{{ $student->name }}</div>
+                    </h5>
+                    <button type="button" class="btn-close" @click="close()"></button>
+                </div>
+                <div class="custom-overlay-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">{{ __('Direction') }}</label>
+                        <div class="chip-group">
+                            <button type="button" class="chip" :class="{ active: type === 'deposit' }" @click="type = 'deposit'">{{ __('Deposit') }}</button>
+                            <button type="button" class="chip" :class="{ active: type === 'withdraw' }" @click="type = 'withdraw'">{{ __('Withdraw') }}</button>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Amount') }} <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted fw-bold">₹</span>
+                            <input type="number" name="amount" x-model.number="amount" class="form-control bg-light fw-bold text-dark" required min="1" step="0.01" placeholder="0.00">
+                        </div>
+                        {{-- Lending is allowed by design — but never silently. --}}
+                        <div class="form-text small mt-2 text-danger fw-semibold" x-show="goesNegative" x-cloak>
+                            <i class="fa-solid fa-hand-holding-hand me-1"></i>
+                            <span x-text="@js(__('This lends the student')) + ' ₹' + fmt(Math.abs(balanceAfter)) + ' ' + @js(__('beyond their balance — the wallet goes negative.'))"></span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Note') }}</label>
+                        <input type="text" name="note" class="form-control bg-light" maxlength="255" placeholder="{{ __('e.g. Canteen expenses') }}">
+                    </div>
+                </div>
+                <div class="custom-overlay-footer bg-light">
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="close()">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :class="type === 'deposit' ? 'btn-success' : 'btn-danger'">
+                        <i class="fa-solid fa-check me-2"></i>
+                        <span x-text="type === 'deposit' ? @js(__('Record Deposit')) : @js(__('Record Withdrawal'))"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </template>
+
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('pocketWallet', () => ({
+        sheetOpen: false,
+        type: 'deposit',
+        amount: '',
+        balance: @json(round((float) $balance, 2)),
+
+        get balanceAfter() {
+            const a = Number(this.amount) || 0;
+            return Math.round((this.type === 'deposit' ? this.balance + a : this.balance - a) * 100) / 100;
+        },
+        get goesNegative() { return this.type === 'withdraw' && this.balanceAfter < 0; },
+
+        fmt(v) { return Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+
+        open(type) {
+            this.type = type;
+            this.amount = '';
+            this.sheetOpen = true;
+            document.body.style.overflow = 'hidden';
+        },
+        close() {
+            this.sheetOpen = false;
+            document.body.style.overflow = '';
+        },
+    }));
+});
+</script>
+@endpush
 @endsection

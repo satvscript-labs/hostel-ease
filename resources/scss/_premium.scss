@@ -1096,6 +1096,20 @@ body {
     color: var(--he-text-muted);
     font-size: var(--he-text-sm);
 }
+/* Optional per-row state chip (pass `tag` on an option) — surfaces something
+   the chooser needs to know BEFORE choosing, e.g. "already holds a deposit".
+   Amber: a caution, never a block. */
+.he-picker-tag {
+    flex-shrink: 0;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--he-radius-full);
+    background: var(--he-warning-soft, rgba(245, 158, 11, 0.12));
+    color: var(--he-warning, #b45309);
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-feature-settings: 'tnum';
+}
 
 /* --- Gradient Stat Card (colored-by-context hero tile — distinct from
    .bento-card, used when a stat needs to read as "this color = this
@@ -1576,6 +1590,45 @@ body {
     .he-datechip { width: 46px; height: 46px; padding: 0; justify-content: center; }
     .he-datechip .he-datechip__txt { display: none; }
 }
+
+/* ── Filter row with NO search ────────────────────────────────────────────
+   The icon-only-on-mobile collapse exists for ONE reason: a search box is
+   competing for the row and a labelled filter pill would push it off. On a
+   filter row with no search that reason is absent — collapsing anyway leaves
+   two mystery icons stranded beside a screen of dead space, which is what
+   this fixes.
+
+   So here the controls keep their labels at every width and SHARE the row —
+   capped, because two filters stretched across a desktop is just as wrong as
+   two lonely icons. Put .he-filters--nosearch on the form.
+
+   (Wrap each direct child in a plain element or use display:contents spans —
+   the aux fragment span is display:contents, so its children are the form's
+   own flex items and get sized here too.) */
+.he-filters--nosearch > *,
+.he-filters--nosearch > [id$='-filter-aux'] > * {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 260px;
+}
+.he-filters--nosearch .he-datechip {
+    width: auto;
+    height: auto;
+    padding: 0.45rem 0.9rem 0.45rem 0.55rem;
+    justify-content: flex-start;
+}
+.he-filters--nosearch .he-datechip .he-datechip__txt { display: block; min-width: 0; }
+.he-filters--nosearch .he-datechip__txt > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+/* The select's trigger must fill its share, and its label must survive. */
+.he-filters--nosearch .he-select--icon-mobile .he-select-trigger.he-select--filter {
+    width: 100%;
+    height: auto;
+    padding: 0.5rem 0.875rem;
+    justify-content: flex-start;
+}
+.he-filters--nosearch .he-select--icon-mobile .he-select-trigger .he-select-text { display: flex; min-width: 0; }
+.he-filters--nosearch .he-select--icon-mobile .he-select-trigger .he-select-chevron { display: inline-block; margin-left: auto; }
+.he-filters--nosearch .he-select-trigger .he-select-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Icon action buttons + action rows ────────────────────────────────────
    Promoted from the Finance Board's page-local styles the moment a second

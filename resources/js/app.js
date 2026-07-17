@@ -280,7 +280,45 @@ export function placeMenu(trigger, menu) {
     if (!trigger || !menu) return;
 
     const GAP = 8; // matches the CSS `top: calc(100% + 0.5rem)`
-    const EDGE = 8; // keep this much clear of the viewport edge
+    const EDGE = 8; // keep this much clear of the edge
+
+    /**
+     * The box the menu must actually fit inside.
+     *
+     * The viewport is NOT it. A menu inside a scrolling container (a modal
+     * body, any overflow:auto panel) is clipped by that container long before
+     * the viewport — so measuring the viewport says "loads of room below",
+     * the menu opens down, gets cut off, and the container grows a scrollbar:
+     * exactly the thing §4.7 forbids, just one box in.
+     *
+     * So: walk up to the nearest clipping ancestor and intersect its rect
+     * with the viewport. No clipping ancestor → the viewport IS the box.
+     */
+    const availableBox = () => {
+        let box = {
+            top: 0,
+            left: 0,
+            right: document.documentElement.clientWidth,
+            bottom: document.documentElement.clientHeight,
+        };
+
+        for (let el = menu.parentElement; el && el !== document.body; el = el.parentElement) {
+            const style = getComputedStyle(el);
+            const clips = /(auto|scroll|hidden|clip)/.test(style.overflowY + style.overflowX);
+            if (!clips) continue;
+
+            const r = el.getBoundingClientRect();
+            box = {
+                top: Math.max(box.top, r.top),
+                left: Math.max(box.left, r.left),
+                right: Math.min(box.right, r.right),
+                bottom: Math.min(box.bottom, r.bottom),
+            };
+            break; // nearest clipper wins; anything above it can only be looser
+        }
+
+        return box;
+    };
 
     const place = () => {
         // Reset first: measure the DEFAULT placement, not wherever the last
@@ -293,31 +331,31 @@ export function placeMenu(trigger, menu) {
         menu.style.maxHeight = '';
         menu.style.overflowY = '';
 
-        const vw = document.documentElement.clientWidth;
-        const vh = document.documentElement.clientHeight;
+        const box = availableBox();
         const t = trigger.getBoundingClientRect();
         let m = menu.getBoundingClientRect();
 
         // ── Horizontal ──
-        if (m.right > vw - EDGE) {
+        if (m.right > box.right - EDGE) {
             // Try right-aligning to the trigger (menu grows leftward).
             menu.style.left = 'auto';
             menu.style.right = '0';
             m = menu.getBoundingClientRect();
 
             // Still out? It's wider than the space on either side — pin it
-            // inside the viewport and cap the width.
-            if (m.left < EDGE) {
+            // inside the box and cap the width.
+            if (m.left < box.left + EDGE) {
                 menu.style.right = 'auto';
-                menu.style.left = `${EDGE - t.left}px`;
-                menu.style.maxWidth = `${vw - EDGE * 2}px`;
+                menu.style.left = `${box.left + EDGE - t.left}px`;
+                menu.style.maxWidth = `${box.right - box.left - EDGE * 2}px`;
             }
         }
 
-        // ── Vertical ──
+        // ── Vertical ── (measured against the box's own edges, not the
+        // viewport's — inside a modal body neither edge is at 0.)
         m = menu.getBoundingClientRect();
-        const spaceBelow = vh - t.bottom - GAP - EDGE;
-        const spaceAbove = t.top - GAP - EDGE;
+        const spaceBelow = box.bottom - t.bottom - GAP - EDGE;
+        const spaceAbove = t.top - box.top - GAP - EDGE;
 
         if (m.height > spaceBelow && spaceAbove > spaceBelow) {
             // More room up top — flip above the trigger.

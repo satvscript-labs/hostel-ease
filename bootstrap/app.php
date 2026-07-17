@@ -36,6 +36,19 @@ return Application::configure(basePath: dirname(__DIR__))
             LogActivity::class,
         ]);
 
+        // CRITICAL (found W6.4): SubstituteBindings ships inside the web
+        // group, which runs BEFORE route middleware like 'tenant' — so every
+        // route-model binding resolved while Tenant was still unbound, and
+        // TenantScope no-opped. Result: ANY authenticated admin could reach
+        // ANY hostel's students/invoices/bills/deposits just by putting the
+        // id in the URL. Forcing SetTenant ahead of SubstituteBindings in the
+        // priority order means the tenant is bound before any model is, and
+        // cross-tenant ids 404 the way the scope always promised.
+        $middleware->prependToPriorityList(
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            SetTenant::class,
+        );
+
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/dashboard');
     })

@@ -1,193 +1,145 @@
 @extends('layouts.app')
-@section('title', 'Pocket Money')
+@section('title', __('Pocket Money'))
 
-@section('content')
+@push('styles')
 <style>
-    /* Total Balance Widget */
-    .pm-total-widget {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        border-radius: 1.5rem;
-        padding: 2.5rem 2rem;
-        color: white;
-        margin-bottom: 2rem;
-        position: relative;
-        overflow: hidden;
-        display: flex;
+    /* Page-local layout only — W6.4 full redesign (the old page was a
+       Bootstrap-column list, active students only, no search). */
+
+    .pw-filter-row { position: relative; z-index: 30; }
+    #pw-filter-aux { display: contents; }
+
+    /* Wallet rows — container-tiered (§4.9/4.10). */
+    .pw-row {
         align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 20px 40px rgba(16, 185, 129, 0.2);
+        gap: 0.75rem 1rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "info acts"
+            "bal  acts";
     }
-    .pm-total-widget::after {
-        content: '\f555';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        position: absolute;
-        right: -20px;
-        bottom: -40px;
-        font-size: 10rem;
-        opacity: 0.1;
-        transform: rotate(-15deg);
-        pointer-events: none;
+    .pw-c-info { grid-area: info; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .pw-c-bal { grid-area: bal; display: flex; justify-content: flex-end; }
+    .pw-row-acts {
+        grid-area: acts;
+        display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;
+        padding-left: 1rem;
+        border-left: 1px solid rgba(0, 0, 0, 0.06);
+        align-self: stretch;
     }
-    .pm-total-label {
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        opacity: 0.9;
-        margin-bottom: 0.5rem;
-        font-size: 0.85rem;
-    }
-    .pm-total-value {
-        font-size: 3rem;
-        font-weight: 800;
-        line-height: 1;
-        text-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    @container (min-width: 700px) {
+        .pw-row {
+            grid-template-columns: minmax(240px, 1fr) auto auto;
+            grid-template-areas: "info bal acts";
+            column-gap: 1.25rem;
+        }
+        .pw-row-acts { padding-left: 1.25rem; align-self: center; }
     }
 
-    /* Student List */
-    .pm-list-card {
-        background: #fff;
-        border-radius: 1.25rem;
-        border: 1px solid #e2e8f0;
-        overflow: hidden;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    .pw-balance {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        padding: 0.4rem 0.9rem;
+        border-radius: var(--he-radius-full);
+        font-weight: 700; font-feature-settings: 'tnum';
+        white-space: nowrap; /* figures never wrap (§4.10) */
     }
-    .pm-list-header {
-        background: #f8fafc;
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid #e2e8f0;
-        font-weight: 700;
-        color: #64748b;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .pm-list-item {
-        display: flex;
-        align-items: center;
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid #f1f5f9;
-        transition: all 0.2s;
-    }
-    .pm-list-item:hover {
-        background: #f8fafc;
-    }
-    .pm-list-item:last-child {
-        border-bottom: none;
-    }
-    
-    .pm-avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-right: 1.25rem;
-        border: 2px solid #fff;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-    .pm-student-name {
-        font-weight: 700;
-        color: #1e293b;
-        font-size: 1.05rem;
-        margin-bottom: 0.1rem;
-    }
-    
-    .pm-balance-badge {
-        font-weight: 800;
-        padding: 0.4rem 1rem;
-        border-radius: 2rem;
-        font-size: 0.9rem;
-    }
-    .pm-balance-positive {
-        background: #d1fae5;
-        color: #047857;
-        border: 1px solid #a7f3d0;
-    }
-    .pm-balance-zero {
-        background: #f1f5f9;
-        color: #64748b;
-        border: 1px solid #e2e8f0;
-    }
-    .pm-balance-negative {
-        background: #fee2e2;
-        color: #b91c1c;
-        border: 1px solid #fecaca;
+    .pw-balance.is-positive { background: var(--he-success-soft, rgba(34,197,94,0.12)); color: var(--he-success, #16a34a); }
+    .pw-balance.is-negative { background: var(--he-danger-soft); color: var(--he-danger); }
+    .pw-balance.is-zero { background: var(--he-bg-canvas); color: var(--he-text-muted); }
+
+    .pw-left-chip {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        margin-left: 0.4rem; padding: 0.2rem 0.55rem;
+        background: var(--he-warning-soft, rgba(245, 158, 11, 0.12));
+        color: var(--he-warning, #b45309);
+        border-radius: var(--he-radius-full);
+        font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+        vertical-align: 2px;
     }
 </style>
+@endpush
 
-<div class="page-enter">
-    
-    <!-- Total Balance Widget -->
-    <div class="pm-total-widget stagger-1">
+@section('content')
+<div class="page-enter" x-data="pocketMoney()">
+
+    <div class="he-page-head mb-4 stagger-1">
         <div>
-            <div class="pm-total-label">Total Pocket Money Held</div>
-            <div class="pm-total-value">{{ hostelease_money($total) }}</div>
-        </div>
-        <div class="d-none d-md-block text-end">
-            <h5 class="fw-bold mb-1">{{ count($students) }} Students</h5>
-            <div class="opacity-75 small">Active Wallets</div>
+            <h1 class="he-page-title">{{ __('Pocket Money') }}</h1>
+            <p class="he-page-sub">{{ __("Students' money in your custody — deposits, withdrawals, lending.") }}</p>
         </div>
     </div>
 
-    <!-- Student List -->
-    <div class="pm-list-card stagger-2">
-        <div class="pm-list-header d-none d-md-flex row m-0">
-            <div class="col-5">Student</div>
-            <div class="col-3">Mobile</div>
-            <div class="col-2 text-center">Balance</div>
-            <div class="col-2 text-end">Actions</div>
-        </div>
-        
-        <div class="pm-list-body">
-            @forelse($students as $s)
-            <div class="pm-list-item row m-0 align-items-center" style="animation: fadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) {{ min($loop->index * 0.05, 0.5) }}s both;">
-                
-                <!-- Student Info -->
-                <div class="col-12 col-md-5 d-flex align-items-center mb-3 mb-md-0 px-0">
-                    <img src="{{ $s->photo_url }}" class="pm-avatar" alt="{{ $s->name }}">
-                    <div>
-                        <div class="pm-student-name">{{ $s->name }}</div>
-                        @if($s->activeAssignment)
-                            <div class="small text-muted fw-semibold"><i class="fa-solid fa-bed me-1"></i> R:{{ $s->activeAssignment->bed->room->room_number }} / B:{{ $s->activeAssignment->bed->bed_number }}</div>
-                        @else
-                            <div class="small text-warning fw-semibold"><i class="fa-solid fa-triangle-exclamation me-1"></i> No Bed</div>
-                        @endif
-                    </div>
+    {{-- Whole-book custody totals — never shrunk by search/filter. --}}
+    <div class="he-stats mb-4 stagger-2">
+        <div class="he-stats__grid" style="--he-stats-cols: 3;">
+            <div class="he-stat he-stat--hero">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: rgba(255, 255, 255, 0.15); color: #93c5fd;"><i class="fa-solid fa-wallet"></i></div>
+                    <div class="he-stat__label">{{ __('Total in Custody') }}</div>
                 </div>
-                
-                <!-- Mobile -->
-                <div class="col-6 col-md-3 px-0">
-                    <div class="d-md-none small text-muted fw-bold mb-1">Mobile</div>
-                    @if($s->mobile)
-                        <x-mobile-link :mobile="$s->mobile" class="fw-semibold text-decoration-none" />
-                    @else 
-                        <span class="text-muted">—</span> 
-                    @endif
-                </div>
-                
-                <!-- Balance -->
-                <div class="col-6 col-md-2 text-md-center px-0 text-end text-md-start">
-                    <div class="d-md-none small text-muted fw-bold mb-1">Balance</div>
-                    <span class="pm-balance-badge {{ $s->pocket_balance > 0 ? 'pm-balance-positive' : ($s->pocket_balance < 0 ? 'pm-balance-negative' : 'pm-balance-zero') }}">
-                        {{ hostelease_money($s->pocket_balance) }}
-                    </span>
-                </div>
-                
-                <!-- Action -->
-                <div class="col-12 col-md-2 text-md-end px-0 mt-3 mt-md-0">
-                    <a href="{{ route('admin.pocket-money.show', $s) }}" class="btn btn-primary rounded-pill fw-bold shadow-sm w-100 w-md-auto">
-                        <i class="fa-solid fa-wallet me-1"></i> Manage
-                    </a>
-                </div>
+                <div class="he-stat__value">{{ hostelease_money($totals['custody']) }}</div>
             </div>
-            @empty
-            <div class="p-5 text-center text-muted">
-                <i class="fa-solid fa-users d-block mb-3" style="font-size: 3rem; opacity: 0.5;"></i>
-                <h5 class="fw-bold text-dark">No Students Found</h5>
-                <p>Add active students to manage their pocket money.</p>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-primary-soft); color: var(--he-primary);"><i class="fa-solid fa-users"></i></div>
+                    <div class="he-stat__label">{{ __('Open Wallets') }}</div>
+                </div>
+                <div class="he-stat__value">{{ $totals['wallets'] }}</div>
             </div>
-            @endforelse
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-danger-soft); color: var(--he-danger);"><i class="fa-solid fa-hand-holding-hand"></i></div>
+                    <div class="he-stat__label">{{ __('Lent Out (negative)') }}</div>
+                </div>
+                <div class="he-stat__value {{ $totals['negative'] > 0 ? 'text-danger' : '' }}">{{ $totals['negative'] }}</div>
+            </div>
         </div>
     </div>
+
+    {{-- Filter bar — ONE row (§4.5), fragment-driven (§4.3). --}}
+    <div class="mb-4 pw-filter-row stagger-3">
+        <form method="GET" action="{{ route('admin.pocket-money.index') }}" x-ref="filterForm"
+              data-fragment="#pw-list, #pw-filter-aux"
+              class="d-flex flex-nowrap gap-2 align-items-center">
+            <div class="he-search he-search--inline he-search--clearable">
+                <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="search" x-model="searchTerm" class="he-search__input"
+                       placeholder="{{ __('Search by name or mobile...') }}"
+                       @input.debounce.450ms="$el.form.requestSubmit()">
+                <button type="button" class="he-search__clear" x-show="searchTerm" x-cloak
+                        @click="clearSearch()" title="{{ __('Clear search') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <span id="pw-filter-aux">
+                <x-he-select name="filter" icon="filter" icon-only-mobile :selected="$filter ?? ''"
+                    :options="[
+                        '' => ['label' => __('All Wallets'), 'icon' => 'filter'],
+                        'negative' => ['label' => __('Lent Out'), 'icon' => 'hand-holding-hand'],
+                        'departed' => ['label' => __('Departed with money'), 'icon' => 'person-walking-arrow-right'],
+                    ]" />
+            </span>
+        </form>
+    </div>
+
+    <div id="pw-list" data-fragment-container class="he-adaptive">
+        @include('admin.pocket_money._list')
+    </div>
+
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('pocketMoney', () => ({
+        searchTerm: @json($search ?? ''),
+
+        clearSearch() {
+            this.searchTerm = '';
+            this.$nextTick(() => this.$refs.filterForm?.requestSubmit());
+        },
+    }));
+});
+</script>
+@endpush
 @endsection

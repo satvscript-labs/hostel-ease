@@ -156,3 +156,8 @@ change, no migration, no data backfill.
 ## 5. Reverse Transaction (Research Pending)
 
 - {PS: i want you to Research this entire thing and i want a system that when we reverse a transaction it just simple should not ask confirmation and reverse the thing ... in some cases you would have collected money and might keep it even after reversing ... so we ask what most app asks, that is, if reverse to original payment methods... or transfer money to credit and keep money ... so i want you to Research this and give me your side of suggestions and way to tackle this thing. [after Research replace this point with your research and suggestions and all]}
+
+## 6. Minor UI Changes
+
+1. in mobile ui, only use short forms rather then full "45 minutes ago"
+2. fix mobile ui, raws in tablet view is not a good UI, they are inconsistent, elements are not aligned (might be aligned coding wise but atleast in terms of view they are not aligned)

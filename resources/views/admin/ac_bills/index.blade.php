@@ -251,9 +251,13 @@
 
     {{-- ══ Filter bar — ONE row (4.5), fragment-driven (4.3) ══ --}}
     <div class="mb-4 ac-filter-row stagger-3">
+        {{-- he-filters--nosearch: this page has no search box, so the two
+             filters keep their labels at every width and share the row
+             (capped at 260px each) instead of collapsing to two lonely icons
+             beside a screen of dead space. --}}
         <form method="GET" action="{{ route('admin.ac-bills.index') }}" x-ref="filterForm"
               data-fragment="#ac-summary, #ac-filter-aux, #ac-list"
-              class="d-flex flex-nowrap gap-2 align-items-center">
+              class="he-filters--nosearch d-flex flex-nowrap gap-2 align-items-center">
             <div class="he-datechip" title="{{ __('Billing month') }}">
                 <input type="month" name="month" x-model="filterMonth" max="{{ now()->format('Y-m') }}"
                        @click="try { $el.showPicker() } catch (e) {}"

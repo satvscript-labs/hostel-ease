@@ -17,6 +17,10 @@
 
      options: [ ['id' => 1, 'name' => 'Amit Shah', 'sub' => '+919000000100'], ... ]
               `sub` is optional (renders a muted second line).
+              `tag` is optional (a short amber chip on the right of the row —
+              a state the picker should surface at choosing time, e.g. a
+              student who already holds a deposit). It also rides along in the
+              `he-picker-change` payload's `item`, so a parent scope can react.
      none:    label for the "no selection" row (e.g. "— General Visit —").
               Omit to make the picker selection-only (no clear row).
 
@@ -42,6 +46,7 @@
         'id' => (string) ($o['id'] ?? ''),
         'name' => (string) ($o['name'] ?? ''),
         'sub' => isset($o['sub']) ? (string) $o['sub'] : null,
+        'tag' => isset($o['tag']) && filled($o['tag']) ? (string) $o['tag'] : null,
     ])->values();
 @endphp
 <div
@@ -133,6 +138,10 @@
                             <span class="d-block small text-muted text-truncate" x-text="i.sub"></span>
                         </template>
                     </span>
+                    {{-- A state worth knowing BEFORE you pick, not after. --}}
+                    <template x-if="i.tag">
+                        <span class="he-picker-tag" x-text="i.tag"></span>
+                    </template>
                     <i class="fa-solid fa-check text-primary" x-show="value === i.id"></i>
                 </button>
             </template>

@@ -90,6 +90,22 @@ class StudentTest extends TestCase
         ])->assertSessionHasErrors('mobile');
     }
 
+    /**
+     * The W6.4 systemic find: SubstituteBindings ran BEFORE the tenant
+     * middleware, so route-model bindings resolved with the TenantScope
+     * no-opped — any admin could open any hostel's student by URL id. The
+     * priority fix in bootstrap/app.php binds the tenant first; this pins it.
+     */
+    public function test_cross_tenant_student_profile_is_not_found(): void
+    {
+        $other = Hostel::factory()->create();
+        $foreign = Student::create(['hostel_id' => $other->id, 'name' => 'Foreign Student',
+            'mobile' => '9222222222', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign->id))
+            ->assertNotFound();
+    }
+
     public function test_students_are_scoped_to_the_tenant(): void
     {
         $other = Hostel::factory()->create();
