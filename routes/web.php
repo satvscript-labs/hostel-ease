@@ -46,6 +46,12 @@ Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('
 // Language switcher (available to everyone, incl. the login page).
 Route::get('locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
 
+// Public legal pages (W10). Static content; linked from the landing, register,
+// and each other. Pending final legal review.
+Route::view('terms', 'legal.terms')->name('terms');
+Route::view('privacy', 'legal.privacy')->name('privacy');
+Route::view('refund', 'legal.refund')->name('refund');
+
 // One-time web installer (token-guarded; 404 when SETUP_TOKEN is blank).
 Route::get('__install/{token}', [SetupController::class, 'install'])->name('setup.install');
 
@@ -59,6 +65,11 @@ Route::middleware('guest')->group(function () {
     
     Route::get('register', [RegisterController::class, 'show'])->name('register');
     Route::post('register', [RegisterController::class, 'register'])->middleware('throttle:6,1')->name('register.attempt');
+
+    // Account recovery (W10). No self-serve reset exists yet — this is an
+    // honest "how to get back in" page, not a dead link. It becomes the OTP
+    // entry point once an SMS provider is chosen (pending_requirements #1).
+    Route::view('recover', 'auth.recover')->name('recover');
 });
 
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
