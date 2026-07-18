@@ -150,7 +150,7 @@
                                 mobile: '{{ $r->mobile }}',
                                 occupation: '{{ addslashes(config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type))) }}',
                                 joining_date: '{{ $r->joining_date ? \Illuminate\Support\Carbon::parse($r->joining_date)->format('d M Y') : '' }}',
-                                aadhaar: '{{ $r->aadhaar }}',
+                                aadhaar: '{{ hostelease_mask_aadhaar($r->aadhaar) }}',
                                 father_mobile: '{{ $r->father_mobile }}',
                                 mother_mobile: '{{ $r->mother_mobile }}',
                                 address: '{{ addslashes($r->address) }}',
@@ -182,7 +182,16 @@
                     <div class="col-md-6"><div class="reg-field"><div class="reg-field-lbl">Mobile</div><div class="reg-field-val" x-text="current.mobile ? '+91 ' + current.mobile : '—'"></div></div></div>
                     <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Joining Date</div><div class="reg-field-val" x-text="current.joining_date || '—'"></div></div></div>
                     <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Occupation</div><div class="reg-field-val" x-text="current.occupation || '—'"></div></div></div>
-                    <div class="col-12 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Aadhaar</div><div class="reg-field-val" x-text="current.aadhaar || '—'"></div></div></div>
+                    <div class="col-12 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Aadhaar</div>
+                        {{-- Masked by default; the eye toggle hits a LOGGED reveal endpoint (P5). --}}
+                        <div class="reg-field-val d-flex align-items-center gap-2">
+                            <span x-text="(aadhaarShown ? aadhaarFull : current.aadhaar) || '—'"></span>
+                            <button type="button" x-show="current.aadhaar && current.aadhaar !== '—'" @click="revealAadhaar()" :disabled="aadhaarLoading"
+                                    class="btn btn-sm btn-link p-0 text-muted lh-1" :title="aadhaarShown ? 'Hide' : 'Reveal — this is logged'">
+                                <i class="fa-solid" :class="aadhaarLoading ? 'fa-spinner fa-spin' : (aadhaarShown ? 'fa-eye-slash' : 'fa-eye')"></i>
+                            </button>
+                        </div>
+                    </div></div>
                     <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">Father's Mobile</div><div class="reg-field-val" x-text="current.father_mobile ? '+91 ' + current.father_mobile : '—'"></div></div></div>
                     <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">Mother's Mobile</div><div class="reg-field-val" x-text="current.mother_mobile ? '+91 ' + current.mother_mobile : '—'"></div></div></div>
                     <div class="col-12"><div class="reg-field"><div class="reg-field-lbl">Address</div><div class="reg-field-val" x-text="current.address || '—'"></div></div></div>
@@ -213,6 +222,9 @@ function registrationManager() {
         pollInterval: null,
         reviewOpen: false,
         current: {},
+        aadhaarShown: false,
+        aadhaarFull: null,
+        aadhaarLoading: false,
 
         init() {
             // Poll every 15 seconds for new submissions.
@@ -246,7 +258,21 @@ function registrationManager() {
 
         openReview(reg) {
             this.current = reg;
+            this.aadhaarShown = false;
+            this.aadhaarFull = null;
             this.reviewOpen = true;
+        },
+
+        // Logged Aadhaar reveal (P5) — fetches the full number for this applicant.
+        async revealAadhaar() {
+            if (this.aadhaarShown) { this.aadhaarShown = false; return; }
+            if (this.aadhaarFull) { this.aadhaarShown = true; return; }
+            this.aadhaarLoading = true;
+            try {
+                const r = await fetch(`{{ url('admin/registrations') }}/${this.current.id}/aadhaar`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (r.ok) { this.aadhaarFull = (await r.json()).aadhaar; this.aadhaarShown = true; }
+            } catch (e) {}
+            this.aadhaarLoading = false;
         }
     }
 }

@@ -214,6 +214,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::post('students/{student}/promise', [StudentController::class, 'promise'])->name('students.promise');
                 Route::put('students/{student}/fee-settings', [StudentController::class, 'updateFeeSettings'])->name('students.fee-settings.update');
                 Route::get('students/{student}/prorate-preview', [StudentController::class, 'previewProration'])->name('students.prorate-preview');
+                // Logged Aadhaar reveal (P5) — returns the full number, writes an audit entry.
+                Route::get('students/{student}/aadhaar', [StudentController::class, 'revealAadhaar'])->name('students.aadhaar');
                 Route::post('students/{student}/documents', [StudentDocumentController::class, 'store'])->name('students.documents.store');
                 Route::delete('students/{student}/documents/{document}', [StudentDocumentController::class, 'destroy'])->name('students.documents.destroy');
                 
@@ -222,6 +224,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::post('registrations/regenerate', [\App\Http\Controllers\Admin\RegistrationController::class, 'regenerate'])->name('registrations.regenerate');
                 Route::post('registrations/{registration}/approve', [\App\Http\Controllers\Admin\RegistrationController::class, 'approve'])->name('registrations.approve');
                 Route::post('registrations/{registration}/reject', [\App\Http\Controllers\Admin\RegistrationController::class, 'reject'])->name('registrations.reject');
+                Route::get('registrations/{registration}/aadhaar', [\App\Http\Controllers\Admin\RegistrationController::class, 'revealAadhaar'])->name('registrations.aadhaar');
             });
 
             // --- Module 5: Finances (Invoices & Payments) ---
@@ -300,6 +303,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                     // withTrashed the mirror would be un-deletable from both
                     // sides the moment its staff member was removed.
                     ->withTrashed(['show']);
+                // Logged Aadhaar reveal (P5) — returns the full number, writes an audit entry.
+                Route::get('staff/{staff}/aadhaar', [\App\Http\Controllers\Admin\StaffController::class, 'revealAadhaar'])->whereNumber('staff')->withTrashed()->name('staff.aadhaar');
                 Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
                 Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])
                     ->withTrashed()->name('staff.salary.destroy');

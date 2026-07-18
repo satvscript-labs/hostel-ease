@@ -243,9 +243,12 @@
             <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity & Address</h4>
             <div class="row g-4">
                 <div class="col-12 col-sm-6 col-md-4">
-                    <label class="form-label fw-bold small">Aadhaar Number <span class="text-danger">*</span></label>
-                    <input type="text" name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" pattern="\d{12}" required
-                           value="{{ old('aadhaar', $student?->aadhaar) }}" placeholder="12-digit number">
+                    <label class="form-label fw-bold small">Aadhaar Number @unless($student)<span class="text-danger">*</span>@endunless</label>
+                    {{-- On EDIT (P5): blank field, masked placeholder — leave blank to keep the
+                         stored number; only a fresh 12-digit entry replaces it. Required on create. --}}
+                    <input type="text" name="aadhaar" class="form-control" inputmode="numeric" maxlength="12" pattern="\d{12}" @unless($student)required @endunless
+                           value="{{ old('aadhaar') }}"
+                           placeholder="{{ $student ? hostelease_mask_aadhaar($student->aadhaar).' · leave blank to keep' : '12-digit number' }}">
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label fw-bold small">City <span class="text-danger">*</span></label>

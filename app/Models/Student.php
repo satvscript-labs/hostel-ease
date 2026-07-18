@@ -45,6 +45,9 @@ class Student extends Model
             'join_date' => 'date',
             'leave_date' => 'date',
             'credit_balance' => 'decimal:2',
+            // Sensitive personal data (DPDP) — encrypted at rest (P5). Column is
+            // TEXT; the number is never searched/indexed so nothing breaks.
+            'aadhaar' => 'encrypted',
         ];
     }
 

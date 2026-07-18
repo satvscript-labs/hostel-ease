@@ -44,6 +44,19 @@ class RegistrationController extends Controller
         return back()->with('success', 'New registration link generated. The old link no longer works.');
     }
 
+    /**
+     * Reveal an applicant's full Aadhaar number (P5). Masked by default in the
+     * review modal; every reveal writes an audit entry (who, when, IP). The
+     * StudentRegistration binding is tenant-scoped, so a reviewer can only ever
+     * reach applicants for their own hostel.
+     */
+    public function revealAadhaar(StudentRegistration $registration): \Illuminate\Http\JsonResponse
+    {
+        $this->logger->log('aadhaar.reveal', "Revealed Aadhaar of applicant {$registration->name}", $registration);
+
+        return response()->json(['aadhaar' => hostelease_aadhaar_groups($registration->aadhaar)]);
+    }
+
     public function approve(StudentRegistration $registration): RedirectResponse
     {
         abort_unless($registration->status === 'pending' && $registration->hostel_id === Tenant::id(), 404);

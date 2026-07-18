@@ -155,9 +155,14 @@ change, no migration, no data backfill.
 
 ## 5. Identity Documents Are On A Public Disk (Deferred by decision — W7.1, own phase)
 
-**Status:** Raised and deferred in W7.1 with the owner. Not a W7 regression — it is how the app has
-always stored documents — but staff Aadhaar is the most sensitive data in the product, so it is
-recorded here rather than left as folklore.
+**Status: DONE.** P1–P4 (files → private disk) shipped earlier; **P5 (the number itself) shipped
+2026-07-18** — see `_artifact/ui_ux_audit/09_testing_P5_aadhaar.md`. The three Aadhaar-number columns
+(`staff.aadhaar_number`, `students.aadhaar`, `student_registrations.aadhaar`) are now `encrypted` at
+rest (columns widened to TEXT; in-migration idempotent backfill), masked to last-4 everywhere
+(`XXXX XXXX 9012`) via `<x-aadhaar-field>`, and revealed in full only through tenant-scoped endpoints
+that write an `aadhaar.reveal` audit entry. Edit forms are blank + keep-if-empty (owner call). Suite
+289 → 297. CAVEAT recorded: encrypted values need the current APP_KEY — don't rotate it without
+re-keying. This whole item (§5) is now closed; text below is kept for history.
 
 **What's actually wrong.** Staff photos and Aadhaar cards are written to the **`public` disk**
 (`StaffController::storeImage` → `StorageService::store(..., 'public', ...)`), and student documents

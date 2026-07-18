@@ -19,7 +19,11 @@ class StudentRegistration extends Model
 
     protected function casts(): array
     {
-        return ['reviewed_at' => 'datetime'];
+        return [
+            'reviewed_at' => 'datetime',
+            // Aadhaar arrives from the PUBLIC form — encrypt at rest (P5, DPDP).
+            'aadhaar' => 'encrypted',
+        ];
     }
 
     public function student(): BelongsTo

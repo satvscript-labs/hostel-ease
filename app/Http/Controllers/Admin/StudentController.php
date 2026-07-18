@@ -117,6 +117,18 @@ class StudentController extends Controller
             ->with('success', 'Student added successfully.');
     }
 
+    /**
+     * Reveal a student's full Aadhaar number (P5). Masked by default on the
+     * profile; every reveal writes an audit entry (who, when, IP). The binding
+     * is tenant-scoped, so a reveal can only reach this hostel's students.
+     */
+    public function revealAadhaar(Student $student): JsonResponse
+    {
+        $this->logger->log('aadhaar.reveal', "Revealed Aadhaar of student {$student->name}", $student);
+
+        return response()->json(['aadhaar' => hostelease_aadhaar_groups($student->aadhaar)]);
+    }
+
     public function show(Student $student): View
     {
         $student->load([
@@ -270,6 +282,12 @@ class StudentController extends Controller
     public function update(StoreStudentRequest $request, Student $student): RedirectResponse
     {
         $data = $request->validated();
+
+        // Keep the stored Aadhaar when the edit form left it blank (P5) — the
+        // form shows a masked placeholder, never the full number.
+        if (blank($data['aadhaar'] ?? null)) {
+            unset($data['aadhaar']);
+        }
 
         if ($request->hasFile('photo')) {
             if ($student->photo) {

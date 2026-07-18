@@ -236,7 +236,8 @@
                     <div class="st-info">
                         <span class="lbl">{{ __('Aadhaar') }}</span>
                         <span class="val d-flex align-items-center gap-2 justify-content-end flex-wrap">
-                            <span style="font-variant-numeric: tabular-nums;">{{ $staff->aadhaar_number ?: '—' }}</span>
+                            <x-aadhaar-field :masked="hostelease_mask_aadhaar($staff->aadhaar_number)"
+                                :url="route('admin.staff.aadhaar', $staff->id)" />
                             @if($staff->aadhaar_file)
                                 <a href="{{ route('admin.files.show', ['staff', $staff->id, 'aadhaar_file']) }}" target="_blank" rel="noopener"
                                    class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 text-decoration-none">
@@ -363,8 +364,11 @@
                             <input type="date" name="join_date" class="form-control bg-light" max="{{ now()->toDateString() }}" value="{{ old('join_date', optional($staff->join_date)->format('Y-m-d')) }}">
                         </div>
                         <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Aadhaar Number') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="aadhaar_number" class="form-control bg-light" required inputmode="numeric" maxlength="12" pattern="\d{12}" value="{{ old('aadhaar_number', $staff->aadhaar_number) }}">
+                            <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Aadhaar Number') }}</label>
+                            {{-- Blank on edit (P5): leave empty to keep the stored number; the
+                                 masked value is the placeholder. Only a fresh 12-digit entry replaces it. --}}
+                            <input type="text" name="aadhaar_number" class="form-control bg-light" inputmode="numeric" maxlength="12" pattern="\d{12}"
+                                   value="{{ old('aadhaar_number') }}" placeholder="{{ hostelease_mask_aadhaar($staff->aadhaar_number) }} · {{ __('leave blank to keep') }}">
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Aadhaar Card') }}</label>

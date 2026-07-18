@@ -259,6 +259,11 @@ class StaffController extends Controller
     {
         $data = $this->validateStaff($request, $staff);
 
+        // Keep the stored Aadhaar when the edit form left it blank (P5).
+        if (blank($data['aadhaar_number'] ?? null)) {
+            unset($data['aadhaar_number']);
+        }
+
         // Only replace an image when a new one was actually uploaded — an
         // absent file field must never blank the stored path.
         foreach (self::IMAGE_FIELDS as $field => [$dir, $size]) {
@@ -341,6 +346,18 @@ class StaffController extends Controller
             'staff', 'counts', 'payments', 'paymentModes', 'modeNames', 'payroll',
             'paidThisMonth', 'paidLifetime'
         ));
+    }
+
+    /**
+     * Reveal a staff member's full Aadhaar number (P5). Masked by default on the
+     * profile; every reveal writes an audit entry (who, when, IP). The binding is
+     * tenant-scoped (withTrashed, so a removed member's profile can still reveal).
+     */
+    public function revealAadhaar(Staff $staff): JsonResponse
+    {
+        $this->logger->log('aadhaar.reveal', "Revealed Aadhaar of staff {$staff->name}", $staff);
+
+        return response()->json(['aadhaar' => hostelease_aadhaar_groups($staff->aadhaar_number)]);
     }
 
     /**
@@ -515,15 +532,20 @@ class StaffController extends Controller
             $request->merge(['mobile' => substr(preg_replace('/\D+/', '', $request->mobile), -10)]);
         }
 
+        // Aadhaar (P5): required on create; on edit a blank field means "keep the
+        // stored one" (the form shows a masked placeholder, never the full value),
+        // so normalise blank → null and relax the rule to nullable when editing.
         if (filled($request->aadhaar_number)) {
             $request->merge(['aadhaar_number' => preg_replace('/\D+/', '', $request->aadhaar_number)]);
+        } else {
+            $request->merge(['aadhaar_number' => null]);
         }
 
         return $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'designation' => ['nullable', 'string', 'max:100'],
             'mobile' => ['required', 'digits:10'],
-            'aadhaar_number' => ['required', 'digits:12'],
+            'aadhaar_number' => [$staff ? 'nullable' : 'required', 'digits:12'],
             'aadhaar_file' => [$staff ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'monthly_salary' => ['required', 'numeric', 'min:0', 'max:9999999'],

@@ -26,6 +26,9 @@ class Staff extends Model
             'monthly_salary' => 'decimal:2',
             'join_date' => 'date',
             'is_active' => 'boolean',
+            // Sensitive personal data (DPDP) — encrypted at rest (P5). Column is
+            // TEXT; the number is never searched/indexed so nothing breaks.
+            'aadhaar_number' => 'encrypted',
         ];
     }
 

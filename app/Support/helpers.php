@@ -90,6 +90,45 @@ if (! function_exists('hostelease_amount_words')) {
     }
 }
 
+if (! function_exists('hostelease_aadhaar_groups')) {
+    /**
+     * Format a 12-digit Aadhaar number into the standard "XXXX XXXX XXXX"
+     * spaced groups. Used for the REVEALED (full) value.
+     */
+    function hostelease_aadhaar_groups(?string $number): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $number);
+
+        if (blank($digits)) {
+            return '—';
+        }
+
+        return trim(chunk_split($digits, 4, ' '));
+    }
+}
+
+if (! function_exists('hostelease_mask_aadhaar')) {
+    /**
+     * Mask an Aadhaar number to its last four digits: "XXXX XXXX 9012".
+     * The default display everywhere the number is shown (P5, DPDP) — the full
+     * number is only ever produced by a logged reveal endpoint.
+     */
+    function hostelease_mask_aadhaar(?string $number): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $number);
+
+        if (blank($digits)) {
+            return '—';
+        }
+
+        $last4 = substr($digits, -4);
+        // Group like a real Aadhaar so the mask lines up with the revealed value.
+        $maskedGroups = str_repeat('XXXX ', max(0, (int) ceil((strlen($digits) - 4) / 4)));
+
+        return trim($maskedGroups.$last4);
+    }
+}
+
 if (! function_exists('normalize_phone')) {
     /**
      * Normalize an Indian phone number for storage: ensures +91 prefix.

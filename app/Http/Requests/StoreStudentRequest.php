@@ -18,7 +18,9 @@ class StoreStudentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $normalize = fn ($v) => $v === null ? null : '+91' . substr(preg_replace('/\D+/', '', $v), -10);
-        $aadhaar = fn ($v) => $v === null ? null : substr(preg_replace('/\D+/', '', $v), -12);
+        // Blank (or digit-less) aadhaar → null, so that on EDIT a left-blank field
+        // means "keep the stored number" (P5) rather than failing validation.
+        $aadhaar = fn ($v) => strlen($d = preg_replace('/\D+/', '', (string) $v)) ? substr($d, -12) : null;
 
         $this->merge([
             'mobile' => $normalize($this->mobile),
@@ -40,7 +42,8 @@ class StoreStudentRequest extends FormRequest
             'father_mobile' => ['required', 'regex:/^\+91\d{10}$/'],
             'mother_mobile' => $mobile,
             'guardian_mobile' => $mobile,
-            'aadhaar' => ['required', 'digits:12'],
+            // Required on create; on edit a blank field keeps the stored number (P5).
+            'aadhaar' => [$this->route('student') ? 'nullable' : 'required', 'digits:12'],
             'aadhaar_file' => [$this->route('student') ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'address' => ['required', 'string', 'max:500'],
             'city' => ['required', 'string', 'max:100'],

@@ -76,15 +76,24 @@ class StaffTest extends TestCase
             'monthly_salary' => 10000, 'is_active' => '1',
         ])->assertRedirect()->assertSessionHas('success');
 
-        // Stored in exactly one shape regardless of how it was typed — the model
-        // normalises now, so the seeder/importer can't invent a second shape.
+        // Mobile stored in exactly one shape regardless of how it was typed — the
+        // model normalises now, so the seeder/importer can't invent a second shape.
         $this->assertDatabaseHas('staff', [
-            'name' => 'Sita Devi', 'mobile' => '+919876543210', 'aadhaar_number' => '123456789012',
+            'name' => 'Sita Devi', 'mobile' => '+919876543210',
         ]);
 
-        // P2: the Aadhaar lands on the PRIVATE disk, tenant-scoped, and NOT on
-        // the public web-root disk. This is the whole point of the migration.
         $staff = Staff::where('name', 'Sita Devi')->firstOrFail();
+
+        // P5: the Aadhaar NUMBER is encrypted at rest — the model round-trips the
+        // digits (separators stripped), but the raw column holds ciphertext, never
+        // the plaintext number.
+        $this->assertSame('123456789012', $staff->aadhaar_number);
+        $raw = \Illuminate\Support\Facades\DB::table('staff')->where('id', $staff->id)->value('aadhaar_number');
+        $this->assertNotSame('123456789012', $raw);
+        $this->assertStringNotContainsString('123456789012', (string) $raw);
+
+        // P2: the Aadhaar CARD lands on the PRIVATE disk, tenant-scoped, and NOT
+        // on the public web-root disk. This is the whole point of the migration.
         $this->assertStringStartsWith("staff/{$this->hostel->id}/aadhaar/", $staff->aadhaar_file);
         Storage::disk('private')->assertExists($staff->aadhaar_file);
         Storage::disk('public')->assertMissing($staff->aadhaar_file);

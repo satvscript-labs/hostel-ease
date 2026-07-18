@@ -313,7 +313,10 @@
                             <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-id-card text-primary me-2"></i>Identity</div>
                             <div class="info-row">
                                 <span class="lbl">Aadhaar No.</span>
-                                <span class="val font-monospace">{{ $student->aadhaar ? substr($student->aadhaar, 0, 4) . ' ' . substr($student->aadhaar, 4, 4) . ' ' . substr($student->aadhaar, 8, 4) : 'Not provided' }}</span>
+                                <span class="val font-monospace">
+                                    <x-aadhaar-field :masked="hostelease_mask_aadhaar($student->aadhaar)"
+                                        :url="route('admin.students.aadhaar', $student->id)" />
+                                </span>
                             </div>
                             <div class="info-row">
                                 <span class="lbl">Join Date</span>
