@@ -30,6 +30,9 @@
                 'prev' => (float) $bill->previous_reading,
                 'curr' => (float) $bill->current_reading,
                 'rate' => (float) $bill->unit_price,
+                // Meter-floor: the highest reading recorded BEFORE this bill's
+                // month — the honest minimum for previous_reading.
+                'floor' => $editFloors[$bill->id] ?? null,
             ]);
         @endphp
         <div class="card border-0 shadow-sm rounded-4" x-data="{ open: false }">

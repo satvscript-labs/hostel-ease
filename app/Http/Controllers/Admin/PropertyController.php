@@ -8,6 +8,7 @@ use App\Models\BedAssignment;
 use App\Models\Floor;
 use App\Models\Room;
 use App\Models\Student;
+use App\Services\AcMeterService;
 use App\Services\ActivityLogger;
 use App\Services\BedAssignmentService;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,7 @@ class PropertyController extends Controller
     public function __construct(
         protected BedAssignmentService $service,
         protected ActivityLogger $logger,
+        protected AcMeterService $meter,
     ) {
     }
 
@@ -41,6 +43,13 @@ class PropertyController extends Controller
         // rather than a nested <select>: the picker shows what the move
         // actually depends on — room, floor, AC, rent (which prices the new
         // plan) and how full the room is.
+        // Every AC room's last recorded meter (derived — bills + moves), so
+        // the meter inputs can hint the floor and warn inline before a typo
+        // ever reaches the server (meter-floor, 2026-07-18).
+        $roomFloors = $this->meter->lastReadingsForRooms(
+            Room::where('room_type', 'ac')->pluck('id')->all()
+        );
+
         $vacantBeds = Bed::with('room.floor')
             ->whereIn('status', ['empty', 'available'])
             ->get()
@@ -51,6 +60,7 @@ class PropertyController extends Controller
                 'room' => (string) $b->room?->room_number,
                 'floor' => $b->room?->floor?->name,
                 'is_ac' => (bool) $b->room?->isAc(),
+                'last_reading' => $roomFloors[$b->room?->id] ?? null,
                 'rent' => (float) ($b->room?->rent ?? 0),
                 'sharing' => (int) ($b->room?->sharing ?? 0),
             ])->values();
@@ -74,7 +84,8 @@ class PropertyController extends Controller
             'occupied',
             'vacant',
             'maintenance',
-            'unassignedStudents'
+            'unassignedStudents',
+            'roomFloors'
         ));
     }
 
@@ -92,6 +103,7 @@ class PropertyController extends Controller
             'bed_id' => ['required', 'integer', 'exists:beds,id'],
             'join_date' => ['nullable', 'date'],
             'meter_reading' => ['nullable', 'numeric', 'min:0'],
+            'meter_reset' => ['nullable', 'boolean'],
             // Every move is a re-pricing — each room has its own cost, so the
             // plan is confirmed on the way in, never assumed (owner, W6.4).
             'fee_frequency' => ['required', 'string', Rule::in(array_keys(config('hostelease.fee_frequencies')))],
@@ -105,7 +117,8 @@ class PropertyController extends Controller
         // is the anchor that makes every future AC bill split exact instead
         // of day-estimated. Checked here, not in the rules array — which room
         // the bed belongs to isn't known until the bed is loaded.
-        $this->requireMeterReading($bed->room, $data['meter_reading'] ?? null, 'meter_reading');
+        $this->validateMeterReading($bed->room, $data['meter_reading'] ?? null, 'meter_reading',
+            $request->boolean('meter_reset'), 'assign');
 
         $assignment = $this->service->assign($student, $bed, $data);
 
@@ -127,10 +140,14 @@ class PropertyController extends Controller
             'leave_date' => ['nullable', 'date', 'after_or_equal:'.$assignment->join_date->toDateString()],
             'mark_student_left' => ['nullable', 'boolean'],
             'meter_reading' => ['nullable', 'numeric', 'min:0'],
+            'meter_reset' => ['nullable', 'boolean'],
         ]);
 
         $assignment->loadMissing('bed.room');
-        $this->requireMeterReading($assignment->bed->room, $data['meter_reading'] ?? null, 'meter_reading');
+        // The floor already includes this student's own join reading, so a
+        // leaver can never record negative consumption either.
+        $this->validateMeterReading($assignment->bed->room, $data['meter_reading'] ?? null, 'meter_reading',
+            $request->boolean('meter_reset'), 'release');
 
         $this->service->release(
             $assignment,
@@ -152,6 +169,8 @@ class PropertyController extends Controller
             'join_date' => ['required', 'date'],
             'meter_reading' => ['nullable', 'numeric', 'min:0'],       // the room being ENTERED
             'old_meter_reading' => ['nullable', 'numeric', 'min:0'],   // the room being LEFT
+            'meter_reset' => ['nullable', 'boolean'],                  // reset declared on the NEW room's meter
+            'old_meter_reset' => ['nullable', 'boolean'],              // reset declared on the OLD room's meter
             // A transfer is a re-pricing: the new room has its own cost, and
             // billing must not keep charging the old room's rate (owner, W6.4
             // — this silence is what let a student be billed for a room they
@@ -165,8 +184,11 @@ class PropertyController extends Controller
 
         // A transfer can touch TWO meters (W6.3): the old room's reading caps
         // what the student bears there; the new room's reading starts them.
-        $this->requireMeterReading($assignment->bed->room, $data['old_meter_reading'] ?? null, 'old_meter_reading');
-        $this->requireMeterReading($target->room, $data['meter_reading'] ?? null, 'meter_reading');
+        // Each meter carries its own floor — and its own reset declaration.
+        $this->validateMeterReading($assignment->bed->room, $data['old_meter_reading'] ?? null, 'old_meter_reading',
+            $request->boolean('old_meter_reset'), 'transfer (room left)');
+        $this->validateMeterReading($target->room, $data['meter_reading'] ?? null, 'meter_reading',
+            $request->boolean('meter_reset'), 'transfer (room entered)');
 
         // Plan-forward-only (owner decision, W6.4): the new rate applies from
         // the next billing cycle. No proration, no credit, no new invoice —
@@ -201,12 +223,25 @@ class PropertyController extends Controller
      * W6.3, owner decision: an occupancy change in an AC room MUST record
      * the meter — that reading is what keeps the AC bill split honest.
      */
-    protected function requireMeterReading(?Room $room, $reading, string $field): void
+    /**
+     * The AC meter gate for every move (W6.3 presence + meter-floor 2026-07-18):
+     * an AC room requires a reading, and that reading can't be below the
+     * room's last recorded meter — a meter only counts up. A genuine meter
+     * reset/replacement passes with $meterReset (confirmed in the UI only
+     * after a warning) and is logged by the service.
+     */
+    protected function validateMeterReading(?Room $room, $reading, string $field, bool $meterReset = false, string $context = 'move'): void
     {
-        if ($room?->room_type === 'ac' && ($reading === null || $reading === '')) {
+        if ($room?->room_type !== 'ac') {
+            return;
+        }
+
+        if ($reading === null || $reading === '') {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 $field => __('Room :room is an AC room — enter its current meter reading for this move (it keeps the AC bill split exact).', ['room' => $room->room_number]),
             ]);
         }
+
+        $this->meter->assertNotBelow($room, (float) $reading, $field, $meterReset, context: $context);
     }
 }

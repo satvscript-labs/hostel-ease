@@ -7,6 +7,7 @@ use App\Models\AcBill;
 use App\Models\Invoice;
 use App\Models\Room;
 use App\Services\AcBillSplitService;
+use App\Services\AcMeterService;
 use App\Services\ActivityLogger;
 use App\Support\Tenant;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class AcBillController extends Controller
     public function __construct(
         protected AcBillSplitService $splitter,
         protected ActivityLogger $logger,
+        protected AcMeterService $meter,
     ) {
     }
 
@@ -67,13 +69,29 @@ class AcBillController extends Controller
             $q->selectRaw('MAX(id)')->from('ac_bills')->whereNull('deleted_at')->groupBy('room_id');
         })->get()->keyBy('room_id');
 
+        // Every billed month per room: the period picker refuses a range that
+        // collides with an existing bill (edit that bill instead). Non-deleted
+        // only — a reversed bill's month is legitimately re-billable.
+        $billedByRoom = AcBill::get(['room_id', 'bill_month'])
+            ->groupBy('room_id')
+            ->map(fn ($g) => $g->map(fn ($b) => Carbon::parse($b->bill_month)->format('Y-m'))->values());
+
+        // When each room was FIRST occupied — the natural billing start for a
+        // never-billed room (billing an empty past helps nobody).
+        $firstOccupied = \App\Models\BedAssignment::query()
+            ->join('beds', 'beds.id', '=', 'bed_assignments.bed_id')
+            ->selectRaw('beds.room_id as rid, MIN(bed_assignments.join_date) as fj')
+            ->groupBy('beds.room_id')
+            ->pluck('fj', 'rid');
+
         $pickerRooms = Room::where('room_type', 'ac')
             ->with(['floor', 'beds.activeAssignment.student'])
             ->orderBy('room_number')
             ->get()
-            ->map(function (Room $room) use ($lastBills) {
+            ->map(function (Room $room) use ($lastBills, $billedByRoom, $firstOccupied) {
                 $occupants = $room->beds->map(fn ($b) => $b->activeAssignment?->student?->name)->filter()->values();
                 $last = $lastBills->get($room->id);
+                $fj = $firstOccupied->get($room->id);
 
                 return [
                     'id' => $room->id,
@@ -83,6 +101,8 @@ class AcBillController extends Controller
                     'last_reading' => $last !== null ? (float) $last->current_reading : 0.0,
                     'last_billed_month' => $last?->bill_month->format('Y-m'),
                     'last_billed_label' => $last?->bill_month->format('M Y'),
+                    'billed_months' => $billedByRoom->get($room->id)?->all() ?? [],
+                    'first_occupied_month' => $fj ? Carbon::parse($fj)->format('Y-m') : null,
                 ];
             })->values();
 
@@ -95,8 +115,13 @@ class AcBillController extends Controller
             ?? AcBill::latest('id')->value('unit_price')
             ?? 12.0);
 
+        // Per-bill floors for the EDIT modal: the highest reading recorded
+        // before each bill's month (meter-floor, 2026-07-18). Batched — two
+        // queries for the whole page, not two per row.
+        $editFloors = $this->meter->floorsForBills($bills->getCollection());
+
         return view('admin.ac_bills.index', compact(
-            'bills', 'summary', 'filterMonth', 'filterFloor', 'floors', 'pickerRooms', 'defaultUnitPrice'
+            'bills', 'summary', 'filterMonth', 'filterFloor', 'floors', 'pickerRooms', 'defaultUnitPrice', 'editFloors'
         ));
     }
 
@@ -112,8 +137,18 @@ class AcBillController extends Controller
         $data = $this->validateBillInput($request);
         $room = Room::findOrFail($data['room_id']);
 
+        // Meter-floor (2026-07-18): the batch's START reading is the meter at
+        // the start of the first selected month, so it floors against readings
+        // recorded BEFORE that month — never against mid-window move readings
+        // (those live inside the period this bill is about to explain). The
+        // preview only REPORTS it; the modal warns inline and reveals the
+        // reset override. store() is where it blocks.
+        $floor = $this->meter->lastReading($room, Carbon::parse($data['pairs'][0]['month'].'-01'));
+
         return response()->json([
             'months' => $this->computeMonths($room, $data),
+            'start_floor' => $floor,
+            'below_floor' => $floor !== null && $data['prev_reading'] < $floor - 0.005,
         ]);
     }
 
@@ -121,6 +156,24 @@ class AcBillController extends Controller
     {
         $data = $this->validateBillInput($request);
         $room = Room::with('beds.activeAssignment.student')->findOrFail($data['room_id']);
+
+        // Meter-floor (2026-07-18): the start reading can't be below what the
+        // meter showed before the first selected month — unless a reset/
+        // replacement was explicitly confirmed, which is accepted and logged.
+        $floor = $this->meter->lastReading($room, Carbon::parse($data['pairs'][0]['month'].'-01'));
+        if ($floor !== null && $data['prev_reading'] < $floor - 0.005) {
+            if (! $data['meter_reset']) {
+                return back()->with('error', __("The start reading (:reading) is below Room :room's last recorded meter (:floor) — a meter only counts up. If it was actually reset or replaced, confirm that in the form and generate again.", [
+                    'reading' => number_format($data['prev_reading'], 2),
+                    'room' => $room->room_number,
+                    'floor' => number_format($floor, 2),
+                ]));
+            }
+            $this->logger->log('ac_meter.reset', sprintf(
+                'Meter reset/replaced accepted for Room %s (bill): %s → %s',
+                $room->room_number, number_format($floor, 2), number_format($data['prev_reading'], 2)
+            ), $room);
+        }
 
         $months = $this->computeMonths($room, $data);
 
@@ -190,7 +243,28 @@ class AcBillController extends Controller
             'previous_reading' => ['required', 'numeric', 'min:0'],
             'current_reading' => ['required', 'numeric', 'gte:previous_reading'],
             'unit_price' => ['required', 'numeric', 'min:0.01', 'max:99999'],
+            'meter_reset' => ['nullable', 'boolean'],
         ]);
+
+        // Meter-floor (2026-07-18): the edited start can't drop below what the
+        // meter showed before this bill's month (earlier bills + moves) —
+        // unless a reset/replacement is confirmed, which is accepted + logged.
+        $floor = $this->meter->lastReading($acBill->room, $acBill->bill_month);
+        if ($floor !== null && $data['previous_reading'] < $floor - 0.005) {
+            if (! $request->boolean('meter_reset')) {
+                return back()->with('error', __("The previous reading (:reading) is below Room :room's last recorded meter before :month (:floor) — a meter only counts up. If it was actually reset or replaced, confirm that in the form and save again.", [
+                    'reading' => number_format($data['previous_reading'], 2),
+                    'room' => $acBill->room->room_number,
+                    'month' => $acBill->bill_month->format('M Y'),
+                    'floor' => number_format($floor, 2),
+                ]));
+            }
+            $this->logger->log('ac_meter.reset', sprintf(
+                'Meter reset/replaced accepted for Room %s (bill edit, %s): %s → %s',
+                $acBill->room->room_number, $acBill->bill_month->format('M Y'),
+                number_format($floor, 2), number_format($data['previous_reading'], 2)
+            ), $acBill->room);
+        }
 
         $units = round($data['current_reading'] - $data['previous_reading'], 2);
         $amount = round($units * $data['unit_price'], 2);
@@ -301,6 +375,7 @@ class AcBillController extends Controller
             'room_id' => ['required', 'integer', Rule::exists('rooms', 'id')->where('hostel_id', Tenant::id())],
             'unit_price' => ['required', 'numeric', 'min:0.01', 'max:99999'],
             'prev_reading' => ['required', 'numeric', 'min:0'],
+            'meter_reset' => ['nullable', 'boolean'],
             'months' => ['required', 'array', 'min:1', 'max:12'],
             'months.*' => ['required', 'date_format:Y-m', 'distinct'],
             'readings' => ['required', 'array', 'size:'.count((array) $request->input('months', []))],
@@ -327,6 +402,7 @@ class AcBillController extends Controller
             'room_id' => (int) $data['room_id'],
             'unit_price' => (float) $data['unit_price'],
             'prev_reading' => (float) $data['prev_reading'],
+            'meter_reset' => $request->boolean('meter_reset'),
             'pairs' => $pairs->all(),
         ];
     }

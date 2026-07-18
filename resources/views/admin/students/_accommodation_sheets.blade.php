@@ -34,7 +34,22 @@
                     <div class="col-md-6 mb-4" x-show="bed?.is_ac" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1"><i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('AC Meter Now') }} <span class="text-danger">*</span></label>
                         <input type="number" name="meter_reading" x-model.number="meter" class="form-control bg-light fw-bold" min="0" step="0.01" :required="bed?.is_ac" :disabled="!bed?.is_ac" placeholder="{{ __('Read the room meter') }}">
+                        {{-- The floor, shown up front so a typo is caught before it's typed. --}}
+                        <div class="form-text small" x-show="newFloor !== null" x-cloak>
+                            {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmtReading(newFloor)"></span>
+                        </div>
                     </div>
+                </div>
+
+                {{-- Below-floor: warn, and only then offer the reset override —
+                     never a popup, never shown on a normal reading (meter-floor). --}}
+                <div class="mb-3" x-show="belowNewFloor" x-cloak
+                     style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                    <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('This reading is below the room’s last recorded meter') }} (<span x-text="fmtReading(newFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                    <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                        <input type="checkbox" name="meter_reset" value="1" x-model="meterReset" x-ref="meterResetBox" class="form-check-input m-0">
+                        <span>{{ __('The meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                    </label>
                 </div>
 
                 <hr class="opacity-10 my-3">
@@ -49,7 +64,10 @@
 
             <div class="custom-overlay-footer bg-light">
                 <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="close()">{{ __('Cancel') }}</button>
-                <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :class="{ 'is-locked': !bed }">
+                {{-- §4.4: never :disabled — a below-floor reading without the
+                     reset confirmation RINGS the confirmation instead. --}}
+                <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :class="{ 'is-locked': !bed }"
+                        @click="if (belowNewFloor && !meterReset) { $event.preventDefault(); window.heRing?.([$refs.meterResetBox], 'primary'); }">
                     <i class="fa-solid fa-check me-2"></i>{{ __('Confirm Assignment') }}
                 </button>
             </div>
@@ -83,12 +101,37 @@
                     <div class="col-md-6 mb-3" x-show="bed?.is_ac" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1"><i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('New room meter') }} <span class="text-danger">*</span></label>
                         <input type="number" name="meter_reading" x-model.number="meter" class="form-control bg-light fw-bold" min="0" step="0.01" :required="bed?.is_ac" :disabled="!bed?.is_ac" placeholder="{{ __('Read the new room meter') }}">
+                        <div class="form-text small" x-show="newFloor !== null" x-cloak>
+                            {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmtReading(newFloor)"></span>
+                        </div>
                     </div>
                     {{-- The room being LEFT: its reading caps the AC share here. --}}
                     <div class="col-md-6 mb-3" x-show="cfg.currentRoomIsAc" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1"><i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('Old room meter') }} (<span x-text="cfg.currentRoom"></span>) <span class="text-danger">*</span></label>
                         <input type="number" name="old_meter_reading" x-model.number="oldMeter" class="form-control bg-light fw-bold" min="0" step="0.01" :required="cfg.currentRoomIsAc" placeholder="{{ __('Read the old room meter') }}">
+                        <div class="form-text small" x-show="oldFloor !== null" x-cloak>
+                            {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmtReading(oldFloor)"></span>
+                        </div>
                     </div>
+                </div>
+
+                {{-- Below-floor warnings — one per meter, each with its own
+                     reset confirmation (a transfer touches TWO meters). --}}
+                <div class="mb-3" x-show="belowNewFloor" x-cloak
+                     style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                    <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('New room reading is below its last recorded meter') }} (<span x-text="fmtReading(newFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                    <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                        <input type="checkbox" name="meter_reset" value="1" x-model="meterReset" x-ref="meterResetBox" class="form-check-input m-0">
+                        <span>{{ __('That meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                    </label>
+                </div>
+                <div class="mb-3" x-show="belowOldFloor" x-cloak
+                     style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                    <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('Old room reading is below its last recorded meter') }} (<span x-text="fmtReading(oldFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                    <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                        <input type="checkbox" name="old_meter_reset" value="1" x-model="oldMeterReset" x-ref="oldMeterResetBox" class="form-check-input m-0">
+                        <span>{{ __('That meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                    </label>
                 </div>
 
                 <hr class="opacity-10 my-3">
@@ -103,7 +146,9 @@
 
             <div class="custom-overlay-footer bg-light">
                 <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="close()">{{ __('Cancel') }}</button>
-                <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :class="{ 'is-locked': !bed }">
+                {{-- §4.4: ring the unanswered reset confirmation(s), never :disabled. --}}
+                <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn" :class="{ 'is-locked': !bed }"
+                        @click="const boxes = []; if (belowNewFloor && !meterReset) boxes.push($refs.meterResetBox); if (belowOldFloor && !oldMeterReset) boxes.push($refs.oldMeterResetBox); if (boxes.length) { $event.preventDefault(); window.heRing?.(boxes, 'primary'); }">
                     <i class="fa-solid fa-check me-2"></i>{{ __('Confirm Transfer') }}
                 </button>
             </div>
@@ -124,8 +169,25 @@ document.addEventListener('alpine:init', () => {
         joinDate: '{{ now()->toDateString() }}',
         meter: null,
         oldMeter: null,
+        meterReset: false,
+        oldMeterReset: false,
         frequency: cfg.frequency || '',
         amount: cfg.fee > 0 ? cfg.fee : null,
+
+        // ── Meter floors (meter-floor, 2026-07-18): a meter only counts up.
+        // The floor comes with the bed payload; typing below it reveals the
+        // warn + reset confirmation. Nothing shows on a normal reading.
+        get newFloor() { return this.bed?.is_ac ? (this.bed.last_reading ?? null) : null; },
+        get belowNewFloor() {
+            return this.newFloor !== null && this.meter !== null && this.meter !== ''
+                && Number(this.meter) < Number(this.newFloor) - 0.005;
+        },
+        get oldFloor() { return this.cfg.currentRoomIsAc ? (this.cfg.currentRoomLastReading ?? null) : null; },
+        get belowOldFloor() {
+            return this.oldFloor !== null && this.oldMeter !== null && this.oldMeter !== ''
+                && Number(this.oldMeter) < Number(this.oldFloor) - 0.005;
+        },
+        fmtReading(v) { return Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
 
         get filteredBeds() {
             const q = this.bedSearch.trim().toLowerCase();
@@ -142,6 +204,8 @@ document.addEventListener('alpine:init', () => {
             this.bedSearch = '';
             this.meter = null;
             this.oldMeter = null;
+            this.meterReset = false;
+            this.oldMeterReset = false;
             this.joinDate = '{{ now()->toDateString() }}';
             this.frequency = this.cfg.frequency || '';
             this.amount = this.cfg.fee > 0 ? this.cfg.fee : null;
@@ -158,7 +222,7 @@ document.addEventListener('alpine:init', () => {
             this.transferOpen = true;
             document.body.style.overflow = 'hidden';
         },
-        pickBed(b) { this.bed = b; if (!b.is_ac) this.meter = null; },
+        pickBed(b) { this.bed = b; this.meterReset = false; if (!b.is_ac) this.meter = null; },
         close() {
             this.assignOpen = this.transferOpen = false;
             document.body.style.overflow = '';

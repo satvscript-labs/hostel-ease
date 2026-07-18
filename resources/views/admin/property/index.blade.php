@@ -593,6 +593,7 @@
                                          'room' => (string) $room->room_number,
                                          'bed' => (string) $bed->bed_number,
                                          'isAc' => $room->isAc(),
+                                         'lastReading' => $roomFloors[$room->id] ?? null,
                                      ]) }})"
                                      title="Assign a student">
                                      <i class="fa-solid fa-circle-plus"></i>
@@ -624,6 +625,7 @@
                                          'join_date_raw' => $assignment->join_date->toDateString(),
                                          'duration' => $assignment->durationInDays(),
                                          'room_is_ac' => $room->isAc(),
+                                         'room_last_reading' => $roomFloors[$room->id] ?? null,
                                          // The student's CURRENT plan, so a transfer opens
                                          // pre-filled from their profile (W6.4 fix).
                                          'fee_amount' => (float) ($student->fee_amount ?? 0),
@@ -743,7 +745,21 @@
                                 </label>
                                 <input type="number" name="meter_reading" x-model.number="assign.meterReading" class="form-control bg-light fw-bold"
                                        min="0" step="0.01" :required="assign.isAc" :disabled="!assign.isAc" placeholder="{{ __('Read the room meter') }}">
+                                <div class="form-text small" x-show="assign.lastReading !== null && assign.lastReading !== undefined" x-cloak>
+                                    {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmt(assign.lastReading)"></span>
+                                </div>
                             </div>
+                        </div>
+
+                        {{-- Below-floor: warn, then offer the reset override — never
+                             a popup, nothing shows on a normal reading (meter-floor). --}}
+                        <div class="mb-3" x-show="assignBelowFloor" x-cloak
+                             style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                            <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('This reading is below the room’s last recorded meter') }} (<span x-text="fmt(assign.lastReading)"></span>) — {{ __('a meter only counts up.') }}</div>
+                            <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                                <input type="checkbox" name="meter_reset" value="1" x-model="assign.meterReset" x-ref="assignResetBox" class="form-check-input m-0">
+                                <span>{{ __('The meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                            </label>
                         </div>
 
                         <hr class="opacity-10 my-4">
@@ -780,8 +796,11 @@
 
                 <div class="custom-overlay-footer bg-light">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="closeAssign()">{{ __('Cancel') }}</button>
+                    {{-- §4.4: a below-floor reading without the reset confirmation
+                         RINGS the confirmation instead of failing silently. --}}
                     <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
-                            :disabled="!assign.student || assign.submitting">
+                            :disabled="!assign.student || assign.submitting"
+                            @click="if (assignBelowFloor && !assign.meterReset) { $event.preventDefault(); window.heRing?.([$refs.assignResetBox], 'primary'); }">
                         <i class="fa-solid fa-check me-2"></i>{{ __('Confirm Assignment') }}
                     </button>
                 </div>
@@ -1021,18 +1040,43 @@
                                 <label class="form-label fw-bold small text-uppercase letter-spacing-1">
                                     <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('Old Room Meter') }} <span class="text-danger">*</span>
                                 </label>
-                                <input type="number" name="old_meter_reading" min="0" step="0.01" class="form-control bg-light fw-bold"
+                                <input type="number" name="old_meter_reading" x-model.number="transfer.oldMeter" min="0" step="0.01" class="form-control bg-light fw-bold"
                                        :required="panels.details.data.room_is_ac" :disabled="!panels.details.data.room_is_ac"
                                        placeholder="{{ __('Meter of the room being left') }}">
+                                <div class="form-text small" x-show="transferOldFloor !== null" x-cloak>
+                                    {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmt(transferOldFloor)"></span>
+                                </div>
                             </div>
                             <div class="col-md-6 mb-4" x-show="transfer.target?.is_ac">
                                 <label class="form-label fw-bold small text-uppercase letter-spacing-1">
                                     <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('New Room Meter') }} <span class="text-danger">*</span>
                                 </label>
-                                <input type="number" name="meter_reading" min="0" step="0.01" class="form-control bg-light fw-bold"
+                                <input type="number" name="meter_reading" x-model.number="transfer.newMeter" min="0" step="0.01" class="form-control bg-light fw-bold"
                                        :required="transfer.target?.is_ac" :disabled="!transfer.target?.is_ac"
                                        placeholder="{{ __('Meter of the new room') }}">
+                                <div class="form-text small" x-show="transferNewFloor !== null" x-cloak>
+                                    {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmt(transferNewFloor)"></span>
+                                </div>
                             </div>
+                        </div>
+
+                        {{-- Below-floor warnings — one per meter, each with its own
+                             reset confirmation (a transfer touches TWO meters). --}}
+                        <div class="mb-3" x-show="transferBelowNewFloor" x-cloak
+                             style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                            <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('New room reading is below its last recorded meter') }} (<span x-text="fmt(transferNewFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                            <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                                <input type="checkbox" name="meter_reset" value="1" x-model="transfer.meterReset" x-ref="transferResetBox" class="form-check-input m-0">
+                                <span>{{ __('That meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                            </label>
+                        </div>
+                        <div class="mb-3" x-show="transferBelowOldFloor" x-cloak
+                             style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                            <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('Old room reading is below its last recorded meter') }} (<span x-text="fmt(transferOldFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                            <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                                <input type="checkbox" name="old_meter_reset" value="1" x-model="transfer.oldMeterReset" x-ref="transferOldResetBox" class="form-check-input m-0">
+                                <span>{{ __('That meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                            </label>
                         </div>
 
                         <hr class="opacity-10 my-4">
@@ -1083,8 +1127,10 @@
 
                 <div class="custom-overlay-footer bg-light">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="closeTransfer()">{{ __('Cancel') }}</button>
+                    {{-- §4.4: ring the unanswered reset confirmation(s), never fail silently. --}}
                     <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
-                            :disabled="!transfer.target || transfer.submitting">
+                            :disabled="!transfer.target || transfer.submitting"
+                            @click="const boxes = []; if (transferBelowNewFloor && !transfer.meterReset) boxes.push($refs.transferResetBox); if (transferBelowOldFloor && !transfer.oldMeterReset) boxes.push($refs.transferOldResetBox); if (boxes.length) { $event.preventDefault(); window.heRing?.(boxes, 'primary'); }">
                         <i class="fa-solid fa-right-left me-2"></i>{{ __('Transfer Now') }}
                     </button>
                 </div>
@@ -1118,9 +1164,22 @@
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">
                             <i class="fa-solid fa-bolt text-warning me-1"></i>AC Meter Reading Now <span class="text-danger">*</span>
                         </label>
-                        <input type="number" name="meter_reading" min="0" step="0.01" class="form-control bg-light"
+                        <input type="number" name="meter_reading" x-model.number="releaseMeter" min="0" step="0.01" class="form-control bg-light"
                                :required="panels.details.data.room_is_ac" :disabled="!panels.details.data.room_is_ac"
                                placeholder="Read the room's meter before releasing">
+                        <div class="form-text small" x-show="releaseFloor !== null" x-cloak>
+                            {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmt(releaseFloor)"></span>
+                        </div>
+                    </div>
+
+                    {{-- Below-floor: warn, then offer the reset override (meter-floor). --}}
+                    <div class="mb-4" x-show="releaseBelowFloor" x-cloak
+                         style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                        <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('This reading is below the room’s last recorded meter') }} (<span x-text="fmt(releaseFloor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                        <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                            <input type="checkbox" name="meter_reset" value="1" x-model="releaseReset" x-ref="releaseResetBox" class="form-check-input m-0">
+                            <span>{{ __('The meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                        </label>
                     </div>
 
                     <label class="form-check p-3 bg-danger-subtle rounded-3 d-flex align-items-center m-0" for="markLeft" style="cursor: pointer;">
@@ -1130,7 +1189,9 @@
                 </div>
                 <div class="custom-overlay-footer">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="releaseOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-danger fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                    {{-- §4.4: ring the unanswered reset confirmation, never fail silently. --}}
+                    <button type="submit" class="btn btn-danger fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
+                            @click="if (releaseBelowFloor && !releaseReset) { $event.preventDefault(); window.heRing?.([$refs.releaseResetBox], 'primary'); }">
                         <i class="fa-solid fa-right-from-bracket me-2"></i>Release Student
                     </button>
                 </div>
@@ -1190,11 +1251,13 @@ document.addEventListener('alpine:init', () => {
         panels: {
             details: {
                 open: false, bedId: '', room: '', bed: '',
-                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, fee_amount: 0, fee_frequency: '' }
+                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, room_last_reading: null, fee_amount: 0, fee_frequency: '' }
             }
         },
 
         releaseOpen: false,
+        releaseMeter: '',
+        releaseReset: false,
 
         // ── Shared plan helpers ──
         // There is ONE plan per student: what they pay, and how often. It is
@@ -1205,6 +1268,23 @@ document.addEventListener('alpine:init', () => {
             return freq === 'yearly' ? @json(__('/ year')) : (freq === 'semester' ? @json(__('/ semester')) : @json(__('/ month')));
         },
         fmt(v) { return Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
+
+        // ── Meter floors (meter-floor, 2026-07-18): a meter only counts up.
+        // Floors ride the bed/room payloads; typing below one reveals the
+        // warn + reset confirmation. Nothing shows on a normal reading.
+        belowFloor(value, floor) {
+            return floor !== null && floor !== undefined && value !== null && value !== '' && value !== undefined
+                && Number(value) < Number(floor) - 0.005;
+        },
+        get assignBelowFloor() {
+            return this.assign.isAc && this.belowFloor(this.assign.meterReading, this.assign.lastReading);
+        },
+        get transferNewFloor() { return this.transfer.target?.is_ac ? (this.transfer.target.last_reading ?? null) : null; },
+        get transferOldFloor() { return this.panels.details.data.room_is_ac ? (this.panels.details.data.room_last_reading ?? null) : null; },
+        get transferBelowNewFloor() { return this.belowFloor(this.transfer.newMeter, this.transferNewFloor); },
+        get transferBelowOldFloor() { return this.belowFloor(this.transfer.oldMeter, this.transferOldFloor); },
+        get releaseFloor() { return this.panels.details.data.room_is_ac ? (this.panels.details.data.room_last_reading ?? null) : null; },
+        get releaseBelowFloor() { return this.belowFloor(this.releaseMeter, this.releaseFloor); },
 
         // The frequency chips aren't a validatable input (the value posts via
         // a hidden field), so an empty one can't ring itself — §4.4's
@@ -1235,6 +1315,7 @@ document.addEventListener('alpine:init', () => {
                 ...this.assign,
                 open: true, submitting: false,
                 bedId: bed.bedId, room: bed.room, bed: bed.bed, isAc: bed.isAc,
+                lastReading: bed.lastReading ?? null, meterReset: false,
                 query: '', student: null, studentId: '',
                 joinDate: @json(now()->toDateString()),
                 meterReading: '',
@@ -1295,6 +1376,7 @@ document.addEventListener('alpine:init', () => {
                 ...this.transfer,
                 open: true, submitting: false,
                 pickerOpen: false, query: '', target: null, bedId: '',
+                oldMeter: '', newMeter: '', meterReset: false, oldMeterReset: false,
                 date: @json(now()->toDateString()),
                 // Their current plan, shown as-is to keep or change. Not a
                 // suggestion, not derived from anything — just what's on file.
@@ -1346,6 +1428,8 @@ document.addEventListener('alpine:init', () => {
         },
         openRelease() {
             this.closeDetails();
+            this.releaseMeter = '';
+            this.releaseReset = false;
             this.releaseOpen = true;
         }
     }));

@@ -154,23 +154,52 @@
     }
     .ac-share-num .ac-row-lbl { margin-bottom: 0; }
 
-    /* ── Generate modal ── */
-    .ac-month-chips {
-        display: grid; gap: 0.5rem;
-        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    /* ── Generate modal · BILLING PERIOD + METER TAPE (redesign 2026-07-18) ──
+       The period is a FROM → TO month range (two he-datechips — the range IS
+       the multi-select, contiguous by construction, exactly how chained
+       readings work). It prefills to "the month after the last bill → last
+       month" (never-billed rooms start from first occupancy). Readings are a
+       ledger tape: Start, then one row per month with LIVE units + ₹ as you
+       type — a chain typo shows red on its own row instantly. */
+    .ac-period { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .ac-period .he-datechip { flex: 0 1 auto; }
+    /* The range toggle — a quiet affordance, not a control that shouts. */
+    .ac-period-toggle {
+        border: 1px dashed rgba(15, 23, 42, 0.18); border-radius: var(--he-radius-full);
+        background: transparent; color: var(--he-text-muted);
+        padding: 0.35rem 0.8rem; font-size: 0.74rem; font-weight: 700;
+        transition: all 0.18s var(--ease-out-expo); white-space: nowrap;
     }
-    .ac-mchip {
-        border: 1px solid rgba(0, 0, 0, 0.08); border-radius: var(--he-radius-full);
-        background: var(--he-bg-surface); color: var(--he-text-main);
-        padding: 0.45rem 0.5rem; font-size: 0.8rem; font-weight: 600;
-        text-align: center; cursor: pointer; white-space: nowrap;
-        transition: all 0.18s var(--ease-out-expo);
+    .ac-period-toggle:hover { border-color: var(--he-primary); color: var(--he-primary); }
+    /* Locked chain anchor: the Start value is the room's own record — shown,
+       not typed. The pencil unlocks it for the rare correction. */
+    .ac-tape-lockval {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        font-weight: 700; font-feature-settings: 'tnum'; color: var(--he-text-main);
     }
-    .ac-mchip:hover { border-color: var(--he-primary); color: var(--he-primary); }
-    .ac-mchip.active { background: var(--he-primary); border-color: var(--he-primary); color: #fff; }
-    .ac-read-row { display: flex; align-items: center; gap: 0.75rem; }
-    .ac-read-row + .ac-read-row { margin-top: 0.6rem; }
-    .ac-read-lbl { flex: 0 0 108px; font-size: 0.8rem; font-weight: 700; color: var(--he-text-main); }
+    .ac-tape-lockval .fa-lock { font-size: 0.68rem; color: var(--he-text-muted); }
+    .ac-tape-unlock {
+        border: 0; background: transparent; padding: 0.1rem 0.25rem; line-height: 1;
+        color: var(--he-text-muted); font-size: 0.72rem; border-radius: 6px;
+        transition: color 0.18s var(--ease-out-expo);
+    }
+    .ac-tape-unlock:hover { color: var(--he-primary); }
+
+    .ac-tape { border: 1px solid rgba(0, 0, 0, 0.07); border-radius: var(--he-radius-md); overflow: hidden; }
+    .ac-tape-row {
+        display: grid; grid-template-columns: minmax(88px, auto) 1fr minmax(120px, auto);
+        gap: 0.75rem; align-items: center; padding: 0.55rem 0.8rem;
+    }
+    .ac-tape-row + .ac-tape-row { border-top: 1px dashed rgba(0, 0, 0, 0.06); }
+    .ac-tape-row--start { background: var(--he-bg-surface-raised); }
+    .ac-tape-mon { font-size: 0.8rem; font-weight: 700; color: var(--he-text-main); line-height: 1.2; }
+    .ac-tape-sub { display: block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--he-text-muted); }
+    .ac-tape-units {
+        text-align: right; font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+        font-feature-settings: 'tnum'; color: var(--he-success);
+    }
+    .ac-tape-units.is-empty { color: var(--he-text-muted); font-weight: 600; }
+    .ac-tape-units.is-neg { color: var(--he-danger); }
     .ac-rate-save {
         border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 10px;
         width: 44px; flex-shrink: 0;
@@ -202,13 +231,6 @@
 @endpush
 
 @section('content')
-@php
-    $monthOptions = collect(range(0, 11))->map(fn ($i) => [
-        'value' => now()->subMonthsNoOverflow($i)->format('Y-m'),
-        'label' => now()->subMonthsNoOverflow($i)->format('M Y'),
-    ])->values();
-@endphp
-
 <div class="page-enter" x-data="acBoard()">
 
     {{-- ══ Header ══ --}}
@@ -311,10 +333,10 @@
                 <input type="hidden" name="room_id" :value="roomId ?? ''">
                 <input type="hidden" name="prev_reading" :value="prevReading">
                 <input type="hidden" name="unit_price" :value="rate">
-                <template x-for="m in sortedMonths" :key="'m-' + m">
+                <template x-for="m in rangeMonths" :key="'m-' + m">
                     <input type="hidden" name="months[]" :value="m">
                 </template>
-                <template x-for="m in sortedMonths" :key="'r-' + m">
+                <template x-for="m in rangeMonths" :key="'r-' + m">
                     <input type="hidden" name="readings[]" :value="readings[m] ?? ''">
                 </template>
 
@@ -368,40 +390,126 @@
                         </div>
                     </div>
 
-                    {{-- Months — one or many; readings chain below --}}
+                    {{-- Billing period — a FROM → TO month range. Contiguous by
+                         construction (exactly how chained readings work); prefills
+                         to "after the last bill → last month" on room pick. --}}
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-flex align-items-center gap-2">
-                            <span>{{ __('Bill Month(s)') }} <span class="text-danger">*</span></span>
+                            <span>{{ __('Billing Period') }} <span class="text-danger">*</span></span>
                             <span class="badge rounded-pill" style="background: var(--he-primary-soft); color: var(--he-primary);"
-                                  x-show="months.length > 1" x-cloak x-text="months.length + ' {{ __('months') }}'"></span>
+                                  x-show="rangeMonths.length > 1" x-cloak x-text="rangeMonths.length + ' {{ __('months') }}'"></span>
                         </label>
-                        <div class="ac-month-chips">
-                            @foreach($monthOptions as $m)
-                                <button type="button" class="ac-mchip" :class="{ active: months.includes('{{ $m['value'] }}') }"
-                                        @click="toggleMonth('{{ $m['value'] }}')">{{ $m['label'] }}</button>
-                            @endforeach
+                        {{-- DYNAMIC: one "Month" chip for the common single-month
+                             bill; the To chip appears only in range mode (opened
+                             by the toggle, or automatically when a room has a
+                             multi-month backlog). --}}
+                        <div class="ac-period">
+                            <div class="he-datechip" :title="rangeMode ? '{{ __('First month to bill') }}' : '{{ __('Month to bill') }}'">
+                                <input type="month" x-model="fromMonth" max="{{ now()->format('Y-m') }}"
+                                       @click="try { $el.showPicker() } catch (e) {}" aria-label="{{ __('First month to bill') }}">
+                                <span class="he-datechip__ic"><i class="fa-solid" :class="rangeMode ? 'fa-play' : 'fa-calendar-days'"></i></span>
+                                <span class="he-datechip__txt">
+                                    <span class="he-datechip__lbl" x-text="rangeMode ? '{{ __('From') }}' : '{{ __('Month') }}'"></span>
+                                    <span class="fw-bold small text-dark" style="line-height: 1.1;" x-text="fromMonth ? fmtMonth(fromMonth) : '—'"></span>
+                                </span>
+                            </div>
+                            <template x-if="rangeMode">
+                                <i class="fa-solid fa-arrow-right-long text-muted small"></i>
+                            </template>
+                            <template x-if="rangeMode">
+                                <div class="he-datechip" title="{{ __('Last month to bill') }}">
+                                    <input type="month" x-model="toMonth" max="{{ now()->format('Y-m') }}"
+                                           @click="try { $el.showPicker() } catch (e) {}" aria-label="{{ __('Last month to bill') }}">
+                                    <span class="he-datechip__ic"><i class="fa-solid fa-flag-checkered"></i></span>
+                                    <span class="he-datechip__txt">
+                                        <span class="he-datechip__lbl">{{ __('To') }}</span>
+                                        <span class="fw-bold small text-dark" style="line-height: 1.1;" x-text="toMonth ? fmtMonth(toMonth) : '—'"></span>
+                                    </span>
+                                </div>
+                            </template>
+                            <button type="button" class="ac-period-toggle" @click="toggleRange()">
+                                <span x-show="!rangeMode"><i class="fa-solid fa-plus me-1"></i>{{ __('Bill a range') }}</span>
+                                <span x-show="rangeMode" x-cloak><i class="fa-solid fa-minus me-1"></i>{{ __('Single month') }}</span>
+                            </button>
+                        </div>
+
+                        {{-- Where the period starts, said plainly. --}}
+                        <div class="form-text small mt-2" x-show="room" x-cloak>
+                            <template x-if="room?.last_billed_label">
+                                <span><i class="fa-solid fa-circle-check text-success me-1"></i>{{ __('Billed till') }} <b x-text="room.last_billed_label"></b> — {{ __('the period continues right after it.') }}</span>
+                            </template>
+                            <template x-if="room && !room.last_billed_label">
+                                <span><i class="fa-solid fa-circle-info me-1"></i>{{ __('Never billed — starting from when the room was first occupied.') }}</span>
+                            </template>
+                        </div>
+
+                        <div class="ac-sum-warn ac-sum-warn--danger" x-show="rangeInvalid" x-cloak>
+                            <i class="fa-solid fa-circle-exclamation"></i>{{ __('“From” is after “To” — swap them around.') }}
+                        </div>
+                        <div class="ac-sum-warn ac-sum-warn--danger" x-show="rangeTooLong" x-cloak>
+                            <i class="fa-solid fa-circle-exclamation"></i>{{ __('A batch covers at most 12 months — shorten the period.') }}
+                        </div>
+                        <div class="ac-sum-warn ac-sum-warn--danger" x-show="billedInRange.length > 0" x-cloak>
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <span>{{ __('Already billed:') }} <b x-text="billedInRange.map(m => fmtMonth(m)).join(', ')"></b> — {{ __('move the period past them, or edit those bills.') }}</span>
                         </div>
                     </div>
 
-                    {{-- Readings — chained: each month's start is the previous end --}}
-                    <div class="mb-4" x-show="months.length > 0" x-cloak>
+                    {{-- Meter tape — Start, then one row per month. Units + ₹
+                         compute LIVE per row; a reading below its previous one
+                         goes red on its own row the moment it's typed. --}}
+                    <div class="mb-4" x-show="rangeMonths.length > 0 && !rangeInvalid && !rangeTooLong" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Meter Readings') }}</label>
-                        <div class="ac-read-row">
-                            <span class="ac-read-lbl">{{ __('Start') }}</span>
-                            <div class="input-group input-group-sm">
-                                <input type="number" class="form-control bg-light fw-bold" x-model.number="prevReading"
-                                       min="0" step="0.01" required aria-label="{{ __('Start reading') }}">
-                                <span class="input-group-text bg-light text-muted small">{{ __('last recorded') }}</span>
+                        <div class="ac-tape">
+                            <div class="ac-tape-row ac-tape-row--start">
+                                <span class="ac-tape-mon">{{ __('Start') }}<span class="ac-tape-sub">{{ __('last recorded') }}</span></span>
+                                {{-- The chain anchor comes from the room's own record —
+                                     once a chain exists nobody should retype it. Locked
+                                     display by default; the pencil unlocks for the rare
+                                     correction (the meter-floor still guards it). --}}
+                                <template x-if="startLocked">
+                                    <span class="ac-tape-lockval">
+                                        <i class="fa-solid fa-lock"></i>
+                                        <span x-text="fmt(prevReading)"></span>
+                                        <button type="button" class="ac-tape-unlock" @click="startLocked = false"
+                                                title="{{ __('Edit the start reading (rare — the chain continues from the last bill)') }}"
+                                                aria-label="{{ __('Edit the start reading') }}">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                    </span>
+                                </template>
+                                <template x-if="!startLocked">
+                                    <input type="number" class="form-control form-control-sm bg-white fw-bold" x-model.number="prevReading"
+                                           min="0" step="0.01" required aria-label="{{ __('Start reading') }}">
+                                </template>
+                                <span class="ac-tape-units is-empty" x-text="preview && preview.start_floor !== null ? '{{ __('floor') }} ' + fmt(preview.start_floor) : '—'"></span>
                             </div>
+                            <template x-for="(m, i) in rangeMonths" :key="'row-' + m">
+                                <div class="ac-tape-row">
+                                    <span class="ac-tape-mon" x-text="fmtMonth(m)"></span>
+                                    <input type="number" class="form-control form-control-sm bg-light fw-bold" x-model.number="readings[m]"
+                                           min="0" step="0.01" required :placeholder="'{{ __('meter at end of') }} ' + fmtMonth(m)"
+                                           :aria-label="'{{ __('Reading at end of') }} ' + fmtMonth(m)">
+                                    <span class="ac-tape-units"
+                                          :class="{ 'is-empty': unitsFor(m) === null, 'is-neg': unitsFor(m) !== null && unitsFor(m) < 0 }"
+                                          x-text="unitsFor(m) === null ? '—'
+                                              : (unitsFor(m) < 0 ? '{{ __('below previous') }}'
+                                                  : '+' + fmt(unitsFor(m)) + ' {{ __('u') }} · ₹' + fmt(unitsFor(m) * (Number(rate) || 0)))"></span>
+                                </div>
+                            </template>
                         </div>
-                        <template x-for="m in sortedMonths" :key="'in-' + m">
-                            <div class="ac-read-row">
-                                <span class="ac-read-lbl" x-text="'{{ __('End of') }} ' + monthLabels[m]"></span>
-                                <input type="number" class="form-control form-control-sm bg-light fw-bold" x-model.number="readings[m]"
-                                       min="0" step="0.01" required :placeholder="'{{ __('meter at end of') }} ' + monthLabels[m]"
-                                       :aria-label="'{{ __('Reading at end of') }} ' + monthLabels[m]">
-                            </div>
-                        </template>
+
+                        {{-- Below-floor: warn, then offer the reset override — never a
+                             popup, nothing shows on a normal reading (meter-floor). --}}
+                        <div class="mt-2" x-show="preview && preview.below_floor" x-cloak
+                             style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                            <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('The start reading is below the room’s last recorded meter') }} (<span x-text="fmt(preview?.start_floor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                            <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                                <input type="checkbox" value="1" x-model="meterReset" x-ref="genResetBox" class="form-check-input m-0">
+                                <span>{{ __('The meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                            </label>
+                        </div>
+                        <input type="hidden" name="meter_reset" :value="meterReset ? 1 : 0">
                     </div>
 
                     {{-- Rate — saveable as the hostel default --}}
@@ -423,7 +531,7 @@
                     </div>
 
                     {{-- Live summary — the server's own math, previewed --}}
-                    <div class="mb-2" x-show="months.length > 0 && room" x-cloak>
+                    <div class="mb-2" x-show="rangeMonths.length > 0 && room" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-flex align-items-center gap-2">
                             <span>{{ __('Summary') }}</span>
                             <i class="fa-solid fa-circle-notch fa-spin text-muted small" x-show="previewBusy" x-cloak></i>
@@ -521,11 +629,25 @@
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Previous Reading') }} <span class="text-danger">*</span></label>
                             <input type="number" name="previous_reading" x-model.number="e.prev" class="form-control bg-light fw-bold" required min="0" step="0.01">
+                            <div class="form-text small" x-show="e.floor !== null && e.floor !== undefined" x-cloak>
+                                {{ __('Meter before this month:') }} <span class="fw-bold" x-text="fmt(e.floor)"></span>
+                            </div>
                         </div>
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Current Reading') }} <span class="text-danger">*</span></label>
                             <input type="number" name="current_reading" x-model.number="e.curr" class="form-control bg-light fw-bold" required :min="e.prev" step="0.01">
                         </div>
+                    </div>
+
+                    {{-- Below-floor: warn, then offer the reset override — never a
+                         popup, nothing shows on a normal reading (meter-floor). --}}
+                    <div class="mb-3" x-show="editBelowFloor" x-cloak
+                         style="background: var(--he-warning-soft, rgba(245,158,11,.12)); color: #b45309; border-radius: var(--he-radius-md); padding: .65rem .8rem; font-size: .82rem; font-weight: 600;">
+                        <div><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ __('The previous reading is below the room’s last recorded meter before this month') }} (<span x-text="fmt(e.floor)"></span>) — {{ __('a meter only counts up.') }}</div>
+                        <label class="d-flex align-items-center gap-2 mt-2 mb-0" style="cursor: pointer;">
+                            <input type="checkbox" name="meter_reset" value="1" x-model="e.reset" x-ref="editResetBox" class="form-check-input m-0">
+                            <span>{{ __('The meter was reset / replaced — accept this lower reading (this is logged)') }}</span>
+                        </label>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Unit Rate (₹)') }} <span class="text-danger">*</span></label>
@@ -537,7 +659,9 @@
                 </div>
                 <div class="custom-overlay-footer bg-light">
                     <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="editOpen = false">{{ __('Cancel') }}</button>
-                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn">
+                    {{-- §4.4: ring the unanswered reset confirmation, never fail silently. --}}
+                    <button type="submit" class="btn btn-premium fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
+                            @click="if (editBelowFloor && !e.reset) { $event.preventDefault(); window.heRing?.([$refs.editResetBox], 'primary'); }">
                         <i class="fa-solid fa-check me-2"></i>{{ __('Save & Recompute') }}
                     </button>
                 </div>
@@ -557,13 +681,25 @@ document.addEventListener('alpine:init', () => {
         // --- Generate sheet ---
         genOpen: false,
         rooms: {{ Illuminate\Support\Js::from($pickerRooms) }},
-        monthLabels: {{ Illuminate\Support\Js::from($monthOptions->pluck('label', 'value')) }},
         roomId: null,
         roomSearch: '',
         roomOpen: false,
-        months: [],
+        // The billing period: a FROM → TO month range (redesign 2026-07-18).
+        // Contiguous by construction — exactly how the chained readings work.
+        // rangeMode: one "Month" chip for the common single-month bill; the To
+        // chip appears via the toggle, or automatically when a room has a
+        // multi-month backlog.
+        fromMonth: @json(now()->subMonthNoOverflow()->format('Y-m')),
+        toMonth: @json(now()->subMonthNoOverflow()->format('Y-m')),
+        currentYm: @json(now()->format('Y-m')),
+        lastMonthYm: @json(now()->subMonthNoOverflow()->format('Y-m')),
+        rangeMode: false,
+        // The Start reading locks once the room has a real chain anchor (a
+        // last bill) — shown, not retyped; the pencil unlocks the rare edit.
+        startLocked: false,
         readings: {},
         prevReading: 0,
+        meterReset: false,
         rate: @json($defaultUnitPrice),
         rateSaved: false,
 
@@ -575,7 +711,15 @@ document.addEventListener('alpine:init', () => {
 
         // --- Edit sheet ---
         editOpen: false,
-        e: { action: '', room: '', month: '', prev: 0, curr: 0, rate: 0 },
+        e: { action: '', room: '', month: '', prev: 0, curr: 0, rate: 0, floor: null, reset: false },
+
+        // Meter-floor (edit): warn + reveal the reset override when the typed
+        // previous reading drops below the recorded meter before that month.
+        get editBelowFloor() {
+            return this.e.floor !== null && this.e.floor !== undefined
+                && this.e.prev !== null && this.e.prev !== ''
+                && Number(this.e.prev) < Number(this.e.floor) - 0.005;
+        },
 
         get room() { return this.rooms.find(r => r.id === this.roomId) ?? null; },
         get roomLabel() {
@@ -590,9 +734,39 @@ document.addEventListener('alpine:init', () => {
                 || (r.floor ?? '').toLowerCase().includes(q)
                 || r.occupants.some(n => n.toLowerCase().includes(q)));
         },
-        get sortedMonths() { return [...this.months].sort(); },
+        // ── The period, resolved ────────────────────────────────────────
+        ymAdd(ym, n) {
+            const [y, m] = ym.split('-').map(Number);
+            const d = new Date(Date.UTC(y, m - 1 + n, 1));
+            return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+        },
+        monthsBetween(a, b) {
+            const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number);
+            return (yb - ya) * 12 + (mb - ma) + 1;
+        },
+        get rangeMonths() {
+            if (! this.fromMonth || ! this.toMonth || this.fromMonth > this.toMonth) return [];
+            const out = []; let m = this.fromMonth, guard = 0;
+            while (m <= this.toMonth && guard < 13) { out.push(m); m = this.ymAdd(m, 1); guard++; }
+            return out;
+        },
+        get rangeInvalid() { return !! (this.fromMonth && this.toMonth && this.fromMonth > this.toMonth); },
+        get rangeTooLong() {
+            return !! (this.fromMonth && this.toMonth && ! this.rangeInvalid && this.monthsBetween(this.fromMonth, this.toMonth) > 12);
+        },
+        isBilled(m) { return this.room ? this.room.billed_months.includes(m) : false; },
+        get billedInRange() { return this.rangeMonths.filter(m => this.isBilled(m)); },
+        // Live units for a month's row: its reading minus the one before it in
+        // the chain. Pure display of what was typed — nothing is derived.
+        unitsFor(m) {
+            const i = this.rangeMonths.indexOf(m);
+            const prev = i <= 0 ? this.prevReading : this.readings[this.rangeMonths[i - 1]];
+            const cur = this.readings[m];
+            if (prev === undefined || prev === '' || prev === null || cur === undefined || cur === '' || cur === null) return null;
+            return Math.round((Number(cur) - Number(prev)) * 100) / 100;
+        },
         get readingsComplete() {
-            return this.sortedMonths.every(m => this.readings[m] !== undefined && this.readings[m] !== '' && this.readings[m] !== null);
+            return this.rangeMonths.every(m => this.readings[m] !== undefined && this.readings[m] !== '' && this.readings[m] !== null);
         },
         get grandTotal() {
             return this.preview ? this.preview.months.reduce((t, m) => t + (Number(m.amount) || 0), 0) : 0;
@@ -604,12 +778,15 @@ document.addEventListener('alpine:init', () => {
             return bills + ' ' + (bills === 1 ? @json(__('bill')) : @json(__('bills'))) + ' · ' + invoices + ' ' + @json(__('invoices'));
         },
         get submitDisabled() {
-            if (! this.roomId || this.months.length === 0 || ! this.readingsComplete || ! (Number(this.rate) > 0)) return true;
+            if (! this.roomId || this.rangeMonths.length === 0 || this.rangeInvalid || this.rangeTooLong || this.billedInRange.length > 0) return true;
+            if (! this.readingsComplete || ! (Number(this.rate) > 0)) return true;
             if (this.previewBusy || ! this.preview) return true;
+            // Below-floor start needs the reset confirmation first (meter-floor).
+            if (this.preview.below_floor && ! this.meterReset) return true;
             return this.preview.months.some(m => m.already_billed || m.students.length === 0);
         },
         get submitLabel() {
-            const n = this.months.length;
+            const n = this.rangeMonths.length;
             return n > 1 ? @json(__('Generate')) + ' ' + n + ' ' + @json(__('Bills')) : @json(__('Generate Bill'));
         },
 
@@ -622,7 +799,11 @@ document.addEventListener('alpine:init', () => {
 
         openGenerate() {
             this.roomId = null; this.roomSearch = ''; this.roomOpen = false;
-            this.months = []; this.readings = {}; this.prevReading = 0;
+            // Last month is THE billing moment — the period lands there.
+            this.fromMonth = this.lastMonthYm; this.toMonth = this.lastMonthYm;
+            this.rangeMode = false; this.startLocked = false;
+            this.readings = {}; this.prevReading = 0;
+            this.meterReset = false;
             this.preview = null; this.rateSaved = false;
             this.genOpen = true;
             document.body.style.overflow = 'hidden';
@@ -641,24 +822,42 @@ document.addEventListener('alpine:init', () => {
         selectRoom(r) {
             this.roomId = r.id;
             this.prevReading = r.last_reading; // the chain's anchor — editable
+            this.meterReset = false;
+
+            // Where billing should START: right after the last bill; for a
+            // never-billed room, when it was first occupied (billing an empty
+            // past helps nobody); else just last month. TO lands on last month
+            // — the natural billing moment — clamped to the 12-month batch cap.
+            let from = r.last_billed_month ? this.ymAdd(r.last_billed_month, 1)
+                : (r.first_occupied_month || this.lastMonthYm);
+            if (from > this.currentYm) from = this.currentYm;
+            let to = this.lastMonthYm >= from ? this.lastMonthYm : from;
+            if (this.monthsBetween(from, to) > 12) from = this.ymAdd(to, -11);
+            this.fromMonth = from;
+            this.toMonth = to;
+            // A backlog opens the range automatically; otherwise stay compact.
+            this.rangeMode = from !== to;
+            // Lock the anchor when the room has a chain to continue from.
+            this.startLocked = !! r.last_billed_month;
+
+            this.pruneReadings();
             this.roomOpen = false;
             this.schedulePreview();
         },
-        toggleMonth(m) {
-            if (this.months.includes(m)) {
-                this.months = this.months.filter(x => x !== m);
-                delete this.readings[m];
-            } else {
-                this.months.push(m);
-            }
-            this.schedulePreview();
+        pruneReadings() {
+            Object.keys(this.readings).forEach(m => { if (! this.rangeMonths.includes(m)) delete this.readings[m]; });
+        },
+        toggleRange() {
+            this.rangeMode = ! this.rangeMode;
+            if (! this.rangeMode) this.toMonth = this.fromMonth; // collapse back to one month
         },
 
         // Debounced; sequence-guarded so a slow early response can never
         // overwrite a fast later one (same discipline as fragment filters).
         schedulePreview() {
             clearTimeout(this.previewTimer);
-            if (! this.roomId || this.months.length === 0 || ! this.readingsComplete || ! (Number(this.rate) > 0)) {
+            if (! this.roomId || this.rangeMonths.length === 0 || this.rangeInvalid || this.rangeTooLong
+                || ! this.readingsComplete || ! (Number(this.rate) > 0)) {
                 this.preview = null;
                 return;
             }
@@ -672,8 +871,8 @@ document.addEventListener('alpine:init', () => {
                     room_id: this.roomId,
                     unit_price: Number(this.rate),
                     prev_reading: Number(this.prevReading) || 0,
-                    months: this.sortedMonths,
-                    readings: this.sortedMonths.map(m => Number(this.readings[m])),
+                    months: this.rangeMonths,
+                    readings: this.rangeMonths.map(m => Number(this.readings[m])),
                 });
                 if (seq !== this.previewSeq) return; // superseded
                 this.preview = res.data;
@@ -695,15 +894,22 @@ document.addEventListener('alpine:init', () => {
         },
 
         openEdit(payload) {
-            this.e = { ...payload };
+            this.e = { floor: null, ...payload, reset: false };
             this.editOpen = true;
         },
 
         init() {
-            // Readings/rate/start changes re-run the preview (deep-ish watch).
+            // Readings/rate/start changes re-run the preview (deep-ish watch);
+            // period changes prune stale readings first.
             this.$watch('readings', () => this.schedulePreview());
             this.$watch('rate', () => this.schedulePreview());
             this.$watch('prevReading', () => this.schedulePreview());
+            this.$watch('fromMonth', () => {
+                // Single-month mode: the one chip drives both ends.
+                if (! this.rangeMode && this.toMonth !== this.fromMonth) this.toMonth = this.fromMonth;
+                this.pruneReadings(); this.schedulePreview();
+            });
+            this.$watch('toMonth', () => { this.pruneReadings(); this.schedulePreview(); });
         },
     }));
 });

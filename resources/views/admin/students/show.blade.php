@@ -216,6 +216,7 @@
                     'transferUrl' => $student->activeAssignment ? route('admin.property.transfer', $student->activeAssignment) : null,
                     'currentRoomIsAc' => (bool) optional($student->activeAssignment?->bed?->room)->isAc(),
                     'currentRoom' => $student->activeAssignment?->bed?->room?->room_number,
+                    'currentRoomLastReading' => $roomFloors[$student->activeAssignment?->bed?->room?->id] ?? null,
                     'fee' => (float) ($student->fee_amount ?? 0),
                     'frequency' => $student->fee_frequency ?? '',
                     'beds' => $vacantBeds,

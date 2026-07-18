@@ -162,6 +162,12 @@ class StudentController extends Controller
         // Vacant beds for the in-profile Assign / Transfer sheets (W10 UX fix —
         // the Accommodation buttons used to just link to the Property Board).
         // Same shape and endpoints the board uses; only the entry point moves.
+        // AC rooms carry their last recorded meter (derived: bills + moves) so
+        // the sheets can hint the floor and warn inline (meter-floor, 2026-07-18).
+        $roomFloors = app(\App\Services\AcMeterService::class)->lastReadingsForRooms(
+            \App\Models\Room::where('room_type', 'ac')->pluck('id')->all()
+        );
+
         $vacantBeds = \App\Models\Bed::with('room.floor')
             ->whereIn('status', ['empty', 'available'])
             ->get()
@@ -172,6 +178,7 @@ class StudentController extends Controller
                 'room' => (string) $b->room?->room_number,
                 'floor' => $b->room?->floor?->name,
                 'is_ac' => (bool) $b->room?->isAc(),
+                'last_reading' => $roomFloors[$b->room?->id] ?? null,
                 'rent' => (float) ($b->room?->rent ?? 0),
                 'sharing' => (int) ($b->room?->sharing ?? 0),
             ])->values();
@@ -271,7 +278,7 @@ class StudentController extends Controller
 
         $timeline = $timeline->sortByDesc('date')->values();
 
-        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes', 'timeline', 'vacantBeds'));
+        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes', 'timeline', 'vacantBeds', 'roomFloors'));
     }
 
     public function edit(Student $student): View
