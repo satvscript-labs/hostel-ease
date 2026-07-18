@@ -59,6 +59,28 @@ class StudentTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * The Aadhaar card (and photo) captured at creation live on the student ROW
+     * as columns, not in student_documents — but the profile's Documents tab must
+     * still surface them as read-only base documents (owner report: the required
+     * Aadhaar upload was invisible on the profile).
+     */
+    public function test_the_profile_surfaces_the_base_aadhaar_card_in_documents(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([
+            'photo' => UploadedFile::fake()->image('avatar.jpg'),
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        $student = Student::firstOrFail();
+        $this->assertNotNull($student->aadhaar_file);
+
+        $this->actingAs($this->admin)->get(route('admin.students.show', $student))
+            ->assertOk()
+            ->assertSee('Aadhaar Card')
+            ->assertSee('Student Photo')
+            ->assertSee(route('admin.files.show', ['student', $student->id, 'aadhaar_file']), false);
+    }
+
     public function test_admin_can_create_a_student_with_photo(): void
     {
         $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([

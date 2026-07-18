@@ -419,6 +419,35 @@
                         </button>
                     </div>
                     <div class="d-flex flex-column gap-2">
+                        {{-- Base identity files (Aadhaar card + photo) captured at
+                             creation/registration live on the student ROW as columns,
+                             not in student_documents. Surface them here read-only so the
+                             base documents show where you'd expect them. They're replaced
+                             via Edit (required identity docs), so no delete button here. --}}
+                        @php($baseDocs = collect([
+                            ['field' => 'aadhaar_file', 'label' => __('Aadhaar Card'), 'type' => 'aadhaar', 'icon' => 'id-card', 'path' => $student->aadhaar_file],
+                            ['field' => 'photo', 'label' => __('Student Photo'), 'type' => 'photo', 'icon' => 'image', 'path' => $student->photo],
+                        ])->filter(fn ($d) => filled($d['path'])))
+                        @foreach($baseDocs as $bd)
+                            <div class="d-flex justify-content-between align-items-center gap-2 p-3 border rounded-4">
+                                <div class="d-flex align-items-center gap-3 min-width-0">
+                                    <div class="sp-ic bg-primary-subtle text-primary"><i class="fa-solid fa-{{ $bd['icon'] }}"></i></div>
+                                    <div class="min-width-0">
+                                        <div class="fw-bold text-truncate">{{ $bd['label'] }}</div>
+                                        <div class="mt-1 d-flex gap-2 flex-wrap align-items-center">
+                                            <span class="badge bg-primary-subtle text-primary fw-bold text-uppercase">{{ $bd['type'] }}</span>
+                                            <span class="small fw-bold text-muted"><i class="fa-solid fa-lock me-1"></i>{{ __('Base document · edit to replace') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 flex-shrink-0">
+                                    <a href="{{ route('admin.files.show', ['student', $student->id, $bd['field']]) }}" target="_blank" rel="noopener" class="btn btn-white border text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;" title="{{ __('View') }}">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        @endforeach
+
                         @forelse($student->documents as $doc)
                             <div class="d-flex justify-content-between align-items-center gap-2 p-3 border rounded-4">
                                 <div class="d-flex align-items-center gap-3 min-width-0">
@@ -451,11 +480,13 @@
                                 </div>
                             </div>
                         @empty
-                            <x-he-empty-state icon="folder-open" title="No documents yet" subtitle="Keep important student files secure here.">
-                                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm mt-3" @click="docOpen = true">
-                                    <i class="fa-solid fa-upload me-1"></i> Upload Document
-                                </button>
-                            </x-he-empty-state>
+                            @if($baseDocs->isEmpty())
+                                <x-he-empty-state icon="folder-open" title="No documents yet" subtitle="Keep important student files secure here.">
+                                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm mt-3" @click="docOpen = true">
+                                        <i class="fa-solid fa-upload me-1"></i> Upload Document
+                                    </button>
+                                </x-he-empty-state>
+                            @endif
                         @endforelse
                     </div>
                 </div>
