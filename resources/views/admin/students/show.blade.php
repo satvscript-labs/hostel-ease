@@ -789,9 +789,16 @@
                             </div>
                         </div>
                     </template>
-                    <template x-if="preview && !preview.has_active_cycle">
+                    <template x-if="preview && !preview.has_active_cycle && preview.has_bed">
                         <div class="fw-bold text-muted">
                             <i class="fa-solid fa-circle-info me-1"></i> No active cycle to prorate. A new invoice for ₹<span x-text="preview.new_invoice_amount"></span> will be generated.
+                        </div>
+                    </template>
+                    {{-- Rent is for a bed: with no bed assigned, this only saves the
+                         intended plan — the first invoice is raised on assignment. --}}
+                    <template x-if="preview && !preview.has_bed">
+                        <div class="fw-bold text-muted">
+                            <i class="fa-solid fa-circle-info me-1"></i> This saves the plan only. The first invoice is raised when a bed is assigned — dated from the join date.
                         </div>
                     </template>
                 </div>

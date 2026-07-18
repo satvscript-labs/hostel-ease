@@ -20,13 +20,22 @@ class ProrationService
      *
      * Extracted from StudentController::updateFeeSettings in W6.4 so the move
      * flow (assign) and the profile's plan editor generate it identically —
-     * one implementation, no drift. Returns null when it isn't warranted
-     * (no join date, or the student already has invoices), so callers can
-     * simply call it and trust the guard.
+     * one implementation, no drift. Returns null when it isn't warranted, so
+     * callers can simply call it and trust the guard.
+     *
+     * Rent is for a BED (owner, W6.4 — the recurring engine already enforces
+     * this via ->has('activeAssignment')). The FIRST invoice must obey the same
+     * rule: setting a fee plan on the profile before a bed is assigned only
+     * SAVES the intended plan — nobody is billed until they actually hold a bed.
+     * The assign flow calls this AFTER creating the assignment, so it still
+     * fires there. The bill is still dated from the student's registered
+     * join_date (the seat is reserved from then), never from the move-in date.
      */
     public function generateInitialInvoice(Student $student): ?Invoice
     {
-        if (! $student->join_date || $student->invoices()->count() > 0) {
+        if (! $student->join_date
+            || $student->invoices()->count() > 0
+            || ! $student->activeAssignment()->exists()) {
             return null;
         }
 
@@ -99,6 +108,9 @@ class ProrationService
 
         return [
             'has_active_cycle' => $hasActiveCycle,
+            // No bed → the plan is only saved, no invoice is raised (rent is for
+            // a bed). Lets the profile modal show honest copy.
+            'has_bed' => $student->activeAssignment()->exists(),
             'old_amount' => $oldAmount,
             'days_used' => $daysUsed,
             'days_unused' => $daysUnused,

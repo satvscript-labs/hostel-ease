@@ -24,7 +24,10 @@
 
                 <div class="row gx-3">
                     <div class="col-md-6 mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Join Date') }} <span class="text-danger">*</span></label>
+                        {{-- This is the bed MOVE-IN date (occupancy history + AC-meter
+                             anchor), not the student's registration join date. The first
+                             invoice still bills from the registered join date. --}}
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Move-in Date') }} <span class="text-danger">*</span></label>
                         <input type="date" name="join_date" x-model="joinDate" class="form-control bg-light" max="{{ now()->toDateString() }}" required>
                     </div>
                     {{-- AC meter required only when the chosen bed's room is AC. --}}
