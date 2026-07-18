@@ -117,7 +117,7 @@ class PropertyController extends Controller
             "Assigned {$student->name} to {$bed->room->room_number}/{$bed->bed_number} at "
             .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $assignment);
 
-        return redirect()->route('admin.property.index')
+        return $this->afterMove($request, $student)
             ->with('success', "{$student->name} assigned to bed {$bed->bed_number}.");
     }
 
@@ -178,7 +178,23 @@ class PropertyController extends Controller
             "Transferred {$assignment->student->name} to {$target->room->room_number}/{$target->bed_number} at "
             .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $target);
 
-        return redirect()->route('admin.property.index')->with('success', 'Student transferred successfully.');
+        return $this->afterMove($request, $assignment->student)
+            ->with('success', 'Student transferred successfully.');
+    }
+
+    /**
+     * Where a move returns to. The Property Board is the default, but the
+     * student profile now drives assign/transfer inline (W10 UX fix) and passes
+     * redirect_to=profile so the operator stays where they started. Whitelisted
+     * — never redirect to an arbitrary caller-supplied URL.
+     */
+    protected function afterMove(Request $request, Student $student): RedirectResponse
+    {
+        if ($request->input('redirect_to') === 'profile') {
+            return redirect()->route('admin.students.show', $student);
+        }
+
+        return redirect()->route('admin.property.index');
     }
 
     /**

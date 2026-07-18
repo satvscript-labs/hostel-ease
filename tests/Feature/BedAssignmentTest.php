@@ -236,4 +236,81 @@ class BedAssignmentTest extends TestCase
         $this->assertEquals(5000, (float) $invoice->amount);
         $this->assertStringContainsString('Initial', $invoice->title);
     }
+
+    // ── W10: assign/transfer driven from the student profile ──────────────
+
+    /**
+     * The Accommodation buttons now assign inline and pass redirect_to=profile,
+     * so the operator lands back on the student — not the Property Board — with
+     * every rule still enforced.
+     */
+    public function test_assign_from_the_profile_returns_to_the_profile(): void
+    {
+        $this->actingAs($this->admin);
+        $student = $this->student('Amit');
+
+        $this->post(route('admin.property.assign'), [
+            'student_id' => $student->id,
+            'bed_id' => $this->room->beds()->first()->id,
+            'join_date' => now()->toDateString(),
+            'fee_amount' => 5000,
+            'fee_frequency' => 'monthly',
+            'redirect_to' => 'profile',
+        ])->assertRedirect(route('admin.students.show', $student))->assertSessionHasNoErrors();
+
+        $this->assertSame('occupied', $this->room->beds()->first()->fresh()->status);
+    }
+
+    public function test_transfer_from_the_profile_returns_to_the_profile(): void
+    {
+        $this->actingAs($this->admin);
+        $student = $this->student('Amit');
+        $assignment = app(BedAssignmentService::class)->assign($student, $this->room->beds()->first(), [
+            'join_date' => now()->subMonth()->toDateString(), 'fee_amount' => 5000, 'fee_frequency' => 'monthly',
+        ]);
+        $target = $this->room->beds()->skip(1)->first();
+
+        $this->patch(route('admin.property.transfer', $assignment), [
+            'bed_id' => $target->id,
+            'join_date' => now()->toDateString(),
+            'fee_amount' => 6000,
+            'fee_frequency' => 'monthly',
+            'redirect_to' => 'profile',
+        ])->assertRedirect(route('admin.students.show', $student))->assertSessionHasNoErrors();
+
+        $this->assertSame('occupied', $target->fresh()->status);
+    }
+
+    /** The profile is the same endpoint, so the AC-meter rule still bites. */
+    public function test_profile_assign_still_requires_the_ac_meter(): void
+    {
+        $this->actingAs($this->admin);
+        $student = $this->student('Amit');
+        $acBed = $this->acRoom()->beds()->first();
+
+        $this->post(route('admin.property.assign'), [
+            'student_id' => $student->id,
+            'bed_id' => $acBed->id,
+            'join_date' => now()->toDateString(),
+            'fee_amount' => 8000,
+            'fee_frequency' => 'monthly',
+            'redirect_to' => 'profile',
+            // no meter_reading
+        ])->assertSessionHasErrors('meter_reading');
+
+        $this->assertSame(0, $student->assignments()->count());
+    }
+
+    /** The profile passes vacant beds to the sheets. */
+    public function test_the_profile_exposes_vacant_beds_to_the_sheets(): void
+    {
+        $this->actingAs($this->admin);
+        $student = $this->student('Amit');
+
+        $beds = $this->get(route('admin.students.show', $student))->assertOk()->viewData('vacantBeds');
+
+        $this->assertNotEmpty($beds);
+        $this->assertArrayHasKey('is_ac', $beds->first());
+        $this->assertArrayHasKey('room', $beds->first());
+    }
 }

@@ -147,6 +147,23 @@ class StudentController extends Controller
             $paymentModes = collect();
         }
 
+        // Vacant beds for the in-profile Assign / Transfer sheets (W10 UX fix —
+        // the Accommodation buttons used to just link to the Property Board).
+        // Same shape and endpoints the board uses; only the entry point moves.
+        $vacantBeds = \App\Models\Bed::with('room.floor')
+            ->whereIn('status', ['empty', 'available'])
+            ->get()
+            ->sortBy(fn ($b) => [$b->room?->floor?->sort_order ?? 0, $b->room?->room_number, $b->bed_number])
+            ->map(fn ($b) => [
+                'id' => $b->id,
+                'bed' => (string) $b->bed_number,
+                'room' => (string) $b->room?->room_number,
+                'floor' => $b->room?->floor?->name,
+                'is_ac' => (bool) $b->room?->isAc(),
+                'rent' => (float) ($b->room?->rent ?? 0),
+                'sharing' => (int) ($b->room?->sharing ?? 0),
+            ])->values();
+
         $qrSvg = null;
         try {
             $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
@@ -242,7 +259,7 @@ class StudentController extends Controller
 
         $timeline = $timeline->sortByDesc('date')->values();
 
-        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes', 'timeline'));
+        return view('admin.students.show', compact('student', 'paymentSummary', 'qrSvg', 'invoices', 'pocketBalance', 'paymentModes', 'timeline', 'vacantBeds'));
     }
 
     public function edit(Student $student): View

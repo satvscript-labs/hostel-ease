@@ -63,6 +63,11 @@
     .info-row .lbl { color: var(--he-text-muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
     .info-row .val { font-weight: 700; color: var(--he-text-main); text-align: right; }
 
+    /* Vacant-bed picker rows (Assign/Transfer sheets) */
+    .acc-bed-row { transition: background 0.15s var(--ease-out-expo, ease); border-bottom: 1px solid rgba(0,0,0,0.04); }
+    .acc-bed-row:last-child { border-bottom: 0; }
+    .acc-bed-row:hover { background: var(--he-bg-surface-raised, #f1f5f9); }
+
     /* Accommodation bed visual */
     .sp-bed {
         background: linear-gradient(135deg, rgba(79, 70, 229, 0.06), rgba(147, 51, 234, 0.03));
@@ -201,8 +206,21 @@
         <div class="col-lg-4">
             <div class="d-flex flex-column gap-4">
 
-                {{-- Accommodation --}}
-                <div class="panel-card">
+                {{-- Accommodation — Assign / Transfer now run INLINE (W10 UX fix).
+                     They used to just link to the Property Board, forcing a
+                     search-and-select detour; they now open a sheet here and
+                     post to the same endpoints with the same validation. --}}
+                <div class="panel-card" x-data="accommodation({{ Illuminate\Support\Js::from([
+                    'studentId' => $student->id,
+                    'assignUrl' => route('admin.property.assign'),
+                    'transferUrl' => $student->activeAssignment ? route('admin.property.transfer', $student->activeAssignment) : null,
+                    'currentRoomIsAc' => (bool) optional($student->activeAssignment?->bed?->room)->isAc(),
+                    'currentRoom' => $student->activeAssignment?->bed?->room?->room_number,
+                    'fee' => (float) ($student->fee_amount ?? 0),
+                    'frequency' => $student->fee_frequency ?? '',
+                    'beds' => $vacantBeds,
+                    'frequencies' => config('hostelease.fee_frequencies'),
+                ]) }})">
                     <div class="panel-head"><h6><i class="fa-solid fa-bed text-primary me-2"></i>Accommodation</h6></div>
                     <div class="panel-body">
                         @if($student->activeAssignment)
@@ -222,17 +240,19 @@
                                 <i class="fa-solid fa-building me-1 text-muted"></i> {{ $student->activeAssignment->bed->room->floor->name }}
                             </div>
                         </div>
-                        <a href="{{ route('admin.property.index') }}" class="btn btn-white border w-100 fw-bold text-primary rounded-pill py-2">
+                        <button type="button" class="btn btn-white border w-100 fw-bold text-primary rounded-pill py-2 tactile-btn" @click="openTransfer()">
                             <i class="fa-solid fa-right-left me-1"></i> Transfer Bed
-                        </a>
+                        </button>
                         @else
                         <div class="text-center py-4">
                             <i class="fa-solid fa-bed-pulse text-muted fs-1 mb-2 opacity-50"></i>
                             <p class="text-muted fw-bold mb-3">Not assigned to a bed</p>
-                            <a href="{{ route('admin.property.index') }}" class="btn btn-primary btn-sm rounded-pill fw-bold px-4 shadow-sm">Assign Now</a>
+                            <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold px-4 shadow-sm tactile-btn" @click="openAssign()">Assign Now</button>
                         </div>
                         @endif
                     </div>
+
+                    @include('admin.students._accommodation_sheets')
                 </div>
 
                 {{-- Plan & preferences --}}
