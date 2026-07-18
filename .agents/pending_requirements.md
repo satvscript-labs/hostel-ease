@@ -233,7 +233,15 @@ wanted; the W8 report-page skeleton makes each one a small standalone slice.
 ## 8. Aligned Row System — Rollout To Every Audit-Era List (Owner, Jul-18)
 
 **Status:** Law written (`ui_design_guidelines.md` §4.11), reference implementation shipped
-(Settings → Team & access, W9). Rollout to the remaining lists pending.
+(Settings → Team & access, W9). **Rollout done in MF (2026-07-18)** — see
+`_artifact/ui_ux_audit/08_MF_aligned_rows.md`. The finance card-lists (expenses, ac_bills,
+pocket_money, security_deposits, staff) had their wide-tier figure DRIFT fixed by dissolving the
+money group into fixed grid tracks (owner call: keep the card look, don't restructure to a single
+subgrid list). The two raw super-admin tables that scrolled sideways on phones — Customers
+(`accounts/index`) and Account 360 orders (`accounts/show`) — were rebuilt into subgrid lists.
+Deferred by owner scope: the Discounts and hidden Subscriptions super-admin tables (still tables).
+Confirmed there are NO other raw tables in the app. Front Desk (Bootstrap-col rows), Students (card
+grid) and Registrations (review card) are bespoke-correct and were intentionally left alone.
 
 **The owner's finding, verbatim intent:** every list built during the UI audit suffers the same two
 flaws — (1) on PC, row segments are not vertically aligned ("everything is dependent on what's on

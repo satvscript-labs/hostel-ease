@@ -26,16 +26,65 @@
     .custom-overlay-body { padding:1.5rem; overflow-y:auto; background:#fafafa; }
     .custom-overlay-footer { padding:1.25rem 1.5rem; border-top:1px solid rgba(0,0,0,.05); display:flex; gap:1rem; justify-content:flex-end; }
 
-    /* ── Expandable Orders & payments rows ── */
-    .order-table tbody.order-group { border-top: 1px solid rgba(15,23,42,.05); }
-    .order-table tbody.order-group:first-of-type { border-top: 0; }
-    .order-row { cursor: pointer; transition: background-color .18s ease; }
-    .order-row:hover { background-color: #f8fafc; }
-    .order-row.is-open { background-color: var(--he-primary-soft, rgba(79,70,229,.08)); }
+    /* ── Expandable Orders & payments rows (MF: raw <table> → aligned subgrid
+       list so columns line up and it reflows to a stacked card on phones
+       instead of scrolling sideways, §4.11). ── */
+    .sao-list { display: grid; grid-template-columns: 1fr; }
+    .sao-head { display: none; }
+    .sao-group + .sao-group { border-top: 1px solid rgba(15,23,42,.06); }
+    .sao-row {
+        grid-column: 1 / -1;
+        display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem;
+        padding: 1rem 1.25rem; cursor: pointer; transition: background-color .18s var(--ease-out-expo, ease);
+    }
+    .sao-row:hover { background-color: var(--he-bg-surface-raised, #f8fafc); }
+    .sao-row.is-open { background-color: var(--he-primary-soft, rgba(79,70,229,.07)); }
+    .sao-caret {
+        flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--he-text-muted); transition: background .18s ease;
+    }
+    .sao-row:hover .sao-caret { background: rgba(15,23,42,.05); }
+    /* Amount is the row's anchor — bigger, bolder, tabular. */
+    .sao-amount { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: .45rem; }
+    .sao-amount-val { font-weight: 800; font-size: 1.05rem; color: var(--he-text-main); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .sao-amount-val.is-zero { color: var(--he-text-muted); }
+    .sao-amount-disc { font-size: .8rem; font-weight: 600; color: var(--he-success); font-variant-numeric: tabular-nums; }
+    .sao-status, .sao-qty, .sao-term, .sao-method, .sao-date { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; min-width: 0; }
+    .sao-qty, .sao-term, .sao-method { font-size: .88rem; color: var(--he-text-main); font-weight: 600; }
+    .sao-meta-ic { color: var(--he-text-muted); font-size: .8rem; flex-shrink: 0; }
+    .sao-date { color: var(--he-text-muted); font-size: .82rem; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sao-lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--he-text-muted); }
     .order-caret { transition: transform .25s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)); font-size:.8rem; }
     .order-caret.rotated { transform: rotate(90deg); color: var(--he-primary, #4f46e5); }
-    .order-detail-row td { background: var(--he-bg-surface-raised, #f1f5f9); }
+    .order-detail-wrap { background: var(--he-bg-surface-raised, #f1f5f9); }
     .order-detail { padding: 1.1rem 1.5rem 1.35rem 3rem; }
+
+    /* Wide ≥760 container: one-line subgrid — the list owns the template, rows
+       inherit it, columns share one x. Columns are proportional (fr), so they
+       SPREAD across the full width instead of clustering on the right the way a
+       greedy amount column + auto tracks did. Header replaces the phone labels.
+       NOTE the container-type lives on the WRAPPER (.he-adaptive), never on
+       .sao-list itself — an element can't query its own size, so a self-hosted
+       container would leave .sao-list stuck at its base 1-col template. Each
+       order is wrapped in .sao-group (Alpine expand scope), so the group must
+       pass the subgrid THROUGH (display:grid + subgrid) or the row inside it
+       has no parent grid to inherit. */
+    @container (min-width: 760px) {
+        .sao-list { grid-template-columns: 30px minmax(130px,1.4fr) minmax(96px,1fr) minmax(52px,.55fr) minmax(88px,.85fr) minmax(120px,1.15fr) minmax(94px,.9fr); column-gap: 1.75rem; }
+        .sao-head { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; column-gap: 1.75rem; align-items: center;
+            padding: .7rem 1.5rem; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--he-text-muted); background: var(--he-bg-surface-raised); border-bottom: 1px solid rgba(15,23,42,.06); }
+        /* Restate column-gap on each nested subgrid level — inheritance through
+           list → group → row is unreliable, and a dropped gap lets the caret
+           butt against the amount. */
+        .sao-group { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; column-gap: 1.75rem; }
+        .sao-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; column-gap: 1.75rem; padding: 1.05rem 1.5rem; }
+        .order-detail-wrap { grid-column: 1 / -1; }
+        .sao-status, .sao-qty { justify-self: center; }
+        .sao-date { margin-left: 0; justify-self: end; }
+        .sao-lbl { display: none; } /* header row carries the labels on wide */
+    }
     .od-label { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color: var(--he-text-muted, #64748b); margin-bottom:.5rem; }
     .od-box { background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); overflow:hidden; }
     .od-line { display:flex; justify-content:space-between; gap:1rem; padding:.5rem .85rem; font-size:.86rem; }
@@ -221,35 +270,35 @@
     {{-- ── Payment history ── --}}
     <div class="panel-card shadow-sm mt-4">
         <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>Orders &amp; payments</h6></div>
-        <div class="table-responsive">
-            <table class="table align-middle mb-0 order-table">
-                <thead class="table-light text-uppercase" style="font-size:.7rem; letter-spacing:.5px;"><tr>
-                    <th class="py-3 ps-4 pe-2 border-0" style="width:32px;"></th>
-                    <th class="py-3 px-2 border-0">Amount</th>
-                    <th class="py-3 px-2 border-0 text-center">Status</th>
-                    <th class="py-3 px-2 border-0 text-center">Qty</th>
-                    <th class="py-3 px-2 border-0">Term</th>
-                    <th class="py-3 px-2 border-0">Method</th>
-                    <th class="py-3 px-4 border-0 text-end">Date</th>
-                </tr></thead>
-                @forelse($orders as $order)
-                    @php($statusColor = $order->payment_status->value === 'paid' ? 'success' : ($order->payment_status->value === 'pending' ? 'warning' : 'danger'))
-                    <tbody class="order-group" x-data="{ open: false }">
-                        <tr class="order-row" @click="open = !open" :class="{ 'is-open': open }">
-                            <td class="ps-4 pe-2 py-3"><i class="fa-solid fa-chevron-right order-caret text-muted" :class="{ 'rotated': open }"></i></td>
-                            <td class="px-2 py-3">
-                                <div class="fw-bold a360-metric {{ (float)$order->amount == 0 ? 'text-secondary' : 'text-dark' }}">{{ hostelease_money($order->amount) }}</div>
-                                @if((float)$order->discount_total > 0)<div class="small text-success fw-semibold">−{{ hostelease_money($order->discount_total) }} discount</div>@endif
-                            </td>
-                            <td class="px-2 py-3 text-center"><span class="badge bg-{{ $statusColor }}-subtle text-{{ $statusColor }} rounded-pill px-3 py-1">{{ $order->payment_status->label() }}</span></td>
-                            <td class="px-2 py-3 text-center fw-bold">{{ $order->quantity }}</td>
-                            <td class="px-2 py-3">{{ $order->period?->label() ?? '—' }}</td>
-                            <td class="px-2 py-3">{{ $order->payment_method?->label() ?? '—' }}</td>
-                            <td class="px-4 py-3 text-muted small text-end text-nowrap">{{ $order->created_at?->format('d M Y') }}</td>
-                        </tr>
-                        <tr class="order-detail-row">
-                            <td colspan="7" class="p-0 border-0">
-                                <div x-show="open" x-collapse x-cloak>
+        <div class="he-adaptive">
+        <div class="sao-list">
+            {{-- Header — subgrid-aligned, wide tier only; phone tier uses the
+                 inline .sao-lbl on each cell instead. --}}
+            <div class="sao-head">
+                <span></span>
+                <span>Amount</span>
+                <span class="text-center">Status</span>
+                <span class="text-center">Qty</span>
+                <span>Term</span>
+                <span>Method</span>
+                <span class="text-end">Date</span>
+            </div>
+            @forelse($orders as $order)
+                @php($statusColor = $order->payment_status->value === 'paid' ? 'success' : ($order->payment_status->value === 'pending' ? 'warning' : 'danger'))
+                    <div class="sao-group" x-data="{ open: false }">
+                        <div class="sao-row" @click="open = !open" :class="{ 'is-open': open }">
+                            <div class="sao-caret"><i class="fa-solid fa-chevron-right order-caret text-muted" :class="{ 'rotated': open }"></i></div>
+                            <div class="sao-amount">
+                                <span class="sao-amount-val {{ (float)$order->amount == 0 ? 'is-zero' : '' }}">{{ hostelease_money($order->amount) }}</span>
+                                @if((float)$order->discount_total > 0)<span class="sao-amount-disc">−{{ hostelease_money($order->discount_total) }}</span>@endif
+                            </div>
+                            <div class="sao-status"><span class="badge bg-{{ $statusColor }}-subtle text-{{ $statusColor }} rounded-pill px-3 py-1">{{ $order->payment_status->label() }}</span></div>
+                            <div class="sao-qty"><span class="sao-lbl">Qty</span><i class="fa-solid fa-hotel sao-meta-ic"></i><span class="fw-bold">{{ $order->quantity }}</span></div>
+                            <div class="sao-term"><span class="sao-lbl">Term</span><i class="fa-regular fa-calendar sao-meta-ic"></i>{{ $order->period?->label() ?? '—' }}</div>
+                            <div class="sao-method"><span class="sao-lbl">Method</span><i class="fa-regular fa-credit-card sao-meta-ic"></i>{{ $order->payment_method?->label() ?? '—' }}</div>
+                            <div class="sao-date">{{ $order->created_at?->format('d M Y') }}</div>
+                        </div>
+                        <div class="order-detail-wrap" x-show="open" x-collapse x-cloak>
                                     <div class="order-detail">
                                         <div class="row g-3">
                                             {{-- Charge breakdown --}}
@@ -316,14 +365,12 @@
                                             @endif
                                         </div>
                                     </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
+                        </div>
+                    </div>
                 @empty
-                    <tbody><tr><td colspan="7" class="p-0"><x-he-empty-state icon="receipt" title="No orders yet" subtitle="Renewals and payments will appear here." /></td></tr></tbody>
+                    <div style="grid-column: 1 / -1;"><x-he-empty-state icon="receipt" title="No orders yet" subtitle="Renewals and payments will appear here." /></div>
                 @endforelse
-            </table>
+        </div>
         </div>
         @if($orders->hasPages())<div class="p-3 border-top">{{ $orders->withQueryString()->links() }}</div>@endif
     </div>

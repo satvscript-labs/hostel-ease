@@ -32,12 +32,22 @@
         border-left: 1px solid rgba(0, 0, 0, 0.06);
         align-self: stretch;
     }
+    /* Wide ≥880: money group dissolves to FIXED per-figure tracks (§4.11 r1).
+       Variable arity is fine — held rows render only Deposit, so their Refunded/
+       Deducted cells are simply empty; the Deposit column keeps its x across
+       held AND refunded rows (real-table behaviour), and acts is fixed so every
+       row's actions share one x. */
     @container (min-width: 880px) {
         .sd-row {
-            grid-template-columns: minmax(260px, 1fr) auto auto;
-            grid-template-areas: "info money acts";
+            grid-template-columns: minmax(260px, 1fr) 110px 110px 110px 220px;
+            grid-template-areas: "info deposit refunded deducted acts";
             column-gap: 1.25rem;
         }
+        .sd-row-money { display: contents; }
+        .sd-cell-deposit  { grid-area: deposit; }
+        .sd-cell-refunded { grid-area: refunded; }
+        .sd-cell-deducted { grid-area: deducted; }
+        .sd-row-num { min-width: 0; }
         .sd-row-acts { padding-left: 1.25rem; align-self: center; }
     }
     .sd-row-num {

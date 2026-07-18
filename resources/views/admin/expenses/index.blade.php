@@ -88,8 +88,12 @@
         align-self: stretch;
     }
     @container (min-width: 880px) {
+        /* Every track after info is FIXED (was: cat minmax(…,auto) + acts auto,
+           which drifted the amount and actions per row) — cat sized for the
+           widest badge ("Staff Salary" + Auto chip), so all columns share one x
+           down the list (§4.11 r1). */
         .exp-row {
-            grid-template-columns: minmax(220px, 1fr) 110px 110px minmax(140px, auto) 120px auto;
+            grid-template-columns: minmax(220px, 1fr) 100px 110px 184px 120px 100px;
             grid-template-areas: "info date mode cat amount acts";
             column-gap: 1rem;
         }

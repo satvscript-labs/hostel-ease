@@ -54,16 +54,16 @@
                     </div>
 
                     <div class="ac-row-money">
-                        <div class="ac-row-num">
+                        <div class="ac-row-num ac-cell-amount">
                             <div class="ac-row-lbl">{{ __('Amount') }}</div>
                             <div class="fw-bold text-dark">{{ hostelease_money($total) }}</div>
                         </div>
-                        <div class="ac-row-num">
+                        <div class="ac-row-num ac-cell-collected">
                             <div class="ac-row-lbl">{{ __('Collected') }}</div>
                             <div class="fw-bold text-success">{{ hostelease_money($collected) }}</div>
                             <div class="ac-progress"><div class="ac-progress-fill" style="width: {{ $pct }}%;"></div></div>
                         </div>
-                        <div class="ac-row-num">
+                        <div class="ac-row-num ac-cell-split">
                             <div class="ac-row-lbl">{{ __('Split') }}</div>
                             <div class="fw-semibold text-secondary text-nowrap">{{ $sharesCount }} {{ __('students') }}</div>
                         </div>

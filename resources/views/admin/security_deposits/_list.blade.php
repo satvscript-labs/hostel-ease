@@ -57,16 +57,16 @@
                     </div>
 
                     <div class="sd-row-money">
-                        <div class="sd-row-num">
+                        <div class="sd-row-num sd-cell-deposit">
                             <div class="sd-row-lbl">{{ __('Deposit') }}</div>
                             <div class="fw-bold text-dark">{{ hostelease_money($deposit->amount) }}</div>
                         </div>
                         @if(! $held)
-                            <div class="sd-row-num">
+                            <div class="sd-row-num sd-cell-refunded">
                                 <div class="sd-row-lbl">{{ __('Refunded') }}</div>
                                 <div class="fw-bold text-success">{{ hostelease_money($deposit->refunded_amount) }}</div>
                             </div>
-                            <div class="sd-row-num">
+                            <div class="sd-row-num sd-cell-deducted">
                                 <div class="sd-row-lbl">{{ __('Deducted') }}</div>
                                 <div class="fw-bold {{ (float) $deposit->deducted_amount > 0 ? 'text-danger' : 'text-muted' }}">{{ hostelease_money($deposit->deducted_amount) }}</div>
                             </div>

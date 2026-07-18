@@ -36,12 +36,20 @@
         align-self: stretch;
         cursor: default;
     }
+    /* Wide ≥880: money group dissolves to FIXED tracks so Amount/Collected/Split
+       align down the list (§4.11 r1); acts is fixed too, so info (1fr) takes all
+       slack and every trailing column shares one x. */
     @container (min-width: 880px) {
         .ac-row {
-            grid-template-columns: minmax(240px, 1fr) auto auto;
-            grid-template-areas: "info money acts";
+            grid-template-columns: minmax(240px, 1fr) 118px 128px 100px 200px;
+            grid-template-areas: "info amount collected split acts";
             column-gap: 1.25rem;
         }
+        .ac-row-money { display: contents; }
+        .ac-cell-amount    { grid-area: amount; }
+        .ac-cell-collected { grid-area: collected; }
+        .ac-cell-split     { grid-area: split; }
+        .ac-row-num { min-width: 0; }
         .ac-row-acts { padding-left: 1.25rem; align-self: center; }
     }
     .ac-row-num {

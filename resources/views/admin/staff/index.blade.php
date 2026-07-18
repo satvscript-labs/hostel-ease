@@ -33,12 +33,22 @@
         border-left: 1px solid rgba(0, 0, 0, 0.06);
         align-self: stretch;
     }
+    /* Wide ≥880: the money group DISSOLVES (display:contents) and each figure
+       takes a FIXED track, so Salary/Present/Paid line up down the whole list
+       (§4.11 r1 — alignment is structural, not per-row luck). acts is fixed too
+       so info (1fr) absorbs all slack and every trailing column shares one x —
+       the acts border-left becomes a clean vertical rule down the list. */
     @container (min-width: 880px) {
         .st-row {
-            grid-template-columns: minmax(260px, 1fr) auto auto;
-            grid-template-areas: "info money acts";
+            grid-template-columns: minmax(240px, 1fr) 116px 92px 116px 148px;
+            grid-template-areas: "info salary present paid acts";
             column-gap: 1.25rem;
         }
+        .st-row-money { display: contents; }
+        .st-cell-salary  { grid-area: salary; }
+        .st-cell-present { grid-area: present; }
+        .st-cell-paid    { grid-area: paid; }
+        .st-row-num { min-width: 0; } /* the fixed track governs width now */
         .st-row-acts { padding-left: 1.25rem; align-self: center; }
     }
     .st-row-num {

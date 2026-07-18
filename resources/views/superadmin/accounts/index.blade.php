@@ -7,9 +7,51 @@
     .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.05) !important; }
     .stat-value { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px; }
     .stat-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
-    .cust-row { transition: background-color 0.2s ease; cursor: pointer; }
-    .cust-row:hover { background-color: #f8fafc !important; }
-    .anchor-pill { font-variant-numeric: tabular-nums; }
+    /* ── Aligned customer list (MF): the raw <table> became a subgrid list so
+       the columns align down the page (§4.11 r1) and it reflows to a stacked
+       card on phones instead of scrolling sideways. Mirrors the hostels list. */
+    .sac-list { display: grid; grid-template-columns: 1fr; }
+    .sac-head { display: none; }
+    .sac-row {
+        grid-column: 1 / -1;
+        display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .9rem;
+        padding: .9rem 1.25rem; text-decoration: none;
+        transition: background .18s var(--ease-out-expo);
+    }
+    .sac-row:hover { background: var(--he-bg-surface-raised); }
+    .sac-row + .sac-row { border-top: 1px solid rgba(15,23,42,.06); }
+
+    .sac-id { display: flex; align-items: center; gap: .8rem; min-width: 0; flex: 1 1 220px; }
+    .sac-ic { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex;
+        align-items: center; justify-content: center; background: var(--he-primary-soft); color: var(--he-primary); font-size: 1rem; }
+    .sac-text { min-width: 0; } /* explicit shrink chain (§4.11 r5) */
+    .sac-name { font-weight: 700; color: var(--he-text-main); }
+    .sac-sub { font-size: .76rem; color: var(--he-text-muted); }
+
+    .sac-cell-lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .06em; color: var(--he-text-muted); margin-right: .4rem; }
+    .sac-branches, .sac-status { min-width: 0; }
+    .sac-renews { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;
+        min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sac-ltv { min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sac-days { font-size: .72rem; }
+    .sac-chev { color: var(--he-text-muted); margin-left: auto; }
+
+    /* Wide ≥880 container: one-line subgrid — the LIST owns the template, every
+       row inherits it, so every column shares one x. A header row (also subgrid)
+       replaces the per-cell inline labels used on the phone tier. */
+    @container (min-width: 880px) {
+        .sac-list { grid-template-columns: minmax(220px,1.5fr) auto auto minmax(150px,auto) auto 20px; column-gap: 1.25rem; }
+        .sac-head { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center;
+            padding: .6rem 1.25rem; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--he-text-muted); background: var(--he-bg-surface-raised); border-bottom: 1px solid rgba(15,23,42,.06); }
+        .sac-row { display: grid; grid-template-columns: subgrid; }
+        .sac-id { flex: none; }
+        .sac-branches, .sac-status { justify-self: center; text-align: center; }
+        .sac-ltv { justify-self: end; text-align: right; }
+        .sac-cell-lbl { display: none; } /* header row carries the labels on wide */
+        .sac-chev { margin-left: 0; }
+    }
 </style>
 @endpush
 
@@ -60,56 +102,68 @@
         </form>
     </div>
 
-    <div id="cust-list" data-fragment-container class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;"><tr>
-                    <th class="py-3 px-4 border-0">Owner</th>
-                    <th class="py-3 px-4 border-0 text-center">Branches</th>
-                    <th class="py-3 px-4 border-0 text-center">Status</th>
-                    <th class="py-3 px-4 border-0">Renews on</th>
-                    <th class="py-3 px-4 border-0 text-end">Lifetime value</th>
-                    <th class="py-3 px-4 border-0 text-end"></th>
-                </tr></thead>
-                <tbody class="border-top-0">
-                @forelse($accounts as $account)
-                    <tr class="cust-row" onclick="window.location='{{ route('superadmin.accounts.show', $account) }}'">
-                        <td class="px-4 py-3">
-                            <div class="fw-bold text-dark">{{ $account->owner?->name ?? 'Unknown owner' }}</div>
-                            <div class="small text-muted"><i class="fa-solid fa-mobile-screen text-primary me-1"></i>{{ $account->owner?->mobile ?? '—' }}</div>
-                        </td>
-                        <td class="px-4 py-3 text-center fw-bold text-dark">{{ $account->branch_count }}</td>
-                        <td class="px-4 py-3 text-center">
-                            <span class="badge bg-{{ $account->status->color() }}-subtle text-{{ $account->status->color() }} border border-{{ $account->status->color() }}-subtle rounded-pill px-3 py-2">{{ $account->status->label() }}</span>
-                        </td>
-                        <td class="px-4 py-3 anchor-pill">
-                            <div class="fw-medium text-dark">{{ $account->current_period_end ? $account->current_period_end->format('d M Y') : '—' }}</div>
-                            @if($account->days_until !== null && $account->status->value !== 'suspended')
-                                @php($du = $account->days_until)
-                                <div class="small mt-1">
-                                    @if($du < 0)
-                                        <span class="text-danger fw-semibold"><i class="fa-solid fa-circle-exclamation me-1"></i>{{ abs($du) }}d overdue</span>
-                                    @elseif($du === 0)
-                                        <span class="text-danger fw-semibold"><i class="fa-solid fa-bolt me-1"></i>Due today</span>
-                                    @elseif($du <= 7)
-                                        <span class="text-warning fw-semibold"><i class="fa-solid fa-clock me-1"></i>in {{ $du }} days</span>
-                                    @elseif($du <= 30)
-                                        <span class="text-muted"><i class="fa-regular fa-clock me-1"></i>in {{ $du }} days</span>
-                                    @endif
-                                </div>
+    <div id="cust-list" data-fragment-container class="he-adaptive card stat-card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="sac-list">
+            {{-- Header row — subgrid-aligned to the columns below, wide tier only.
+                 On the phone tier each cell carries its own inline label instead. --}}
+            <div class="sac-head">
+                <span>{{ __('Owner') }}</span>
+                <span class="text-center">{{ __('Branches') }}</span>
+                <span class="text-center">{{ __('Status') }}</span>
+                <span>{{ __('Renews on') }}</span>
+                <span class="text-end">{{ __('Lifetime value') }}</span>
+                <span></span>
+            </div>
+
+            @forelse($accounts as $account)
+                <a href="{{ route('superadmin.accounts.show', $account) }}" class="sac-row">
+                    <div class="sac-id">
+                        <div class="sac-ic"><i class="fa-solid fa-user-tie"></i></div>
+                        <div class="sac-text">
+                            <div class="sac-name text-truncate">{{ $account->owner?->name ?? __('Unknown owner') }}</div>
+                            <div class="sac-sub text-truncate"><i class="fa-solid fa-mobile-screen text-primary me-1"></i>{{ $account->owner?->mobile ?? '—' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="sac-branches">
+                        <span class="sac-cell-lbl">{{ __('Branches') }}</span>
+                        <span class="fw-bold text-dark">{{ $account->branch_count }}</span>
+                    </div>
+
+                    <div class="sac-status">
+                        <span class="badge bg-{{ $account->status->color() }}-subtle text-{{ $account->status->color() }} border border-{{ $account->status->color() }}-subtle rounded-pill px-3 py-2">{{ $account->status->label() }}</span>
+                    </div>
+
+                    <div class="sac-renews">
+                        <span class="sac-cell-lbl">{{ __('Renews on') }}</span>
+                        <span class="fw-semibold text-dark">{{ $account->current_period_end ? $account->current_period_end->format('d M Y') : '—' }}</span>
+                        @if($account->days_until !== null && $account->status->value !== 'suspended')
+                            @php($du = $account->days_until)
+                            @if($du < 0)
+                                <span class="sac-days text-danger fw-semibold"><i class="fa-solid fa-circle-exclamation me-1"></i>{{ abs($du) }}d {{ __('overdue') }}</span>
+                            @elseif($du === 0)
+                                <span class="sac-days text-danger fw-semibold"><i class="fa-solid fa-bolt me-1"></i>{{ __('Due today') }}</span>
+                            @elseif($du <= 7)
+                                <span class="sac-days text-warning fw-semibold"><i class="fa-solid fa-clock me-1"></i>{{ __('in :n days', ['n' => $du]) }}</span>
+                            @elseif($du <= 30)
+                                <span class="sac-days text-muted"><i class="fa-regular fa-clock me-1"></i>{{ __('in :n days', ['n' => $du]) }}</span>
                             @endif
-                        </td>
-                        <td class="px-4 py-3 text-end fw-bold text-dark">{{ hostelease_money($account->ltv) }}</td>
-                        <td class="px-4 py-3 text-end"><i class="fa-solid fa-chevron-right text-muted small"></i></td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="p-0">
-                        <x-he-empty-state icon="users-gear" title="No customer accounts yet"
-                            subtitle="Accounts are created automatically when an owner's first branch is billed." />
-                    </td></tr>
-                @endforelse
-                </tbody>
-            </table>
+                        @endif
+                    </div>
+
+                    <div class="sac-ltv">
+                        <span class="sac-cell-lbl">{{ __('Lifetime value') }}</span>
+                        <span class="fw-bold text-dark">{{ hostelease_money($account->ltv) }}</span>
+                    </div>
+
+                    <div class="sac-chev"><i class="fa-solid fa-chevron-right"></i></div>
+                </a>
+            @empty
+                <div style="grid-column: 1 / -1;">
+                    <x-he-empty-state icon="users-gear" title="{{ __('No customer accounts yet') }}"
+                        subtitle="{{ __('Accounts are created automatically when an owner\'s first branch is billed.') }}" />
+                </div>
+            @endforelse
         </div>
         @if($accounts->hasPages())
             <div class="p-3 border-top">{{ $accounts->withQueryString()->links() }}</div>

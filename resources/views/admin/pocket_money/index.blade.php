@@ -27,12 +27,16 @@
         border-left: 1px solid rgba(0, 0, 0, 0.06);
         align-self: stretch;
     }
+    /* Wide ≥700: balance and action take FIXED tracks so balances line up down
+       the list and every Open-Wallet button starts at the same x (§4.11 r1) —
+       info (1fr) absorbs the slack. */
     @container (min-width: 700px) {
         .pw-row {
-            grid-template-columns: minmax(240px, 1fr) auto auto;
+            grid-template-columns: minmax(240px, 1fr) 150px 180px;
             grid-template-areas: "info bal acts";
             column-gap: 1.25rem;
         }
+        .pw-c-bal { justify-content: flex-end; }
         .pw-row-acts { padding-left: 1.25rem; align-self: center; }
     }
 

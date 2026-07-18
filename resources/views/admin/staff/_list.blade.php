@@ -57,15 +57,15 @@
                     </div>
 
                     <div class="st-row-money">
-                        <div class="st-row-num">
+                        <div class="st-row-num st-cell-salary">
                             <div class="st-row-lbl">{{ __('Salary') }}</div>
                             <div class="fw-bold text-dark">{{ hostelease_money($s->monthly_salary) }}</div>
                         </div>
-                        <div class="st-row-num">
+                        <div class="st-row-num st-cell-present">
                             <div class="st-row-lbl">{{ __('Present') }}</div>
                             <div class="fw-bold text-dark">{{ $s->present_this_month }} <span class="text-muted fw-normal small">{{ __('d') }}</span></div>
                         </div>
-                        <div class="st-row-num">
+                        <div class="st-row-num st-cell-paid">
                             <div class="st-row-lbl">{{ __('Paid') }}</div>
                             <div class="fw-bold {{ (float) $s->paid_this_month > 0 ? 'text-success' : 'text-muted' }}">{{ hostelease_money($s->paid_this_month ?? 0) }}</div>
                         </div>
