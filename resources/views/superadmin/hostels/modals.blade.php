@@ -2,7 +2,7 @@
     <div>
         {{-- ══ Create Hostel / Branch ══ --}}
         <div class="custom-overlay-backdrop" x-show="createModalOpen" x-transition.opacity @click.self="createModalOpen = false" x-cloak style="display: none;">
-            <form method="POST" action="{{ route('superadmin.hostels.store') }}" class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': createModalOpen }" @click.stop>
+            <form method="POST" action="{{ route('superadmin.hostels.store') }}" data-ring-required class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': createModalOpen }" @click.stop>
                 @csrf
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0"><i class="fa-solid fa-building-circle-arrow-right text-primary me-2"></i>Add New Hostel / Branch</h5>
@@ -99,7 +99,7 @@
 
         {{-- ══ Edit Hostel ══ --}}
         <div class="custom-overlay-backdrop" x-show="editModalOpen" x-transition.opacity @click.self="editModalOpen = false" x-cloak style="display: none;">
-            <form method="POST" :action="editUrl" class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': editModalOpen }" @click.stop>
+            <form method="POST" :action="editUrl" data-ring-required class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': editModalOpen }" @click.stop>
                 @csrf @method('PUT')
                 <input type="hidden" name="is_edit" value="1">
                 <input type="hidden" name="hostel_id" x-model="e_id">
@@ -193,6 +193,13 @@ document.addEventListener('alpine:init', () => {
         createModalOpen: {{ $errors->any() && old('is_edit') != '1' ? 'true' : 'false' }},
         editModalOpen: {{ $errors->any() && old('is_edit') == '1' ? 'true' : 'false' }},
 
+        // Fragment filter bar (W12) — search stays OUTSIDE the swap (§4.5).
+        searchTerm: @json(request('q', '')),
+        clearSearch() {
+            this.searchTerm = '';
+            this.$nextTick(() => this.$refs.filterForm?.requestSubmit());
+        },
+
         hostels: <?php echo json_encode($hostelsJson); ?>,
         pricing: <?php echo json_encode($pricingJson); ?>,
 
@@ -225,9 +232,13 @@ document.addEventListener('alpine:init', () => {
         e_status: {!! json_encode(old('is_edit') ? old('status', '') : '') !!},
         editUrl: {!! json_encode(old('is_edit') && old('hostel_id') ? url('superadmin/hostels/'.old('hostel_id')) : '') !!},
 
-        openEditModal(id) {
-            const h = this.hostels[id];
+        // W12: rows swapped in by the fragment router carry their OWN payload
+        // (an object) — the page-load hostelsJson map only knows page 1, so an
+        // id lookup would silently fail on any paged-in row.
+        openEditModal(h) {
+            if (typeof h !== 'object' || h === null) h = this.hostels[h];
             if (!h) return;
+            const id = h.id ?? this.e_id;
             this.e_id = id;
             this.e_name = h.name;
             this.e_owner_name = h.owner_name;

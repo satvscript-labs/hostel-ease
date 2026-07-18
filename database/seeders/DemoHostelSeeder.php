@@ -137,6 +137,34 @@ class DemoHostelSeeder extends Seeder
             ],
         );
 
+        // One PAID renewal order + a per-branch line, so the Account 360 Orders
+        // table has content and the W12 subscription-invoice PDF is testable
+        // by hand (the spine above creates the account but no order).
+        $ownerBranches = $owner->hostels()->orderBy('id')->get();
+        if ($ownerBranches->isNotEmpty()) {
+            $qty = $ownerBranches->count();
+            $unit = (float) config('hostelease.subscription_pricing.yearly', 10000);
+            $subtotal = $unit * $qty;
+            $discount = round($subtotal * 0.05, 2);
+            $order = \App\Models\SubscriptionOrder::firstOrCreate(
+                ['account_id' => $account->id, 'transaction_number' => 'pay_SEED'.$account->id],
+                [
+                    'period' => BillingPeriod::Yearly->value, 'quantity' => $qty,
+                    'subtotal' => $subtotal, 'discount_total' => $discount, 'amount' => $subtotal - $discount,
+                    'payment_status' => \App\Enums\PaymentStatus::Paid->value,
+                    'payment_method' => \App\Enums\PaymentMethod::Online->value,
+                    'created_at' => now()->subMonths(2),
+                ],
+            );
+            foreach ($ownerBranches as $b) {
+                \App\Models\SubscriptionOrderLine::firstOrCreate(
+                    ['order_id' => $order->id, 'branch_id' => $b->id],
+                    ['amount' => round(($subtotal - $discount) / $qty, 2),
+                     'start_date' => now()->subMonths(2), 'end_date' => now()->subMonths(2)->addYear()],
+                );
+            }
+        }
+
         // 4. Create Sub-Users (Staff Logins)
         $manager1 = User::updateOrCreate(
             ['mobile' => '+919876543001'],

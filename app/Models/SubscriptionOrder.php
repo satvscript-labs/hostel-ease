@@ -61,4 +61,23 @@ class SubscriptionOrder extends Model
     {
         return $query->where('payment_status', PaymentStatus::Paid->value);
     }
+
+    /**
+     * A stable, human invoice number for this order — {PREFIX}-{YYYY}-{00042}.
+     * Derived from the immutable id + creation year, so it never renumbers and
+     * two invoices can't collide. The order id is the ledger's own sequence.
+     */
+    public function invoiceNumber(): string
+    {
+        $prefix = config('hostelease.company.invoice_prefix', 'HE');
+        $year = ($this->created_at ?? now())->format('Y');
+
+        return sprintf('%s-%s-%05d', $prefix, $year, $this->id);
+    }
+
+    /** Paid → a tax invoice / receipt; anything else → a proforma. */
+    public function isBillable(): bool
+    {
+        return $this->payment_status !== PaymentStatus::Failed;
+    }
 }

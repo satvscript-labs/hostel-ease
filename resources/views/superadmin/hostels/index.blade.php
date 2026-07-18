@@ -1,160 +1,113 @@
 @extends('layouts.app')
-@section('title', 'Hostels')
+@section('title', __('Hostels'))
 
 @push('styles')
 <style>
-    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
+    /* ══ Hostels directory — W12 rebuild. The table (all text-nowrap, no phone
+       tier) becomes the aligned row system (§4.11): the LIST owns the columns
+       on the wide tier via subgrid; 640–880 is a DESIGNED two-line reflow (the
+       tablet band is never "the wide grid, squeezed"); phones get an iOS row
+       that opens the branch. Filters are fragment-driven (§4.3). ══ */
+
     .h13-tile { display:flex; align-items:center; gap:.9rem; padding:1rem 1.15rem; }
     .h13-tile .h13-ic { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0; }
     .h13-tile .h13-val { font-size:1.35rem; font-weight:800; line-height:1; color:var(--he-text-main,#0f172a); font-variant-numeric:tabular-nums; }
     .h13-tile .h13-lbl { font-size:.68rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--he-text-muted,#64748b); }
-    .h13-search { max-width:320px; }
-    .h13-search .form-control { border-left:0; }
-    .h13-search .input-group-text { background:#fff; }
-    .hostel-row { cursor:pointer; }
-    .hostel-row td { transition:background-color .18s ease; }
-    .hostel-row:hover td { background-color:#f8fafc; }
+
+    /* Dropdown-over-list (§4.2): the filter row must not sit inside the container. */
+    .sah-filter-row { position:relative; z-index:30; }
+
+    /* ── The aligned list (rewritten flat after owner review — no wrapper /
+       display:contents interplay; cells are DIRECT children of the row). ── */
+    .sah-list { display:grid; grid-template-columns:1fr; }
+    .sah-row { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .9rem;
+        padding:.85rem 1.25rem; transition:background .18s var(--ease-out-expo); }
+    .sah-row:hover { background:var(--he-bg-surface-raised); }
+    .sah-row + .sah-row { border-top:1px solid rgba(15,23,42,.06); }
+
+    .sah-id { display:flex; align-items:center; gap:.8rem; min-width:0; flex:1 1 240px; }
+    .sah-ic { width:42px; height:42px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+        background:var(--he-primary-soft); color:var(--he-primary); font-size:1rem; }
+    .sah-text { flex:1 1 auto; min-width:0; } /* explicit shrink chain (§4.11 r5) */
+    .sah-name { font-weight:700; color:var(--he-text-main); }
+    .sah-sub { font-size:.76rem; color:var(--he-text-muted); }
+
+    .sah-owner { display:flex; align-items:center; gap:.5rem; min-width:0; }
+    .sah-cov { display:flex; align-items:center; gap:.45rem; font-size:.8rem; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .sah-status { white-space:nowrap; }
+    .sah-acts { display:flex; align-items:center; gap:.45rem; justify-content:flex-end; margin-left:auto; }
+
+    /* Wide ≥880 container: one-line subgrid — every cell starts at the same x
+       in every row (§4.11). Below 880: the flex row above wraps naturally into
+       a compact stacked card (SA mobile is explicitly out of scope for now). */
+    @container (min-width: 880px) {
+        .sah-list { grid-template-columns:minmax(220px,1.3fr) minmax(170px,1fr) auto auto auto; column-gap:1.25rem; }
+        .sah-row { display:grid; grid-template-columns:subgrid; }
+        .sah-id { flex:none; }
+        .sah-owner .sah-text { max-width:190px; }
+        .sah-acts { margin-left:0; }
+    }
 </style>
 @endpush
 
 @section('content')
 <div class="page-enter" x-data="hostelsManager()">
-    {{-- ── Header ── --}}
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div class="he-page-head mb-4 stagger-1">
         <div>
-            <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Hostels</h1>
-            <p class="text-muted mb-0 small">Every tenant branch across the platform — coverage, owners and admins.</p>
+            <h1 class="he-page-title">{{ __('Hostels') }}</h1>
+            <p class="he-page-sub">{{ __('Every tenant branch across the platform — coverage, owners and admins.') }}</p>
         </div>
-        <button type="button" @click="createModalOpen = true" class="btn btn-primary shadow-sm rounded-pill px-4 fw-semibold tactile-btn">
-            <i class="fa-solid fa-plus me-2"></i> Add Hostel
+        <button type="button" @click="createModalOpen = true" class="btn btn-premium shadow-sm rounded-pill px-4 fw-semibold tactile-btn d-none d-md-inline-flex align-items-center">
+            <i class="fa-solid fa-plus me-2"></i>{{ __('Add Hostel') }}
         </button>
     </div>
 
-    {{-- ── Fleet health tiles ── --}}
-    <div class="row g-3 mb-4 stagger">
-        <div class="col-6 col-lg-3">
-            <div class="panel-card shadow-sm h13-tile">
-                <div class="h13-ic bg-primary-subtle text-primary"><i class="fa-solid fa-hotel"></i></div>
-                <div><div class="h13-val">{{ $stats['total'] }}</div><div class="h13-lbl">Branches</div></div>
+    <template x-teleport="body">
+        <button type="button" class="fab" @click="createModalOpen = true" title="{{ __('Add Hostel') }}"><i class="fa-solid fa-plus"></i></button>
+    </template>
+
+    {{-- ── Fleet health ── --}}
+    <div class="row g-3 mb-4 stagger-2">
+        @foreach([
+            ['primary', 'hotel', $stats['total'], __('Branches')],
+            ['success', 'circle-check', $stats['active'], __('Active')],
+            ['warning', 'hourglass-half', $stats['expiring'], __('Expiring ≤ 30d')],
+            ['danger', 'circle-xmark', $stats['expired'], __('Expired')],
+        ] as [$color, $icon, $val, $lbl])
+            <div class="col-6 col-lg-3">
+                <div class="panel-card shadow-sm h13-tile">
+                    <div class="h13-ic bg-{{ $color }}-subtle text-{{ $color }}"><i class="fa-solid fa-{{ $icon }}"></i></div>
+                    <div><div class="h13-val">{{ $val }}</div><div class="h13-lbl">{{ $lbl }}</div></div>
+                </div>
             </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="panel-card shadow-sm h13-tile">
-                <div class="h13-ic bg-success-subtle text-success"><i class="fa-solid fa-circle-check"></i></div>
-                <div><div class="h13-val">{{ $stats['active'] }}</div><div class="h13-lbl">Active</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="panel-card shadow-sm h13-tile">
-                <div class="h13-ic bg-warning-subtle text-warning"><i class="fa-solid fa-hourglass-half"></i></div>
-                <div><div class="h13-val">{{ $stats['expiring'] }}</div><div class="h13-lbl">Expiring ≤ 30d</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="panel-card shadow-sm h13-tile">
-                <div class="h13-ic bg-danger-subtle text-danger"><i class="fa-solid fa-circle-xmark"></i></div>
-                <div><div class="h13-val">{{ $stats['expired'] }}</div><div class="h13-lbl">Expired</div></div>
-            </div>
-        </div>
+        @endforeach
     </div>
 
-    {{-- ── Directory ── --}}
-    <div class="panel-card shadow-sm">
-        <div class="p-3 px-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-building text-primary me-2"></i>All branches</h6>
-            <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
-                <div class="input-group input-group-sm shadow-sm h13-search rounded-pill overflow-hidden border">
-                    <span class="input-group-text border-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                    <input type="text" name="q" value="{{ request('q') }}" class="form-control border-0" placeholder="Search name, owner, mobile, city…">
-                </div>
-                <x-he-select name="status" icon="signal" label="Status" :selected="request('status', '')"
-                    :options="['' => 'All statuses', 'active' => 'Active', 'expired' => 'Expired', 'suspended' => 'Suspended']" />
-                @if(request('q') || request('status'))
-                    <a href="{{ route('superadmin.hostels.index') }}" class="btn btn-sm btn-light border rounded-pill px-3" title="Clear filters"><i class="fa-solid fa-xmark"></i></a>
-                @endif
-            </form>
-        </div>
-        <div class="table-responsive">
-            <table class="table align-middle mb-0">
-                <thead class="table-light text-uppercase" style="font-size:.7rem; letter-spacing:.5px;">
-                    <tr>
-                        <th class="py-3 px-4 border-0">Hostel / Branch</th>
-                        <th class="py-3 px-4 border-0">Owner</th>
-                        <th class="py-3 px-4 border-0 text-center">Students</th>
-                        <th class="py-3 px-4 border-0">Coverage</th>
-                        <th class="py-3 px-4 border-0 text-center">Status</th>
-                        <th class="py-3 px-4 border-0 text-end"></th>
-                    </tr>
-                </thead>
-                <tbody class="border-top-0">
-                @forelse($hostels as $h)
-                    @php($days = $h->daysUntilExpiry())
-                    @php($initials = collect(explode(' ', (string) $h->owner_name))->map(fn($w) => substr($w, 0, 1))->take(2)->join(''))
-                    @php($avatarColor = ['primary', 'success', 'warning', 'info', 'danger'][strlen((string) $h->owner_name) % 5])
-                    @php($statusColor = $h->status === 'active' ? 'success' : ($h->status === 'expired' ? 'danger' : 'secondary'))
-                    <tr class="hostel-row" onclick="window.location='{{ route('superadmin.hostels.show', $h) }}'">
-                        <td class="px-4 py-3 text-nowrap">
-                            <div class="fw-bold text-dark fs-6 lh-1 mb-1">{{ $h->name }}</div>
-                            <span class="text-muted small"><i class="fa-solid fa-location-dot me-1"></i>{{ $h->city ?: '—' }}{{ $h->state ? ', '.$h->state : '' }}</span>
-                        </td>
-                        <td class="px-4 py-3 text-nowrap">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="rounded-circle bg-{{ $avatarColor }}-subtle text-{{ $avatarColor }} d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width:38px; height:38px; font-size:.85rem;">
-                                    {{ strtoupper($initials) }}
-                                </div>
-                                <div>
-                                    <div class="fw-semibold text-dark lh-1 mb-1">{{ $h->owner_name }}</div>
-                                    <div class="small text-muted lh-1" onclick="event.stopPropagation()"><x-mobile-link :mobile="$h->mobile" /></div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <span class="badge bg-light text-dark border px-2 py-1 rounded-pill">{{ $h->students_count }}</span>
-                        </td>
-                        <td class="px-4 py-3 text-nowrap">
-                            <div class="fw-semibold text-dark" style="font-variant-numeric:tabular-nums;">{{ optional($h->subscription_end)->format('d M Y') ?? '—' }}</div>
-                            @if(!is_null($days))
-                                <div class="small mt-1">
-                                    @if($days <= 0)
-                                        <span class="text-danger fw-semibold"><i class="fa-solid fa-circle-xmark me-1"></i>Expired</span>
-                                    @elseif($days <= 30)
-                                        <span class="text-warning fw-semibold"><i class="fa-solid fa-clock me-1"></i>{{ $days }} days left</span>
-                                    @else
-                                        <span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>{{ $days }} days left</span>
-                                    @endif
-                                </div>
-                            @endif
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <span class="badge bg-{{ $statusColor }}-subtle text-{{ $statusColor }} border border-{{ $statusColor }}-subtle rounded-pill px-3">{{ ucfirst($h->status) }}</span>
-                        </td>
-                        <td class="px-4 py-3 text-end text-nowrap" onclick="event.stopPropagation()">
-                            @if(!empty($accountByHostel[$h->id]))
-                            <a href="{{ route('superadmin.accounts.show', $accountByHostel[$h->id]) }}" class="btn btn-sm btn-light rounded-circle shadow-sm" style="width:32px;height:32px;" title="Owner Account">
-                                <i class="fa-solid fa-user-gear text-primary"></i>
-                            </a>
-                            @endif
-                            <button type="button" @click="openEditModal({{ $h->id }})" class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width:32px;height:32px;" title="Edit Hostel">
-                                <i class="fa-regular fa-pen-to-square text-secondary"></i>
-                            </button>
-                            <form action="{{ route('superadmin.hostels.destroy', $h) }}" method="POST" class="d-inline" data-confirm="Delete {{ $h->name }}? This removes its admins and data.">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width:32px;height:32px;" title="Delete">
-                                    <i class="fa-regular fa-trash-can text-danger"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="p-0"><x-he-empty-state icon="hotel" title="No hostels found"
-                        subtitle="{{ (request('q') || request('status')) ? 'Try clearing the search or status filter.' : 'Provision the first hostel to get started.' }}" /></td></tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if($hostels->hasPages())
-            <div class="p-3 border-top">{{ $hostels->links() }}</div>
-        @endif
+    {{-- ── Filter bar: ONE row (§4.5), fragment-driven (§4.3) ── --}}
+    <div class="mb-3 sah-filter-row stagger-3">
+        <form method="GET" action="{{ route('superadmin.hostels.index') }}" x-ref="filterForm"
+              data-fragment="#hostel-list" class="d-flex flex-nowrap gap-2 align-items-center">
+            <div class="he-search he-search--inline he-search--clearable">
+                <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="q" x-model="searchTerm" class="he-search__input"
+                       placeholder="{{ __('Search name, owner, mobile, city…') }}"
+                       @input.debounce.450ms="$el.form.requestSubmit()">
+                <button type="button" class="he-search__clear" x-show="searchTerm" x-cloak @click="clearSearch()" title="{{ __('Clear search') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <x-he-select name="status" icon="filter" icon-only-mobile :selected="request('status', '')"
+                :options="[
+                    '' => ['label' => __('All statuses'), 'icon' => 'filter'],
+                    'active' => ['label' => __('Active'), 'icon' => 'circle-check'],
+                    'expired' => ['label' => __('Expired'), 'icon' => 'circle-xmark'],
+                    'suspended' => ['label' => __('Suspended'), 'icon' => 'ban'],
+                ]" />
+        </form>
+    </div>
+
+    <div id="hostel-list" data-fragment-container class="he-adaptive stagger-4">
+        @include('superadmin.hostels._list')
     </div>
 
     @include('superadmin.hostels.modals')

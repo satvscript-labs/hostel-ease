@@ -128,7 +128,8 @@ class AdminController extends Controller
             ->when($request->filled('hostel'), fn ($q) => $q->where('hostel_id', $request->integer('hostel')))
             ->when($request->filled('action'), fn ($q) => $q->where('action', 'like', $request->action.'%'))
             ->latest()
-            ->paginate(50);
+            ->paginate(50)
+            ->withQueryString();
 
         $hostels = Hostel::orderBy('name')->get(['id', 'name']);
 

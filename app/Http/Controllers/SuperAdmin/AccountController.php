@@ -82,6 +82,31 @@ class AccountController extends Controller
         return view('superadmin.accounts.index', compact('accounts', 'summary', 'dueDays'));
     }
 
+    /**
+     * A subscription invoice PDF for one order — the platform billing the
+     * customer for their branches. Paid orders render a Tax Invoice; unpaid
+     * ones a Proforma (the status drives the doctype, not a separate route).
+     */
+    public function invoice(SubscriptionAccount $account, SubscriptionOrder $order)
+    {
+        // The order must belong to THIS account — the URL binds both, so a
+        // mismatched pair is a 404, not someone else's invoice.
+        abort_unless($order->account_id === $account->id, 404);
+
+        $order->load(['lines.branch', 'account.owner']);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('superadmin.orders.invoice_pdf', [
+            'order' => $order,
+            'account' => $account,
+            'company' => config('hostelease.company'),
+        ]);
+
+        $this->logger->log('order.invoice', "Downloaded invoice {$order->invoiceNumber()} for "
+            .($account->owner?->name ?? 'account #'.$account->id), $order);
+
+        return $pdf->download($order->invoiceNumber().'.pdf');
+    }
+
     /** Account 360. */
     public function show(SubscriptionAccount $account): View
     {

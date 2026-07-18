@@ -131,6 +131,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         // Customers / Accounts (account-level billing control terminal)
         Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
         Route::get('accounts/{account}', [AccountController::class, 'show'])->name('accounts.show');
+        Route::get('accounts/{account}/orders/{order}/invoice', [AccountController::class, 'invoice'])->name('accounts.orders.invoice');
         Route::post('accounts/{account}/renew', [AccountController::class, 'renew'])->name('accounts.renew');
         Route::post('accounts/{account}/add-branch', [AccountController::class, 'addBranch'])->name('accounts.add-branch');
         Route::post('accounts/{account}/add-hostel', [AccountController::class, 'addHostel'])->name('accounts.add-hostel');

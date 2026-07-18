@@ -1,10 +1,17 @@
-// Hostel Ease — Blue theme built on Bootstrap 5
-$primary: #2563eb;
-$secondary: #64748b;
-$success: #22c55e;
-$danger: #ef4444;
-$warning: #eab308;
-$info: #0ea5e9;
+// Hostel Ease — Bootstrap's semantic colours are SOURCED from the canonical
+// design-system palette (_premium.scss :root, guidelines §2.2), so every
+// Bootstrap utility (text-primary, btn-primary, bg-success-subtle, …) matches
+// the --he-* tokens the rebuilt pages use directly. Before this they diverged:
+// $primary was the old blue #2563eb while --he-primary is indigo #4f46e5, and
+// $success/$warning were off-hue too — which is why older pages (bg-primary,
+// btn-primary) looked a different colour from the redesigned ones. Keep these
+// in lockstep with _premium.scss; do not drift them.
+$primary: #4f46e5;   // --he-primary  (indigo, was #2563eb)
+$secondary: #64748b; // --he-text-muted
+$success: #10b981;   // --he-success  (was #22c55e)
+$danger: #ef4444;    // --he-danger
+$warning: #f59e0b;   // --he-warning  (was #eab308)
+$info: #0ea5e9;      // --he-info
 $light: #f8fafc;
 $dark: #0f172a;
 

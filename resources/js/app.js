@@ -547,6 +547,17 @@ function initGlobalSearch() {
     const url = input.closest('[data-search-url]')?.dataset.searchUrl;
     let timer;
 
+    // Ctrl+K / Cmd+K focuses the global search from anywhere (W12 — the
+    // shortcut every SaaS trains users to expect). preventDefault stops the
+    // browser's own address-bar/search capture of the same combo.
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            input.focus();
+            input.select();
+        }
+    });
+
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
     ));

@@ -11,7 +11,7 @@
     <div class="topbar-search" :class="{ 'is-focused': searchOpen }" data-search-url="{{ route('search') }}">
         <span class="search-icon-badge"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" id="global-search" class="search-input"
-               placeholder="{{ $user->isSuperAdmin() ? __('Search hostels…') : __('Search students, rooms, beds…') }}"
+               placeholder="{{ $user->isSuperAdmin() ? __('Search hostels, customers…') : __('Search students, staff, rooms, receipts…') }}"
                autocomplete="off"
                @focus="searchOpen = true" @blur="searchOpen = false">
         <kbd class="search-kbd d-none d-md-inline-flex">⌘K</kbd>

@@ -102,7 +102,25 @@ return [
     'subscription_amount' => (float) env('hostelease_SUBSCRIPTION_AMOUNT', 5000),
 
     /*
-    | Branch-level subscription pricing. 
+    | The platform (seller) identity — the "from" on a subscription invoice the
+    | Super Admin issues to a customer for their branches. Env-overridable so a
+    | real GSTIN / address can land in production without a code change.
+    */
+    'company' => [
+        'name' => env('HOSTELEASE_COMPANY_NAME', 'HostelEase'),
+        'legal_name' => env('HOSTELEASE_COMPANY_LEGAL', 'SatvScript'),
+        'tagline' => env('HOSTELEASE_COMPANY_TAGLINE', 'Hostel Management Platform'),
+        'address' => env('HOSTELEASE_COMPANY_ADDRESS', ''),
+        'city' => env('HOSTELEASE_COMPANY_CITY', ''),
+        'state' => env('HOSTELEASE_COMPANY_STATE', ''),
+        'email' => env('HOSTELEASE_COMPANY_EMAIL', env('MAIL_FROM_ADDRESS', 'support@hostel-ease.satvscript.com')),
+        'website' => env('HOSTELEASE_COMPANY_WEBSITE', 'hostel-ease.satvscript.com'),
+        'gstin' => env('HOSTELEASE_COMPANY_GSTIN', ''),
+        'invoice_prefix' => env('HOSTELEASE_INVOICE_PREFIX', 'HE'),
+    ],
+
+    /*
+    | Branch-level subscription pricing.
     | Billing is handled individually per branch.
     */
     'subscription_pricing' => [

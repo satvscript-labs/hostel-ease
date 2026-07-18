@@ -1,126 +1,120 @@
 @extends('layouts.app')
-@section('title', 'System Backups')
+@section('title', __('System Backups'))
+
+@push('styles')
+<style>
+    /* ══ Backups — W12 rework onto the design system: he-page-head + he-stats
+       health band, snapshot table → aligned rows (§4.11) with a designed
+       640–880 tier, he-icon-btn actions, FAB on phones. ══ */
+    .bk-list { display:grid; grid-template-columns:1fr; }
+    .bk-row { grid-column:1/-1; display:flex; align-items:center; gap:.75rem; padding:.85rem 1.25rem; transition:background .18s var(--ease-out-expo); }
+    .bk-row:hover { background:var(--he-bg-surface-raised); }
+    .bk-row + .bk-row { border-top:1px solid rgba(15,23,42,.06); }
+    .bk-ic { width:40px; height:40px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+        background:var(--he-primary-soft); color:var(--he-primary); }
+    .bk-text { flex:1 1 auto; min-width:0; } /* shrink chain (§4.11 r5) */
+    .bk-name { font-weight:600; font-size:.82rem; color:var(--he-text-main); font-family:var(--bs-font-monospace, monospace); }
+    .bk-sub { font-size:.74rem; color:var(--he-text-muted); }
+    .bk-size, .bk-when { display:none; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .bk-acts { display:flex; align-items:center; gap:.45rem; flex-shrink:0; }
+
+    @container (min-width: 640px) {
+        .bk-size { display:block; font-weight:600; color:var(--he-text-main); font-size:.84rem; }
+    }
+    @container (min-width: 880px) {
+        .bk-list { grid-template-columns:minmax(260px,1fr) auto auto auto; column-gap:1.25rem; }
+        .bk-row { display:grid; grid-template-columns:subgrid; }
+        .bk-main { display:flex; align-items:center; gap:.75rem; min-width:0; }
+        .bk-when { display:block; font-size:.8rem; color:var(--he-text-muted); }
+        .bk-sub-when { display:none; } /* the timestamp moves into its column */
+    }
+    .bk-main { display:flex; align-items:center; gap:.75rem; min-width:0; flex:1 1 auto; }
+</style>
+@endpush
 
 @section('content')
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">System Backups</h1>
-        <p class="text-muted mb-0 small">Secure database snapshots and automated recovery points.</p>
-    </div>
-    <div>
-        <form method="POST" action="{{ route('superadmin.backups.store') }}" class="d-inline">@csrf
-            <button class="btn btn-primary shadow-sm rounded-pill px-4">
-                <i class="fa-solid fa-cloud-arrow-up me-2"></i> Create Backup Now
-            </button>
-        </form>
-    </div>
-</div>
-
 @php
     $totalSize = collect($backups)->sum('size');
     $lastBackup = count($backups) > 0 ? $backups[0] : null;
-    $statusClass = $lastBackup && $lastBackup['created_at']->diffInHours(now()) < 24 ? 'success' : 'warning';
-    $statusText = $lastBackup && $lastBackup['created_at']->diffInHours(now()) < 24 ? 'Healthy' : 'Needs Backup';
+    $healthy = $lastBackup && $lastBackup['created_at']->diffInHours(now()) < 24;
 @endphp
+<div class="page-enter">
+    <div class="he-page-head mb-4 stagger-1">
+        <div>
+            <h1 class="he-page-title">{{ __('System Backups') }}</h1>
+            <p class="he-page-sub">{{ __('Database snapshots and automated recovery points.') }}</p>
+        </div>
+        <button form="backupForm" class="btn btn-premium shadow-sm rounded-pill px-4 fw-semibold tactile-btn d-none d-md-inline-flex align-items-center">
+            <i class="fa-solid fa-cloud-arrow-up me-2"></i>{{ __('Create Backup Now') }}
+        </button>
+    </div>
 
-<div class="row g-4 mb-4">
-    <div class="col-lg-4">
-        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-body p-4 d-flex flex-column justify-content-center">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h2 class="h5 fw-bold mb-0 text-dark">Storage Health</h2>
-                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                        <i class="fa-solid fa-hard-drive"></i>
-                    </div>
+    <form id="backupForm" method="POST" action="{{ route('superadmin.backups.store') }}" class="d-none">@csrf</form>
+    <template x-teleport="body">
+        <button form="backupForm" class="fab" title="{{ __('Create Backup Now') }}"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+    </template>
+
+    {{-- ── Health band ── --}}
+    <div class="he-stats mb-4 stagger-2">
+        <div class="he-stats__grid" style="--he-stats-cols: 3;">
+            <div class="he-stat he-stat--hero">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: rgba(255,255,255,.15); color: {{ $healthy ? '#6ee7b7' : '#fbbf24' }};"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="he-stat__label">{{ __('Last backup') }} <span class="opacity-50">· {{ $healthy ? __('healthy') : __('needs backup') }}</span></div>
                 </div>
-                <div class="d-flex align-items-end gap-2 mb-2">
-                    <div class="fs-2 fw-bold text-dark lh-1">{{ number_format($totalSize / 1024 / 1024, 2) }}</div>
-                    <div class="text-muted fw-semibold mb-1">MB Used</div>
+                <div class="he-stat__value">{{ $lastBackup ? $lastBackup['created_at']->diffForHumans(short: true) : __('None yet') }}</div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-primary-soft); color: var(--he-primary);"><i class="fa-solid fa-hard-drive"></i></div>
+                    <div class="he-stat__label">{{ __('Storage used') }}</div>
                 </div>
-                <div class="progress mt-2" style="height: 6px; border-radius: 10px;">
-                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, ($totalSize / 1024 / 1024 / 100) * 100) }}%"></div>
+                <div class="he-stat__value">{{ number_format($totalSize / 1024 / 1024, 2) }} <span class="fs-6 opacity-50 fw-normal">MB</span></div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-info-soft); color: var(--he-info);"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <div class="he-stat__label">{{ __('Snapshots kept') }}</div>
                 </div>
-                <div class="small text-muted mt-2">{{ count($backups) }} snapshot(s) retained.</div>
+                <div class="he-stat__value">{{ count($backups) }}</div>
             </div>
         </div>
     </div>
-    
-    <div class="col-lg-8">
-        <div class="card stat-card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
-            <div class="position-absolute top-0 end-0 p-4 opacity-10">
-                <i class="fa-solid fa-shield-halved" style="font-size: 6rem;"></i>
-            </div>
-            <div class="card-body p-4 d-flex flex-column justify-content-center position-relative z-1">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h2 class="h5 fw-bold mb-0 text-dark">Last Backup Status</h2>
-                    <span class="badge bg-{{ $statusClass }}-subtle text-{{ $statusClass }} border border-{{ $statusClass }}-subtle rounded-pill px-3 py-2">
-                        <i class="fa-solid fa-circle me-1" style="font-size: 0.5rem; vertical-align: middle;"></i> {{ $statusText }}
-                    </span>
-                </div>
-                @if($lastBackup)
-                    <div class="fs-3 fw-bold text-dark lh-1 mb-2">{{ $lastBackup['created_at']->diffForHumans() }}</div>
-                    <div class="text-muted mb-0">{{ $lastBackup['created_at']->format('l, j M Y \a\t H:i') }} ({{ number_format($lastBackup['size'] / 1024, 1) }} KB)</div>
-                @else
-                    <div class="fs-4 fw-bold text-muted lh-1 mb-2">No backups found</div>
-                    <div class="text-muted mb-0">Run a manual backup to secure your database.</div>
-                @endif
-                <div class="mt-4 alert alert-info py-2 small mb-0 border-0 bg-info-subtle text-info-emphasis rounded-3">
-                    <i class="fa-solid fa-circle-info me-1"></i>
-                    Nightly auto-backup runs at 02:00 (keeps 30 days). Backups stored in <code>storage/app/backups</code>.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                    <tr>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Snapshot File</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Size</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Created At</th>
-                        <th class="py-3 px-4 text-end border-0">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="border-top-0">
+    <div class="d-flex align-items-start gap-2 mb-3 p-3 rounded-3 stagger-3" style="background: var(--he-info-soft); color: #0369a1; font-size:.84rem; font-weight:600;">
+        <i class="fa-solid fa-circle-info mt-1"></i>
+        <div>{{ __('Nightly auto-backup runs at 02:00 and keeps 30 days. Files live in') }} <code>storage/app/backups</code>.</div>
+    </div>
+
+    {{-- ── Snapshots — aligned rows ── --}}
+    <div class="he-adaptive stagger-4 mb-5">
+        <div class="panel-card shadow-sm">
+            <div class="bk-list">
                 @forelse($backups as $b)
-                    <tr>
-                        <td class="px-4 py-3">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-muted" style="width: 36px; height: 36px;">
-                                    <i class="fa-solid fa-file-zipper"></i>
-                                </div>
-                                <div class="fw-semibold text-dark font-monospace small">{{ $b['name'] }}</div>
+                    <div class="bk-row">
+                        <div class="bk-main">
+                            <div class="bk-ic"><i class="fa-solid fa-file-zipper"></i></div>
+                            <div class="bk-text">
+                                <div class="bk-name text-truncate">{{ $b['name'] }}</div>
+                                <div class="bk-sub text-truncate"><span class="d-sm-none">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB · </span><span class="bk-sub-when">{{ $b['created_at']->format('d M Y H:i') }} · </span>{{ $b['created_at']->diffForHumans() }}</div>
                             </div>
-                        </td>
-                        <td class="px-4 py-3 fw-medium text-dark">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB</td>
-                        <td class="px-4 py-3 text-muted">
-                            {{ $b['created_at']->format('d M Y H:i') }}
-                            <span class="small ms-1 opacity-75">({{ $b['created_at']->diffForHumans() }})</span>
-                        </td>
-                        <td class="px-4 py-3 text-end">
-                            <a href="{{ route('superadmin.backups.download', $b['name']) }}" class="btn btn-sm btn-primary rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Download">
-                                <i class="fa-solid fa-download"></i>
-                            </a>
-                            <form action="{{ route('superadmin.backups.destroy', $b['name']) }}" method="POST" class="d-inline" data-confirm="Delete this snapshot permanently?">
+                        </div>
+                        <div class="bk-size">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB</div>
+                        <div class="bk-when">{{ $b['created_at']->format('d M Y H:i') }}</div>
+                        <div class="bk-acts he-act-row">
+                            <a href="{{ route('superadmin.backups.download', $b['name']) }}" class="he-icon-btn" title="{{ __('Download') }}" aria-label="{{ __('Download :file', ['file' => $b['name']]) }}"><i class="fa-solid fa-download"></i></a>
+                            <form action="{{ route('superadmin.backups.destroy', $b['name']) }}" method="POST" class="m-0" data-confirm="{{ __('Delete this snapshot permanently?') }}">
                                 @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width: 32px; height: 32px;" title="Delete">
-                                    <i class="fa-solid fa-trash text-danger"></i>
-                                </button>
+                                <button class="he-icon-btn is-danger" title="{{ __('Delete') }}" aria-label="{{ __('Delete :file', ['file' => $b['name']]) }}"><i class="fa-solid fa-trash"></i></button>
                             </form>
-                        </td>
-                    </tr>
+                        </div>
+                    </div>
                 @empty
-                    <tr><td colspan="4" class="text-center text-muted py-5">
-                        <i class="fa-solid fa-ghost fs-1 text-light mb-3"></i>
-                        <p class="mb-0">No backups yet. Click <strong>Create Backup Now</strong> to get started.</p>
-                    </td></tr>
+                    <div class="p-3" style="grid-column:1/-1;">
+                        <x-he-empty-state icon="cloud-arrow-up" title="{{ __('No backups yet') }}" subtitle="{{ __('Create your first snapshot to secure the database.') }}" />
+                    </div>
                 @endforelse
-                </tbody>
-            </table>
+            </div>
         </div>
     </div>
 </div>

@@ -26,34 +26,41 @@
     <div class="row g-3 mb-4 stagger">
         <div class="col-6 col-md-3"><div class="card stat-card shadow-sm rounded-4"><div class="card-body py-4"><div class="stat-value text-primary mb-1">{{ $summary['accounts'] }}</div><div class="stat-label">Accounts</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card stat-card shadow-sm rounded-4"><div class="card-body py-4"><div class="stat-value text-success mb-1">{{ $summary['active'] }}</div><div class="stat-label">Active</div></div></div></div>
-        <div class="col-6 col-md-3">
-            <a href="{{ route('superadmin.accounts.index', ['due' => 30]) }}" class="text-decoration-none">
-                <div class="card stat-card shadow-sm rounded-4 h-100 {{ $dueDays ? 'border border-warning-subtle' : '' }}"><div class="card-body py-4">
-                    <div class="stat-value text-warning mb-1">{{ $summary['due_30'] }}</div>
-                    <div class="stat-label">Renewals due · 30d <i class="fa-solid fa-arrow-right ms-1 small"></i></div>
-                </div></div>
-            </a>
-        </div>
+        <div class="col-6 col-md-3"><div class="card stat-card shadow-sm rounded-4"><div class="card-body py-4"><div class="stat-value text-warning mb-1">{{ $summary['due_30'] }}</div><div class="stat-label">Renewals due · 30d</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card stat-card shadow-sm rounded-4"><div class="card-body py-4"><div class="stat-value text-dark mb-1">{{ hostelease_money($summary['revenue']) }}</div><div class="stat-label">Lifetime Revenue</div></div></div></div>
     </div>
 
-    {{-- Filters: a "due soon" renewals worklist + the status pill --}}
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <div class="d-flex flex-wrap gap-1 bg-white border rounded-pill p-1 shadow-sm">
-            <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm rounded-pill px-3 fw-semibold {{ ! $dueDays && ! request('status') ? 'btn-primary' : 'btn-light text-muted' }}">All</a>
-            <a href="{{ route('superadmin.accounts.index', ['due' => 7]) }}" class="btn btn-sm rounded-pill px-3 fw-semibold {{ (int) request('due') === 7 ? 'btn-warning text-white' : 'btn-light text-muted' }}">Due ≤ 7 days</a>
-            <a href="{{ route('superadmin.accounts.index', ['due' => 30]) }}" class="btn btn-sm rounded-pill px-3 fw-semibold {{ (int) request('due') === 30 ? 'btn-warning text-white' : 'btn-light text-muted' }}">Due ≤ 30 days</a>
-        </div>
-        <form method="GET">
+    {{-- Filters — ONE canonical no-search row (§4.5): two matching he-selects
+         (Renewals + Status), both auto-submitting the form. Fragment-driven so
+         ONLY #cust-list swaps (W12 fix): the controls live OUTSIDE the swapped
+         region, so their submit listeners survive — the old status form sat
+         inside a swapped target, lost its listener, and hard-reloaded. Both
+         filters combine (one form → both params). --}}
+    <div class="mb-3" style="position:relative; z-index:30;">
+        {{-- Natural-width, grouped left (NOT .he-filters--nosearch, which
+             stretches each filter to fill the row — with only two it left a
+             dead gap on the right that read as "separate"). --}}
+        <form method="GET" action="{{ route('superadmin.accounts.index') }}" data-fragment="#cust-list"
+              class="d-flex flex-wrap gap-2 align-items-center">
+            <x-he-select name="due" icon="rotate" label="Renewals" :selected="(string) request('due', '')"
+                :options="[
+                    '' => ['label' => __('All renewals'), 'icon' => 'rotate'],
+                    '7' => ['label' => __('Due ≤ 7 days'), 'icon' => 'bolt'],
+                    '30' => ['label' => __('Due ≤ 30 days'), 'icon' => 'clock'],
+                ]" />
             <x-he-select name="status" icon="filter" label="Status" :selected="request('status', '')"
-                :options="['' => 'All statuses', 'active' => 'Active', 'grace' => 'Grace', 'expired' => 'Expired', 'trial' => 'Trial', 'suspended' => 'Suspended']" />
+                :options="[
+                    '' => ['label' => __('All statuses'), 'icon' => 'filter'],
+                    'active' => ['label' => __('Active'), 'icon' => 'circle-check'],
+                    'grace' => ['label' => __('Grace'), 'icon' => 'hourglass-half'],
+                    'expired' => ['label' => __('Expired'), 'icon' => 'circle-xmark'],
+                    'trial' => ['label' => __('Trial'), 'icon' => 'gift'],
+                    'suspended' => ['label' => __('Suspended'), 'icon' => 'ban'],
+                ]" />
         </form>
-        @if($dueDays || request('status'))
-            <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm btn-light border rounded-pill px-3" title="Clear filters"><i class="fa-solid fa-xmark"></i></a>
-        @endif
     </div>
 
-    <div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden">
+    <div id="cust-list" data-fragment-container class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;"><tr>

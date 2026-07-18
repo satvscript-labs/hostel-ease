@@ -18,6 +18,20 @@
     .hp-metric .hp-m-val { font-weight:800; line-height:1.1; color:var(--he-text-main,#0f172a); font-variant-numeric:tabular-nums; }
     .hp-metric .hp-m-lbl { font-size:.64rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--he-text-muted,#64748b); }
 
+    /* Billing rows — aligned (§4.11): list-owned subgrid ≥640 container. */
+    .hp-sub-list { display:grid; grid-template-columns:1fr; }
+    .hp-sub-row { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .9rem; padding:.8rem 1.25rem; }
+    .hp-sub-row + .hp-sub-row { border-top:1px solid rgba(15,23,42,.06); }
+    .hp-sub-period { flex:1 1 100%; min-width:0; }
+    .hp-sub-amt { white-space:nowrap; font-variant-numeric:tabular-nums; margin-left:auto; }
+    @container (min-width: 640px) {
+        .hp-sub-list { grid-template-columns:minmax(0,1fr) auto auto; column-gap:1.25rem; }
+        .hp-sub-row { display:grid; grid-template-columns:subgrid; }
+        .hp-sub-period { flex:none; }
+        .hp-sub-amt { margin-left:0; text-align:right; }
+        .hp-sub-status { justify-self:center; }
+    }
+
     .hp-detail { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.7rem 0; }
     .hp-detail + .hp-detail { border-top:1px dashed rgba(15,23,42,.07); }
     .hp-detail .hp-d-k { font-size:.68rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--he-text-muted,#64748b); }
@@ -179,38 +193,25 @@
                         <i class="fa-solid fa-rotate me-1"></i> Add / Renew
                     </a>
                 </div>
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="table-light text-uppercase" style="font-size:.7rem; letter-spacing:.5px;">
-                            <tr>
-                                <th class="py-3 px-4 border-0">Period</th>
-                                <th class="py-3 px-4 border-0">Plan</th>
-                                <th class="py-3 px-4 border-0 text-end">Amount</th>
-                                <th class="py-3 px-4 border-0 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="border-top-0">
+                {{-- Aligned rows (§4.11): subgrid columns ≥640 in this panel's
+                     own container; stacked iOS-style rows below. Replaces a raw
+                     table that horizontally scrolled on phones. --}}
+                <div class="he-adaptive">
+                    <div class="hp-sub-list">
                         @forelse($hostel->subscriptions as $s)
-                            <tr>
-                                <td class="px-4 py-3">
-                                    <div class="fw-semibold text-dark" style="font-variant-numeric:tabular-nums;">{{ $s->start_date->format('d M Y') }} <i class="fa-solid fa-arrow-right-long mx-1 text-muted" style="font-size:.7rem;"></i> {{ $s->end_date->format('d M Y') }}</div>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1" style="font-size:.68rem; font-weight:700;">{{ $s->plan ? ucfirst($s->plan) : 'Custom' }}</span>
-                                </td>
-                                <td class="px-4 py-3 text-end">
-                                    <span class="fw-bold text-dark" style="font-variant-numeric:tabular-nums;">{{ hostelease_money($s->amount) }}</span>
-                                </td>
-                                <td class="px-4 py-3 text-center">
-                                    @php($payColor = $s->payment_status === 'paid' ? 'success' : ($s->payment_status === 'pending' ? 'warning' : 'danger'))
-                                    <span class="badge bg-{{ $payColor }}-subtle text-{{ $payColor }} border border-{{ $payColor }}-subtle rounded-pill px-3">{{ ucfirst($s->payment_status) }}</span>
-                                </td>
-                            </tr>
+                            @php($payColor = $s->payment_status === 'paid' ? 'success' : ($s->payment_status === 'pending' ? 'warning' : 'danger'))
+                            <div class="hp-sub-row">
+                                <div class="hp-sub-period">
+                                    <div class="fw-semibold text-dark text-truncate" style="font-variant-numeric:tabular-nums;">{{ $s->start_date->format('d M Y') }} <i class="fa-solid fa-arrow-right-long mx-1 text-muted" style="font-size:.7rem;"></i> {{ $s->end_date->format('d M Y') }}</div>
+                                    <div class="hp-sub-meta"><span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1" style="font-size:.66rem; font-weight:700;">{{ $s->plan ? ucfirst($s->plan) : __('Custom') }}</span></div>
+                                </div>
+                                <span class="badge bg-{{ $payColor }}-subtle text-{{ $payColor }} rounded-pill px-3 hp-sub-status">{{ ucfirst($s->payment_status) }}</span>
+                                <span class="fw-bold text-dark hp-sub-amt">{{ hostelease_money($s->amount) }}</span>
+                            </div>
                         @empty
-                            <tr><td colspan="4" class="p-0"><x-he-empty-state icon="receipt" title="No billing history" subtitle="Renewals recorded for this branch will appear here." /></td></tr>
+                            <div class="p-3" style="grid-column:1/-1;"><x-he-empty-state icon="receipt" title="{{ __('No billing history') }}" subtitle="{{ __('Renewals recorded for this branch will appear here.') }}" /></div>
                         @endforelse
-                        </tbody>
-                    </table>
+                    </div>
                 </div>
             </div>
         </div>

@@ -60,6 +60,13 @@ class DashboardController extends Controller
             'registrations' => $months->map(fn ($m) => (int) ($registrations[$m] ?? 0))->values(),
         ];
 
-        return view('superadmin.dashboard', compact('stats', 'upcomingRenewals', 'charts'));
+        // Platform pulse (W12): the latest actions across every tenant — the
+        // operator's peripheral vision. Full log lives at superadmin.activity.
+        $recentActivity = \App\Models\ActivityLog::with('user:id,name')
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        return view('superadmin.dashboard', compact('stats', 'upcomingRenewals', 'charts', 'recentActivity'));
     }
 }

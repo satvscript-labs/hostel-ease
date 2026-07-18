@@ -46,10 +46,22 @@
     .od-k { font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; color: var(--he-text-muted, #64748b); font-weight:700; }
     .od-v { font-size:.86rem; font-weight:600; color: var(--he-text-main, #0f172a); word-break:break-word; }
     .od-remarks { margin-top:.6rem; font-size:.84rem; color: var(--he-text-main, #334155); background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); padding:.55rem .85rem; }
-    .od-lines { background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); overflow:hidden; }
-    .od-line-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem .95rem; flex-wrap:wrap; }
+    /* Coverage rows — the LIST owns the columns; rows inherit via subgrid so
+       branch / period / amount line up vertically across every row (§4.11 —
+       per-row flex made each column start at a different x). */
+    .od-lines { background:#fff; border:1px solid rgba(15,23,42,.07); border-radius: var(--he-radius-md, 10px); overflow:hidden;
+        display:grid; grid-template-columns: minmax(0,1fr) minmax(150px,auto) minmax(90px,auto); }
+    .od-line-row { grid-column:1/-1; display:grid; grid-template-columns:subgrid; align-items:center; column-gap:1rem; padding:.6rem .95rem; }
     .od-line-row + .od-line-row { border-top:1px solid rgba(15,23,42,.05); }
-    .od-line-row .od-coverage { flex:1; text-align:center; min-width:150px; }
+    .od-line-row .od-coverage { text-align:center; }
+    .od-line-row > :first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .od-line-row > :last-child { text-align:right; white-space:nowrap; }
+    @media (max-width: 575.98px) {
+        /* Detail panel is narrow on phones — stack to two lines, amount right. */
+        .od-lines { grid-template-columns: minmax(0,1fr) auto; }
+        .od-line-row { grid-template-columns:subgrid; row-gap:.15rem; }
+        .od-line-row .od-coverage { grid-column:1/-1; text-align:left; }
+    }
 
     /* ── Comp modal — stepper, branch tiles, gift preview ── */
     .comp-stepper { display:flex; align-items:stretch; border:1px solid rgba(15,23,42,.12); border-radius: var(--he-radius-full, 9999px); overflow:hidden; background:#fff; }
@@ -290,6 +302,18 @@
                                                     </div>
                                                 @endif
                                             </div>
+
+                                            {{-- Invoice download (W12). Paid → tax invoice; else proforma.
+                                                 Failed orders get no invoice at all. --}}
+                                            @if($order->isBillable())
+                                                <div class="col-12">
+                                                    <a href="{{ route('superadmin.accounts.orders.invoice', [$account, $order]) }}" target="_blank" rel="noopener"
+                                                       class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
+                                                        <i class="fa-solid fa-file-invoice me-1"></i>
+                                                        {{ $order->payment_status->value === 'paid' ? 'Download tax invoice' : 'Download proforma' }}
+                                                    </a>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

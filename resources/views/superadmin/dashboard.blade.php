@@ -1,159 +1,181 @@
 @extends('layouts.app')
-@section('title', 'Superadmin Dashboard')
+@section('title', __('Platform Dashboard'))
 
 @push('styles')
 <style>
-    /* Premium Dashboard Aesthetic */
-    .stat-card {
-        background: rgba(255,255,255,0.85);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(0,0,0,0.05);
-        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    /* ══ Super Admin Dashboard — W12 rebuild on the design system. The old
+       page was pre-system: bespoke .stat-card glass, Bootstrap-blue charts,
+       a raw <table> for renewals. Now: mesh hero + he-stats, glowing indigo
+       charts, and renewals/activity as aligned rows (§4.11). ══ */
+
+    /* Chart shells — skeleton until Chart.js paints (same as admin dashboard). */
+    .sad-chart-shell { position: relative; height: 260px; }
+    .sad-chart-shell canvas { position: relative; z-index: 1; }
+    .sad-chart-skeleton { position: absolute; inset: 0; border-radius: var(--he-radius-md); transition: opacity .3s ease; }
+    .sad-chart-shell.is-ready .sad-chart-skeleton { opacity: 0; pointer-events: none; }
+
+    /* ── Renewal rows — the aligned row system (§4.11): the LIST owns the
+       columns; rows inherit via subgrid so every column aligns vertically. ── */
+    .sad-list { display: grid; grid-template-columns: 1fr; }
+    .sad-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center;
+        padding: .8rem 1.25rem; transition: background .18s var(--ease-out-expo); }
+    .sad-row:hover { background: var(--he-bg-surface-raised); }
+    .sad-row + .sad-row { border-top: 1px solid rgba(15, 23, 42, .06); }
+    .sad-who { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+    .sad-text { flex: 1 1 auto; min-width: 0; } /* explicit shrink chain (§4.11 r5) */
+    .sad-sub-extra { display: inline; }
+    .sad-chip { white-space: nowrap; }
+    .sad-cols { display: none; } /* desktop-only columns */
+    .sad-act { display: flex; justify-content: flex-end; }
+    @container (min-width: 760px) {
+        .sad-list { grid-template-columns: minmax(220px, 1.3fr) auto auto auto; column-gap: 1.25rem; }
+        .sad-row { grid-template-columns: subgrid; } /* re-assert over the phone tier */
+        .sad-cols { display: block; white-space: nowrap; }
+        .sad-sub-extra { display: none; } /* data moves into its aligned columns */
     }
-    .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.04) !important;
-    }
-    .stat-value {
-        font-size: 1.75rem;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
-    .stat-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-    }
+
+    /* ── Activity feed rows ── */
+    .sad-feed-row { display: flex; align-items: flex-start; gap: .75rem; padding: .7rem 1.25rem; }
+    .sad-feed-row + .sad-feed-row { border-top: 1px solid rgba(15, 23, 42, .05); }
+    .sad-feed-ic { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: .75rem;
+        background: var(--he-primary-soft); color: var(--he-primary); }
 </style>
 @endpush
 
-@php
-    $cards = [
-        ['label' => 'Total Hostels', 'value' => $stats['total_hostels'], 'icon' => 'fa-hotel', 'bg' => 'primary', 'desc' => 'Total branches managed'],
-        ['label' => 'Active Hostels', 'value' => $stats['active_hostels'], 'icon' => 'fa-circle-check', 'bg' => 'success', 'desc' => 'Paying subscriptions'],
-        ['label' => 'Due Renewals', 'value' => $stats['due_renewals'], 'icon' => 'fa-bell', 'bg' => 'warning', 'desc' => 'Expiring within 30 days'],
-        ['label' => 'Total Students', 'value' => $stats['total_students'], 'icon' => 'fa-users', 'bg' => 'info', 'desc' => 'Across all hostels'],
-        ['label' => 'Total Revenue', 'value' => hostelease_money($stats['total_income']), 'icon' => 'fa-sack-dollar', 'bg' => 'success', 'desc' => 'Lifetime earnings'],
-        ['label' => 'Monthly Revenue', 'value' => hostelease_money($stats['monthly_revenue']), 'icon' => 'fa-chart-line', 'bg' => 'primary', 'desc' => 'Earnings this month'],
-    ];
-@endphp
-
 @section('content')
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1 text-dark tracking-tight">Superadmin Dashboard</h1>
-        <p class="text-muted mb-0 small">Platform overview, revenue, and active subscriptions.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-primary shadow-sm rounded-pill px-4">
-            <i class="fa-solid fa-users-gear me-2"></i> Customers
+<div class="page-enter">
+
+    <div class="he-page-head mb-4 stagger-1">
+        <div>
+            <h1 class="he-page-title">{{ __('Platform Dashboard') }}</h1>
+            <p class="he-page-sub">{{ __('Every hostel, every rupee, at a glance.') }}</p>
+        </div>
+        <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-premium rounded-pill px-4 fw-semibold shadow-sm tactile-btn d-none d-md-inline-flex align-items-center">
+            <i class="fa-solid fa-users-gear me-2"></i>{{ __('Customers') }}
         </a>
     </div>
-</div>
 
-<!-- Bento Box Metric Cards -->
-<div class="row g-4 mb-4">
-    @foreach($cards as $c)
-        <div class="col-sm-6 col-lg-4 col-xl-4">
-            <div class="card stat-card border-0 shadow-sm rounded-4 h-100 overflow-hidden position-relative" style="background: linear-gradient(145deg, #ffffff, #f8f9fa);">
-                <div class="position-absolute opacity-10" style="bottom: -10%; right: -5%;">
-                    <i class="fa-solid {{ $c['icon'] }}" style="font-size: 8rem; color: var(--bs-{{ $c['bg'] }}); transform: rotate(-15deg);"></i>
+    {{-- ══ Platform KPIs — hero carries the money ══ --}}
+    <div class="he-stats mb-4 stagger-2">
+        <div class="he-stats__grid" style="--he-stats-cols: 4;">
+            <div class="he-stat he-stat--hero">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: rgba(255, 255, 255, 0.15); color: #6ee7b7;"><i class="fa-solid fa-sack-dollar"></i></div>
+                    <div class="he-stat__label">{{ __('Revenue') }} · {{ now()->format('M') }} <span class="opacity-50">· {{ __('lifetime') }} {{ hostelease_money($stats['total_income']) }}</span></div>
                 </div>
-                <div class="card-body p-4 position-relative z-1 d-flex flex-column justify-content-between h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h2 class="h6 fw-bold mb-0 text-muted text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 1px;">{{ $c['label'] }}</h2>
-                        <div class="rounded-circle bg-{{ $c['bg'] }}-subtle text-{{ $c['bg'] }} d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px;">
-                            <i class="fa-solid {{ $c['icon'] }} fs-6"></i>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="fs-1 fw-bolder text-dark lh-1 mb-2">{{ $c['value'] }}</div>
-                        <div class="small text-muted fw-medium d-flex align-items-center gap-1">
-                            <i class="fa-solid fa-circle text-{{ $c['bg'] }}" style="font-size: 0.4rem;"></i> {{ $c['desc'] }}
-                        </div>
+                <div class="he-stat__value">{{ hostelease_money($stats['monthly_revenue']) }}</div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-primary-soft); color: var(--he-primary);"><i class="fa-solid fa-hotel"></i></div>
+                    <div class="he-stat__label">{{ __('Hostels') }}</div>
+                </div>
+                <div class="he-stat__value">{{ $stats['active_hostels'] }} <span class="fs-6 opacity-50 fw-normal">/ {{ $stats['total_hostels'] }} {{ __('active') }}</span></div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-warning-soft); color: var(--he-warning);"><i class="fa-solid fa-bell"></i></div>
+                    <div class="he-stat__label">{{ __('Due in 30 days') }}</div>
+                </div>
+                <div class="he-stat__value {{ $stats['due_renewals'] > 0 ? 'text-warning' : '' }}">{{ $stats['due_renewals'] }}</div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: var(--he-info-soft); color: var(--he-info);"><i class="fa-solid fa-users"></i></div>
+                    <div class="he-stat__label">{{ __('Students') }}</div>
+                </div>
+                <div class="he-stat__value">{{ number_format($stats['total_students']) }}</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══ Trends ══ --}}
+    <div class="row g-4 mb-4 stagger-3">
+        <div class="col-xl-7">
+            <div class="panel-card h-100">
+                <div class="panel-head"><h6><i class="fa-solid fa-chart-line me-2" style="color: var(--he-primary);"></i>{{ __('Revenue — last 12 months') }}</h6></div>
+                <div class="panel-body">
+                    <div class="sad-chart-shell" id="revShell">
+                        <div class="sad-chart-skeleton skeleton"></div>
+                        <canvas id="revenueChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-    @endforeach
-</div>
-
-<div class="row g-4 mb-4">
-    <div class="col-xl-7">
-        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-primary"></i> Revenue (Last 12 Months)
-                    </h2>
-                </div>
-                <div style="height: 280px; position: relative;">
-                    <canvas id="revenueChart"></canvas>
+        <div class="col-xl-5">
+            <div class="panel-card h-100">
+                <div class="panel-head"><h6><i class="fa-solid fa-building-circle-arrow-right me-2" style="color: var(--he-accent);"></i>{{ __('New hostels') }}</h6></div>
+                <div class="panel-body">
+                    <div class="sad-chart-shell" id="regShell">
+                        <div class="sad-chart-skeleton skeleton"></div>
+                        <canvas id="regChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-xl-5">
-        <div class="card stat-card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="h5 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-                        <i class="fa-solid fa-users text-success"></i> New Hostels
-                    </h2>
+
+    <div class="row g-4 mb-5 stagger-4">
+        {{-- ══ Upcoming renewals — aligned rows ══ --}}
+        <div class="col-xl-7">
+            <div class="panel-card h-100">
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-rotate me-2" style="color: var(--he-warning);"></i>{{ __('Upcoming renewals') }} <span class="text-muted fw-normal">· 30 {{ __('days') }}</span></h6>
+                    <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm btn-white border rounded-pill px-3 fw-semibold">{{ __('All customers') }}</a>
                 </div>
-                <div style="height: 280px; position: relative;">
-                    <canvas id="regChart"></canvas>
+                <div class="he-adaptive">
+                    <div class="sad-list">
+                        @forelse($upcomingRenewals as $account)
+                            @php($days = $account->daysUntilAnchor())
+                            @php($branches = count($account->owner?->accessibleHostelIds() ?? []))
+                            <div class="sad-row">
+                                <div class="sad-who">
+                                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 38px; height: 38px;">{{ strtoupper(substr($account->owner?->name ?? '?', 0, 1)) }}</div>
+                                    <div class="sad-text">
+                                        <div class="fw-bold text-dark text-truncate">{{ $account->owner?->name ?? '—' }}</div>
+                                        <div class="small text-muted text-truncate">{{ optional($account->current_period_end)->format('d M Y') }}<span class="sad-sub-extra"> · {{ $branches }} {{ __('branch(es)') }}</span></div>
+                                    </div>
+                                </div>
+                                <div class="sad-cols small fw-semibold text-secondary">{{ $branches }} {{ __('branch(es)') }}</div>
+                                <div class="sad-cols">
+                                    <span class="badge sad-chip bg-{{ $days <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $days <= 7 ? 'danger' : 'warning' }} rounded-pill px-3 py-1 fw-semibold">{{ $days }} {{ __('days') }}</span>
+                                </div>
+                                <div class="sad-act">
+                                    <a href="{{ route('superadmin.accounts.show', $account) }}" class="btn btn-sm btn-white border text-primary rounded-pill fw-semibold px-3">{{ __('Renew') }}</a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="p-3" style="grid-column: 1 / -1;">
+                                <x-he-empty-state icon="face-smile" title="{{ __('Nothing due') }}" subtitle="{{ __('No renewals in the next 30 days.') }}" />
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="card stat-card border-0 shadow-sm rounded-4 overflow-hidden mb-5">
-    <div class="card-body p-0">
-        <div class="p-4 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0 text-dark">Upcoming Renewals (30 days)</h5>
-            <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm fw-medium">View All Customers</a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                    <tr>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Owner</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0 text-center">Branches</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Renewal Date</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0">Days Left</th>
-                        <th class="py-3 px-4 text-muted fw-semibold border-0 text-end">Action</th>
-                    </tr>
-                </thead>
-                <tbody class="border-top-0">
-                @forelse($upcomingRenewals as $account)
-                    @php($days = $account->daysUntilAnchor())
-                    <tr>
-                        <td class="px-4 py-3 fw-bold text-dark">{{ $account->owner?->name ?? '—' }}</td>
-                        <td class="px-4 py-3 text-center fw-medium text-secondary">{{ count($account->owner?->accessibleHostelIds() ?? []) }}</td>
-                        <td class="px-4 py-3 text-dark fw-medium">{{ optional($account->current_period_end)->format('d M Y') }}</td>
-                        <td class="px-4 py-3">
-                            <span class="badge bg-{{ $days <= 7 ? 'danger' : 'warning' }}-subtle text-{{ $days <= 7 ? 'danger' : 'warning' }} border border-{{ $days <= 7 ? 'danger' : 'warning' }}-subtle rounded-pill px-3 py-1">
-                                {{ $days }} days
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-end">
-                            <a href="{{ route('superadmin.accounts.show', $account) }}" class="btn btn-sm btn-light text-primary rounded-pill fw-semibold px-3 shadow-sm" title="Open account">
-                                Renew
-                            </a>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" class="text-center text-muted py-5">
-                        <i class="fa-solid fa-face-smile fs-1 text-light mb-3"></i>
-                        <p class="mb-0">All good! No renewals due in the next 30 days.</p>
-                    </td></tr>
-                @endforelse
-                </tbody>
-            </table>
+        {{-- ══ Platform pulse ══ --}}
+        <div class="col-xl-5">
+            <div class="panel-card h-100">
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-wave-square me-2" style="color: var(--he-info);"></i>{{ __('Platform pulse') }}</h6>
+                    <a href="{{ route('superadmin.activity') }}" class="btn btn-sm btn-white border rounded-pill px-3 fw-semibold">{{ __('Full log') }}</a>
+                </div>
+                <div>
+                    @forelse($recentActivity as $log)
+                        <div class="sad-feed-row">
+                            <div class="sad-feed-ic"><i class="fa-solid fa-bolt"></i></div>
+                            <div class="min-w-0">
+                                <div class="small fw-semibold text-dark text-truncate">{{ $log->description ?? $log->action }}</div>
+                                <div class="text-muted text-truncate" style="font-size: .72rem;">{{ $log->user?->name ?? __('System') }} · {{ $log->created_at->diffForHumans(short: true) }}</div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="p-3"><x-he-empty-state icon="wave-square" title="{{ __('No activity yet') }}" subtitle="{{ __('Actions across the platform appear here.') }}" /></div>
+                    @endforelse
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -161,80 +183,50 @@
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const labels = @json($charts['labels']);
-        
-        // Define a gradient for the line chart
-        const revCtx = document.getElementById('revenueChart').getContext('2d');
-        const revGradient = revCtx.createLinearGradient(0, 0, 0, 250);
-        revGradient.addColorStop(0, 'rgba(37,99,235,0.4)');
-        revGradient.addColorStop(1, 'rgba(37,99,235,0.0)');
+document.addEventListener('DOMContentLoaded', function () {
+    const labels = @json($charts['labels']);
 
-        new Chart(revCtx, {
-            type: 'line',
-            data: { 
-                labels, 
-                datasets: [{ 
-                    label: 'Revenue (₹)', 
-                    data: @json($charts['revenue']),
-                    borderColor: '#2563eb', 
-                    backgroundColor: revGradient, 
-                    fill: true, 
-                    borderWidth: 3,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#2563eb',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    tension: .4 
-                }] 
+    // Glowing indigo area (design law: high tension, gradient fill, no x grid).
+    const revCtx = document.getElementById('revenueChart').getContext('2d');
+    const g = revCtx.createLinearGradient(0, 0, 0, 250);
+    g.addColorStop(0, 'rgba(79, 70, 229, 0.35)');
+    g.addColorStop(1, 'rgba(79, 70, 229, 0)');
+    new Chart(revCtx, {
+        type: 'line',
+        data: { labels, datasets: [{
+            data: @json($charts['revenue']),
+            borderColor: '#4f46e5', backgroundColor: g, fill: true, borderWidth: 3,
+            pointBackgroundColor: '#fff', pointBorderColor: '#4f46e5', pointBorderWidth: 2,
+            pointRadius: 3, pointHoverRadius: 6, tension: 0.4,
+        }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, border: { display: false } },
+                x: { grid: { display: false }, border: { display: false } },
             },
-            options: { 
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }, 
-                scales: { 
-                    y: { 
-                        beginAtZero: true,
-                        grid: { borderDash: [4, 4], color: 'rgba(0,0,0,0.05)', drawBorder: false }
-                    },
-                    x: {
-                        grid: { display: false, drawBorder: false }
-                    }
-                } 
-            }
-        });
-
-        const regCtx = document.getElementById('regChart').getContext('2d');
-        new Chart(regCtx, {
-            type: 'bar',
-            data: { 
-                labels, 
-                datasets: [{ 
-                    label: 'Registrations', 
-                    data: @json($charts['registrations']),
-                    backgroundColor: '#10b981', 
-                    borderRadius: 6,
-                    barPercentage: 0.6
-                }] 
-            },
-            options: { 
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }, 
-                scales: { 
-                    y: { 
-                        beginAtZero: true, 
-                        ticks: { precision: 0 },
-                        grid: { borderDash: [4, 4], color: 'rgba(0,0,0,0.05)', drawBorder: false }
-                    },
-                    x: {
-                        grid: { display: false, drawBorder: false }
-                    }
-                } 
-            }
-        });
+        },
     });
+    document.getElementById('revShell').classList.add('is-ready');
+
+    const regCtx = document.getElementById('regChart').getContext('2d');
+    new Chart(regCtx, {
+        type: 'bar',
+        data: { labels, datasets: [{
+            data: @json($charts['registrations']),
+            backgroundColor: 'rgba(147, 51, 234, 0.75)', borderRadius: 6, barPercentage: 0.6,
+        }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.05)' }, border: { display: false } },
+                x: { grid: { display: false }, border: { display: false } },
+            },
+        },
+    });
+    document.getElementById('regShell').classList.add('is-ready');
+});
 </script>
 @endpush
-
