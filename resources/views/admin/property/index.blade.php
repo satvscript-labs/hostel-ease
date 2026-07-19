@@ -734,7 +734,10 @@
 
                         <div class="row gx-3">
                             <div class="col-md-6 mb-4">
-                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Join Date') }} <span class="text-danger">*</span></label>
+                                {{-- Bed MOVE-IN date (occupancy history + AC-meter anchor), not the
+                                     student's registration join date — the first invoice still bills
+                                     from the registered join date. Matches the profile Assign sheet. --}}
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Move-in Date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="join_date" x-model="assign.joinDate" class="form-control bg-light" max="{{ now()->toDateString() }}" required>
                             </div>
                             {{-- Required for AC rooms (W6.3): this reading anchors every
@@ -1027,7 +1030,7 @@
                     <div x-show="transfer.target" x-cloak>
                         <div class="row gx-3">
                             <div class="col-md-6 mb-4">
-                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Transfer Date') }} <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Move Date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="join_date" x-model="transfer.date" class="form-control bg-light" required>
                             </div>
                         </div>
