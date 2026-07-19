@@ -153,6 +153,41 @@ class AcMeterValidationTest extends TestCase
         $this->assertFalse($assignment->fresh()->is_active);
     }
 
+    public function test_transferring_floors_both_meters_independently(): void
+    {
+        $roomA = $this->acRoom('403');
+        $roomB = $this->acRoom('404');
+        // Room B already read 800 at its last bill; Room A's floor is the
+        // student's own join reading of 500.
+        $this->bill($roomB, now()->subMonths(2)->startOfMonth()->toDateString(), 0, 800);
+        $student = $this->student('Mover');
+        $assignment = app(BedAssignmentService::class)->assign($student, $roomA->beds[0], ['meter_reading' => 500]);
+
+        $base = [
+            'bed_id' => $roomB->beds[0]->id, 'join_date' => now()->toDateString(),
+            'fee_frequency' => 'monthly', 'fee_amount' => 5000,
+        ];
+
+        // Old room reading below A's floor (500) → refused.
+        $this->patch(route('admin.property.transfer', $assignment),
+            $base + ['old_meter_reading' => 400, 'meter_reading' => 850])
+            ->assertSessionHasErrors('old_meter_reading');
+
+        // New room reading below B's floor (800) → refused.
+        $this->patch(route('admin.property.transfer', $assignment),
+            $base + ['old_meter_reading' => 560, 'meter_reading' => 700])
+            ->assertSessionHasErrors('meter_reading');
+
+        $this->assertTrue($assignment->fresh()->is_active, 'no transfer happened on a refusal');
+
+        // Both above their floors → the transfer goes through.
+        $this->patch(route('admin.property.transfer', $assignment),
+            $base + ['old_meter_reading' => 560, 'meter_reading' => 850])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertFalse($assignment->fresh()->is_active);
+        $this->assertSame(1, $student->activeAssignment()->where('bed_id', $roomB->beds[0]->id)->count());
+    }
+
     public function test_a_non_ac_room_never_demands_or_floors_a_reading(): void
     {
         $room = Room::create(['hostel_id' => $this->hostel->id, 'floor_id' => $this->floor->id,

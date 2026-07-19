@@ -320,6 +320,16 @@ class DemoHostelSeeder extends Seeder
         $docPlaceholder = "students/{$hostel->id}/documents/sample-aadhaar.png";
         \Illuminate\Support\Facades\Storage::disk('private')->put($docPlaceholder, $this->demoIdImage());
 
+        // The BASE identity files that live as columns on the student row
+        // (P5 / private-disk): the Aadhaar CARD and the photo. Seeding them means
+        // the profile's Aadhaar number masks + reveals (P5), and the Documents
+        // tab shows the base "Aadhaar Card" + "Student Photo" cards — the exact
+        // things a real intake produces, so both are hand-testable.
+        $aadhaarPlaceholder = "students/{$hostel->id}/aadhaar/sample-aadhaar.png";
+        $photoPlaceholder = "students/{$hostel->id}/photos/sample-photo.png";
+        \Illuminate\Support\Facades\Storage::disk('private')->put($aadhaarPlaceholder, $this->demoIdImage());
+        \Illuminate\Support\Facades\Storage::disk('private')->put($photoPlaceholder, $this->demoIdImage());
+
         foreach (array_slice($studentPool, 0, $toOccupy) as $idx => $slot) {
             $mobileSuffix = $hostel->id . str_pad((string) $idx, 2, '0', STR_PAD_LEFT);
             $student = Student::firstOrCreate(
@@ -327,9 +337,19 @@ class DemoHostelSeeder extends Seeder
                 [
                     'name' => $names[$idx % count($names)],
                     'father_mobile' => '880000' . $mobileSuffix,
+                    // A valid 12-digit Aadhaar (encrypted at rest by the model
+                    // cast, P5) + the base card/photo, so the profile's masked
+                    // number, its logged reveal, and the Documents-tab base cards
+                    // all have real data to render.
+                    'aadhaar' => (string) (200000000000 + $hostel->id * 1000 + $idx),
+                    'aadhaar_file' => $aadhaarPlaceholder,
+                    'photo' => $photoPlaceholder,
                     'occupation_type' => $idx % 2 === 0 ? 'working' : 'student',
+                    'address' => ($idx + 1).' Demo Residency, Sector '.($idx + 3),
                     'city' => 'Ahmedabad',
                     'state' => 'Gujarat',
+                    'college' => $idx % 2 === 0 ? null : 'Nirma University',
+                    'field_of_study' => $idx % 2 === 0 ? null : 'Computer Engineering',
                     'join_date' => now()->subDays(rand(10, 120)),
                     'leave_date' => null,
                     'status' => 'active',
@@ -454,6 +474,30 @@ class DemoHostelSeeder extends Seeder
         if (! str_contains($hostel->name, 'Girls')) {
             $this->seedAcScenarios($hostel);
             $this->seedCustodyScenarios($hostel, $owner);
+
+            // A fresh, UNASSIGNED student with a saved plan but no bed — proves
+            // the rent-invoice gate (a plan saved without a bed raises NO
+            // invoice; the first bill appears only on bed assignment, dated
+            // from the join date) and gives the assign flow a ready target.
+            Student::firstOrCreate(
+                ['hostel_id' => $hostel->id, 'mobile' => '9750000001'],
+                [
+                    'name' => 'Meera Enquiry',
+                    'father_mobile' => '9750000002',
+                    'aadhaar' => (string) (200000090000 + $hostel->id),
+                    'aadhaar_file' => $aadhaarPlaceholder,
+                    'photo' => $photoPlaceholder,
+                    'occupation_type' => 'student',
+                    'college' => 'GTU', 'field_of_study' => 'Commerce',
+                    'address' => 'Awaiting allocation, Gate 2',
+                    'city' => 'Ahmedabad', 'state' => 'Gujarat',
+                    'join_date' => now()->addDays(5),   // reserved for next week — not in yet
+                    'status' => 'active',
+                    'room_preference' => 'AC', 'sharing_preference' => 'Double',
+                    // Plan saved; the gate means this raises NO invoice until a bed.
+                    'fee_amount' => 6500, 'fee_frequency' => 'monthly',
+                ]
+            );
         }
 
         // --- STAFF, ATTENDANCE & PAYROLL (W7.1) ---
