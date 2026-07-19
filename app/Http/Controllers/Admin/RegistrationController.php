@@ -72,6 +72,10 @@ class RegistrationController extends Controller
             'city' => $registration->city,
             'state' => $registration->state,
             'occupation_type' => $registration->occupation_type,
+            // Academic details the public form collects (required for students) —
+            // carried over so approval is a complete intake, not a lossy one (H5b).
+            'college' => $registration->college,
+            'field_of_study' => $registration->field_of_study,
             'join_date' => $registration->joining_date,
             'photo' => $registration->photo,
             // D2 (private-disk): carry the Aadhaar the applicant uploaded on the

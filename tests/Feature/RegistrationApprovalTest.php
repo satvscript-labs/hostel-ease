@@ -52,4 +52,23 @@ class RegistrationApprovalTest extends TestCase
         // The line that was missing.
         $this->assertSame($registration->aadhaar_file, $student->aadhaar_file);
     }
+
+    /** H5b — the public form requires college/field for students; approval must carry them. */
+    public function test_approving_a_student_carries_the_academic_fields(): void
+    {
+        $registration = StudentRegistration::create([
+            'hostel_id' => $this->hostel->id,
+            'name' => 'Bhavya Patel', 'mobile' => '+919800000011', 'father_mobile' => '+919800000012',
+            'aadhaar' => '223344556677', 'address' => '2 Road', 'city' => 'Surat', 'state' => 'Gujarat',
+            'occupation_type' => 'student', 'college' => 'Nirma University', 'field_of_study' => 'Computer Engineering',
+            'joining_date' => now()->toDateString(), 'status' => 'pending',
+        ]);
+
+        $this->post(route('admin.registrations.approve', $registration))->assertRedirect()->assertSessionHas('success');
+
+        $student = Student::where('name', 'Bhavya Patel')->firstOrFail();
+        $this->assertSame('student', $student->occupation_type);
+        $this->assertSame('Nirma University', $student->college);
+        $this->assertSame('Computer Engineering', $student->field_of_study);
+    }
 }

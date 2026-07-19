@@ -10,6 +10,24 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** H3 — self-service signup must provision the tenant fully. */
+    public function test_self_signup_provisions_owner_payment_modes_and_account(): void
+    {
+        $this->post('/register', [
+            'name' => 'New Owner', 'hostel_name' => 'Fresh PG',
+            'mobile' => '9812345678', 'password' => 'secret123',
+        ])->assertRedirect();
+
+        $owner = User::where('mobile', '+919812345678')->firstOrFail();
+        $hostel = \App\Models\Hostel::where('name', 'Fresh PG')->firstOrFail();
+
+        // Explicit owner FK, default payment modes (so the owner can record a
+        // payment immediately), and the account billing spine — all provisioned.
+        $this->assertSame($owner->id, $hostel->owner_id);
+        $this->assertGreaterThan(0, \App\Models\PaymentMode::where('hostel_id', $hostel->id)->count());
+        $this->assertNotNull(\App\Models\SubscriptionAccount::where('owner_id', $owner->id)->first());
+    }
+
     public function test_login_screen_can_be_rendered(): void
     {
         // Asserts the form, not the brand wording: this used to look for

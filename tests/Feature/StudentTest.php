@@ -81,6 +81,26 @@ class StudentTest extends TestCase
             ->assertSee(route('admin.files.show', ['student', $student->id, 'aadhaar_file']), false);
     }
 
+    /** H2b — the index filters + paginates on the SERVER now, not client-side. */
+    public function test_the_index_filters_and_paginates_server_side(): void
+    {
+        Student::factory()->count(26)->create(['hostel_id' => $this->hostel->id, 'status' => 'active']);
+        Student::factory()->left()->create(['hostel_id' => $this->hostel->id, 'name' => 'Departed Person']);
+        Student::factory()->create(['hostel_id' => $this->hostel->id, 'name' => 'Working Wanda', 'occupation_type' => 'working']);
+
+        // 26+ students → paginated (page-2 link present).
+        $this->actingAs($this->admin)->get(route('admin.students.index'))
+            ->assertOk()->assertSee('page=2', false);
+
+        // filter=left shows only the departed student.
+        $this->actingAs($this->admin)->get(route('admin.students.index', ['filter' => 'left']))
+            ->assertOk()->assertSee('Departed Person');
+
+        // A no-match search → empty state, and nobody's card is rendered.
+        $this->actingAs($this->admin)->get(route('admin.students.index', ['q' => 'zzz-nobody']))
+            ->assertOk()->assertSee('No matches')->assertDontSee('Departed Person');
+    }
+
     public function test_admin_can_create_a_student_with_photo(): void
     {
         $this->actingAs($this->admin)->post(route('admin.students.store'), $this->validIntake([

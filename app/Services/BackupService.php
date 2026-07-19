@@ -32,35 +32,53 @@ class BackupService
         $path = $this->directory().DIRECTORY_SEPARATOR.$filename;
 
         $binary = config('hostelease.dump_binary', env('DB_DUMP_BINARY', 'mysqldump'));
+        $password = (string) config('database.connections.mysql.password');
 
-        $command = [
-            $binary,
+        // Keep the password OFF the argv (M6): a `--password=` element is visible
+        // to any user running `ps`. Hand it to mysqldump through a 0600
+        // defaults-file instead, and delete that file no matter how we exit.
+        // `--defaults-extra-file` MUST be the first argument.
+        $cnf = null;
+        $command = [$binary];
+        if ($password !== '') {
+            $cnf = tempnam(sys_get_temp_dir(), 'hedump');
+            file_put_contents($cnf, "[client]\npassword=\"".addcslashes($password, '"\\')."\"\n");
+            @chmod($cnf, 0600);
+            $command[] = '--defaults-extra-file='.$cnf;
+        }
+        array_push(
+            $command,
             '--host='.config('database.connections.mysql.host'),
             '--port='.config('database.connections.mysql.port'),
             '--user='.config('database.connections.mysql.username'),
-            '--password='.config('database.connections.mysql.password'),
             '--single-transaction',
             '--skip-lock-tables',
             config('database.connections.mysql.database'),
-        ];
+        );
 
-        $process = new Process($command);
-        $process->setTimeout(300);
+        try {
+            $process = new Process($command);
+            $process->setTimeout(300);
 
-        $handle = fopen($path, 'w');
-        $process->run(function ($type, $buffer) use ($handle) {
-            if ($type === Process::OUT) {
-                fwrite($handle, $buffer);
+            $handle = fopen($path, 'w');
+            $process->run(function ($type, $buffer) use ($handle) {
+                if ($type === Process::OUT) {
+                    fwrite($handle, $buffer);
+                }
+            });
+            fclose($handle);
+
+            if (! $process->isSuccessful()) {
+                @unlink($path);
+                throw new \RuntimeException('Backup failed: '.trim($process->getErrorOutput() ?: 'mysqldump not available.'));
             }
-        });
-        fclose($handle);
 
-        if (! $process->isSuccessful()) {
-            @unlink($path);
-            throw new \RuntimeException('Backup failed: '.trim($process->getErrorOutput() ?: 'mysqldump not available.'));
+            return $filename;
+        } finally {
+            if ($cnf !== null) {
+                @unlink($cnf);
+            }
         }
-
-        return $filename;
     }
 
     /**
