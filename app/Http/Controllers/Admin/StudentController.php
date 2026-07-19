@@ -78,14 +78,32 @@ class StudentController extends Controller
 
     public function index(Request $request): View
     {
+        // Server-side search + filter + pagination (H2b): the list used to load
+        // EVERY student and filter client-side — fine for a demo, a wall for a
+        // real tenant. `filter` is one of '' | active | left | <occupation>.
+        $search = trim((string) $request->input('q', ''));
+        $filter = (string) $request->input('filter', '');
+        $occupations = array_keys(config('hostelease.occupation_types', []));
+
         $students = Student::query()
             ->with('activeAssignment.bed.room')
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
-            ->when($request->filled('occupation'), fn ($q) => $q->where('occupation_type', $request->occupation))
+            ->when($search !== '', function ($q) use ($search) {
+                $digits = preg_replace('/\D+/', '', $search);
+                $q->where(function ($w) use ($search, $digits) {
+                    $w->where('name', 'like', "%{$search}%")
+                        ->orWhere('mobile', 'like', '%'.($digits !== '' ? $digits : $search).'%')
+                        ->orWhereHas('activeAssignment.bed.room',
+                            fn ($r) => $r->where('room_number', 'like', "%{$search}%"));
+                });
+            })
+            ->when(in_array($filter, ['active', 'left'], true), fn ($q) => $q->where('status', $filter))
+            ->when($filter !== '' && in_array($filter, $occupations, true),
+                fn ($q) => $q->where('occupation_type', $filter))
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(24)
+            ->withQueryString();
 
-        return view('admin.students.index', compact('students'));
+        return view('admin.students.index', compact('students', 'search', 'filter'));
     }
 
     public function create(): View

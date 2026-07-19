@@ -20,6 +20,11 @@ class ActivityLogger
     ): ActivityLog {
         $user = Auth::user();
 
+        // Mark this request as having a SPECIFIC audit entry, so the LogActivity
+        // middleware skips its generic `request.*` fallback (M1: no more two rows
+        // per mutation). Harmless in console — request() is a throwaway there.
+        request()->attributes->set('activity.logged', true);
+
         return ActivityLog::create([
             // Log against the active branch when one is bound, else the user's primary.
             'hostel_id' => \App\Support\Tenant::id() ?? $user?->hostel_id,

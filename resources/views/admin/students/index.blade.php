@@ -237,8 +237,8 @@
 @endpush
 
 @section('content')
-<div x-data="studentList()" class="page-enter">
-    
+<div class="page-enter">
+
     <!-- Hero Banner -->
     <div class="students-hero">
         <div>
@@ -250,109 +250,33 @@
         </a>
     </div>
 
-    <!-- Toolbar -->
+    <!-- Toolbar — one fragment-driven row (§4.5): search + a filter select, both
+         swap #student-list without a reload (§4.3). Server-side now (H2b). -->
     <div class="filter-toolbar mb-4">
-        <div class="he-search students-search">
-            <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
-            <input type="text" class="he-search__input" placeholder="Search by name, mobile, room..." x-model="query">
-        </div>
-        <div class="filter-pills">
-            <button class="filter-pill" :class="{ active: filter === '' }" @click="filter = ''">All</button>
-            <button class="filter-pill" :class="{ active: filter === 'active' }" @click="filter = 'active'">Active</button>
-            <button class="filter-pill" :class="{ active: filter === 'left' }" @click="filter = 'left'">Left</button>
-            @foreach(config('hostelease.occupation_types') as $k => $label)
-                <button class="filter-pill" :class="{ active: filter === '{{ $k }}' }" @click="filter = '{{ $k }}'">{{ $label }}</button>
-            @endforeach
-        </div>
-    </div>
-
-    <!-- Student Cards Grid -->
-    <div class="row g-4 stagger">
-        @forelse($students as $index => $s)
-            @php
-                $asg = $s->activeAssignment;
-                if($s->status === 'active') {
-                    $bannerClass = $asg ? 'banner-active' : 'banner-nobed';
-                    $statusClass = 'status-active';
-                    $statusIcon = 'fa-check';
-                } else {
-                    $bannerClass = 'banner-left';
-                    $statusClass = 'status-left';
-                    $statusIcon = 'fa-door-open';
-                }
-            @endphp
-        <div class="col-12 col-md-6 col-lg-4 col-xl-3 student-item"
-             x-show="matchesSearch('{{ strtolower(addslashes($s->name)) }}', '{{ $s->mobile }}', '{{ $asg ? strtolower($asg->bed->room->room_number) : '' }}', '{{ $s->status }}', '{{ $s->occupation_type }}')">
-             
-            <a href="{{ route('admin.students.show', $s) }}" class="id-card">
-                <div class="id-card-banner {{ $bannerClass }}"></div>
-                <div class="id-avatar-wrapper">
-                    <img src="{{ $s->photo_url }}" class="id-avatar" alt="{{ $s->name }}">
-                </div>
-                
-                <div class="id-card-body">
-                    <div class="id-name text-truncate">{{ $s->name }}</div>
-                    <div class="id-status-badge {{ $statusClass }}">
-                        <i class="fa-solid {{ $statusIcon }}"></i> {{ ucfirst($s->status) }}
-                    </div>
-                    
-                    <div class="id-info-grid">
-                        <!-- Room info -->
-                        <div class="id-info-item" title="Room Allocation">
-                            <i class="fa-solid fa-bed id-info-icon text-primary"></i>
-                            <div class="id-info-val text-truncate" style="max-width: 100%;">
-                                @if($asg)
-                                    R:{{ $asg->bed->room->room_number }} / B:{{ $asg->bed->bed_number }}
-                                @else
-                                    <span class="text-warning">No Bed</span>
-                                @endif
-                            </div>
-                        </div>
-                        
-                        <!-- Mobile info -->
-                        <div class="id-info-item" title="Mobile Number">
-                            <i class="fa-solid fa-phone id-info-icon text-success"></i>
-                            <div class="id-info-val text-truncate" style="max-width: 100%;">
-                                {{ substr($s->mobile, 0, 5) }}...
-                            </div>
-                        </div>
-                        
-                        <!-- Occupation info -->
-                        <div class="id-info-item" title="Occupation" style="grid-column: span 2;">
-                            <i class="fa-solid fa-briefcase id-info-icon text-info"></i>
-                            <div class="id-info-val">
-                                {{ config('hostelease.occupation_types.'.$s->occupation_type, ucfirst($s->occupation_type)) }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Hover Action -->
-                <div class="id-overlay">
-                    <div class="overlay-btn">
-                        <i class="fa-regular fa-eye me-1"></i> View Profile
-                    </div>
-                </div>
-            </a>
-        </div>
-        @empty
-        <div class="col-12">
-            <div class="card-premium">
-                <x-he-empty-state icon="users" title="No students found"
-                    subtitle="Add your first student to get started.">
-                    <a href="{{ route('admin.students.create') }}" class="btn btn-primary rounded-pill px-4 mt-3 tactile-btn">
-                        <i class="fa-solid fa-plus me-1"></i> Add Student
-                    </a>
-                </x-he-empty-state>
+        <form method="GET" action="{{ route('admin.students.index') }}" data-fragment="#student-list"
+              class="d-flex flex-wrap align-items-center gap-2 w-100">
+            <div class="he-search he-search--inline he-search--clearable students-search" x-data="{ q: @js($search) }">
+                <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="q" class="he-search__input" x-model="q" value="{{ $search }}"
+                       placeholder="Search by name, mobile, room…"
+                       @input.debounce.450ms="$el.form.requestSubmit()">
+                <button type="button" class="he-search__clear" x-show="q.length" x-cloak
+                        @click="q = ''; $root.closest('form').requestSubmit()" aria-label="Clear search">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-        </div>
-        @endforelse
+            <x-he-select name="filter" icon="filter" icon-only-mobile :selected="$filter"
+                :options="[
+                    '' => ['label' => __('All Students'), 'icon' => 'users'],
+                    'active' => ['label' => __('Active'), 'icon' => 'circle-check'],
+                    'left' => ['label' => __('Left'), 'icon' => 'door-open'],
+                ] + collect(config('hostelease.occupation_types'))->mapWithKeys(fn ($l, $k) => [$k => ['label' => $l, 'icon' => 'briefcase']])->all()" />
+        </form>
     </div>
 
-    <!-- No Results Message -->
-    <div class="card-premium mt-4" x-show="noResults" x-cloak>
-        <x-he-empty-state icon="magnifying-glass" title="No matches"
-            subtitle="No students match your search or filter criteria." />
+    <!-- Student Cards Grid — the swap target -->
+    <div id="student-list" data-fragment-container>
+        @include('admin.students._list')
     </div>
 
     {{-- Mobile FAB — teleported to <body> so its position:fixed anchors to
@@ -365,48 +289,4 @@
         </a>
     </template>
 </div>
-
-@push('scripts')
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('studentList', () => ({
-        query: '',
-        filter: '',
-        noResults: false,
-
-        matchesSearch(name, mobile, room, status, occupation) {
-            const q = this.query.toLowerCase().trim();
-            const f = this.filter;
-
-            // Filter chips
-            if (f === 'active' || f === 'left') {
-                if (status !== f) return false;
-            } else if (f && f !== '') {
-                if (occupation !== f) return false;
-            }
-
-            // Search query
-            if (!q) return true;
-            return name.includes(q) || mobile.includes(q) || room.includes(q);
-        },
-
-        init() {
-            this.$watch('query', () => this.checkNoResults());
-            this.$watch('filter', () => this.checkNoResults());
-        },
-
-        checkNoResults() {
-            this.$nextTick(() => {
-                const items = this.$root.querySelectorAll('.student-item');
-                let visible = 0;
-                items.forEach(el => {
-                    if (el.style.display !== 'none') visible++;
-                });
-                this.noResults = visible === 0 && items.length > 0;
-            });
-        }
-    }));
-});
-</script>
-@endpush
 @endsection

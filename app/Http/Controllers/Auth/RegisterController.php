@@ -68,6 +68,16 @@ class RegisterController extends Controller
             // 3. Attach user to hostel in the pivot table (if applicable for multi-branch)
             $user->hostels()->attach($hostel->id);
 
+            // 4. Provision the tenant FULLY (H3) — the super-admin path does this
+            // via HostelService, but self-signup skipped it, leaving a new owner
+            // with no payment modes (so collect() had no valid mode → couldn't
+            // record any payment) and no owner FK / account spine. Fix all three:
+            $hostel->update(['owner_id' => $user->id]);
+            app(\App\Services\HostelService::class)->seedPaymentModes($hostel);
+            // The account billing spine, so Account 360 / super-admin revenue
+            // resolve for a trial owner (firstOrCreate — harmless if it exists).
+            app(\App\Services\Billing\AccountBillingService::class)->accountFor($user);
+
             DB::commit();
 
             // Log them in immediately

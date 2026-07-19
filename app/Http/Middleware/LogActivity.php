@@ -33,6 +33,13 @@ class LogActivity
             return;
         }
 
+        // A controller/service already wrote a SPECIFIC entry for this request
+        // (e.g. `payment.reverse`) — don't also write a generic `request.*` one
+        // (M1: this is the fallback, not a duplicate).
+        if ($request->attributes->get('activity.logged')) {
+            return;
+        }
+
         $route = optional($request->route())->getName() ?? $request->path();
 
         $this->logger->log(

@@ -10,7 +10,7 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $mobile = substr(preg_replace('/\D+/', '', env('SUPERADMIN_MOBILE', '9999999999')), -10);
+        $mobile = substr(preg_replace('/\D+/', '', env('SUPERADMIN_MOBILE', '8140740705')), -10);
         $mobile = '+91' . $mobile;
 
         User::updateOrCreate(

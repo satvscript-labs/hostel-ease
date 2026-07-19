@@ -88,11 +88,23 @@ class SecurityDepositController extends Controller
             'collected_on' => ['required', 'date', 'before_or_equal:today'],
         ]);
 
-        $deposit = SecurityDeposit::create($data + [
-            'receipt_number' => $this->nextReceiptNumber(),
-            'created_by' => $request->user()->id,
-            'status' => 'collected',
-        ]);
+        // receipt_number is UNIQUE; two concurrent stores can probe the same next
+        // number. Rather than 500 the loser on the constraint, catch the
+        // collision and retry with a freshly-probed number (M4).
+        $deposit = null;
+        for ($attempt = 0; $attempt < 5 && $deposit === null; $attempt++) {
+            try {
+                $deposit = SecurityDeposit::create($data + [
+                    'receipt_number' => $this->nextReceiptNumber(),
+                    'created_by' => $request->user()->id,
+                    'status' => 'collected',
+                ]);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                if ($attempt === 4) {
+                    throw $e;
+                }
+            }
+        }
 
         $this->logger->log('deposit.create', "Security deposit {$deposit->receipt_number} — "
             .hostelease_money($deposit->amount)." from {$deposit->student->name}", $deposit);
