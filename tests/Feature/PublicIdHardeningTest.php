@@ -6,7 +6,10 @@ use App\Models\AcBill;
 use App\Models\Bed;
 use App\Models\BedAssignment;
 use App\Models\Complaint;
+use App\Models\Discount;
+use App\Models\DiscountRule;
 use App\Models\Expense;
+use App\Models\Hostel;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PocketMoneyTransaction;
@@ -16,6 +19,10 @@ use App\Models\StaffSalaryPayment;
 use App\Models\Student;
 use App\Models\StudentDocument;
 use App\Models\StudentRegistration;
+use App\Models\Subscription;
+use App\Models\SubscriptionAccount;
+use App\Models\SubscriptionOrder;
+use App\Models\User;
 use App\Models\Visitor;
 use Tests\TestCase;
 
@@ -53,6 +60,14 @@ class PublicIdHardeningTest extends TestCase
             'Complaint' => [Complaint::class],
             'Bed' => [Bed::class],
             'BedAssignment' => [BedAssignment::class],
+            // U4 — platform / super admin
+            'Hostel' => [Hostel::class],
+            'User' => [User::class],
+            'SubscriptionAccount' => [SubscriptionAccount::class],
+            'SubscriptionOrder' => [SubscriptionOrder::class],
+            'Subscription' => [Subscription::class],
+            'Discount' => [Discount::class],
+            'DiscountRule' => [DiscountRule::class],
         ];
     }
 

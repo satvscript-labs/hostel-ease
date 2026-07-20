@@ -118,10 +118,11 @@ Report: `_artifact/ui_ux_audit/08_MF_aligned_rows.md`.
 
 ---
 
-## 9. Minor UI Changes
+## 9. Minor UI Changes/Bugs
 
 1. In mobile UI, use short relative-time forms ("45m ago", not "45 minutes ago"). — *pending*
 2. ~~Tablet-view rows not visually aligned~~ — **DONE**, folded into the Aligned Row System rollout (§8 / §4.11).
+3. Creating a new branch, adding hosted with pending payment mode still add records in Orders & payments...right now nothing gets there ... if i create one with pending still adds 1 year (2027) to subscription and when renew it takes only 10k but renews till 2028 means 2 years with everything paid up ...
 
 ---
 

@@ -73,7 +73,10 @@ class SettingsController extends Controller
             ->groupBy('hostel_id')->pluck('n', 'hostel_id');
 
         // Account context — the one anchor every branch renews against.
-        $account = $this->accountBilling->accountFor($owner);
+        // accountForViewer(), not accountFor(): $owner here is really the VIEWER
+        // (see $viewerIsOwner above), and a co-admin must be shown the owner's
+        // account rather than silently given one of their own.
+        $account = $this->accountBilling->accountForViewer($owner);
 
         return view('admin.settings.index', [
             'owner' => $owner,

@@ -55,7 +55,7 @@
                         </td>
                         <td class="px-4 py-3 text-end text-nowrap">
                             <button class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width:32px;height:32px;" title="Edit"
-                                @click="openEdit({{ $rule->id }})">
+                                @click="openEdit('{{ $rule->public_id }}')">
                                 <i class="fa-solid fa-pen text-primary"></i>
                             </button>
                             <form method="POST" action="{{ route('superadmin.discounts.rules.destroy', $rule) }}" class="d-inline" data-confirm="Delete this volume tier?">
@@ -164,7 +164,9 @@ document.addEventListener('alpine:init', () => {
         storeUrl: @json(route('superadmin.discounts.rules.store')),
         rules: {
             @foreach($rules as $r)
-            {{ $r->id }}: { min_quantity: {{ $r->min_quantity }}, type: @json($r->type->value), value: {{ (float) $r->value }}, max_amount: {{ $r->max_amount !== null ? (float) $r->max_amount : 'null' }} },
+            {{-- Keyed by the OPAQUE public_id: openEdit() is handed that same value
+                 and builds the edit URL from it (public-id hardening U4). --}}
+            @json($r->public_id): { min_quantity: {{ $r->min_quantity }}, type: @json($r->type->value), value: {{ (float) $r->value }}, max_amount: {{ $r->max_amount !== null ? (float) $r->max_amount : 'null' }} },
             @endforeach
         },
         f: { min_quantity: '', type: 'percentage', value: '', max_amount: '' },

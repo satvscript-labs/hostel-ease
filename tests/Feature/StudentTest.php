@@ -151,6 +151,11 @@ class StudentTest extends TestCase
      * middleware, so route-model bindings resolved with the TenantScope
      * no-opped — any admin could open any hostel's student by URL id. The
      * priority fix in bootstrap/app.php binds the tenant first; this pins it.
+     *
+     * Passes the MODEL, so the URL carries a real, resolvable opaque id
+     * (public-id hardening). Passing a raw integer here would 404 simply
+     * because no such public_id exists — which would quietly stop testing the
+     * tenant boundary this exists to protect.
      */
     public function test_cross_tenant_student_profile_is_not_found(): void
     {
@@ -158,7 +163,7 @@ class StudentTest extends TestCase
         $foreign = Student::create(['hostel_id' => $other->id, 'name' => 'Foreign Student',
             'mobile' => '9222222222', 'occupation_type' => 'student', 'status' => 'active']);
 
-        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign->id))
+        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign))
             ->assertNotFound();
     }
 
@@ -248,15 +253,4 @@ class StudentTest extends TestCase
         $this->actingAs($this->admin)->get('/admin/students/'.$student->id)->assertNotFound();
     }
 
-    /** Cross-tenant is still blocked even with a VALID foreign public_id. */
-    public function test_a_foreign_public_id_is_not_found(): void
-    {
-        $other = Hostel::factory()->create();
-        $foreign = Student::create(['hostel_id' => $other->id, 'name' => 'Foreign',
-            'mobile' => '9555522222', 'occupation_type' => 'student', 'status' => 'active']);
-
-        // A real, valid ULID — but it belongs to another tenant, so TenantScope 404s it.
-        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign))
-            ->assertNotFound();
-    }
 }
