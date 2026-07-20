@@ -315,6 +315,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             // ['*'] and must be excluded (01 §8). P2 = Devices & Enrollment;
             // the boards (P3) and gate log (P4) add their routes here later.
             Route::middleware('presence.access')->prefix('presence')->name('presence.')->group(function () {
+                // Boards (P3) — the live who's-in/out surfaces, students & staff
+                // kept separate. Filtering/paging fragment-swaps the list (§4.3).
+                Route::get('students', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'students'])->name('students');
+                Route::get('staff', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'staff'])->name('staff');
+                Route::get('muster', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'muster'])->name('muster');
+
                 Route::get('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'index'])->name('devices');
 
                 // Device registry

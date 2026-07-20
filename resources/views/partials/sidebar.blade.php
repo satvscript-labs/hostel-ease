@@ -155,16 +155,30 @@
                 </div>
             </div>
 
-            {{-- Presence / In-Out Register (gate device). Solo link in P2 (only
-                 the Devices & Enrollment page exists yet); becomes an expandable
-                 group in P3 when the Students/Staff boards + Gate Log land.
-                 Gated to owner + manager + warden (Q6) — accountant/viewer never
-                 see it. --}}
+            {{-- Presence / In-Out Register (gate device). Students & staff kept
+                 as separate boards (owner's hard requirement); Devices is the P2
+                 control room. Gate Log arrives in P4. Gated to owner + manager +
+                 warden (Q6) — accountant/viewer never see it. --}}
             @if($user->canAccessPresence())
-            <a class="sidebar-link {{ request()->routeIs('admin.presence.*') ? 'is-active' : '' }}" href="{{ route('admin.presence.devices') }}">
-                <span class="sidebar-link-icon"><i class="fa-solid fa-door-open"></i></span>
-                <span class="sidebar-link-label">{{ __('Presence') }}</span>
-            </a>
+            @php($presenceActive = request()->routeIs('admin.presence.*'))
+            <div class="sidebar-group" x-data="{ expanded: {{ $presenceActive ? 'true' : 'false' }} }">
+                <button class="sidebar-link" :class="{ 'is-active': {{ $presenceActive ? 'true' : 'false' }}, 'is-expanded': expanded }" @click="expanded = !expanded" type="button">
+                    <span class="sidebar-link-icon"><i class="fa-solid fa-door-open"></i></span>
+                    <span class="sidebar-link-label">{{ __('Presence') }}</span>
+                    <span class="sidebar-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+                </button>
+                <div class="sidebar-submenu" x-show="expanded" x-collapse.duration.350ms>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.presence.students') ? 'is-active' : '' }}" href="{{ route('admin.presence.students') }}">
+                        <span class="sublink-dot"></span>{{ __('Students') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.presence.staff') ? 'is-active' : '' }}" href="{{ route('admin.presence.staff') }}">
+                        <span class="sublink-dot"></span>{{ __('Staff') }}
+                    </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.presence.devices') ? 'is-active' : '' }}" href="{{ route('admin.presence.devices') }}">
+                        <span class="sublink-dot"></span>{{ __('Devices') }}
+                    </a>
+                </div>
+            </div>
             @endif
 
             {{-- Reports (Solo section) --}}
