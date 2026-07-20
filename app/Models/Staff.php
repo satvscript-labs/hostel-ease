@@ -75,4 +75,10 @@ class Staff extends Model
     {
         return $query->where('is_active', true);
     }
+
+    /** Presence enrollment (gate device), if any — additive, read-only here. */
+    public function presenceProfile(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(PresenceProfile::class, 'presenceable');
+    }
 }

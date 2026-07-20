@@ -139,6 +139,17 @@ class User extends Authenticatable
         return (bool) ($this->roleAccess()['readonly'] ?? false);
     }
 
+    /**
+     * Presence module access — an explicit allow-list, NOT the area matrix
+     * (owner Q6): viewer holds ['*'] but must be excluded. Owner (+ co-admins)
+     * + manager + warden only. Mirrors CheckPresenceAccess so the sidebar shows
+     * exactly what the routes allow.
+     */
+    public function canAccessPresence(): bool
+    {
+        return in_array($this->role, ['hostel_admin', 'manager', 'warden'], true);
+    }
+
     /** Concrete list of areas (expanding the '*' wildcard) for the client. */
     public function accessibleAreas(): array
     {

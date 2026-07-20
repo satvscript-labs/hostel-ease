@@ -110,5 +110,11 @@ class Student extends Model
     {
         return $this->hasMany(SecurityDeposit::class);
     }
+
+    /** Presence enrollment (gate device), if any — additive, read-only here. */
+    public function presenceProfile(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(PresenceProfile::class, 'presenceable');
+    }
 }
 

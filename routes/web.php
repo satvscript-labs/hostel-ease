@@ -310,6 +310,34 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                     ->withTrashed()->name('staff.salary.destroy');
             });
 
+            // --- New module: Presence / In-Out Register (gate device) ---
+            // Explicit allow-list gate (owner Q6), NOT access:* — viewer holds
+            // ['*'] and must be excluded (01 §8). P2 = Devices & Enrollment;
+            // the boards (P3) and gate log (P4) add their routes here later.
+            Route::middleware('presence.access')->prefix('presence')->name('presence.')->group(function () {
+                Route::get('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'index'])->name('devices');
+
+                // Device registry
+                Route::post('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'store'])->name('devices.store');
+                Route::put('devices/{device}', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'update'])->name('devices.update');
+                Route::delete('devices/{device}', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'destroy'])->name('devices.destroy');
+                Route::post('devices/{device}/sync-time', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'syncTime'])->name('devices.sync-time');
+                Route::post('devices/{device}/pull-logs', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'pullLogs'])->name('devices.pull-logs');
+                Route::post('devices/discover', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'discover'])->name('devices.discover');
+
+                // Enrollment
+                Route::post('enroll', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'store'])->name('enroll');
+                Route::post('profiles/{profile}/repush', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'rePush'])->name('profiles.repush');
+                Route::delete('profiles/{profile}', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'revoke'])->name('profiles.revoke');
+                Route::post('enroll/floor', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'enrollFloor'])->name('enroll.floor');
+                Route::post('reconcile', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'reconcile'])->name('reconcile');
+
+                // Quarantine — bind an unmatched device UserID (and all its
+                // punches) to a person. Keyed by the raw id string, not a punch
+                // row, so no punch id is ever exposed in a URL.
+                Route::post('quarantine/match', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'matchQuarantine'])->name('quarantine.match');
+            });
+
             // --- New module: Users & roles (sub-users) ---
             Route::middleware('access:users')->group(function () {
                 Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');

@@ -155,6 +155,18 @@
                 </div>
             </div>
 
+            {{-- Presence / In-Out Register (gate device). Solo link in P2 (only
+                 the Devices & Enrollment page exists yet); becomes an expandable
+                 group in P3 when the Students/Staff boards + Gate Log land.
+                 Gated to owner + manager + warden (Q6) — accountant/viewer never
+                 see it. --}}
+            @if($user->canAccessPresence())
+            <a class="sidebar-link {{ request()->routeIs('admin.presence.*') ? 'is-active' : '' }}" href="{{ route('admin.presence.devices') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-door-open"></i></span>
+                <span class="sidebar-link-label">{{ __('Presence') }}</span>
+            </a>
+            @endif
+
             {{-- Reports (Solo section) --}}
             <a class="sidebar-link {{ request()->routeIs('admin.reports.*') ? 'is-active' : '' }}" href="{{ route('admin.reports.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-chart-line"></i></span>
