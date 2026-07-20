@@ -306,14 +306,16 @@ class StaffController extends Controller
         return back()->with('success', "{$staff->name} removed — salary history kept.");
     }
 
-    public function restore(int $staff): RedirectResponse
+    public function restore(Staff $staff): RedirectResponse
     {
-        $record = Staff::onlyTrashed()->findOrFail($staff);
-        $record->restore();
+        // Bound withTrashed on the route (public-id hardening U1: the route key
+        // is now the opaque ULID, so we can't hand-cast the param to an int and
+        // look it up — the binding resolves the soft-deleted row for us).
+        $staff->restore();
 
-        $this->logger->log('staff.restore', "Staff restored — {$record->name}", $record);
+        $this->logger->log('staff.restore', "Staff restored — {$staff->name}", $staff);
 
-        return back()->with('success', "{$record->name} restored.");
+        return back()->with('success', "{$staff->name} restored.");
     }
 
     public function show(Staff $staff): View

@@ -618,6 +618,7 @@
                                      @click="openDetails({{ $bed->id }}, '{{ $room->room_number }}', '{{ $bed->bed_number }}', {{ json_encode([
                                          'assignment_id' => $assignment->id,
                                          'student_id' => $student->id,
+                                         'student_public_id' => $student->public_id,
                                          'student_name' => $student->name,
                                          'student_mobile' => $student->mobile,
                                          'student_photo' => $student->photo_url,
@@ -892,7 +893,7 @@
                         </div>
                         
                         <div class="mt-4">
-                            <a :href="'/admin/students/' + panels.details.data.student_id" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
+                            <a :href="'/admin/students/' + panels.details.data.student_public_id" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
                                 View Full Profile <i class="fa-solid fa-arrow-right ms-1"></i>
                             </a>
                         </div>
@@ -1254,7 +1255,7 @@ document.addEventListener('alpine:init', () => {
         panels: {
             details: {
                 open: false, bedId: '', room: '', bed: '',
-                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, room_last_reading: null, fee_amount: 0, fee_frequency: '' }
+                data: { assignment_id: '', student_id: '', student_public_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, room_last_reading: null, fee_amount: 0, fee_frequency: '' }
             }
         },
 

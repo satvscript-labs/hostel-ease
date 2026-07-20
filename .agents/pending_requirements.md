@@ -122,3 +122,35 @@ Report: `_artifact/ui_ux_audit/08_MF_aligned_rows.md`.
 
 1. In mobile UI, use short relative-time forms ("45m ago", not "45 minutes ago"). — *pending*
 2. ~~Tablet-view rows not visually aligned~~ — **DONE**, folded into the Aligned Row System rollout (§8 / §4.11).
+
+---
+
+## 10. Presence Module — Deferred Value-Adds & Future Phases
+
+**Context:** the Presence / In-Out Register module (TimeWatch TrueFace1000EW gate device) is planned
+in `_artifact/presence_module/` (plans 00–06). The owner approved its core build phases (P1–P6) on
+2026-07-19; the items below were explicitly **deferred out of that build** and are picked up later.
+
+- **Night auto-roll-call digest** (idea #9.8) — one WhatsApp/notification at curfew+30min to the
+  warden listing who's still out ("3 still out: A (Room 204), B (301), C staff"). Rides the P5
+  curfew infrastructure; deferred by owner.
+- **Card fallback** (idea #9.9) — the device reads proximity cards; issue cards to residents whose
+  face enrollment is flaky (same `AddUser` call, `card_number` already on `presence_profiles`).
+  Deferred by owner.
+- **Door-lock / access control** — the device *can* drive an electric lock; the module ships as a
+  logger only, with the seam preserved (`01_module_plan.md §5.1`). Additive future phase.
+- **Mobile API** (`/api/v1/presence/*`) — deferred; not focusing on the mobile apk now. Pipeline is
+  API-ready (`04_integration_and_api.md §7`).
+- **Out-too-long alert** (idea #9.5) + **Visitor gate passes** (idea #9.10, touches Front Desk) —
+  ❓ not yet decided; parked in the plan's §9 for an owner call.
+
+---
+
+## 11. Public ID / ULID Hardening (Separate Workstream — approach approved 2026-07-19)
+
+**Status:** approach agreed, awaiting owner's timing cue to start. Add an opaque `public_id` (ULID)
+to URL-facing tables (students, staff, invoices, payments, registrations, complaints, expenses, AC
+bills…) and point `getRouteKeyName()` at it; **primary keys stay untouched** (no FK churn). Fixes
+sequential-ID enumeration in URLs. **Not a cross-tenant vulnerability** — `TenantScope` already
+404s cross-hostel access; this is enumeration/BI-leak hardening. Decoupled from Presence; will get
+its own plan + testing doc. Full analysis: `_artifact/presence_module/01_module_plan.md §8`.

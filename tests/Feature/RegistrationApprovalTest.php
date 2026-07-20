@@ -71,4 +71,23 @@ class RegistrationApprovalTest extends TestCase
         $this->assertSame('Nirma University', $student->college);
         $this->assertSame('Computer Engineering', $student->field_of_study);
     }
+
+    /** Public-ID hardening (U1): approval URLs carry the opaque id, not a number. */
+    public function test_the_approve_url_uses_the_public_id_and_the_integer_is_rejected(): void
+    {
+        $registration = StudentRegistration::create([
+            'hostel_id' => $this->hostel->id,
+            'name' => 'Chirag Mehta', 'mobile' => '+919800000021', 'father_mobile' => '+919800000022',
+            'aadhaar' => '334455667788', 'address' => '3 Road', 'city' => 'Rajkot', 'state' => 'Gujarat',
+            'occupation_type' => 'working', 'joining_date' => now()->toDateString(), 'status' => 'pending',
+        ]);
+
+        $this->assertSame(26, strlen($registration->public_id));
+        $url = route('admin.registrations.approve', $registration);
+        $this->assertStringContainsString($registration->public_id, $url);
+
+        // Guessing the sequential integer no longer hits the record.
+        $this->post('/admin/registrations/'.$registration->id.'/approve')->assertNotFound();
+        $this->assertSame('pending', $registration->fresh()->status);
+    }
 }

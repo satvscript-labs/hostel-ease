@@ -316,7 +316,7 @@
                                 <span class="lbl">Aadhaar No.</span>
                                 <span class="val font-monospace">
                                     <x-aadhaar-field :masked="hostelease_mask_aadhaar($student->aadhaar)"
-                                        :url="route('admin.students.aadhaar', $student->id)" />
+                                        :url="route('admin.students.aadhaar', $student)" />
                                 </span>
                             </div>
                             <div class="info-row">

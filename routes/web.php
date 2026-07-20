@@ -294,7 +294,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::middleware('access:staff')->group(function () {
                 Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
                 Route::post('staff/{staff}/restore', [\App\Http\Controllers\Admin\StaffController::class, 'restore'])
-                    ->whereNumber('staff')->name('staff.restore');
+                    ->withTrashed()->name('staff.restore');
                 Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show'])
                     // Removing a staff member keeps their salary history (owner
                     // decision, W7.1), so their profile must stay reachable —
@@ -304,7 +304,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                     // sides the moment its staff member was removed.
                     ->withTrashed(['show']);
                 // Logged Aadhaar reveal (P5) — returns the full number, writes an audit entry.
-                Route::get('staff/{staff}/aadhaar', [\App\Http\Controllers\Admin\StaffController::class, 'revealAadhaar'])->whereNumber('staff')->withTrashed()->name('staff.aadhaar');
+                Route::get('staff/{staff}/aadhaar', [\App\Http\Controllers\Admin\StaffController::class, 'revealAadhaar'])->withTrashed()->name('staff.aadhaar');
                 Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
                 Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])
                     ->withTrashed()->name('staff.salary.destroy');

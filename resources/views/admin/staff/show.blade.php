@@ -210,7 +210,7 @@
         <div class="st-removed mb-4">
             <i class="fa-solid fa-user-slash"></i>
             <span>{{ __('Removed from the directory. Salary history below stays on the books — restore to make changes.') }}</span>
-            <form method="POST" action="{{ route('admin.staff.restore', $staff->id) }}" class="ms-auto m-0">
+            <form method="POST" action="{{ route('admin.staff.restore', $staff) }}" class="ms-auto m-0">
                 @csrf
                 <button class="btn btn-sm btn-white border rounded-pill fw-bold px-3 text-nowrap tactile-btn">
                     <i class="fa-solid fa-rotate-left me-1"></i>{{ __('Restore') }}
@@ -237,7 +237,7 @@
                         <span class="lbl">{{ __('Aadhaar') }}</span>
                         <span class="val d-flex align-items-center gap-2 justify-content-end flex-wrap">
                             <x-aadhaar-field :masked="hostelease_mask_aadhaar($staff->aadhaar_number)"
-                                :url="route('admin.staff.aadhaar', $staff->id)" />
+                                :url="route('admin.staff.aadhaar', $staff)" />
                             @if($staff->aadhaar_file)
                                 <a href="{{ route('admin.files.show', ['staff', $staff->id, 'aadhaar_file']) }}" target="_blank" rel="noopener"
                                    class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 text-decoration-none">
@@ -305,7 +305,7 @@
                         {{-- Deleting the salary takes its expense mirror with it
                              (W6.2). Reachable even for a removed staff member —
                              otherwise the mirror is stranded un-deletable. --}}
-                        <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff->id, $p->id]) }}" class="m-0"
+                        <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff, $p->id]) }}" class="m-0"
                               data-confirm="{{ __('Delete this salary entry? Its matching expense entry is removed too.') }}">
                             @csrf @method('DELETE')
                             <button class="he-icon-btn is-danger" title="{{ __('Delete salary entry') }}" aria-label="{{ __('Delete salary entry') }}">

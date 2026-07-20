@@ -145,7 +145,7 @@
                     </div>
                     <button class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm fw-bold reg-review-btn"
                             @click="openReview({
-                                id: {{ $r->id }},
+                                id: '{{ $r->public_id }}',
                                 name: '{{ addslashes($r->name) }}',
                                 mobile: '{{ $r->mobile }}',
                                 occupation: '{{ addslashes(config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type))) }}',

@@ -217,4 +217,46 @@ class StudentTest extends TestCase
             'fee_amount' => 50000,
         ])->assertRedirect(route('admin.students.show', $student));
     }
+
+    // ── Public-ID hardening (U0): opaque ULID route key ───────────────────
+
+    /** Every student gets a 26-char ULID public_id on create; the PK is untouched. */
+    public function test_a_student_is_assigned_a_public_id_on_create(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'ULID Kid',
+            'mobile' => '9555500000', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $this->assertNotNull($student->public_id);
+        $this->assertSame(26, strlen($student->public_id));
+        // Route key is the opaque id, not the integer PK.
+        $this->assertSame($student->public_id, $student->getRouteKey());
+        $this->assertNotSame((string) $student->id, $student->getRouteKey());
+    }
+
+    /** The profile URL carries the ULID, never the sequential integer id. */
+    public function test_the_profile_url_uses_the_public_id_not_the_integer(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'No Enum',
+            'mobile' => '9555511111', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $url = route('admin.students.show', $student);
+        $this->assertStringContainsString($student->public_id, $url);
+        $this->assertStringEndsWith('/'.$student->public_id, $url);
+
+        // Opaque URL resolves; guessing the sequential integer no longer does.
+        $this->actingAs($this->admin)->get($url)->assertOk();
+        $this->actingAs($this->admin)->get('/admin/students/'.$student->id)->assertNotFound();
+    }
+
+    /** Cross-tenant is still blocked even with a VALID foreign public_id. */
+    public function test_a_foreign_public_id_is_not_found(): void
+    {
+        $other = Hostel::factory()->create();
+        $foreign = Student::create(['hostel_id' => $other->id, 'name' => 'Foreign',
+            'mobile' => '9555522222', 'occupation_type' => 'student', 'status' => 'active']);
+
+        // A real, valid ULID — but it belongs to another tenant, so TenantScope 404s it.
+        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign))
+            ->assertNotFound();
+    }
 }
