@@ -591,7 +591,7 @@ class StaffTest extends TestCase
         ]);
 
         $payment = StaffSalaryPayment::firstOrFail();
-        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment->id]))
+        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment]))
             ->assertSessionHas('success');
 
         // A phantom expense left behind would inflate the P&L forever.
@@ -637,7 +637,7 @@ class StaffTest extends TestCase
 
         $this->get(route('admin.staff.show', $staff))->assertOk()->assertSee('Govind');
 
-        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment->id]))
+        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment]))
             ->assertSessionHas('success');
         $this->assertSame(0, Expense::count());
     }

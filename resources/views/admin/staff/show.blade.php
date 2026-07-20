@@ -305,7 +305,7 @@
                         {{-- Deleting the salary takes its expense mirror with it
                              (W6.2). Reachable even for a removed staff member —
                              otherwise the mirror is stranded un-deletable. --}}
-                        <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff, $p->id]) }}" class="m-0"
+                        <form method="POST" action="{{ route('admin.staff.salary.destroy', [$staff, $p]) }}" class="m-0"
                               data-confirm="{{ __('Delete this salary entry? Its matching expense entry is removed too.') }}">
                             @csrf @method('DELETE')
                             <button class="he-icon-btn is-danger" title="{{ __('Delete salary entry') }}" aria-label="{{ __('Delete salary entry') }}">
