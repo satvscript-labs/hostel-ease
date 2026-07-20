@@ -321,6 +321,13 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::get('staff', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'staff'])->name('staff');
                 Route::get('muster', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'muster'])->name('muster');
 
+                // Gate Log + per-person history (P4)
+                Route::get('log', [\App\Http\Controllers\Admin\Presence\GateLogController::class, 'index'])->name('log');
+                Route::get('log/export', [\App\Http\Controllers\Admin\Presence\GateLogController::class, 'export'])->name('log.export');
+                Route::get('history/{profile}', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'show'])->name('history');
+                Route::post('history/{profile}/correct', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'correct'])->name('history.correct');
+                Route::post('history/{profile}/reset', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'reset'])->name('history.reset');
+
                 Route::get('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'index'])->name('devices');
 
                 // Device registry

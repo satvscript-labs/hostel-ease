@@ -83,4 +83,7 @@
             @include('admin.presence._board_rows')
         </div>
     </div>
+
+    {{-- Per-person history drawer (opened by a row's name) --}}
+    @include('admin.presence._history_drawer')
 </div>

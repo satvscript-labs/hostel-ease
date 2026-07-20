@@ -320,6 +320,8 @@ class StaffController extends Controller
 
     public function show(Staff $staff): View
     {
+        $staff->load('presenceProfile'); // last-seen chip (P4)
+
         $monthStart = now()->startOfMonth()->toDateString();
         $monthEnd = now()->endOfMonth()->toDateString();
 

@@ -48,7 +48,8 @@
                     <span class="pb-avatar">{{ $initial }}</span>
                     <div style="min-width: 0;">
                         <div class="text-truncate">
-                            <a href="{{ $profileUrl }}" class="fw-bold text-dark text-decoration-none">{{ $person->name }}</a>
+                            <button type="button" class="pb-name fw-bold text-dark border-0 bg-transparent p-0"
+                                    @click="$dispatch('presence-history', { profile: '{{ $profile->public_id }}' })">{{ $person->name }}</button>
                             @if($stale)<span class="pb-stale" title="{{ __('A scan was likely missed') }}"><i class="fa-solid fa-triangle-exclamation"></i>{{ __('check') }}</span>@endif
                         </div>
                         <div class="small text-muted text-truncate">{{ $sub }}</div>
@@ -84,8 +85,10 @@
             </div>
         </div>
 
-        {{-- Phone iOS row — whole row taps to profile --}}
-        <a href="{{ $profileUrl }}" class="card shadow-sm rounded-4 he-cq-card pb-card {{ $state === PresenceState::Out ? 'is-out' : '' }} pb-ios text-reset">
+        {{-- Phone iOS row — whole row opens the history drawer --}}
+        <div role="button" tabindex="0" class="card shadow-sm rounded-4 he-cq-card pb-card {{ $state === PresenceState::Out ? 'is-out' : '' }} pb-ios text-reset"
+             @click="$dispatch('presence-history', { profile: '{{ $profile->public_id }}' })"
+             @keydown.enter="$dispatch('presence-history', { profile: '{{ $profile->public_id }}' })">
             <span class="pb-avatar" style="width:40px;height:40px;font-size:.85rem;">{{ $initial }}</span>
             <span class="pb-ios__body">
                 <span class="d-block pb-ios__name text-truncate">{{ $person->name }} @if($stale)<i class="fa-solid fa-triangle-exclamation text-warning small"></i>@endif</span>
@@ -95,7 +98,7 @@
                 </span>
             </span>
             <span class="pb-ios__dot pb-ios__dot--{{ $pill }}"></span>
-        </a>
+        </div>
     @empty
         @if($isFiltered)
             <x-he-empty-state icon="magnifying-glass" title="{{ __('No matches') }}"

@@ -135,6 +135,7 @@
                             @else
                                 <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-1">{{ __('Inactive') }}</span>
                             @endif
+                            @includeWhen(auth()->user()->canAccessPresence(), 'admin.presence._last_seen_chip', ['person' => $staff])
                         </div>
                         <div class="st-hero-meta d-flex flex-wrap align-items-center gap-3">
                             <span><i class="fa-solid fa-briefcase me-1"></i>{{ $staff->designation ?: __('Staff Member') }}</span>

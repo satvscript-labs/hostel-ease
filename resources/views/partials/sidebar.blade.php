@@ -174,6 +174,9 @@
                     <a class="sidebar-sublink {{ request()->routeIs('admin.presence.staff') ? 'is-active' : '' }}" href="{{ route('admin.presence.staff') }}">
                         <span class="sublink-dot"></span>{{ __('Staff') }}
                     </a>
+                    <a class="sidebar-sublink {{ request()->routeIs('admin.presence.log') ? 'is-active' : '' }}" href="{{ route('admin.presence.log') }}">
+                        <span class="sublink-dot"></span>{{ __('Gate Log') }}
+                    </a>
                     <a class="sidebar-sublink {{ request()->routeIs('admin.presence.devices') ? 'is-active' : '' }}" href="{{ route('admin.presence.devices') }}">
                         <span class="sublink-dot"></span>{{ __('Devices') }}
                     </a>

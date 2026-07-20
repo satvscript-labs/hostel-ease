@@ -31,14 +31,16 @@ class PresencePunch extends Model
         ];
     }
 
+    // Explicit foreign keys: the relation names (device/profile) would otherwise
+    // make Eloquent infer device_id / profile_id, but the columns are prefixed.
     public function device(): BelongsTo
     {
-        return $this->belongsTo(PresenceDevice::class);
+        return $this->belongsTo(PresenceDevice::class, 'presence_device_id');
     }
 
     public function profile(): BelongsTo
     {
-        return $this->belongsTo(PresenceProfile::class);
+        return $this->belongsTo(PresenceProfile::class, 'presence_profile_id');
     }
 
     /** Unmatched scans — a device UserID we could not bind to a person. */
