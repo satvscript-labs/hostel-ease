@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\AcBill;
+use App\Models\Bed;
+use App\Models\BedAssignment;
+use App\Models\Complaint;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -13,6 +16,7 @@ use App\Models\StaffSalaryPayment;
 use App\Models\Student;
 use App\Models\StudentDocument;
 use App\Models\StudentRegistration;
+use App\Models\Visitor;
 use Tests\TestCase;
 
 /**
@@ -44,6 +48,11 @@ class PublicIdHardeningTest extends TestCase
             'AcBill' => [AcBill::class],
             'PocketMoneyTransaction' => [PocketMoneyTransaction::class],
             'StaffSalaryPayment' => [StaffSalaryPayment::class],
+            // U3 — front desk + people ops
+            'Visitor' => [Visitor::class],
+            'Complaint' => [Complaint::class],
+            'Bed' => [Bed::class],
+            'BedAssignment' => [BedAssignment::class],
         ];
     }
 
