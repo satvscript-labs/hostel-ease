@@ -30,6 +30,7 @@
         'date' => $attendance['date'],
         'strip' => $attendance['strip'],
         'marks' => $attendance['marks'],
+        'suggested' => $attendance['suggested'],
         'roster' => $attendance['roster']->map(fn ($s) => ['id' => (string) $s->id, 'name' => $s->name])->values(),
         'prev' => $attendance['prev'],
         'next' => $attendance['next'],
@@ -137,6 +138,14 @@
                         <span class="att-tool__full" x-text="bulkLabel"></span>
                         <span class="att-tool__short" x-text="bulkLabelShort"></span>
                     </button>
+                    <template x-if="suggestedUnmarked.length > 0">
+                        <button type="button" class="btn btn-sm btn-white border rounded-pill fw-bold px-2 px-sm-3 tactile-btn text-nowrap"
+                                :title="'{{ __('Confirm gate presence for') }} ' + suggestedUnmarked.length + ' {{ __('staff') }}'" @click="confirmSuggested()">
+                            <i class="fa-solid fa-door-open me-1 text-primary"></i>
+                            <span class="att-tool__full">{{ __('Confirm gate') }} (<span x-text="suggestedUnmarked.length"></span>)</span>
+                            <span class="att-tool__short"><i class="fa-solid fa-door-open"></i> <span x-text="suggestedUnmarked.length"></span></span>
+                        </button>
+                    </template>
                     <template x-if="copySource">
                         <button type="button" class="btn btn-sm btn-white border rounded-pill fw-bold px-2 px-sm-3 tactile-btn text-nowrap"
                                 :title="'{{ __('Copy the marks from') }} ' + copySourceLabel" @click="copyPreviousDay()">
@@ -165,7 +174,11 @@
                         <div style="min-width: 0;">
                             <div class="fw-bold text-dark text-truncate">{{ $s->name }}</div>
                             <div class="att-row__sub text-truncate">
-                                <span x-show="! statusOf(@js($sid))" class="text-muted">{{ __('Not marked') }}</span>
+                                <span x-show="! statusOf(@js($sid)) && ! isSuggested(@js($sid))" class="text-muted">{{ __('Not marked') }}</span>
+                                <span x-show="! statusOf(@js($sid)) && isSuggested(@js($sid))" x-cloak
+                                      class="att-gate-hint" title="{{ __('Seen at the gate today — confirm to mark present') }}">
+                                    <i class="fa-solid fa-door-open"></i>{{ __('Seen at gate') }}
+                                </span>
                                 <span x-show="statusOf(@js($sid))" x-cloak
                                       :class="'att-tag att-tag--' + (statusOf(@js($sid)) || '').replace('_', '-')"
                                       x-text="labelFor(statusOf(@js($sid)))"></span>
@@ -223,6 +236,7 @@
             date: cfg.date,
             marks: cfg.marks,        // { 'Y-m-d': { staffId: status } }
             roster: cfg.roster,      // [{ id, name }]
+            suggested: cfg.suggested ?? {}, // { 'Y-m-d': { staffId: true } } — seen at the gate
 
             // Pending marks, and the day they belong to. The date is held WITH
             // the queue on purpose: the payload carries no date of its own, so
@@ -277,6 +291,12 @@
             },
             get marked() { return this.roster.filter((s) => this.statusOf(s.id)).length; },
             get unmarked() { return this.roster.length - this.marked; },
+
+            // Presence bridge (P5): "seen at the gate that day" — a suggestion the
+            // admin CONFIRMS, never an auto-write to payroll.
+            isSuggested(id) { return !! (this.suggested[this.date] || {})[id]; },
+            get suggestedUnmarked() { return this.roster.filter((s) => this.isSuggested(s.id) && ! this.statusOf(s.id)); },
+            confirmSuggested() { this.suggestedUnmarked.forEach((s) => this.set(s.id, 'present')); },
 
             // Two labels, not one truncated one (§4.8: fit or drop — never wrap,
             // never half-clip). The count survives into the short form because

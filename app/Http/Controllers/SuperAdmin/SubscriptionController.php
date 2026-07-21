@@ -59,9 +59,12 @@ class SubscriptionController extends Controller
             ],
         ]);
 
-        // Flat map (subscription id => fields) for the edit modal's JavaScript.
+        // Flat map for the edit modal's JavaScript, keyed by the OPAQUE public_id
+        // — the same value the modal uses to build its edit URL (public-id
+        // hardening U4). Keying by the integer id would make the lookup miss and
+        // the modal would silently never open.
         $subsJson = collect($subscriptions->items())->mapWithKeys(fn ($s) => [
-            $s->id => [
+            $s->public_id => [
                 'plan' => $s->plan,
                 'amount' => $s->amount,
                 'start_date' => $s->start_date->format('Y-m-d'),

@@ -207,7 +207,7 @@
                                 </form>
                             @endif
                             <button class="btn btn-sm btn-light rounded-circle shadow-sm mx-1" style="width: 32px; height: 32px;" title="Edit"
-                                    @click="openEditModal({{ $s->id }})">
+                                    @click="openEditModal('{{ $s->public_id }}')">
                                 <i class="fa-solid fa-pen text-primary"></i>
                             </button>
                             <form action="{{ route('superadmin.subscriptions.destroy', $s) }}" method="POST" class="d-inline" data-confirm="Delete this subscription record?">

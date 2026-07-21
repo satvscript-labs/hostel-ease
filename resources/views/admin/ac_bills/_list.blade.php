@@ -186,7 +186,7 @@
                             @foreach($breakdown['students'] as $s)
                                 @php $inv = $invoicesByStudent->get($s['student_id']); @endphp
                                 <div class="ac-share-row">
-                                    <a href="{{ route('admin.students.show', $s['student_id']) }}" class="ac-share-who">
+                                    <a href="{{ $inv?->student ? route('admin.students.show', $inv->student) : '#' }}" class="ac-share-who">
                                         <span class="ac-share-avatar">{{ mb_substr($s['name'], 0, 1) }}</span>
                                         <span style="min-width: 0;">
                                             <span class="d-block fw-semibold text-dark text-truncate">{{ $s['name'] }}</span>

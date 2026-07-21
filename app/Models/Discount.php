@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DiscountRecurrence;
 use App\Enums\DiscountStatus;
 use App\Enums\DiscountType;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Discount extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'account_id',

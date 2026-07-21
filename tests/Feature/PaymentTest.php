@@ -36,6 +36,27 @@ class PaymentTest extends TestCase
         $this->actingAs($this->admin);
     }
 
+    /**
+     * Public-ID hardening (U2). Receipts are the enumerable one: payments/{payment}/pdf
+     * is a GET that returns a real document, so a sequential id there let anyone
+     * walk other people's receipts. The URL now carries an opaque ULID.
+     */
+    public function test_the_receipt_pdf_url_uses_the_public_id_and_the_integer_is_rejected(): void
+    {
+        $this->post(route('admin.students.collect', $this->student), [
+            'amount' => 5000, 'mode' => 'cash', 'paid_on' => now()->toDateString(),
+        ])->assertRedirect();
+
+        $payment = Payment::firstOrFail();
+        $this->assertSame(26, strlen($payment->public_id));
+
+        $url = route('admin.payments.pdf', $payment);
+        $this->assertStringEndsWith('/'.$payment->public_id.'/pdf', $url);
+
+        $this->get($url)->assertOk();
+        $this->get('/admin/payments/'.$payment->id.'/pdf')->assertNotFound();
+    }
+
     public function test_recording_a_payment_generates_a_unique_receipt(): void
     {
         $this->post(route('admin.students.collect', $this->student), [

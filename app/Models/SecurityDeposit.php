@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -17,7 +18,7 @@ class SecurityDeposit extends Model
      * cross-tenant rows invisible (route binding 404s them) and auto-fills
      * hostel_id on create.
      */
-    use BelongsToHostel, SoftDeletes;
+    use BelongsToHostel, HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'hostel_id',

@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Subscription extends Model
 {
-    use BelongsToHostel, HasFactory, SoftDeletes;
+    use BelongsToHostel, HasFactory, HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'hostel_id',

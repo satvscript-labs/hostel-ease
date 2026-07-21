@@ -427,6 +427,17 @@
             <div class="action-icon text-warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <div class="fw-bold small">Log Complaint</div>
         </a>
+        @if(($stats['presence_configured'] ?? false) && auth()->user()->canAccessPresence())
+        {{-- Currently-out tile (P5, idea #3): links to the live board; goes red
+             when people are still out past curfew. --}}
+        <a href="{{ route('admin.presence.students') }}" class="action-tile position-relative">
+            <div class="action-icon {{ $stats['presence_late'] > 0 ? 'text-danger' : '' }}"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
+            <div class="fw-bold small">
+                <span class="fs-5 fw-bold {{ $stats['presence_late'] > 0 ? 'text-danger' : '' }}">{{ $stats['presence_out'] }}</span> Out now
+                @if($stats['presence_late'] > 0)<div class="text-danger" style="font-size:0.65rem;font-weight:800;">{{ $stats['presence_late'] }} past curfew</div>@endif
+            </div>
+        </a>
+        @endif
     </div>
 
     {{-- 3. Financial Snapshot Bento --}}

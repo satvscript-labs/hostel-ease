@@ -202,6 +202,12 @@
     .att-tag--half-day { background: var(--he-warning-soft); color: #b45309; }
     .att-tag--leave { background: var(--he-bg-surface-raised); color: var(--he-text-muted); }
 
+    /* Presence bridge (P5): "seen at the gate" suggestion on an unmarked staff. */
+    .att-gate-hint {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        font-size: 0.68rem; font-weight: 700; color: var(--he-primary);
+    }
+
     /* The two-way toggle: the ~95% case, at a size a thumb can actually hit. */
     .att-toggle {
         display: flex; gap: 2px; padding: 3px;

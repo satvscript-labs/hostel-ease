@@ -154,6 +154,7 @@ class StudentController extends Controller
             'assignments' => fn ($q) => $q->with('bed.room')->orderByDesc('join_date'),
             'documents' => fn ($q) => $q->latest(),
             'invoices' => fn ($q) => $q->orderByDesc('created_at'),
+            'presenceProfile', // last-seen chip (P4)
         ]);
 
         $invoices = $student->invoices;

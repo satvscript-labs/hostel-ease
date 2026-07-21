@@ -36,8 +36,11 @@ class SubscriptionController extends Controller
     /** The owner's Subscription page — status, branches, renew-all quote, history. */
     public function index(Request $request): View
     {
-        $owner = $request->user();
-        $account = $this->accountBilling->accountFor($owner);
+        // The viewer is not necessarily the owner — a co-admin shares the role.
+        // accountForViewer() resolves the branches' real owner instead of
+        // minting a phantom account for whoever opened the page.
+        $viewer = $request->user();
+        $account = $this->accountBilling->accountForViewer($viewer);
 
         // Keep the account's anchor/status in sync with its branches on load.
         $this->accountBilling->refreshAccountAnchor($account);
@@ -103,7 +106,7 @@ class SubscriptionController extends Controller
         }
 
         $owner = $request->user();
-        $account = $this->accountBilling->accountFor($owner);
+        $account = $this->accountBilling->accountForViewer($owner);
         $quote = $this->accountBilling->quoteRenewal($account, $data['period']);
 
         $paise = (int) round($quote['breakdown']['final'] * 100);
@@ -158,7 +161,7 @@ class SubscriptionController extends Controller
         }
 
         $owner = $request->user();
-        $account = $this->accountBilling->accountFor($owner);
+        $account = $this->accountBilling->accountForViewer($owner);
 
         // Invariant-keeping creation (P4 item 14): owner_id + pivot + primary
         // branch — the old inline Hostel::create() set none of them. Trial plan
@@ -219,7 +222,7 @@ class SubscriptionController extends Controller
         ]);
 
         $owner = $request->user();
-        $account = $this->accountBilling->accountFor($owner);
+        $account = $this->accountBilling->accountForViewer($owner);
 
         if (! $this->razorpay->verifySignature($data['razorpay_order_id'], $data['razorpay_payment_id'], $data['razorpay_signature'])) {
             return response()->json(['message' => 'Payment verification failed. You have not been charged.'], 400);

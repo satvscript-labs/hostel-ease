@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Staff extends Model
 {
-    use BelongsToHostel, SoftDeletes;
+    use BelongsToHostel, HasPublicId, SoftDeletes;
 
     protected $table = 'staff';
 
@@ -73,5 +74,11 @@ class Staff extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /** Presence enrollment (gate device), if any — additive, read-only here. */
+    public function presenceProfile(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(PresenceProfile::class, 'presenceable');
     }
 }

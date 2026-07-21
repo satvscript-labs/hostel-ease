@@ -101,7 +101,7 @@ class AadhaarPrivacyTest extends TestCase
     {
         $staff = $this->makeStaff();
 
-        $this->getJson(route('admin.staff.aadhaar', $staff->id))
+        $this->getJson(route('admin.staff.aadhaar', $staff))
             ->assertOk()
             ->assertJson(['aadhaar' => '1234 1234 1234']);
 
@@ -115,7 +115,7 @@ class AadhaarPrivacyTest extends TestCase
     {
         $student = $this->makeStudent();
 
-        $this->getJson(route('admin.students.aadhaar', $student->id))
+        $this->getJson(route('admin.students.aadhaar', $student))
             ->assertOk()
             ->assertJson(['aadhaar' => '1111 2222 3333']);
 
@@ -132,7 +132,7 @@ class AadhaarPrivacyTest extends TestCase
         ]);
 
         // Bound within the acting admin's tenant — the other hostel's staff is invisible.
-        $this->getJson(route('admin.staff.aadhaar', $otherStaff->id))->assertNotFound();
+        $this->getJson(route('admin.staff.aadhaar', $otherStaff))->assertNotFound();
         $this->assertDatabaseMissing('activity_logs', ['action' => 'aadhaar.reveal', 'subject_id' => $otherStaff->id]);
     }
 

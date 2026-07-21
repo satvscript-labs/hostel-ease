@@ -313,4 +313,46 @@ class BedAssignmentTest extends TestCase
         $this->assertArrayHasKey('is_ac', $beds->first());
         $this->assertArrayHasKey('room', $beds->first());
     }
+
+    // ── Public-ID hardening (U3): opaque ULID route key ───────────────────
+
+    /**
+     * Bed history lists everyone who has ever occupied that bed, so a guessable
+     * id walked other rooms' occupancy. The URL is opaque now.
+     */
+    public function test_the_bed_history_url_uses_the_public_id_and_the_integer_is_rejected(): void
+    {
+        $this->actingAs($this->admin);
+        $bed = $this->room->beds()->firstOrFail();
+
+        $this->assertSame(26, strlen($bed->public_id));
+
+        $url = route('admin.beds.history', $bed);
+        $this->assertStringEndsWith('/'.$bed->public_id.'/history', $url);
+
+        $this->get($url)->assertOk();
+        $this->get('/admin/beds/'.$bed->id.'/history')->assertNotFound();
+    }
+
+    /**
+     * Release/transfer are driven by URLs the property board builds in JS from
+     * the assignment id — so the assignment needed an opaque key of its own.
+     */
+    public function test_releasing_an_assignment_works_through_its_opaque_id(): void
+    {
+        $this->actingAs($this->admin);
+        $student = $this->student('Release Me');
+        $bed = $this->room->beds()->firstOrFail();
+
+        app(BedAssignmentService::class)->assign($student, $bed, [
+            'join_date' => now()->toDateString(), 'fee_amount' => 5000, 'fee_frequency' => 'monthly',
+        ]);
+        $assignment = $student->activeAssignment()->firstOrFail();
+
+        $url = route('admin.property.release', $assignment);
+        $this->assertStringContainsString($assignment->public_id, $url);
+
+        $this->patch($url, ['leave_date' => now()->toDateString()])->assertRedirect();
+        $this->assertSame(0, $student->assignments()->where('is_active', true)->count());
+    }
 }

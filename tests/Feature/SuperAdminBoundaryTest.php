@@ -64,9 +64,13 @@ class SuperAdminBoundaryTest extends TestCase
             $params = [];
             foreach ($route->parameterNames() as $p) {
                 $params[$p] = match ($p) {
-                    'hostel' => $this->hostel->id,
-                    'account' => $account->id,
-                    'order' => $order->id,
+                    // Bind the MODELS, not raw ids: these route keys are opaque
+                    // public_ids now (public-id hardening U4), so an integer here
+                    // would 404 at binding and never reach the role middleware —
+                    // making the boundary look untested.
+                    'hostel' => $this->hostel,
+                    'account' => $account,
+                    'order' => $order,
                     // File-bound routes (backups download) can't 200 without a
                     // real file — the boundary still applies, so bind a name.
                     'filename' => 'nonexistent.sql',

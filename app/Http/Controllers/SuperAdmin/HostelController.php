@@ -47,8 +47,13 @@ class HostelController extends Controller
             'expired' => Hostel::where('status', 'expired')->count(),
         ];
 
+        // Keyed by the OPAQUE public_id, and carrying it as `id`, so the edit
+        // modal's by-key fallback lookup builds a URL that actually resolves
+        // (public-id hardening U4). The primary path hands the modal the whole
+        // payload object from _list, which is already opaque.
         $hostelsJson = collect($hostels->items())->mapWithKeys(fn ($h) => [
-            $h->id => [
+            $h->public_id => [
+                'id' => $h->public_id,
                 'name' => $h->name,
                 'owner_name' => $h->owner_name,
                 'mobile' => $h->mobile,
@@ -73,9 +78,15 @@ class HostelController extends Controller
         // queries rather than per-row.
         $mobiles = collect($hostels->items())->pluck('mobile')->filter()->unique();
         $owners = \App\Models\User::whereIn('mobile', $mobiles)->where('role', 'hostel_admin')->get(['id', 'mobile'])->keyBy('mobile');
-        $accounts = \App\Models\SubscriptionAccount::whereIn('owner_id', $owners->pluck('id'))->get(['id', 'owner_id'])->keyBy('owner_id');
+        // public_id is selected because it is the ROUTE KEY the link below is
+        // generated from — omitting it makes route() throw under strict mode.
+        $accounts = \App\Models\SubscriptionAccount::whereIn('owner_id', $owners->pluck('id'))->get(['id', 'owner_id', 'public_id'])->keyBy('owner_id');
+        // Map to the ACCOUNT MODEL, not its id: the list links with
+        // route('superadmin.accounts.show', $account) and the route key is the
+        // opaque public_id now (public-id hardening U4) — an integer here builds
+        // a URL that no longer resolves.
         $accountByHostel = collect($hostels->items())->mapWithKeys(fn ($h) => [
-            $h->id => optional($owners->get($h->mobile), fn ($o) => $accounts->get($o->id)?->id),
+            $h->id => optional($owners->get($h->mobile), fn ($o) => $accounts->get($o->id)),
         ])->all();
 
         return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson', 'accountByHostel', 'stats'));

@@ -33,6 +33,21 @@ class SuperAdminAccountsTest extends TestCase
         return [$owner, $account];
     }
 
+    /** Public-ID hardening (U4): Account 360 is reached by opaque id, not a number. */
+    public function test_account_360_url_uses_the_public_id_and_the_integer_is_rejected(): void
+    {
+        [, $account] = $this->seedAccount();
+        $super = User::factory()->superAdmin()->create();
+
+        $this->assertSame(26, strlen($account->public_id));
+
+        $url = route('superadmin.accounts.show', $account);
+        $this->assertStringEndsWith('/'.$account->public_id, $url);
+
+        $this->actingAs($super)->get($url)->assertOk();
+        $this->actingAs($super)->get('/superadmin/accounts/'.$account->id)->assertNotFound();
+    }
+
     public function test_customers_index_renders_and_lists_the_account(): void
     {
         [$owner] = $this->seedAccount();

@@ -9,7 +9,7 @@
             @php($days = $h->daysUntilExpiry())
             @php($statusColor = $h->status === 'active' ? 'success' : ($h->status === 'expired' ? 'danger' : 'secondary'))
             
-            @php($payload = ['id' => $h->id, 'name' => $h->name, 'owner_name' => $h->owner_name, 'mobile' => $h->mobile,
+            @php($payload = ['id' => $h->public_id, 'name' => $h->name, 'owner_name' => $h->owner_name, 'mobile' => $h->mobile,
                 'email' => $h->email, 'address' => $h->address, 'city' => $h->city, 'state' => $h->state,
                 'gst_number' => $h->gst_number, 'status' => $h->status,
                 'subscription_start' => optional($h->subscription_start)->format('Y-m-d'),

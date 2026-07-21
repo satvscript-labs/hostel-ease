@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasPublicId, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'hostel_id',
@@ -136,6 +137,17 @@ class User extends Authenticatable
     public function isReadonly(): bool
     {
         return (bool) ($this->roleAccess()['readonly'] ?? false);
+    }
+
+    /**
+     * Presence module access — an explicit allow-list, NOT the area matrix
+     * (owner Q6): viewer holds ['*'] but must be excluded. Owner (+ co-admins)
+     * + manager + warden only. Mirrors CheckPresenceAccess so the sidebar shows
+     * exactly what the routes allow.
+     */
+    public function canAccessPresence(): bool
+    {
+        return in_array($this->role, ['hostel_admin', 'manager', 'warden'], true);
     }
 
     /** Concrete list of areas (expanding the '*' wildcard) for the client. */

@@ -147,6 +147,7 @@
                         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                             <h1 class="h3 fw-bold mb-0">{{ $student->name }}</h1>
                             <span class="badge bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}-subtle text-{{ $student->status === 'active' ? 'success' : 'secondary' }} rounded-pill px-3 py-1 text-capitalize">{{ $student->status }}</span>
+                            @includeWhen(auth()->user()->canAccessPresence(), 'admin.presence._last_seen_chip', ['person' => $student])
                         </div>
                         <div class="sp-hero-meta d-flex flex-wrap align-items-center">
                             <span class="me-3"><i class="fa-solid fa-briefcase me-1"></i>{{ config('hostelease.occupation_types.'.$student->occupation_type) }}</span>
@@ -316,7 +317,7 @@
                                 <span class="lbl">Aadhaar No.</span>
                                 <span class="val font-monospace">
                                     <x-aadhaar-field :masked="hostelease_mask_aadhaar($student->aadhaar)"
-                                        :url="route('admin.students.aadhaar', $student->id)" />
+                                        :url="route('admin.students.aadhaar', $student)" />
                                 </span>
                             </div>
                             <div class="info-row">

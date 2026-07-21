@@ -23,7 +23,7 @@
             $icon = $catIcons[$expense->category] ?? 'receipt';
             $catLabel = config('hostelease.expense_categories.'.$expense->category, ucfirst($expense->category));
             $modeLabel = $modeNames[$expense->mode] ?? ucfirst($expense->mode);
-            $salaryStaffId = $expense->isSalaryLinked() ? $expense->salaryPayment?->staff_id : null;
+            $salaryStaff = $expense->isSalaryLinked() ? $expense->salaryPayment?->staff : null;
             $editPayload = $expense->isSalaryLinked() ? null : \Illuminate\Support\Js::from([
                 'action' => route('admin.expenses.update', $expense),
                 'category' => $expense->category,
@@ -87,8 +87,8 @@
 
                     <div class="exp-row-acts">
                         @if($expense->isSalaryLinked())
-                            @if($salaryStaffId)
-                                <a href="{{ route('admin.staff.show', $salaryStaffId) }}" class="he-icon-btn"
+                            @if($salaryStaff)
+                                <a href="{{ route('admin.staff.show', $salaryStaff) }}" class="he-icon-btn"
                                    title="{{ __('Manage from the staff page') }}"><i class="fa-solid fa-user-tie"></i></a>
                             @else
                                 <span class="he-icon-btn opacity-50" title="{{ __('Salary mirror — staff record removed') }}"><i class="fa-solid fa-user-tie"></i></span>
@@ -129,8 +129,8 @@
                         @if($expense->isSalaryLinked())
                             <span class="exp-auto-chip"><i class="fa-solid fa-rotate"></i>{{ __('Auto') }}</span>
                             <div class="he-act-right">
-                                @if($salaryStaffId)
-                                    <a href="{{ route('admin.staff.show', $salaryStaffId) }}" class="he-icon-btn he-icon-btn--lg"
+                                @if($salaryStaff)
+                                    <a href="{{ route('admin.staff.show', $salaryStaff) }}" class="he-icon-btn he-icon-btn--lg"
                                        title="{{ __('Manage from the staff page') }}" aria-label="{{ __('Manage from the staff page') }}">
                                         <i class="fa-solid fa-user-tie"></i>
                                     </a>

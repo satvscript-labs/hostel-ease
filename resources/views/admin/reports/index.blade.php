@@ -83,7 +83,7 @@
     </div>
 
     <div class="he-adaptive">
-        @foreach(['money' => __('Money'), 'property' => __('Property')] as $cat => $catLabel)
+        @foreach(['money' => __('Money'), 'property' => __('Property'), 'presence' => __('Presence')] as $cat => $catLabel)
             @php $cards = collect($types)->filter(fn ($t) => $t[3] === $cat); @endphp
             @continue($cards->isEmpty())
 

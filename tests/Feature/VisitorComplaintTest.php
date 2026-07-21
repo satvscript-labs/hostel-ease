@@ -51,4 +51,29 @@ class VisitorComplaintTest extends TestCase
         $this->assertSame('resolved', $complaint->status);
         $this->assertNotNull($complaint->resolved_at);
     }
+
+    // ── Public-ID hardening (U3): opaque ULID route key ───────────────────
+
+    public function test_visitor_and_complaint_actions_use_opaque_ids(): void
+    {
+        $visitor = Visitor::create(['hostel_id' => $this->hostel->id, 'name' => 'Guest',
+            'purpose' => 'Meeting', 'check_in' => now()]);
+        $complaint = Complaint::create(['hostel_id' => $this->hostel->id, 'title' => 'No water',
+            'category' => 'plumbing', 'priority' => 'high', 'status' => 'open']);
+
+        $this->assertSame(26, strlen($visitor->public_id));
+        $this->assertSame(26, strlen($complaint->public_id));
+
+        $this->assertStringContainsString($visitor->public_id, route('admin.visitors.checkout', $visitor));
+        $this->assertStringContainsString($complaint->public_id, route('admin.complaints.update', $complaint));
+
+        // Guessing the sequential integer no longer reaches either record.
+        $this->actingAs($this->admin)
+            ->patch('/admin/visitors/'.$visitor->id.'/checkout')->assertNotFound();
+        $this->actingAs($this->admin)
+            ->patch('/admin/complaints/'.$complaint->id, ['status' => 'resolved'])->assertNotFound();
+
+        $this->assertNull($visitor->fresh()->check_out);
+        $this->assertSame('open', $complaint->fresh()->status);
+    }
 }

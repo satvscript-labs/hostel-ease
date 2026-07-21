@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
-    use BelongsToHostel, HasFactory, SoftDeletes;
+    use BelongsToHostel, HasFactory, HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'hostel_id',
@@ -108,6 +109,12 @@ class Student extends Model
     public function securityDeposits()
     {
         return $this->hasMany(SecurityDeposit::class);
+    }
+
+    /** Presence enrollment (gate device), if any — additive, read-only here. */
+    public function presenceProfile(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(PresenceProfile::class, 'presenceable');
     }
 }
 

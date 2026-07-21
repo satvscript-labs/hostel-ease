@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CheckAccess;
+use App\Http\Middleware\CheckPresenceAccess;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureUserRole;
 use App\Http\Middleware\LogActivity;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserRole::class,
             'tenant' => SetTenant::class,
             'access' => CheckAccess::class,
+            'presence.access' => CheckPresenceAccess::class,
             'subscription.active' => EnsureActiveSubscription::class,
             'no-cache' => \App\Http\Middleware\PreventBackHistory::class,
         ]);

@@ -73,7 +73,7 @@
 
                     <div class="st-row-acts">
                         @if($removed)
-                            <form method="POST" action="{{ route('admin.staff.restore', $s->id) }}" class="m-0">
+                            <form method="POST" action="{{ route('admin.staff.restore', $s) }}" class="m-0">
                                 @csrf
                                 <button class="btn btn-sm btn-white border rounded-pill fw-bold px-3 text-nowrap" style="min-height: 36px;">
                                     <i class="fa-solid fa-rotate-left me-1"></i>{{ __('Restore') }}
@@ -132,7 +132,7 @@
 
                     <div class="he-act-row">
                         @if($removed)
-                            <form method="POST" action="{{ route('admin.staff.restore', $s->id) }}" class="m-0">
+                            <form method="POST" action="{{ route('admin.staff.restore', $s) }}" class="m-0">
                                 @csrf
                                 <button class="btn btn-white border rounded-pill fw-bold px-4" style="min-height: 44px;">
                                     <i class="fa-solid fa-rotate-left me-1"></i>{{ __('Restore') }}

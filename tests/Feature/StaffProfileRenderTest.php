@@ -91,7 +91,7 @@ class StaffProfileRenderTest extends TestCase
         // Assert on what the page OFFERS, not on URL fragments: the update route
         // is /admin/staff/1, which is a substring of the restore URL the page
         // legitimately renders — so a URL check here passes or fails by accident.
-        $this->get(route('admin.staff.show', $this->staff->id))
+        $this->get(route('admin.staff.show', $this->staff))
             ->assertOk()
             ->assertSee('Govind Watchman')
             ->assertSee('Restore')

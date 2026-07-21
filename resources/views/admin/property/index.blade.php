@@ -601,7 +601,7 @@
                                 </div>
                             @elseif($bed->status === 'maintenance')
                                 <div class="bed-tile bed-maintenance"
-                                     @click="openBedStatus('{{ $bed->id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
+                                     @click="openBedStatus('{{ $bed->public_id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
                                      title="Manage Bed">
                                      <div class="d-flex align-items-center gap-2">
                                         <i class="fa-solid fa-wrench"></i>
@@ -615,9 +615,10 @@
                                     $assignment = $bed->activeAssignment;
                                 @endphp
                                 <div class="bed-tile bed-occupied"
-                                     @click="openDetails({{ $bed->id }}, '{{ $room->room_number }}', '{{ $bed->bed_number }}', {{ json_encode([
-                                         'assignment_id' => $assignment->id,
+                                     @click="openDetails('{{ $bed->public_id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', {{ json_encode([
+                                         'assignment_public_id' => $assignment->public_id,
                                          'student_id' => $student->id,
+                                         'student_public_id' => $student->public_id,
                                          'student_name' => $student->name,
                                          'student_mobile' => $student->mobile,
                                          'student_photo' => $student->photo_url,
@@ -892,7 +893,7 @@
                         </div>
                         
                         <div class="mt-4">
-                            <a :href="'/admin/students/' + panels.details.data.student_id" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
+                            <a :href="'/admin/students/' + panels.details.data.student_public_id" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
                                 View Full Profile <i class="fa-solid fa-arrow-right ms-1"></i>
                             </a>
                         </div>
@@ -943,7 +944,7 @@
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="transfer.open" x-transition.opacity @click="closeTransfer()" x-cloak style="display: none;">
             <form class="custom-overlay-modal" :class="{ 'is-open': transfer.open }" x-show="transfer.open" x-transition.opacity @click.stop data-ring-required
-                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/transfer'" method="POST"
+                  :action="'/admin/property/assignments/' + panels.details.data.assignment_public_id + '/transfer'" method="POST"
                   style="display: none;" @submit="planChipsGuard($event, 'transferFreqChips', transfer.frequency) && (transfer.submitting = true)">
                 @csrf @method('PATCH')
                 <input type="hidden" name="bed_id" :value="transfer.bedId">
@@ -1144,7 +1145,7 @@
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="releaseOpen" x-transition.opacity @click="releaseOpen = false" x-cloak style="display: none;">
             <form class="custom-overlay-modal" :class="{ 'is-open': releaseOpen }" x-show="releaseOpen" @click.stop data-ring-required
-                  :action="'/admin/property/assignments/' + panels.details.data.assignment_id + '/release'" method="POST" style="display: none; max-width: 480px;">
+                  :action="'/admin/property/assignments/' + panels.details.data.assignment_public_id + '/release'" method="POST" style="display: none; max-width: 480px;">
                 @csrf @method('PATCH')
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0 text-danger">
@@ -1254,7 +1255,7 @@ document.addEventListener('alpine:init', () => {
         panels: {
             details: {
                 open: false, bedId: '', room: '', bed: '',
-                data: { assignment_id: '', student_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, room_last_reading: null, fee_amount: 0, fee_frequency: '' }
+                data: { assignment_public_id: '', student_id: '', student_public_id: '', student_name: '', student_mobile: '', student_photo: '', join_date: '', join_date_raw: '', duration: '', room_is_ac: false, room_last_reading: null, fee_amount: 0, fee_frequency: '' }
             }
         },
 

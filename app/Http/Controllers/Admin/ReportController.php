@@ -32,6 +32,11 @@ class ReportController extends Controller
         'expenses' => ['Expenses', 'Spending by category or by month — one report, a toggle.', 'money-bill-trend-up', 'money', true],
         'ac' => ['AC Bills', 'Metered AC billing — billed, collected and due per bill.', 'bolt', 'money', true],
         'occupancy' => ['Occupancy', 'Bed utilisation floor by floor, live.', 'bed', 'property', false],
+        // Presence (P6) — shown only to presence-access roles (see index/show).
+        'presence_time_out' => ['Time Out', 'How long students spend out — sessions and hours.', 'person-walking-arrow-right', 'presence', true],
+        'presence_late' => ['Late Returns', 'Who came back during curfew, and how often.', 'clock', 'presence', true],
+        'presence_nights_out' => ['Nights Out', 'Nights a student was away overnight.', 'moon', 'presence', true],
+        'presence_staff_hours' => ['Staff Hours', 'Hours staff were on the premises, per person.', 'business-time', 'presence', true],
     ];
 
     public function __construct(protected ReportService $reports)
@@ -56,13 +61,33 @@ class ReportController extends Controller
             'occupancy' => $this->occupancyStat(),
         ];
 
-        return view('admin.reports.index', ['types' => self::TYPES, 'stats' => $stats]);
+        // Presence reports are restricted to presence-access roles (owner Q6):
+        // a reports-access accountant/viewer must not see gate data. Hide the
+        // whole category from them by dropping those types.
+        $types = self::TYPES;
+        if (auth()->user()->canAccessPresence()) {
+            $enrolled = \App\Models\PresenceProfile::query()->enrolled()->count();
+            $stats['presence_time_out'] = $enrolled.' enrolled';
+            $stats['presence_late'] = $this->presenceStat();
+            $stats['presence_nights_out'] = $enrolled.' enrolled';
+            $stats['presence_staff_hours'] = \App\Models\PresenceProfile::query()->enrolled()
+                ->where('presenceable_type', \App\Models\Staff::class)->count().' staff';
+        } else {
+            $types = array_filter($types, fn ($t) => $t[3] !== 'presence');
+        }
+
+        return view('admin.reports.index', ['types' => $types, 'stats' => $stats]);
     }
 
     public function show(Request $request, string $type)
     {
         abort_unless(isset(self::TYPES[$type]), 404);
         [$label, $description, $icon, $category, $needsRange] = self::TYPES[$type];
+
+        // Presence reports carry gate data — restricted to presence-access roles.
+        if ($category === 'presence') {
+            abort_unless(auth()->user()->canAccessPresence(), 403);
+        }
 
         [$from, $to, $preset] = $this->range($request);
         $period = in_array($request->input('period'), ['daily', 'weekly', 'monthly', 'yearly'], true)
@@ -79,6 +104,10 @@ class ReportController extends Controller
             'expenses' => $this->reports->expenses($groupBy, $from, $to),
             'ac' => $this->reports->acReport($from, $to),
             'occupancy' => $this->reports->occupancy(),
+            'presence_time_out' => $this->reports->presenceTimeOut($from, $to),
+            'presence_late' => $this->reports->presenceLateReturns($from, $to),
+            'presence_nights_out' => $this->reports->presenceNightsOut($from, $to),
+            'presence_staff_hours' => $this->reports->presenceStaffHours($from, $to),
         };
 
         $title = $label.' Report';
@@ -144,5 +173,12 @@ class ReportController extends Controller
         $occ = \App\Models\Bed::where('status', 'occupied')->count();
 
         return $total ? round($occ / $total * 100).'% occupied' : 'No beds yet';
+    }
+
+    protected function presenceStat(): string
+    {
+        $branch = \App\Models\Hostel::find(\App\Support\Tenant::id());
+
+        return $branch?->hasCurfew() ? 'Curfew '.$branch->curfewLabel() : 'No curfew set';
     }
 }

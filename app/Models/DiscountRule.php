@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\DiscountType;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class DiscountRule extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'min_quantity',
         'type',
