@@ -223,12 +223,18 @@ class PresenceService
      */
     public function rebuildState(PresenceProfile $profile): void
     {
-        $latest = PresencePunch::query()
+        // The two most recent known-direction punches: the latest owns the state,
+        // and whether the pair shares a direction re-derives the missed-punch
+        // flag — so a manual correction that resolves a gap clears a stale flag
+        // instead of leaving it stuck on the board (must mirror applyToState()).
+        $known = PresencePunch::query()
             ->where('presence_profile_id', $profile->id)
             ->whereIn('direction', [PresenceState::In->value, PresenceState::Out->value])
             ->orderByDesc('punched_at')
             ->orderByDesc('id')
-            ->first();
+            ->limit(2)->get();
+
+        $latest = $known->first();
 
         if (! $latest) {
             $profile->forceFill([
@@ -241,10 +247,14 @@ class PresenceService
             return;
         }
 
+        $previous = $known->get(1);
+        $missed = $previous !== null && $previous->direction === $latest->direction;
+
         $profile->forceFill([
             'state' => $latest->direction,
             'state_changed_at' => $latest->punched_at,
             'last_punch_id' => $latest->id,
+            'has_missed_punch' => $missed,
         ])->save();
     }
 }

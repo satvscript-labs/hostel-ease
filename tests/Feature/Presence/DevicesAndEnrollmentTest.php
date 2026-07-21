@@ -202,6 +202,17 @@ class DevicesAndEnrollmentTest extends TestCase
         $this->assertNotNull($student->fresh()->presenceProfile);
     }
 
+    public function test_bulk_floor_enroll_rejects_a_floor_from_another_branch(): void
+    {
+        // A real floor id, but belonging to a DIFFERENT hostel. The validation
+        // must reject it (not pass an unscoped exists, then fatal on a null find).
+        $otherHostel = Hostel::factory()->create();
+        $foreignFloor = \App\Models\Floor::create(['hostel_id' => $otherHostel->id, 'name' => 'Foreign']);
+
+        $this->actingAs($this->admin)->post(route('admin.presence.enroll.floor'), ['floor_id' => $foreignFloor->id])
+            ->assertSessionHasErrors('floor_id');
+    }
+
     // ── Quarantine ───────────────────────────────────────────────────────
 
     public function test_matching_an_unmatched_id_binds_it_and_attaches_its_history(): void

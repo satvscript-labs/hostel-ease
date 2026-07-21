@@ -168,6 +168,25 @@ class CurfewBridgeTest extends TestCase
         $this->assertSame(1, Notification::where('type', 'presence.curfew')->count());
     }
 
+    public function test_a_student_leaving_later_in_the_window_is_still_alerted(): void
+    {
+        $this->curfewCoveringNow(notify: true);
+
+        // First check with nobody out yet: no alert — and the window must NOT be
+        // marked notified, or a later leaver would be silenced for the whole window.
+        $this->artisan('hostelease:presence-curfew-check')->assertSuccessful();
+        $this->assertSame(0, Notification::where('type', 'presence.curfew')->count());
+        $this->assertNull($this->hostel->fresh()->curfew_notified_at);
+
+        // Someone leaves during the window; the next check must still alert them.
+        $this->outStudent('Late Leaver');
+        $this->artisan('hostelease:presence-curfew-check')->assertSuccessful();
+
+        $note = Notification::where('type', 'presence.curfew')->first();
+        $this->assertNotNull($note);
+        $this->assertStringContainsString('Late Leaver', $note->message);
+    }
+
     public function test_the_curfew_command_ignores_on_leave_students(): void
     {
         $this->curfewCoveringNow(notify: true);

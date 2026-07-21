@@ -232,6 +232,32 @@ class PresencePipelineTest extends TestCase
         $this->assertSame(PresenceState::Out, $p->fresh()->state);
     }
 
+    public function test_rebuild_after_a_correction_clears_a_stale_missed_flag(): void
+    {
+        $entry = $this->device('entry', 'TW-IN');
+        $p = $this->profile($entry, 'S1');
+
+        // Entered 2 days ago, never scanned out → flagged stale by the detector.
+        $this->service->ingest(collect([$this->punch($entry, 'S1', now()->subDays(2))]));
+        $this->service->flagStaleProfiles();
+        $this->assertTrue($p->fresh()->has_missed_punch);
+
+        // A manual OUT correction lands in the log and rebuild runs: the gap is
+        // now resolved, so the stale flag must clear (not linger on the board).
+        PresencePunch::create([
+            'hostel_id' => $this->hostel->id,
+            'presence_profile_id' => $p->id,
+            'device_user_id' => 'S1',
+            'punched_at' => now(),
+            'direction' => PresenceState::Out,
+            'source' => \App\Enums\Presence\PunchSource::Manual,
+        ]);
+        $this->service->rebuildState($p->fresh());
+
+        $this->assertSame(PresenceState::Out, $p->fresh()->state);
+        $this->assertFalse($p->fresh()->has_missed_punch, 'A correction that resolves the gap must clear the stale flag.');
+    }
+
     // ── Tenancy ──────────────────────────────────────────────────────────
 
     public function test_a_device_user_id_matches_only_within_its_own_hostel(): void

@@ -57,6 +57,10 @@ class PresenceCurfewCheck extends Command
                     ->with('presenceable:id,name')
                     ->get();
 
+                // Only mark the window "alerted" once we actually alert. Setting
+                // it when nobody is out yet would silence the alert for a student
+                // who leaves LATER in the same window (push() self-dedupes by sig,
+                // so re-running until someone is out is safe).
                 if ($out->isNotEmpty()) {
                     $names = $out->take(5)->map(fn ($p) => $p->presenceable?->name)->filter()->implode(', ');
                     $more = $out->count() > 5 ? ' +'.($out->count() - 5).' more' : '';
@@ -67,10 +71,10 @@ class PresenceCurfewCheck extends Command
                         "Still out during curfew ({$hostel->curfew_from}–{$hostel->curfew_to}): {$names}{$more}.",
                         'danger'
                     );
+                    $hostel->forceFill(['curfew_notified_at' => now()])->save();
                     $alerted++;
                 }
 
-                $hostel->forceFill(['curfew_notified_at' => now()])->save();
                 Tenant::clear();
             });
 

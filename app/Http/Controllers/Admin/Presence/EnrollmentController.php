@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Services\ActivityLogger;
 use App\Services\Presence\EnrollmentService;
 use App\Services\Presence\PresenceService;
+use App\Support\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -64,10 +65,18 @@ class EnrollmentController extends Controller
     /** Floor-phased bulk enroll (owner 06 §4) — staged so a terminal isn't swamped. */
     public function enrollFloor(Request $request): RedirectResponse
     {
-        $data = $request->validate(['floor_id' => ['required', Rule::exists('floors', 'id')]]);
+        // Scope the exists check to THIS branch: an unscoped rule would pass a
+        // foreign floor id, then the tenant-scoped Floor::find() below returns
+        // null and $floor->name fatals. Reject it cleanly at validation instead.
+        // Scope the exists check to THIS branch: an unscoped rule would pass a
+        // foreign floor id, then the tenant-scoped Floor::find() below returns
+        // null and $floor->name fatals. Reject it cleanly at validation instead.
+        $data = $request->validate([
+            'floor_id' => ['required', Rule::exists('floors', 'id')->where('hostel_id', Tenant::id())],
+        ]);
 
         $tally = $this->enrollment->enrollStudentFloor((int) $data['floor_id']);
-        $floor = Floor::find($data['floor_id']);
+        $floor = Floor::findOrFail($data['floor_id']);
 
         return back()->with('success',
             "{$floor->name}: {$tally['enrolled']} enrolled, {$tally['skipped']} already active.");
