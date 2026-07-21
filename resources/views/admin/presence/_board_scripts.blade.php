@@ -5,6 +5,7 @@
     function presenceBoard() {
         return {
             polling: false,
+            curfewOpen: false,
             _poll: null, _tick: null,
 
             init() {

@@ -94,10 +94,13 @@ class BoardController extends Controller
 
         $profiles = $query->paginate(20)->withQueryString();
 
+        $branch = \App\Models\Hostel::find(\App\Support\Tenant::id());
+
         return [
             'type' => $type,
             'profiles' => $profiles,
-            'stats' => $this->stats($modelClass, $table, $type),
+            'branch' => $branch,
+            'stats' => $this->stats($modelClass, $table, $type, $branch),
             'freshness' => $this->freshness(),
             'status' => $status,
             'search' => $search,
@@ -112,8 +115,8 @@ class BoardController extends Controller
         ];
     }
 
-    /** @return array{inside:int,out:int,unknown:int,stale:int,not_enrolled:int} */
-    protected function stats(string $modelClass, string $table, string $type): array
+    /** @return array{inside:int,out:int,unknown:int,stale:int,not_enrolled:int,late:int} */
+    protected function stats(string $modelClass, string $table, string $type, ?\App\Models\Hostel $branch): array
     {
         $base = fn () => PresenceProfile::query()
             ->where('presence_profiles.presenceable_type', $modelClass)
@@ -128,13 +131,51 @@ class BoardController extends Controller
             ? Staff::active()->whereDoesntHave('presenceProfile')->count()
             : Student::active()->whereDoesntHave('presenceProfile')->count();
 
+        // Late = out, inside the curfew window, not a known absence (03 §6).
+        // Curfew is a STUDENT concept only (owner feedback) — never staff.
+        $late = 0;
+        if ($type === 'student' && $branch?->inCurfewWindow()) {
+            $late = (int) $base()->where('presence_profiles.state', PresenceState::Out->value)
+                ->where(fn ($q) => $q->whereNull('presence_profiles.on_leave_until')
+                    ->orWhere('presence_profiles.on_leave_until', '<', now()->startOfDay()))
+                ->count();
+        }
+
         return [
             'inside' => (int) ($byState[PresenceState::In->value] ?? 0),
             'out' => (int) ($byState[PresenceState::Out->value] ?? 0),
             'unknown' => (int) ($byState[PresenceState::Unknown->value] ?? 0),
             'stale' => (int) $base()->where('presence_profiles.has_missed_punch', true)->count(),
             'not_enrolled' => $notEnrolled,
+            'late' => $late,
         ];
+    }
+
+    /**
+     * Owner sets the branch curfew WINDOW (03 §6). One control: an on/off toggle
+     * plus a from→to range. Off (or a missing time) clears the whole curfew.
+     */
+    public function saveCurfew(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate([
+            'curfew_enabled' => ['sometimes', 'boolean'],
+            'curfew_from' => ['nullable', 'date_format:H:i'],
+            'curfew_to' => ['nullable', 'date_format:H:i'],
+            'curfew_notify' => ['sometimes', 'boolean'],
+        ]);
+
+        $on = $request->boolean('curfew_enabled') && ! empty($data['curfew_from']) && ! empty($data['curfew_to']);
+
+        $branch = \App\Models\Hostel::findOrFail(\App\Support\Tenant::id());
+        $branch->forceFill([
+            'curfew_from' => $on ? $data['curfew_from'] : null,
+            'curfew_to' => $on ? $data['curfew_to'] : null,
+            'curfew_notify' => $on && $request->boolean('curfew_notify'),
+        ])->save();
+
+        return back()->with('success', $on
+            ? "Curfew set: {$data['curfew_from']} – {$data['curfew_to']}."
+            : 'Curfew turned off.');
     }
 
     /** @return array{synced_at:?\Illuminate\Support\Carbon,online:int,devices:int,ok:bool} */

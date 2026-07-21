@@ -39,10 +39,13 @@
                 PresenceState::In => 'in', PresenceState::Out => 'out', default => 'unknown',
             };
             $lp = $profile->lastPunch;
+            // Curfew is a student concept only (owner feedback) — never on staff.
+            $late = $type === 'student' && $profile->isLate($branch ?? null);
+            $onLeave = $profile->isOnLeave();
         @endphp
 
         {{-- Wide / tablet-reflow row --}}
-        <div class="card shadow-sm rounded-4 he-cq-wide pb-card {{ $state === PresenceState::Out ? 'is-out' : '' }}">
+        <div class="card shadow-sm rounded-4 he-cq-wide pb-card {{ $late ? 'is-late' : ($state === PresenceState::Out ? 'is-out' : '') }}">
             <div class="card-body p-3 p-lg-4 pb-row" style="display: grid;">
                 <div class="pb-row__id">
                     <span class="pb-avatar">{{ $initial }}</span>
@@ -50,7 +53,9 @@
                         <div class="text-truncate">
                             <button type="button" class="pb-name fw-bold text-dark border-0 bg-transparent p-0"
                                     @click="$dispatch('presence-history', { profile: '{{ $profile->public_id }}' })">{{ $person->name }}</button>
-                            @if($stale)<span class="pb-stale" title="{{ __('A scan was likely missed') }}"><i class="fa-solid fa-triangle-exclamation"></i>{{ __('check') }}</span>@endif
+                            @if($late)<span class="pb-late"><i class="fa-solid fa-clock"></i>{{ __('late') }}</span>@endif
+                            @if($onLeave)<span class="pb-leave"><i class="fa-solid fa-plane-departure"></i>{{ __('on leave') }}</span>@endif
+                            @if($stale && ! $onLeave)<span class="pb-stale" title="{{ __('A scan was likely missed') }}"><i class="fa-solid fa-triangle-exclamation"></i>{{ __('check') }}</span>@endif
                         </div>
                         <div class="small text-muted text-truncate">{{ $sub }}</div>
                     </div>
@@ -91,7 +96,11 @@
              @keydown.enter="$dispatch('presence-history', { profile: '{{ $profile->public_id }}' })">
             <span class="pb-avatar" style="width:40px;height:40px;font-size:.85rem;">{{ $initial }}</span>
             <span class="pb-ios__body">
-                <span class="d-block pb-ios__name text-truncate">{{ $person->name }} @if($stale)<i class="fa-solid fa-triangle-exclamation text-warning small"></i>@endif</span>
+                <span class="d-block pb-ios__name text-truncate">{{ $person->name }}
+                    @if($late)<span class="pb-late"><i class="fa-solid fa-clock"></i>{{ __('late') }}</span>
+                    @elseif($onLeave)<i class="fa-solid fa-plane-departure text-muted small"></i>
+                    @elseif($stale)<i class="fa-solid fa-triangle-exclamation text-warning small"></i>@endif
+                </span>
                 <span class="d-block pb-ios__sub text-truncate">
                     {{ $type === 'staff' ? $sub : ($person->activeAssignment?->bed?->room?->room_number ?? __('No room')) }}
                     · {{ strtolower($state->label()) }}@if($dur) <span data-since="{{ $since->toIso8601String() }}">{{ $dur }}</span>@endif

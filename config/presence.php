@@ -39,6 +39,10 @@ return [
         'stale_hours' => (int) env('PRESENCE_STALE_HOURS', 24),
     ],
 
+    // Minutes after the branch curfew before the warden is alerted (03 §6) —
+    // a grace window so a couple of stragglers don't fire it instantly.
+    'curfew_grace_minutes' => (int) env('PRESENCE_CURFEW_GRACE', 30),
+
     // device_user_id scheme: prefix encodes audience so ingest resolves it
     // instantly; the numeric part binds the model (04 §3). S412 / T18.
     'user_id_prefixes' => [

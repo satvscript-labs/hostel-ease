@@ -38,7 +38,18 @@
     <button type="button" class="he-drawer__x" @click="$dispatch('close-history')" onclick="window.dispatchEvent(new CustomEvent('close-history'))" aria-label="{{ __('Close') }}"><i class="fa-solid fa-xmark"></i></button>
 </div>
 
-<div class="he-drawer__body" x-data="{ correcting: false }">
+<div class="he-drawer__body" x-data="{ correcting: false, leaving: false }">
+
+    {{-- On-leave banner (a known absence — curfew flags paused) --}}
+    @if($profile->isOnLeave())
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3 p-2 px-3 rounded-3" style="background: var(--he-bg-surface-raised);">
+            <span class="small fw-semibold text-muted"><i class="fa-solid fa-plane-departure me-1"></i>{{ __('On leave until') }} {{ $profile->on_leave_until->format('d M Y') }}</span>
+            <form method="POST" action="{{ route('admin.presence.history.leave.clear', $profile) }}" class="m-0">
+                @csrf @method('DELETE')
+                <button class="btn btn-sm btn-link text-decoration-none p-0 fw-bold">{{ __('Clear') }}</button>
+            </form>
+        </div>
+    @endif
 
     {{-- Mini-stats --}}
     <div class="hist-stats">
@@ -53,9 +64,25 @@
             <i class="fa-solid fa-pen me-1"></i>{{ __('Correct') }}
         </button>
         <a href="{{ $profileUrl }}" class="btn btn-sm btn-light border rounded-pill fw-bold px-3 tactile-btn"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>{{ __('Profile') }}</a>
+        @unless($profile->isOnLeave())
+            <button type="button" class="he-icon-btn" title="{{ __('Mark on leave') }}" aria-label="{{ __('Mark on leave') }}" @click="leaving = !leaving"><i class="fa-solid fa-plane-departure"></i></button>
+        @endunless
         <form method="POST" action="{{ route('admin.presence.history.reset', $profile) }}" class="m-0" data-confirm="{{ __('Reset this person\'s state to unknown?') }}">
             @csrf
             <button class="he-icon-btn" title="{{ __('Reset state to unknown') }}" aria-label="{{ __('Reset state') }}"><i class="fa-solid fa-rotate-left"></i></button>
+        </form>
+    </div>
+
+    {{-- On-leave form --}}
+    <div class="hist-correct" x-show="leaving" x-collapse x-cloak>
+        <form method="POST" action="{{ route('admin.presence.history.leave', $profile) }}">
+            @csrf
+            <label class="form-label small fw-bold text-uppercase mb-1">{{ __('On leave until') }}</label>
+            <p class="small text-muted mb-2">{{ __('Pauses curfew and missed-scan flags for this person until this date.') }}</p>
+            <div class="d-flex gap-2">
+                <input type="date" name="until" class="form-control form-control-sm bg-light" required min="{{ now()->toDateString() }}" value="{{ now()->addDays(2)->toDateString() }}">
+                <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold text-nowrap">{{ __('Set') }}</button>
+            </div>
         </form>
     </div>
 

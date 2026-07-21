@@ -8,7 +8,7 @@
                 <div class="he-stat__icon" style="background: rgba(255,255,255,0.15); color: #fbbf24;"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
                 <div class="he-stat__label">{{ __('Currently Out') }}</div>
             </div>
-            <div class="he-stat__value">{{ $stats['out'] }}</div>
+            <div class="he-stat__value">{{ $stats['out'] }}@if(($stats['late'] ?? 0) > 0) <span class="fs-6" style="color:#fca5a5;">· {{ $stats['late'] }} {{ __('past curfew') }}</span>@endif</div>
         </div>
         <div class="he-stat">
             <div class="he-stat__head">

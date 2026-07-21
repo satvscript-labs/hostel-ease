@@ -31,6 +31,10 @@ class Hostel extends Model
         'logo',
         'settings',
         'registration_token',
+        'curfew_from',
+        'curfew_to',
+        'curfew_notify',
+        'curfew_notified_at',
     ];
 
     /** Ensure (and return) the public self-registration token for this hostel. */
@@ -59,7 +63,61 @@ class Hostel extends Model
             'subscription_start' => 'date',
             'subscription_end' => 'date',
             'settings' => 'array',
+            'curfew_notify' => 'boolean',
+            'curfew_notified_at' => 'datetime',
         ];
+    }
+
+    /** A curfew window is configured (both ends set). */
+    public function hasCurfew(): bool
+    {
+        return filled($this->curfew_from) && filled($this->curfew_to);
+    }
+
+    /**
+     * Is the given time inside the curfew window? Handles a window that crosses
+     * midnight (22:00 → 06:00). Being OUT during this window is "late".
+     */
+    public function inCurfewWindow(?\Illuminate\Support\Carbon $at = null): bool
+    {
+        if (! $this->hasCurfew()) {
+            return false;
+        }
+        $at ??= now();
+        $mins = $at->hour * 60 + $at->minute;
+        [$fh, $fm] = array_pad(explode(':', $this->curfew_from), 2, 0);
+        [$th, $tm] = array_pad(explode(':', $this->curfew_to), 2, 0);
+        $from = (int) $fh * 60 + (int) $fm;
+        $to = (int) $th * 60 + (int) $tm;
+
+        return $from <= $to
+            ? ($mins >= $from && $mins < $to)         // same-day window
+            : ($mins >= $from || $mins < $to);        // crosses midnight
+    }
+
+    /**
+     * The instant the CURRENT curfew window began (for once-per-window alert
+     * dedupe), or null if not currently in a window.
+     */
+    public function curfewWindowStart(): ?\Illuminate\Support\Carbon
+    {
+        if (! $this->inCurfewWindow()) {
+            return null;
+        }
+        [$fh, $fm] = array_pad(explode(':', $this->curfew_from), 2, 0);
+        $start = now()->setTime((int) $fh, (int) $fm, 0);
+        // If "from" is later today than now, the active window began yesterday.
+        if ($start->gt(now())) {
+            $start = $start->subDay();
+        }
+
+        return $start;
+    }
+
+    /** "22:00 – 06:00" for display. */
+    public function curfewLabel(): ?string
+    {
+        return $this->hasCurfew() ? "{$this->curfew_from} – {$this->curfew_to}" : null;
     }
 
     /**

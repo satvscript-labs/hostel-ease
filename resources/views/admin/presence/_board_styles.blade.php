@@ -44,6 +44,22 @@
         background: var(--he-warning-soft); color: #b45309; margin-left: 0.4rem;
     }
 
+    .pb-curfew {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.4rem 0.85rem; border-radius: var(--he-radius-full);
+        border: 1px solid rgba(0,0,0,0.08); background: var(--he-bg-surface);
+        font-size: 0.76rem; font-weight: 700; color: var(--he-text-muted);
+        transition: all 0.18s var(--ease-out-expo); cursor: pointer;
+    }
+    .pb-curfew:hover { border-color: var(--he-primary); color: var(--he-primary); }
+    .pb-curfew.is-set { background: var(--he-primary-soft); border-color: transparent; color: var(--he-primary); }
+
+    /* On/off switch in the curfew modal. */
+    .cf-switch { width: 46px; height: 26px; border-radius: 999px; background: #cbd5e1; position: relative; flex-shrink: 0; transition: background 0.2s var(--ease-out-expo); }
+    .cf-switch.is-on { background: var(--he-primary); }
+    .cf-switch__knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s var(--ease-out-expo); }
+    .cf-switch.is-on .cf-switch__knob { transform: translateX(20px); }
+
     .pb-dur { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--he-text-main); }
     .pb-last { font-size: 0.8rem; color: var(--he-text-muted); white-space: nowrap; }
     .pb-last b { color: var(--he-text-main); font-weight: 600; }
@@ -62,6 +78,20 @@
         transition: border-color 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
     }
     .pb-card.is-out { border-left-color: var(--he-warning); }
+    .pb-card.is-late { border-left-color: var(--he-danger); background: linear-gradient(90deg, rgba(239,68,68,0.04), transparent 40%); }
+
+    .pb-late {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        margin-left: 0.4rem; padding: 0.15rem 0.5rem; border-radius: var(--he-radius-full);
+        font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        background: var(--he-danger); color: #fff;
+    }
+    .pb-leave {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        margin-left: 0.4rem; padding: 0.15rem 0.5rem; border-radius: var(--he-radius-full);
+        font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        background: var(--he-bg-surface-raised); color: var(--he-text-muted);
+    }
     .pb-card.is-flash { animation: pb-flash 1.4s var(--ease-out-expo); }
     @keyframes pb-flash { 0%{background:var(--he-primary-soft)} 100%{background:var(--he-bg-surface)} }
 

@@ -90,6 +90,25 @@ class HistoryController extends Controller
         return back()->with('success', "Correction saved — {$name} marked ".($data['direction'] === 'in' ? 'inside' : 'out').'.');
     }
 
+    /** Mark a known absence (gone home / on leave) — suppresses curfew flags. */
+    public function setLeave(Request $request, PresenceProfile $profile): RedirectResponse
+    {
+        $data = $request->validate(['until' => ['required', 'date', 'after_or_equal:today']]);
+        $profile->forceFill(['on_leave_until' => Carbon::parse($data['until'])])->save();
+
+        $name = $profile->presenceable?->name ?? 'this person';
+        $this->logger->log('presence.leave', "Marked {$name} on leave until {$data['until']}", $profile);
+
+        return back()->with('success', "{$name} marked on leave — curfew alerts paused until ".Carbon::parse($data['until'])->format('d M').'.');
+    }
+
+    public function clearLeave(PresenceProfile $profile): RedirectResponse
+    {
+        $profile->forceFill(['on_leave_until' => null])->save();
+
+        return back()->with('success', 'Leave cleared.');
+    }
+
     public function reset(PresenceProfile $profile): RedirectResponse
     {
         $profile->forceFill([

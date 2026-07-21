@@ -26,7 +26,7 @@ class PresenceProfile extends Model
     protected $fillable = [
         'hostel_id', 'presenceable_type', 'presenceable_id', 'device_user_id',
         'card_number', 'state', 'state_changed_at', 'last_punch_id',
-        'has_missed_punch', 'enrollment_status', 'enrolled_at',
+        'has_missed_punch', 'on_leave_until', 'enrollment_status', 'enrolled_at',
     ];
 
     protected function casts(): array
@@ -36,8 +36,27 @@ class PresenceProfile extends Model
             'enrollment_status' => EnrollmentStatus::class,
             'has_missed_punch' => 'boolean',
             'state_changed_at' => 'datetime',
+            'on_leave_until' => 'date',
             'enrolled_at' => 'datetime',
         ];
+    }
+
+    /** A known absence (gone home / on leave) — suppresses curfew + stale flags. */
+    public function isOnLeave(): bool
+    {
+        return $this->on_leave_until !== null && $this->on_leave_until->gte(now()->startOfDay());
+    }
+
+    /**
+     * "Late" = out, inside the branch curfew window, and not a known absence.
+     * The person a warden actually needs to chase (03 §6). Students only —
+     * callers gate on person type. Pass the branch to avoid an N+1 per row.
+     */
+    public function isLate(?\App\Models\Hostel $branch): bool
+    {
+        return (bool) $branch?->inCurfewWindow()
+            && $this->state === PresenceState::Out
+            && ! $this->isOnLeave();
     }
 
     public function presenceable(): MorphTo

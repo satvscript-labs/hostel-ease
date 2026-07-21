@@ -328,6 +328,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::post('history/{profile}/correct', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'correct'])->name('history.correct');
                 Route::post('history/{profile}/reset', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'reset'])->name('history.reset');
 
+                // Curfew (P5) + on-leave marker
+                Route::post('curfew', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'saveCurfew'])->name('curfew');
+                Route::post('history/{profile}/leave', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'setLeave'])->name('history.leave');
+                Route::delete('history/{profile}/leave', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'clearLeave'])->name('history.leave.clear');
+
                 Route::get('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'index'])->name('devices');
 
                 // Device registry
