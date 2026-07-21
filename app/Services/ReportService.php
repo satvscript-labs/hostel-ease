@@ -8,6 +8,13 @@ use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\PaymentMode;
 use App\Models\Invoice;
+use App\Enums\Presence\PresenceState;
+use App\Models\Hostel;
+use App\Models\PresenceProfile;
+use App\Models\PresencePunch;
+use App\Models\Staff;
+use App\Models\Student;
+use App\Support\Tenant;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 
@@ -347,5 +354,227 @@ class ReportService
             ],
             'chart' => null, // per-bill rows don't chart meaningfully
         ];
+    }
+
+    // ═══════════════════════ Presence (P6) ═══════════════════════════════
+
+    /**
+     * Punches in range for one person type, grouped by profile, each group
+     * sorted ascending. One query; the pairing below is pure PHP.
+     *
+     * @return \Illuminate\Support\Collection<int, array{profile: PresenceProfile, punches: \Illuminate\Support\Collection}>
+     */
+    protected function presencePunches(Carbon $from, Carbon $to, string $modelClass): \Illuminate\Support\Collection
+    {
+        $profiles = PresenceProfile::query()->enrolled()
+            ->where('presenceable_type', $modelClass)
+            ->with(['presenceable' => fn ($m) => $m->morphWith([
+                Student::class => ['activeAssignment.bed.room'],
+                Staff::class => [],
+            ])])
+            ->get()->keyBy('id');
+
+        if ($profiles->isEmpty()) {
+            return collect();
+        }
+
+        return PresencePunch::query()
+            ->whereIn('presence_profile_id', $profiles->keys())
+            ->whereBetween('punched_at', [$from, $to])
+            ->whereIn('direction', [PresenceState::In->value, PresenceState::Out->value])
+            ->orderBy('punched_at')->orderBy('id')
+            ->get(['presence_profile_id', 'punched_at', 'direction'])
+            ->groupBy('presence_profile_id')
+            ->map(fn ($punches, $pid) => ['profile' => $profiles[$pid], 'punches' => $punches])
+            ->values();
+    }
+
+    protected function roomOf(PresenceProfile $p): string
+    {
+        $room = $p->presenceable?->activeAssignment?->bed?->room;
+
+        return $room ? ('Room '.$room->room_number) : '—';
+    }
+
+    /** How long students spend OUT — out→in sessions and their hours. */
+    public function presenceTimeOut(Carbon $from, Carbon $to): array
+    {
+        $rows = collect();
+        $grandSeconds = 0;
+        $grandSessions = 0;
+
+        foreach ($this->presencePunches($from, $to, Student::class) as $entry) {
+            [$sessions, $seconds] = $this->pairSessions($entry['punches'], PresenceState::Out);
+            if ($sessions === 0) {
+                continue;
+            }
+            $grandSeconds += $seconds;
+            $grandSessions += $sessions;
+            $rows->push([
+                $entry['profile']->presenceable?->name ?? '—',
+                $this->roomOf($entry['profile']),
+                $sessions,
+                round($seconds / 3600, 1),
+                round($seconds / 3600 / $sessions, 1),
+            ]);
+        }
+
+        $rows = $rows->sortByDesc(3)->values();
+        $totalHours = round($grandSeconds / 3600, 1);
+
+        return [
+            'headings' => ['Student', 'Room', 'Out Sessions', 'Total Hours Out', 'Avg Hours / Session'],
+            'rows' => $rows->all(),
+            'money' => [],
+            'total' => null,
+            'summary' => [
+                ['person-walking-arrow-right', 'Students Out', (string) $rows->count(), 'hero'],
+                ['hourglass-half', 'Total Hours Out', (string) $totalHours],
+                ['repeat', 'Out Sessions', (string) $grandSessions],
+            ],
+            'chart' => null,
+        ];
+    }
+
+    /** Late returns — an IN punch that landed inside the curfew window. */
+    public function presenceLateReturns(Carbon $from, Carbon $to): array
+    {
+        $branch = Hostel::find(Tenant::id());
+        $empty = [
+            'headings' => ['Student', 'Room', 'Late Returns', 'Last Late Return'],
+            'rows' => [], 'money' => [], 'total' => null, 'chart' => null,
+        ];
+
+        if (! $branch?->hasCurfew()) {
+            return $empty + ['summary' => [['clock', 'Curfew', 'Not set', 'danger']]];
+        }
+
+        $rows = collect();
+        $grand = 0;
+        foreach ($this->presencePunches($from, $to, Student::class) as $entry) {
+            $late = $entry['punches']->filter(fn ($p) => $p->direction === PresenceState::In
+                && $branch->inCurfewWindow($p->punched_at));
+            if ($late->isEmpty()) {
+                continue;
+            }
+            $grand += $late->count();
+            $rows->push([
+                $entry['profile']->presenceable?->name ?? '—',
+                $this->roomOf($entry['profile']),
+                $late->count(),
+                $late->max('punched_at')->format('d M · H:i'),
+            ]);
+        }
+
+        return [
+            'headings' => ['Student', 'Room', 'Late Returns', 'Last Late Return'],
+            'rows' => $rows->sortByDesc(2)->values()->all(),
+            'money' => [], 'total' => null,
+            'summary' => [
+                ['clock', 'Late Returns', (string) $grand, 'hero'],
+                ['users', 'Students', (string) $rows->count()],
+                ['moon', 'Curfew', $branch->curfewLabel()],
+            ],
+            'chart' => null,
+        ];
+    }
+
+    /**
+     * Nights out — nights a student was away overnight. Honest heuristic: an OUT
+     * after 20:00 with no IN before 08:00 the next morning counts as one night.
+     */
+    public function presenceNightsOut(Carbon $from, Carbon $to): array
+    {
+        $rows = collect();
+        $grand = 0;
+
+        foreach ($this->presencePunches($from, $to, Student::class) as $entry) {
+            $punches = $entry['punches']->values();
+            $nights = 0;
+            foreach ($punches as $i => $p) {
+                if ($p->direction !== PresenceState::Out || $p->punched_at->hour < 20) {
+                    continue;
+                }
+                $morning = $p->punched_at->copy()->addDay()->setTime(8, 0);
+                $returned = $punches->slice($i + 1)->contains(fn ($q) => $q->direction === PresenceState::In
+                    && $q->punched_at->lte($morning));
+                if (! $returned) {
+                    $nights++;
+                }
+            }
+            if ($nights > 0) {
+                $grand += $nights;
+                $rows->push([$entry['profile']->presenceable?->name ?? '—', $this->roomOf($entry['profile']), $nights]);
+            }
+        }
+
+        return [
+            'headings' => ['Student', 'Room', 'Nights Out'],
+            'rows' => $rows->sortByDesc(2)->values()->all(),
+            'money' => [], 'total' => null,
+            'summary' => [
+                ['moon', 'Nights Out', (string) $grand, 'hero'],
+                ['users', 'Students', (string) $rows->count()],
+            ],
+            'chart' => null,
+        ];
+    }
+
+    /** Staff on-premises hours — in→out sessions and their hours. */
+    public function presenceStaffHours(Carbon $from, Carbon $to): array
+    {
+        $rows = collect();
+        $grandSeconds = 0;
+
+        foreach ($this->presencePunches($from, $to, Staff::class) as $entry) {
+            [$sessions, $seconds] = $this->pairSessions($entry['punches'], PresenceState::In);
+            if ($sessions === 0) {
+                continue;
+            }
+            $grandSeconds += $seconds;
+            $rows->push([
+                $entry['profile']->presenceable?->name ?? '—',
+                $entry['profile']->presenceable?->designation ?: 'Staff',
+                $sessions,
+                round($seconds / 3600, 1),
+            ]);
+        }
+
+        return [
+            'headings' => ['Staff', 'Designation', 'Sessions', 'Hours On Premises'],
+            'rows' => $rows->sortByDesc(3)->values()->all(),
+            'money' => [], 'total' => null,
+            'summary' => [
+                ['business-time', 'Total Hours', (string) round($grandSeconds / 3600, 1), 'hero'],
+                ['users', 'Staff Tracked', (string) $rows->count()],
+            ],
+            'chart' => null,
+        ];
+    }
+
+    /**
+     * Pair punches into sessions that START with $startDir and close on the
+     * opposite. Returns [sessionCount, totalSeconds]. Open trailing sessions
+     * (started, never closed in range) are ignored — we only measure completed
+     * ones, so the figure never guesses.
+     *
+     * @return array{0:int,1:int}
+     */
+    protected function pairSessions(\Illuminate\Support\Collection $punches, PresenceState $startDir): array
+    {
+        $sessions = 0;
+        $seconds = 0;
+        $openAt = null;
+        foreach ($punches as $p) {
+            if ($p->direction === $startDir && $openAt === null) {
+                $openAt = $p->punched_at;
+            } elseif ($p->direction === $startDir->opposite() && $openAt !== null) {
+                $seconds += $openAt->diffInSeconds($p->punched_at);
+                $sessions++;
+                $openAt = null;
+            }
+        }
+
+        return [$sessions, $seconds];
     }
 }
