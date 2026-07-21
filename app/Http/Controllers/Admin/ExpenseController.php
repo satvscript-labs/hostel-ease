@@ -34,7 +34,7 @@ class ExpenseController extends Controller
 
         // W6.2: search/filter moved server-side (the old page filtered
         // client-side over an unbounded ->get()) and the list paginates.
-        $expensesQuery = Expense::with('recorder', 'salaryPayment.staff')
+        $expensesQuery = Expense::with(['recorder', 'salaryPayment.staff' => fn ($q) => $q->withTrashed()])
             ->whereBetween('expense_date', [$from, $to])
             ->when($category, fn ($q) => $q->where('category', $category))
             ->when($search, fn ($q) => $q->where(function ($query) use ($search) {

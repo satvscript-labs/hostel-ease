@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StaffSalaryPayment extends Model
 {
-    use BelongsToHostel, SoftDeletes;
+    use BelongsToHostel, HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'hostel_id', 'staff_id', 'salary_month', 'amount',

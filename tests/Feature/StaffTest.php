@@ -591,7 +591,7 @@ class StaffTest extends TestCase
         ]);
 
         $payment = StaffSalaryPayment::firstOrFail();
-        $this->delete(route('admin.staff.salary.destroy', [$staff->id, $payment->id]))
+        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment]))
             ->assertSessionHas('success');
 
         // A phantom expense left behind would inflate the P&L forever.
@@ -635,9 +635,9 @@ class StaffTest extends TestCase
 
         $this->delete(route('admin.staff.destroy', $staff));
 
-        $this->get(route('admin.staff.show', $staff->id))->assertOk()->assertSee('Govind');
+        $this->get(route('admin.staff.show', $staff))->assertOk()->assertSee('Govind');
 
-        $this->delete(route('admin.staff.salary.destroy', [$staff->id, $payment->id]))
+        $this->delete(route('admin.staff.salary.destroy', [$staff, $payment]))
             ->assertSessionHas('success');
         $this->assertSame(0, Expense::count());
     }
@@ -652,7 +652,7 @@ class StaffTest extends TestCase
         $removed = $this->get(route('admin.staff.index', ['status' => 'removed']))->assertOk()->viewData('staff');
         $this->assertCount(1, $removed);
 
-        $this->post(route('admin.staff.restore', $staff->id))->assertSessionHas('success');
+        $this->post(route('admin.staff.restore', $staff))->assertSessionHas('success');
         $this->assertNotSoftDeleted('staff', ['id' => $staff->id]);
         $this->assertCount(1, $this->get(route('admin.staff.index'))->viewData('staff'));
     }
@@ -663,11 +663,47 @@ class StaffTest extends TestCase
         $staff = $this->staff();
         $this->delete(route('admin.staff.destroy', $staff));
 
-        $this->post(route('admin.staff.salary', $staff->id), [
+        $this->post(route('admin.staff.salary', $staff), [
             'salary_month' => now()->format('Y-m'), 'amount' => 12000,
             'paid_on' => now()->toDateString(), 'mode' => 'cash',
         ])->assertNotFound();
 
         $this->assertSame(0, StaffSalaryPayment::count());
+    }
+
+    // ── Public-ID hardening (U1): opaque ULID route key ───────────────────
+
+    public function test_staff_get_a_public_id_and_the_profile_url_uses_it(): void
+    {
+        $staff = $this->staff();
+
+        $this->assertSame(26, strlen($staff->public_id));
+        $this->assertSame($staff->public_id, $staff->getRouteKey());
+
+        $url = route('admin.staff.show', $staff);
+        $this->assertStringEndsWith('/'.$staff->public_id, $url);
+
+        // Opaque URL resolves; the old sequential integer no longer does.
+        $this->get($url)->assertOk();
+        $this->get('/admin/staff/'.$staff->id)->assertNotFound();
+    }
+
+    /**
+     * The whereNumber('staff') landmine: restore/aadhaar used to constrain the
+     * route param to digits, which would 404 an alphanumeric ULID. Removed in
+     * U1 — a trashed staff still restores by its opaque id.
+     */
+    public function test_a_trashed_staff_restores_via_its_opaque_id(): void
+    {
+        $staff = $this->staff();
+        $this->delete(route('admin.staff.destroy', $staff));
+        $this->assertSoftDeleted('staff', ['id' => $staff->id]);
+
+        // The URL carries the ULID, not a number — and it still works.
+        $restoreUrl = route('admin.staff.restore', $staff);
+        $this->assertStringContainsString($staff->public_id, $restoreUrl);
+
+        $this->post($restoreUrl)->assertSessionHas('success');
+        $this->assertNotSoftDeleted('staff', ['id' => $staff->id]);
     }
 }

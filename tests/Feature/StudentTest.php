@@ -151,6 +151,11 @@ class StudentTest extends TestCase
      * middleware, so route-model bindings resolved with the TenantScope
      * no-opped — any admin could open any hostel's student by URL id. The
      * priority fix in bootstrap/app.php binds the tenant first; this pins it.
+     *
+     * Passes the MODEL, so the URL carries a real, resolvable opaque id
+     * (public-id hardening). Passing a raw integer here would 404 simply
+     * because no such public_id exists — which would quietly stop testing the
+     * tenant boundary this exists to protect.
      */
     public function test_cross_tenant_student_profile_is_not_found(): void
     {
@@ -158,7 +163,7 @@ class StudentTest extends TestCase
         $foreign = Student::create(['hostel_id' => $other->id, 'name' => 'Foreign Student',
             'mobile' => '9222222222', 'occupation_type' => 'student', 'status' => 'active']);
 
-        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign->id))
+        $this->actingAs($this->admin)->get(route('admin.students.show', $foreign))
             ->assertNotFound();
     }
 
@@ -217,4 +222,35 @@ class StudentTest extends TestCase
             'fee_amount' => 50000,
         ])->assertRedirect(route('admin.students.show', $student));
     }
+
+    // ── Public-ID hardening (U0): opaque ULID route key ───────────────────
+
+    /** Every student gets a 26-char ULID public_id on create; the PK is untouched. */
+    public function test_a_student_is_assigned_a_public_id_on_create(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'ULID Kid',
+            'mobile' => '9555500000', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $this->assertNotNull($student->public_id);
+        $this->assertSame(26, strlen($student->public_id));
+        // Route key is the opaque id, not the integer PK.
+        $this->assertSame($student->public_id, $student->getRouteKey());
+        $this->assertNotSame((string) $student->id, $student->getRouteKey());
+    }
+
+    /** The profile URL carries the ULID, never the sequential integer id. */
+    public function test_the_profile_url_uses_the_public_id_not_the_integer(): void
+    {
+        $student = Student::create(['hostel_id' => $this->hostel->id, 'name' => 'No Enum',
+            'mobile' => '9555511111', 'occupation_type' => 'student', 'status' => 'active']);
+
+        $url = route('admin.students.show', $student);
+        $this->assertStringContainsString($student->public_id, $url);
+        $this->assertStringEndsWith('/'.$student->public_id, $url);
+
+        // Opaque URL resolves; guessing the sequential integer no longer does.
+        $this->actingAs($this->admin)->get($url)->assertOk();
+        $this->actingAs($this->admin)->get('/admin/students/'.$student->id)->assertNotFound();
+    }
+
 }

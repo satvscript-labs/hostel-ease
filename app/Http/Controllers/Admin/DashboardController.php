@@ -61,6 +61,24 @@ class DashboardController extends Controller
             'occupancy_pct' => $totalBeds > 0 ? round(($occupiedBeds / $totalBeds) * 100, 1) : 0,
         ];
 
+        // Presence tile (P5) — only meaningful once the gate module is set up.
+        $stats['presence_configured'] = \App\Models\PresenceDevice::exists()
+            || \App\Models\PresenceProfile::where('presenceable_type', Student::class)->exists();
+        $stats['presence_out'] = 0;
+        $stats['presence_late'] = 0;
+        if ($stats['presence_configured']) {
+            $outQuery = \App\Models\PresenceProfile::query()
+                ->where('presenceable_type', Student::class)->enrolled()
+                ->where('state', \App\Enums\Presence\PresenceState::Out->value);
+            $stats['presence_out'] = (clone $outQuery)->count();
+            $branch = \App\Models\Hostel::find(\App\Support\Tenant::id());
+            if ($branch?->inCurfewWindow()) {
+                $stats['presence_late'] = (clone $outQuery)
+                    ->where(fn ($q) => $q->whereNull('on_leave_until')->orWhere('on_leave_until', '<', now()->startOfDay()))
+                    ->count();
+            }
+        }
+
         // Monthly collection for the last 6 months (grouped in PHP — DB-agnostic).
         $months = collect(range(0, 5))->map(fn ($i) => now()->subMonths(5 - $i)->format('Y-m'));
         $collection = Payment::income()->where('paid_on', '>=', now()->subMonths(5)->startOfMonth())

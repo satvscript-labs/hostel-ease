@@ -58,6 +58,56 @@ class AccountBillingService
         return $owner ? $this->accountFor($owner) : null;
     }
 
+    /**
+     * The account a VIEWER should be shown.
+     *
+     * accountFor() is a firstOrCreate keyed on owner_id, so calling it with
+     * `$request->user()` mints an account for whoever is looking. A co-admin is
+     * also a `hostel_admin` (there is no separate role), so merely opening
+     * Settings or the Subscription page silently turned them into a "customer"
+     * of their own — a phantom trial account in the Super Admin's Customers
+     * list, owning no branches.
+     *
+     * A co-admin belongs to the OWNER's account. Resolve that first; an account
+     * is only ever created for someone who genuinely owns a branch.
+     */
+    public function accountForViewer(User $viewer): SubscriptionAccount
+    {
+        return $this->accountFor($this->ownerForViewer($viewer));
+    }
+
+    public function ownerForViewer(User $viewer): User
+    {
+        $accessibleIds = $viewer->accessibleHostelIds();
+
+        // 1. They own one of the branches they can see — they ARE the owner.
+        if (Hostel::whereIn('id', $accessibleIds)->where('owner_id', $viewer->id)->exists()) {
+            return $viewer;
+        }
+
+        // 2. They already hold an account: never strand an existing one (e.g. a
+        //    freshly-registered owner whose branch FK isn't linked yet).
+        if (SubscriptionAccount::where('owner_id', $viewer->id)->exists()) {
+            return $viewer;
+        }
+
+        // 3. Co-admin: the account is the one owning the branches they work in.
+        //    The explicit FK is the authority (P4 item 14) — deterministic, and
+        //    read-only here, so a page view can never re-point ownership.
+        $ownerId = Hostel::whereIn('id', $accessibleIds)
+            ->whereNotNull('owner_id')
+            ->where('owner_id', '!=', $viewer->id)
+            ->value('owner_id');
+
+        if ($ownerId && $owner = User::find($ownerId)) {
+            return $owner;
+        }
+
+        // 4. Nothing resolvable (legacy row with no owner FK, or a brand-new
+        //    owner mid-provision) — unchanged from previous behaviour.
+        return $viewer;
+    }
+
     public function ownerForBranch(Hostel $branch): ?User
     {
         // The explicit owner FK is the authority (P4 item 14) — deterministic,

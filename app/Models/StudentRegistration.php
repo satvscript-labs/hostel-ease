@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToHostel;
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentRegistration extends Model
 {
-    use BelongsToHostel;
+    use BelongsToHostel, HasPublicId;
 
     protected $fillable = [
         'hostel_id', 'name', 'mobile', 'father_mobile', 'mother_mobile',

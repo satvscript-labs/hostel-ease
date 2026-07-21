@@ -102,7 +102,11 @@
             <form method="POST" :action="editUrl" data-ring-required class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': editModalOpen }" @click.stop>
                 @csrf @method('PUT')
                 <input type="hidden" name="is_edit" value="1">
-                <input type="hidden" name="hostel_id" x-model="e_id">
+                {{-- Carries the hostel's OPAQUE public id (public-id hardening U4), purely so a
+                     validation bounce can rebuild `editUrl` below. Deliberately NOT named
+                     `hostel_id`: that name means a real integer DB id elsewhere (AdminController
+                     validates `exists:hostels,id`), and this is not that. --}}
+                <input type="hidden" name="hostel_public_id" x-model="e_id">
 
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Edit Hostel</h5>
@@ -218,7 +222,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         // Edit form
-        e_id: {!! json_encode(old('is_edit') ? old('hostel_id', '') : '') !!},
+        e_id: {!! json_encode(old('is_edit') ? old('hostel_public_id', '') : '') !!},
         e_name: {!! json_encode(old('is_edit') ? old('name', '') : '') !!},
         e_owner_name: {!! json_encode(old('is_edit') ? old('owner_name', '') : '') !!},
         e_mobile: {!! json_encode(old('is_edit') ? old('mobile', '') : '') !!},
@@ -230,7 +234,7 @@ document.addEventListener('alpine:init', () => {
         e_start: {!! json_encode(old('is_edit') ? old('subscription_start', '') : '') !!},
         e_end: {!! json_encode(old('is_edit') ? old('subscription_end', '') : '') !!},
         e_status: {!! json_encode(old('is_edit') ? old('status', '') : '') !!},
-        editUrl: {!! json_encode(old('is_edit') && old('hostel_id') ? url('superadmin/hostels/'.old('hostel_id')) : '') !!},
+        editUrl: {!! json_encode(old('is_edit') && old('hostel_public_id') ? url('superadmin/hostels/'.old('hostel_public_id')) : '') !!},
 
         // W12: rows swapped in by the fragment router carry their OWN payload
         // (an object) — the page-load hostelsJson map only knows page 1, so an

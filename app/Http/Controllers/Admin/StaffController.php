@@ -178,12 +178,25 @@ class StaffController extends Controller
             $byDay[$key] ??= (object) [];
         }
 
+        // Presence bridge (P5): which staff were seen at the gate on each strip
+        // day — a *suggestion* the admin confirms, never an auto-write to payroll.
+        $suggested = [];
+        \App\Models\PresencePunch::query()
+            ->join('presence_profiles', 'presence_profiles.id', '=', 'presence_punches.presence_profile_id')
+            ->where('presence_profiles.presenceable_type', Staff::class)
+            ->whereBetween('presence_punches.punched_at', [$stripStart->copy()->startOfDay(), $stripEnd->copy()->endOfDay()])
+            ->get(['presence_punches.punched_at', 'presence_profiles.presenceable_id'])
+            ->each(function ($row) use (&$suggested) {
+                $suggested[$row->punched_at->format('Y-m-d')][(string) $row->presenceable_id] = true;
+            });
+
         return [
             'date' => $date->toDateString(),
             'label' => $date->isSameDay($today) ? __('Today') : $date->format('l, j M Y'),
             'strip' => $strip,
             'marks' => $byDay,
             'roster' => $roster,
+            'suggested' => $suggested,
             'prev' => $date->copy()->subDays(7)->toDateString(),
             'next' => $date->copy()->addDays(7)->min($today)->toDateString(),
             'today' => $today->toDateString(),
@@ -306,18 +319,22 @@ class StaffController extends Controller
         return back()->with('success', "{$staff->name} removed — salary history kept.");
     }
 
-    public function restore(int $staff): RedirectResponse
+    public function restore(Staff $staff): RedirectResponse
     {
-        $record = Staff::onlyTrashed()->findOrFail($staff);
-        $record->restore();
+        // Bound withTrashed on the route (public-id hardening U1: the route key
+        // is now the opaque ULID, so we can't hand-cast the param to an int and
+        // look it up — the binding resolves the soft-deleted row for us).
+        $staff->restore();
 
-        $this->logger->log('staff.restore', "Staff restored — {$record->name}", $record);
+        $this->logger->log('staff.restore', "Staff restored — {$staff->name}", $staff);
 
-        return back()->with('success', "{$record->name} restored.");
+        return back()->with('success', "{$staff->name} restored.");
     }
 
     public function show(Staff $staff): View
     {
+        $staff->load('presenceProfile'); // last-seen chip (P4)
+
         $monthStart = now()->startOfMonth()->toDateString();
         $monthEnd = now()->endOfMonth()->toDateString();
 

@@ -345,7 +345,9 @@
                 <div class="su-list">
                 @forelse($users as $u)
                     @php($isCoAdmin = $u->isHostelAdmin())
-                    @php($ud = ['id' => $u->id, 'name' => $u->name, 'mobile' => $u->mobile, 'role' => $u->role,
+                    {{-- `id` stays the integer (form state); `public_id` is what the
+                         edit URL is built from (public-id hardening U4). --}}
+                    @php($ud = ['id' => $u->id, 'public_id' => $u->public_id, 'name' => $u->name, 'mobile' => $u->mobile, 'role' => $u->role,
                         'roleLabel' => $isCoAdmin ? __('Admin') : ($roles[$u->role] ?? ucfirst($u->role)),
                         'branches' => $u->hostels->pluck('id')->all(), 'is_active' => (bool) $u->is_active,
                         'isCoAdmin' => $isCoAdmin,
@@ -495,7 +497,7 @@
                         @if($viewerIsOwner && $branch->owner_id === $owner->id)
                             <button type="button" class="st-mini st-mini--btn ms-auto tactile-btn"
                                     title="{{ __('Edit branch details') }}"
-                                    @click="openRenameModal({{ $branch->id }}, @js($branch->name), @js($branch->address), @js($branch->city))">
+                                    @click="openRenameModal(@js($branch->public_id), @js($branch->name), @js($branch->address), @js($branch->city))">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                         @endif
@@ -507,7 +509,7 @@
                                 <i class="fa-solid fa-circle-check"></i> {{ __('Current branch') }}
                             </div>
                         @else
-                            <a href="{{ route('branch.switch', $branch->id) }}" class="btn btn-primary rounded-pill flex-grow-1 fw-bold shadow-sm tactile-btn">
+                            <a href="{{ route('branch.switch', $branch) }}" class="btn btn-primary rounded-pill flex-grow-1 fw-bold shadow-sm tactile-btn">
                                 <i class="fa-solid fa-right-left me-1"></i> {{ __('Switch') }}
                             </a>
                         @endif
@@ -873,7 +875,7 @@
                 if (user) {
                     m.isEdit = true;
                     m.title = '{{ __('Edit User') }}';
-                    m.action = '{{ url('admin/users') }}/' + user.id;
+                    m.action = '{{ url('admin/users') }}/' + user.public_id;
                     m.method = 'PUT';
                     m.form = {
                         id: user.id,

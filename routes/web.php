@@ -294,7 +294,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             Route::middleware('access:staff')->group(function () {
                 Route::post('staff/attendance', [\App\Http\Controllers\Admin\StaffController::class, 'saveAttendance'])->name('staff.attendance.save');
                 Route::post('staff/{staff}/restore', [\App\Http\Controllers\Admin\StaffController::class, 'restore'])
-                    ->whereNumber('staff')->name('staff.restore');
+                    ->withTrashed()->name('staff.restore');
                 Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class)->only(['index', 'store', 'update', 'destroy', 'show'])
                     // Removing a staff member keeps their salary history (owner
                     // decision, W7.1), so their profile must stay reachable —
@@ -304,10 +304,56 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                     // sides the moment its staff member was removed.
                     ->withTrashed(['show']);
                 // Logged Aadhaar reveal (P5) — returns the full number, writes an audit entry.
-                Route::get('staff/{staff}/aadhaar', [\App\Http\Controllers\Admin\StaffController::class, 'revealAadhaar'])->whereNumber('staff')->withTrashed()->name('staff.aadhaar');
+                Route::get('staff/{staff}/aadhaar', [\App\Http\Controllers\Admin\StaffController::class, 'revealAadhaar'])->withTrashed()->name('staff.aadhaar');
                 Route::post('staff/{staff}/salary', [\App\Http\Controllers\Admin\StaffController::class, 'paySalary'])->name('staff.salary');
                 Route::delete('staff/{staff}/salary/{payment}', [\App\Http\Controllers\Admin\StaffController::class, 'deleteSalary'])
                     ->withTrashed()->name('staff.salary.destroy');
+            });
+
+            // --- New module: Presence / In-Out Register (gate device) ---
+            // Explicit allow-list gate (owner Q6), NOT access:* — viewer holds
+            // ['*'] and must be excluded (01 §8). P2 = Devices & Enrollment;
+            // the boards (P3) and gate log (P4) add their routes here later.
+            Route::middleware('presence.access')->prefix('presence')->name('presence.')->group(function () {
+                // Boards (P3) — the live who's-in/out surfaces, students & staff
+                // kept separate. Filtering/paging fragment-swaps the list (§4.3).
+                Route::get('students', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'students'])->name('students');
+                Route::get('staff', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'staff'])->name('staff');
+                Route::get('muster', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'muster'])->name('muster');
+
+                // Gate Log + per-person history (P4)
+                Route::get('log', [\App\Http\Controllers\Admin\Presence\GateLogController::class, 'index'])->name('log');
+                Route::get('log/export', [\App\Http\Controllers\Admin\Presence\GateLogController::class, 'export'])->name('log.export');
+                Route::get('history/{profile}', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'show'])->name('history');
+                Route::post('history/{profile}/correct', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'correct'])->name('history.correct');
+                Route::post('history/{profile}/reset', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'reset'])->name('history.reset');
+
+                // Curfew (P5) + on-leave marker
+                Route::post('curfew', [\App\Http\Controllers\Admin\Presence\BoardController::class, 'saveCurfew'])->name('curfew');
+                Route::post('history/{profile}/leave', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'setLeave'])->name('history.leave');
+                Route::delete('history/{profile}/leave', [\App\Http\Controllers\Admin\Presence\HistoryController::class, 'clearLeave'])->name('history.leave.clear');
+
+                Route::get('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'index'])->name('devices');
+
+                // Device registry
+                Route::post('devices', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'store'])->name('devices.store');
+                Route::put('devices/{device}', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'update'])->name('devices.update');
+                Route::delete('devices/{device}', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'destroy'])->name('devices.destroy');
+                Route::post('devices/{device}/sync-time', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'syncTime'])->name('devices.sync-time');
+                Route::post('devices/{device}/pull-logs', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'pullLogs'])->name('devices.pull-logs');
+                Route::post('devices/discover', [\App\Http\Controllers\Admin\Presence\DeviceController::class, 'discover'])->name('devices.discover');
+
+                // Enrollment
+                Route::post('enroll', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'store'])->name('enroll');
+                Route::post('profiles/{profile}/repush', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'rePush'])->name('profiles.repush');
+                Route::delete('profiles/{profile}', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'revoke'])->name('profiles.revoke');
+                Route::post('enroll/floor', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'enrollFloor'])->name('enroll.floor');
+                Route::post('reconcile', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'reconcile'])->name('reconcile');
+
+                // Quarantine — bind an unmatched device UserID (and all its
+                // punches) to a person. Keyed by the raw id string, not a punch
+                // row, so no punch id is ever exposed in a URL.
+                Route::post('quarantine/match', [\App\Http\Controllers\Admin\Presence\EnrollmentController::class, 'matchQuarantine'])->name('quarantine.match');
             });
 
             // --- New module: Users & roles (sub-users) ---
