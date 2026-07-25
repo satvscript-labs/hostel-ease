@@ -105,6 +105,47 @@
         width: 0; /* animated to target on load */
         transition: width 1s var(--ease-out-expo);
     }
+    /* Near-full (≥90%) — the unit is running out of face slots. */
+    .pr-gauge__fill--warn { background: linear-gradient(90deg, var(--he-warning), var(--he-danger)); }
+
+    /* Capacity unknown — a confident enrolled stat instead of a gauge against a
+       guessed ceiling. Same footprint as the gauge so the card grid stays even. */
+    .pr-cap {
+        display: flex; align-items: center; gap: 0.6rem;
+        padding: 0.45rem 0.55rem;
+        background: var(--he-bg-surface-raised);
+        border-radius: var(--he-radius-md);
+    }
+    .pr-cap__badge {
+        width: 34px; height: 34px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        background: var(--he-primary-soft); color: var(--he-primary);
+        font-size: 0.82rem;
+    }
+    .pr-cap__stat { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .pr-cap__num {
+        font-size: 1.15rem; font-weight: 800; color: var(--he-text-main);
+        font-variant-numeric: tabular-nums;
+    }
+    .pr-cap__label {
+        font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.05em; color: var(--he-text-muted);
+    }
+    .pr-cap__set {
+        margin-left: auto; flex-shrink: 0;
+        display: inline-flex; align-items: center; gap: 0.32rem;
+        background: transparent; border: 1px dashed rgba(0,0,0,0.16);
+        color: var(--he-text-muted);
+        font-size: 0.66rem; font-weight: 700;
+        padding: 0.32rem 0.6rem; border-radius: var(--he-radius-full);
+        cursor: pointer; white-space: nowrap;
+        transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+    .pr-cap__set:hover, .pr-cap__set:focus-visible {
+        color: var(--he-primary); border-color: var(--he-primary);
+        background: var(--he-primary-soft); outline: none;
+    }
 
     .pr-device__mode {
         display: inline-flex; align-items: center; gap: 0.35rem;
@@ -300,11 +341,15 @@
             @php
                 $st = $device->device_status;
                 $ledClass = $st === DeviceStatus::Online ? 'online' : ($st === DeviceStatus::Offline ? 'offline' : 'unknown');
-                $pct = min(100, round(($device->face_count / 1000) * 100));
+                // Capacity is per-model (never hardcoded). Gauge only when we know the ceiling.
+                $cap = $device->face_capacity;
+                $pct = $cap ? min(100, (int) round($device->face_count / $cap * 100)) : null;
+                $near = $pct !== null && $pct >= 90;
                 $payload = \Illuminate\Support\Js::from([
                     'id' => $device->public_id,
                     'name' => $device->name,
                     'direction_mode' => $device->direction_mode->value,
+                    'face_capacity' => $device->face_capacity,
                     'is_active' => (bool) $device->is_active,
                 ]);
             @endphp
@@ -329,15 +374,31 @@
                     <span>{{ __('Synced') }} <b>{{ $device->last_synced_at ? $device->last_synced_at->diffForHumans() : __('never') }}</b></span>
                 </div>
 
-                <div class="pr-gauge">
-                    <div class="pr-gauge__top">
-                        <span>{{ __('Faces enrolled') }}</span>
-                        <span class="pr-gauge__num">{{ $device->face_count }} <span class="text-muted">/ 1,000</span></span>
+                @if($cap)
+                    <div class="pr-gauge">
+                        <div class="pr-gauge__top">
+                            <span>{{ __('Faces enrolled') }}</span>
+                            <span class="pr-gauge__num">{{ number_format($device->face_count) }} <span class="text-muted">/ {{ number_format($cap) }}</span></span>
+                        </div>
+                        <div class="pr-gauge__track">
+                            <div class="pr-gauge__fill {{ $near ? 'pr-gauge__fill--warn' : '' }}" data-pct="{{ $pct }}"></div>
+                        </div>
                     </div>
-                    <div class="pr-gauge__track">
-                        <div class="pr-gauge__fill" data-pct="{{ $pct }}"></div>
+                @else
+                    {{-- Capacity varies per model and isn't set yet — show a confident
+                         enrolled stat, not a gauge measured against a guessed ceiling. --}}
+                    <div class="pr-gauge pr-cap" role="group" aria-label="{{ __('Faces enrolled') }}">
+                        <span class="pr-cap__badge"><i class="fa-solid fa-user-group"></i></span>
+                        <span class="pr-cap__stat">
+                            <span class="pr-cap__num">{{ number_format($device->face_count) }}</span>
+                            <span class="pr-cap__label">{{ __('faces enrolled') }}</span>
+                        </span>
+                        <button type="button" class="pr-cap__set" @click="openEditDevice({{ $payload }})"
+                                title="{{ __('Set this model’s capacity from its datasheet') }}">
+                            <i class="fa-solid fa-gauge-high"></i>{{ __('Set capacity') }}
+                        </button>
                     </div>
-                </div>
+                @endif
 
                 <div class="pr-device__acts">
                     <form method="POST" action="{{ route('admin.presence.devices.sync-time', $device) }}" class="m-0">
@@ -504,6 +565,17 @@
             </div>
         </div>
 
+        <div class="mb-2">
+            <label class="form-label fw-bold small text-uppercase">
+                {{ __('Face capacity') }} <span class="text-muted fw-normal text-lowercase">— {{ __('optional') }}</span>
+            </label>
+            <input type="number" name="face_capacity" x-model="form.face_capacity" min="1" step="1"
+                   class="form-control bg-light" placeholder="{{ __('e.g. 1000') }}" inputmode="numeric">
+            <div class="small text-muted mt-2">
+                {{ __('How many faces this model holds (from its datasheet). Varies by model — leave blank if unsure; we’ll just show the enrolled count.') }}
+            </div>
+        </div>
+
         <template x-if="editing">
             <label class="d-flex align-items-center gap-2 mt-3">
                 <input type="checkbox" name="is_active" value="1" x-model="form.is_active" class="form-check-input mt-0">
@@ -558,7 +630,7 @@
             deviceModalOpen: false,
             editing: false,
             editAction: '',
-            form: { serial_number: '', name: '', direction_mode: 'toggle', is_active: true },
+            form: { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true },
             // Discover
             discovering: false, discoverDone: false, discovered: [],
             // Bulk
@@ -582,14 +654,14 @@
 
             openAddDevice() {
                 this.editing = false;
-                this.form = { serial_number: '', name: '', direction_mode: 'toggle', is_active: true };
+                this.form = { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true };
                 this.discovered = []; this.discoverDone = false;
                 this.deviceModalOpen = true;
             },
             openEditDevice(d) {
                 this.editing = true;
                 this.editAction = '{{ url('admin/presence/devices') }}/' + d.id;
-                this.form = { serial_number: '', name: d.name, direction_mode: d.direction_mode, is_active: d.is_active };
+                this.form = { serial_number: '', name: d.name, direction_mode: d.direction_mode, face_capacity: d.face_capacity ?? '', is_active: d.is_active };
                 this.deviceModalOpen = true;
             },
 

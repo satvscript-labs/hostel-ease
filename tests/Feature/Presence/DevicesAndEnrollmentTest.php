@@ -113,6 +113,32 @@ class DevicesAndEnrollmentTest extends TestCase
         $this->assertSoftDeleted($device);
     }
 
+    public function test_face_capacity_is_optional_per_device_and_drives_the_gauge(): void
+    {
+        // Stored when given (per-model ceiling, never hardcoded)...
+        $this->actingAs($this->admin)->post(route('admin.presence.devices.store'), [
+            'serial_number' => 'TW-CAP-1', 'name' => 'Capped Gate',
+            'direction_mode' => 'toggle', 'face_capacity' => 500,
+        ])->assertRedirect();
+        $capped = PresenceDevice::where('serial_number', 'TW-CAP-1')->firstOrFail();
+        $this->assertSame(500, $capped->face_capacity);
+        $capped->forceFill(['face_count' => 250])->save();
+
+        // ...and left null when omitted (unknown capacity is a valid state).
+        $this->actingAs($this->admin)->post(route('admin.presence.devices.store'), [
+            'serial_number' => 'TW-CAP-2', 'name' => 'Open Gate', 'direction_mode' => 'toggle',
+        ])->assertRedirect();
+        $open = PresenceDevice::where('serial_number', 'TW-CAP-2')->firstOrFail();
+        $this->assertNull($open->face_capacity);
+
+        // The page renders both states without error: a gauge for the capped
+        // device, the "Set capacity" affordance for the open one.
+        $this->actingAs($this->admin)->get(route('admin.presence.devices'))
+            ->assertOk()
+            ->assertSee('/ 500')          // gauge denominator = this device's own ceiling
+            ->assertSee('Set capacity');  // actionable state for the unknown one
+    }
+
     public function test_sync_time_and_pull_logs_reach_the_adapter(): void
     {
         $device = $this->device();

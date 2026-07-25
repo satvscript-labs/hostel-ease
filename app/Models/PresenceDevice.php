@@ -23,7 +23,7 @@ class PresenceDevice extends Model
     protected $fillable = [
         'hostel_id', 'serial_number', 'name', 'direction_mode', 'is_active',
         'device_status', 'last_connected_at', 'last_log_at', 'last_synced_at',
-        'enrolled_count', 'face_count',
+        'enrolled_count', 'face_count', 'face_capacity',
     ];
 
     protected function casts(): array
@@ -35,6 +35,7 @@ class PresenceDevice extends Model
             'last_connected_at' => 'datetime',
             'last_log_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'face_capacity' => 'integer',
         ];
     }
 

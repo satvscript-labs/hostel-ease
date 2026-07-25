@@ -84,6 +84,8 @@ class DeviceController extends Controller
             'serial_number' => ['required', 'string', 'max:64', Rule::unique('presence_devices', 'serial_number')],
             'name' => ['required', 'string', 'max:120'],
             'direction_mode' => ['required', Rule::enum(DeviceDirectionMode::class)],
+            // Optional per-model ceiling (from the datasheet) — never assumed.
+            'face_capacity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
         ]);
 
         $device = PresenceDevice::create($data + ['is_active' => true]);
@@ -97,6 +99,7 @@ class DeviceController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'direction_mode' => ['required', Rule::enum(DeviceDirectionMode::class)],
+            'face_capacity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
