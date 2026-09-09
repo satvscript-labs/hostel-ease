@@ -3,6 +3,7 @@
 
 @php
     use App\Enums\Presence\DeviceStatus;
+    use App\Enums\Presence\DeviceConnectionMode;
     use App\Enums\Presence\DeviceDirectionMode;
     use App\Enums\Presence\EnrollmentStatus;
 @endphp
@@ -146,6 +147,30 @@
         color: var(--he-primary); border-color: var(--he-primary);
         background: var(--he-primary-soft); outline: none;
     }
+
+    /* Connection block (S1) — collapsed by default so the common "name +
+       direction" case stays a short form. */
+    .pr-conn {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: var(--he-radius-md);
+        overflow: hidden;
+    }
+    .pr-conn__toggle {
+        width: 100%; display: flex; align-items: center; gap: 0.55rem;
+        padding: 0.6rem 0.75rem;
+        background: var(--he-bg-surface-raised); border: 0;
+        font-size: 0.78rem; font-weight: 700; color: var(--he-text-main);
+        cursor: pointer;
+    }
+    .pr-conn__toggle:hover { background: var(--he-primary-soft); color: var(--he-primary); }
+    .pr-conn__toggle > i:first-child { color: var(--he-primary); font-size: 0.85rem; }
+    .pr-conn__hint {
+        font-size: 0.66rem; font-weight: 600; color: var(--he-text-muted);
+        text-transform: lowercase;
+    }
+    .pr-conn__chev { font-size: 0.7rem; color: var(--he-text-muted); transition: transform 0.25s var(--ease-out-expo); }
+    .pr-conn__chev.is-open { transform: rotate(180deg); }
+    .pr-conn__body { padding: 0.85rem 0.75rem 0.75rem; }
 
     .pr-device__mode {
         display: inline-flex; align-items: center; gap: 0.35rem;
@@ -345,12 +370,17 @@
                 $cap = $device->face_capacity;
                 $pct = $cap ? min(100, (int) round($device->face_count / $cap * 100)) : null;
                 $near = $pct !== null && $pct >= 90;
+                // NOTE: no password — a live device credential never reaches the browser.
                 $payload = \Illuminate\Support\Js::from([
                     'id' => $device->public_id,
                     'name' => $device->name,
                     'direction_mode' => $device->direction_mode->value,
                     'face_capacity' => $device->face_capacity,
                     'is_active' => (bool) $device->is_active,
+                    'connection_mode' => $device->connection_mode?->value ?? 'tcp',
+                    'ip_address' => $device->ip_address,
+                    'port' => $device->port,
+                    'username' => $device->username,
                 ]);
             @endphp
             <div class="glass-tile pr-device rounded-4">
@@ -529,7 +559,7 @@
             <input type="text" name="serial_number" x-model="form.serial_number" class="form-control bg-light"
                    placeholder="TW60000324000187" autocomplete="off">
             <div class="d-flex justify-content-between align-items-center mt-2">
-                <span class="small text-muted">{{ __('Printed on the device / iDMS.') }}</span>
+                <span class="small text-muted">{{ __('Printed on the device, or shown in its menu.') }}</span>
                 <button type="button" class="btn btn-sm btn-link text-decoration-none fw-bold p-0" @click="runDiscover()" :disabled="discovering">
                     <i class="fa-solid" :class="discovering ? 'fa-spinner fa-spin' : 'fa-magnifying-glass'"></i>
                     <span x-text="discovering ? '{{ __('Scanning…') }}' : '{{ __('Discover') }}'"></span>
@@ -547,7 +577,7 @@
                     </button>
                 </template>
             </div>
-            <div class="small text-muted mt-2" x-show="discoverDone && !discovered.length" x-cloak>{{ __('No new devices found on iDMS.') }}</div>
+            <div class="small text-muted mt-2" x-show="discoverDone && !discovered.length" x-cloak>{{ __('No new devices found.') }}</div>
         </div>
 
         <div class="mb-3">
@@ -573,6 +603,64 @@
                    class="form-control bg-light" placeholder="{{ __('e.g. 1000') }}" inputmode="numeric">
             <div class="small text-muted mt-2">
                 {{ __('How many faces this model holds (from its datasheet). Varies by model — leave blank if unsure; we’ll just show the enrolled count.') }}
+            </div>
+        </div>
+
+        {{-- ══ Connection (S1) — how the Connector reaches this unit ══
+             Collapsed by default so the common case stays a short form (02 §6.1a). --}}
+        <div class="pr-conn mt-3">
+            <button type="button" class="pr-conn__toggle" @click="connOpen = !connOpen"
+                    :aria-expanded="connOpen ? 'true' : 'false'">
+                <i class="fa-solid fa-plug"></i>
+                <span class="flex-grow-1 text-start">{{ __('Connection') }}</span>
+                <span class="pr-conn__hint" x-show="!connOpen" x-cloak>{{ __('optional') }}</span>
+                <i class="fa-solid fa-chevron-down pr-conn__chev" :class="{ 'is-open': connOpen }"></i>
+            </button>
+
+            <div class="pr-conn__body" x-show="connOpen" x-collapse x-cloak>
+                <label class="form-label fw-bold small text-uppercase">{{ __('How they connect') }}</label>
+                <x-he-select name="connection_mode" :submit="false" compact icon="plug"
+                    x-model="form.connection_mode"
+                    :options="collect(DeviceConnectionMode::cases())->mapWithKeys(fn($m) => [$m->value => $m->label()])->all()" />
+                <div class="small text-muted mt-2 mb-3">
+                    <template x-if="form.connection_mode === 'tcp'">
+                        <span>{{ __('The device has a fixed address on this network.') }}</span>
+                    </template>
+                    <template x-if="form.connection_mode === 'auto_register'">
+                        <span>{{ __('Best for a remote branch — no static IP needed there. The device dials in and tells us its address.') }}</span>
+                    </template>
+                </div>
+
+                {{-- Address only matters when WE dial the device. --}}
+                <div class="row g-2" x-show="form.connection_mode === 'tcp'" x-cloak>
+                    <div class="col-7">
+                        <label class="form-label fw-bold small text-uppercase">{{ __('IP address') }}</label>
+                        <input type="text" name="ip_address" x-model="form.ip_address"
+                               class="form-control bg-light" placeholder="192.168.1.51" inputmode="decimal">
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label fw-bold small text-uppercase">{{ __('Port') }}</label>
+                        <input type="number" name="port" x-model="form.port" min="1" max="65535"
+                               class="form-control bg-light" placeholder="37777" inputmode="numeric">
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-uppercase">{{ __('Username') }}</label>
+                        <input type="text" name="username" x-model="form.username"
+                               class="form-control bg-light" placeholder="admin" autocomplete="off">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-uppercase">{{ __('Password') }}</label>
+                        <input type="password" name="password" x-model="form.password"
+                               class="form-control bg-light" autocomplete="new-password"
+                               :placeholder="editing ? '{{ __('unchanged') }}' : ''">
+                    </div>
+                </div>
+                <div class="small text-muted mt-2">
+                    {{ __('The device’s own login. Stored encrypted; leave the password blank when editing to keep the current one.') }}
+                </div>
             </div>
         </div>
 
@@ -630,7 +718,9 @@
             deviceModalOpen: false,
             editing: false,
             editAction: '',
-            form: { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true },
+            connOpen: false,
+            form: { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true,
+                    connection_mode: 'tcp', ip_address: '', port: '', username: '', password: '' },
             // Discover
             discovering: false, discoverDone: false, discovered: [],
             // Bulk
@@ -654,14 +744,22 @@
 
             openAddDevice() {
                 this.editing = false;
-                this.form = { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true };
+                this.connOpen = false;
+                this.form = { serial_number: '', name: '', direction_mode: 'toggle', face_capacity: '', is_active: true,
+                              connection_mode: 'tcp', ip_address: '', port: '', username: '', password: '' };
                 this.discovered = []; this.discoverDone = false;
                 this.deviceModalOpen = true;
             },
             openEditDevice(d) {
                 this.editing = true;
                 this.editAction = '{{ url('admin/presence/devices') }}/' + d.id;
-                this.form = { serial_number: '', name: d.name, direction_mode: d.direction_mode, face_capacity: d.face_capacity ?? '', is_active: d.is_active };
+                // password is intentionally absent from the payload (never sent to
+                // the browser) — blank means "keep the stored one".
+                this.form = { serial_number: '', name: d.name, direction_mode: d.direction_mode,
+                              face_capacity: d.face_capacity ?? '', is_active: d.is_active,
+                              connection_mode: d.connection_mode ?? 'tcp', ip_address: d.ip_address ?? '',
+                              port: d.port ?? '', username: d.username ?? '', password: '' };
+                this.connOpen = !!(d.ip_address || d.username || d.connection_mode === 'auto_register');
                 this.deviceModalOpen = true;
             },
 
@@ -676,7 +774,7 @@
                     this.discovered = data.devices || [];
                 } catch (e) {
                     this.discovered = [];
-                    window.Swal && Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: '{{ __('Could not reach iDMS') }}', showConfirmButton: false, timer: 2500 });
+                    window.Swal && Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: '{{ __('Could not reach the devices') }}', showConfirmButton: false, timer: 2500 });
                 } finally {
                     this.discovering = false; this.discoverDone = true;
                 }

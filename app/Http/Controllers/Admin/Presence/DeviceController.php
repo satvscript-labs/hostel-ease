@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Presence;
 
+use App\Enums\Presence\DeviceConnectionMode;
 use App\Enums\Presence\DeviceDirectionMode;
 use App\Enums\Presence\EnrollmentStatus;
 use App\Http\Controllers\Controller;
@@ -86,9 +87,9 @@ class DeviceController extends Controller
             'direction_mode' => ['required', Rule::enum(DeviceDirectionMode::class)],
             // Optional per-model ceiling (from the datasheet) — never assumed.
             'face_capacity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
-        ]);
+        ] + $this->connectionRules());
 
-        $device = PresenceDevice::create($data + ['is_active' => true]);
+        $device = PresenceDevice::create($this->withConnectionDefaults($data) + ['is_active' => true]);
         $this->logger->log('presence.device.add', "Added gate device {$device->name}", $device);
 
         return back()->with('success', "Device “{$device->name}” added. Enroll people, then run a sync.");
@@ -101,7 +102,16 @@ class DeviceController extends Controller
             'direction_mode' => ['required', Rule::enum(DeviceDirectionMode::class)],
             'face_capacity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'is_active' => ['sometimes', 'boolean'],
-        ]);
+        ] + $this->connectionRules());
+
+        $data = $this->withConnectionDefaults($data);
+
+        // A blank password means "keep the stored one" — the current password is
+        // never sent to the browser, so an empty field is absence of intent to
+        // change it, not an instruction to clear it.
+        if (($data['password'] ?? null) === null || $data['password'] === '') {
+            unset($data['password']);
+        }
 
         $device->update($data + ['is_active' => $request->boolean('is_active')]);
         $this->logger->log('presence.device.update', "Updated gate device {$device->name}", $device);
@@ -137,7 +147,47 @@ class DeviceController extends Controller
         );
     }
 
-    /** Discover serials from iDMS to help the Add-device form (no blind typing). */
+    /**
+     * Connection fields (S1) — how the Connector reaches this unit (01 §3.1).
+     * All optional: a device can be registered before the Connector exists, and
+     * an auto-registering unit tells us its address when it dials in.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    protected function connectionRules(): array
+    {
+        return [
+            'connection_mode' => ['nullable', Rule::enum(DeviceConnectionMode::class)],
+            'ip_address' => ['nullable', 'string', 'max:45'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'username' => ['nullable', 'string', 'max:64'],
+            'password' => ['nullable', 'string', 'max:128'],
+        ];
+    }
+
+    /**
+     * Normalise the connection block: default the port to the device family's
+     * standard rather than storing null, and drop an address for a unit that
+     * dials us (where it would be stale fiction).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function withConnectionDefaults(array $data): array
+    {
+        if (array_key_exists('port', $data) && ! $data['port']) {
+            $data['port'] = 37777;
+        }
+
+        $mode = $data['connection_mode'] ?? null;
+        if ($mode === DeviceConnectionMode::AutoRegister->value) {
+            $data['ip_address'] = null;
+        }
+
+        return $data;
+    }
+
+    /** Discover serials to help the Add-device form (no blind typing). */
     public function discover(): JsonResponse
     {
         $known = PresenceDevice::query()->pluck('serial_number')->all();

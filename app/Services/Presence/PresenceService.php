@@ -106,25 +106,81 @@ class PresenceService
     }
 
     /**
-     * Resolve a punch's direction from the device's mode (01 §4):
-     *  - entry/exit → fixed direction (or InOutMode-derived when configured).
-     *  - toggle     → opposite of the person's current state.
+     * Resolve a punch's direction, in the documented order (01 §4):
+     *
+     *  1. The DEVICE'S OWN VERDICT (`rawInOutMode`) when it reported one. The
+     *     unit runs its own attendance engine and stamps every real-time event
+     *     with an in/out state; that is first-hand truth about which way the
+     *     person walked, so it outranks our inference. (S1 — mapped from
+     *     `emAttendanceState` by SdkEventMapper.)
+     *  2. Otherwise the device's configured mode:
+     *     - entry/exit → fixed direction,
+     *     - toggle     → opposite of the person's current state.
+     *
+     * Step 2 is NOT redundant: historical records replayed after an outage carry
+     * no attendance state (10 §7), and a device left in the wrong attendance
+     * mode reports nothing usable. So both paths stay live.
      */
     protected function resolveDirection(RawPunch $raw, PresenceDevice $device, ?PresenceProfile $profile): PresenceState
     {
         $mode = $device->direction_mode;
 
+        // 1. A fixed-direction unit: the ADMIN'S topology declaration wins.
+        //
+        //    ⚠️ Proven on real hardware 2026-09-09: this device stamps
+        //    emEventType = ENTRY on EVERY event, regardless of its role. In the
+        //    back-to-back topology (01 §5.2) the EXIT unit would therefore also
+        //    claim ENTRY — so trusting the device over the admin's config would
+        //    silently record every exit as an entry. The device does not know
+        //    which side of the door it is on; the admin does.
         if ($mode instanceof DeviceDirectionMode && $mode->fixedDirection() !== null) {
             return $mode->fixedDirection();
         }
 
-        // Toggle: flip from current state. First-ever punch is treated as "in".
-        $current = $profile?->state ?? PresenceState::Unknown;
+        // 2. Toggle means "one unit serves both ways — I can't tell from the
+        //    hardware". A device that explicitly reports OUT is nonetheless
+        //    giving us real information (it is distinguishing directions), so
+        //    honour that; an ENTRY claim here is ignored as the device's default.
+        if ($this->reportedDirection($raw) === PresenceState::Out) {
+            return PresenceState::Out;
+        }
 
-        return match ($current) {
+        // 3. Toggle alternation needs somebody to alternate FROM. An unmatched
+        //    punch has no profile, so there is no state to flip — and guessing
+        //    "in" would be inventing a fact about a person we cannot even name.
+        //
+        //    Found in the field 2026-09-09: a quarantined device user produced
+        //    12 consecutive "in" punches and 1 "out", which is physically
+        //    impossible. `unknown` is the honest answer; rebuildState() ignores
+        //    unknown-direction punches, so matching the person later derives
+        //    their state from real evidence instead of our guesses (01 §4).
+        if (! $profile) {
+            return PresenceState::Unknown;
+        }
+
+        // 4. Otherwise flip from current state. A known person's first-ever
+        //    punch is treated as "in" — they are arriving.
+        return match ($profile->state) {
             PresenceState::In => PresenceState::Out,
             PresenceState::Out => PresenceState::In,
             PresenceState::Unknown => PresenceState::In,
+        };
+    }
+
+    /**
+     * The direction the device itself reported, or null when it said nothing
+     * usable. Deliberately strict: only an explicit in/out counts, so an unknown
+     * or garbled value falls through to the device-mode strategy rather than
+     * being guessed at.
+     */
+    protected function reportedDirection(RawPunch $raw): ?PresenceState
+    {
+        $reported = is_string($raw->rawInOutMode) ? strtolower(trim($raw->rawInOutMode)) : null;
+
+        return match ($reported) {
+            'in' => PresenceState::In,
+            'out' => PresenceState::Out,
+            default => null,
         };
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PresenceEventController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,12 @@ Route::prefix('v1')->group(function () {
 
     // Razorpay server-to-server webhook (public; verified by HMAC signature).
     Route::post('/webhooks/razorpay', [WebhookController::class, 'razorpay']);
+
+    // Presence gate events from the Connector (public; verified by HMAC
+    // signature + device allow-list). Throttled generously: a busy gate is a
+    // few events a minute, but a reconnecting Connector flushes its buffer in
+    // batches, so the limit guards abuse without punishing recovery.
+    Route::post('/presence/events', [PresenceEventController::class, 'store'])
+        ->middleware('throttle:120,1')
+        ->name('api.presence.events');
 });

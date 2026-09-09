@@ -13,9 +13,35 @@
 */
 
 return [
-    // Which adapter backs PresenceService. 'timewatch' = the iDMS HTTP adapter;
-    // 'fake' = the in-memory scriptable adapter (tests, local dev without a box).
-    'driver' => env('PRESENCE_DRIVER', 'timewatch'),
+    // Which adapter backs PresenceService.
+    //   'connector' = the Presence Connector (Dahua NetSDK bridge) — CURRENT
+    //   'fake'      = in-memory scriptable adapter (tests, local dev, CI)
+    //   'timewatch' = the retired iDMS HTTP adapter (kept, see 04 §0)
+    'driver' => env('PRESENCE_DRIVER', 'fake'),
+
+    /*
+    | The Connector — a small Windows service that speaks the device's SDK on
+    | one side and plain HTTP to us on the other (10 §8). It POSTs each gate
+    | event to /api/v1/presence/events.
+    |
+    | Punches are real hardware truth, so the endpoint is treated as public and
+    | untrusted: a shared secret proves the caller, and the punch unique index
+    | makes replays free.
+    */
+    'connector' => [
+        // Shared secret the Connector sends in the X-Presence-Signature header
+        // (HMAC-SHA256 of the raw body). NEVER commit a real value.
+        'secret' => env('PRESENCE_CONNECTOR_SECRET'),
+
+        // Reject events whose timestamp is absurd — a device with a wildly wrong
+        // clock (they ship on UTC+08:00) would otherwise poison every duration.
+        'max_future_minutes' => (int) env('PRESENCE_MAX_FUTURE_MINUTES', 10),
+        'max_age_days' => (int) env('PRESENCE_MAX_AGE_DAYS', 30),
+
+        // Largest batch a single POST may carry (the Connector buffers offline
+        // and flushes in batches on reconnect).
+        'max_batch' => (int) env('PRESENCE_MAX_BATCH', 200),
+    ],
 
     'timewatch' => [
         // e.g. http://idms-host:8001/TimeWatchAPI  (no trailing slash)

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Presence\DeviceConnectionMode;
 use App\Enums\Presence\DeviceDirectionMode;
 use App\Enums\Presence\DeviceStatus;
 use App\Models\Concerns\BelongsToHostel;
@@ -24,7 +25,16 @@ class PresenceDevice extends Model
         'hostel_id', 'serial_number', 'name', 'direction_mode', 'is_active',
         'device_status', 'last_connected_at', 'last_log_at', 'last_synced_at',
         'enrolled_count', 'face_count', 'face_capacity',
+        // S1 — how the Connector reaches this unit (01 §3.1)
+        'ip_address', 'port', 'username', 'password', 'connection_mode',
     ];
+
+    /**
+     * The device password is a live credential to physical hardware — it must
+     * never reach a response, a log line, or a JS payload. `encrypted` keeps it
+     * unreadable at rest; `$hidden` keeps it out of toArray()/toJson().
+     */
+    protected $hidden = ['password'];
 
     protected function casts(): array
     {
@@ -36,6 +46,9 @@ class PresenceDevice extends Model
             'last_log_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'face_capacity' => 'integer',
+            'connection_mode' => DeviceConnectionMode::class,
+            'port' => 'integer',
+            'password' => 'encrypted',
         ];
     }
 

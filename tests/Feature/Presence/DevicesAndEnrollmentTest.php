@@ -139,6 +139,65 @@ class DevicesAndEnrollmentTest extends TestCase
             ->assertSee('Set capacity');  // actionable state for the unknown one
     }
 
+    public function test_connection_fields_are_stored_and_the_password_never_leaks(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.presence.devices.store'), [
+            'serial_number' => 'TW-CONN-1', 'name' => 'Wired Gate', 'direction_mode' => 'entry',
+            'connection_mode' => 'tcp', 'ip_address' => '192.168.1.51',
+            'port' => 37777, 'username' => 'admin', 'password' => 'devicePass123',
+        ])->assertRedirect();
+
+        $device = PresenceDevice::where('serial_number', 'TW-CONN-1')->firstOrFail();
+        $this->assertSame('192.168.1.51', $device->ip_address);
+        $this->assertSame(37777, $device->port);
+        $this->assertSame('devicePass123', $device->password);          // decrypts for our own use
+        $this->assertSame(\App\Enums\Presence\DeviceConnectionMode::Tcp, $device->connection_mode);
+
+        // Encrypted at rest — the raw column must not contain the plaintext.
+        $raw = \Illuminate\Support\Facades\DB::table('presence_devices')
+            ->where('id', $device->id)->value('password');
+        $this->assertNotSame('devicePass123', $raw);
+        $this->assertStringNotContainsString('devicePass123', (string) $raw);
+
+        // Never serialized to the browser.
+        $this->assertArrayNotHasKey('password', $device->toArray());
+
+        // ...and never rendered into the page's JS payloads.
+        $this->actingAs($this->admin)->get(route('admin.presence.devices'))
+            ->assertOk()->assertDontSee('devicePass123');
+    }
+
+    public function test_editing_without_a_password_keeps_the_stored_one(): void
+    {
+        $device = PresenceDevice::factory()->create([
+            'hostel_id' => $this->hostel->id, 'password' => 'originalPass',
+            'ip_address' => '10.0.0.5', 'username' => 'admin',
+        ]);
+
+        $this->actingAs($this->admin)->put(route('admin.presence.devices.update', $device), [
+            'name' => 'Renamed Gate', 'direction_mode' => 'entry', 'is_active' => '1',
+            'connection_mode' => 'tcp', 'ip_address' => '10.0.0.9',
+            'port' => 37777, 'username' => 'admin', 'password' => '',
+        ])->assertRedirect();
+
+        $device->refresh();
+        $this->assertSame('10.0.0.9', $device->ip_address);       // other fields update
+        $this->assertSame('originalPass', $device->password);      // password preserved
+    }
+
+    public function test_an_auto_registering_device_does_not_keep_a_stale_address(): void
+    {
+        // The device dials US, so an address entered here would be fiction.
+        $this->actingAs($this->admin)->post(route('admin.presence.devices.store'), [
+            'serial_number' => 'TW-AUTO-1', 'name' => 'Remote Gate', 'direction_mode' => 'toggle',
+            'connection_mode' => 'auto_register', 'ip_address' => '1.2.3.4',
+        ])->assertRedirect();
+
+        $device = PresenceDevice::where('serial_number', 'TW-AUTO-1')->firstOrFail();
+        $this->assertNull($device->ip_address);
+        $this->assertSame(37777, $device->port);   // defaulted, not null
+    }
+
     public function test_sync_time_and_pull_logs_reach_the_adapter(): void
     {
         $device = $this->device();
