@@ -103,8 +103,11 @@ class WebhookController extends Controller
             return;
         }
 
-        // Idempotency fast-path; the DB unique index on transaction_number is the real guard (below).
-        if (Subscription::where('transaction_number', $paymentId)->exists()) {
+        // Idempotency fast-path; the unique index on subscription_orders.transaction_number
+        // is the real guard (below). S1: this used to check the legacy `subscriptions`
+        // table, which is no longer written — leaving it there would have made every
+        // retried delivery look new and granted coverage twice.
+        if (SubscriptionOrder::where('transaction_number', $paymentId)->exists()) {
             return;
         }
 
@@ -128,7 +131,7 @@ class WebhookController extends Controller
             }
             $amount = $capturedPaise > 0 ? $capturedPaise / 100 : $quote['amount'];
 
-            $subscription = $this->accountBilling->recordBranchRenewal($branch, $period, [
+            $order = $this->accountBilling->recordBranchRenewal($branch, $period, [
                 'amount' => $amount,
                 'payment_status' => 'paid',
                 'payment_method' => 'online',
@@ -140,13 +143,31 @@ class WebhookController extends Controller
             $this->logger->log(
                 'subscription.paid',
                 "Webhook {$period} renewal — ".hostelease_money($amount),
-                $subscription,
+                $order,
             );
         } catch (QueryException $e) {
             // A concurrent delivery (the browser callback) already recorded this payment id.
             if ((string) $e->getCode() !== '23000') {
                 throw $e;
             }
+        } catch (\RuntimeException $e) {
+            // The branch has no resolvable owner account, so there is nothing to bill
+            // it against (S1). Money HAS been captured, so this must not throw: a 500
+            // makes Razorpay retry forever and still never succeed. Record it loudly
+            // and let a human reconcile it.
+            Log::error('Razorpay webhook: captured payment could not be applied', [
+                'payment' => $paymentId, 'order' => $orderId, 'branch_id' => $branchId, 'error' => $e->getMessage(),
+            ]);
+
+            $this->notifications->push(
+                null,
+                'payment_unapplied',
+                'payment_unapplied:'.$paymentId,
+                'Payment received but not applied — manual review',
+                hostelease_money($capturedPaise / 100)." was captured for branch #{$branchId} but could not be"
+                    .' recorded: '.$e->getMessage().' Resolve the branch owner, then record the charge from Account 360.',
+                'danger',
+            );
         } finally {
             Tenant::clear();
         }
@@ -246,26 +267,31 @@ class WebhookController extends Controller
         $paymentId = $refund['payment_id'] ?? null;
         $amount = (int) ($refund['amount'] ?? 0);
 
-        $subscription = $paymentId
-            ? Subscription::where('transaction_number', $paymentId)->first()
+        // S1: resolve against the order ledger. The refunded payment id is on the
+        // order that recorded it, whichever path took it (link, checkout, autopay).
+        $order = $paymentId
+            ? SubscriptionOrder::with('account.owner')->where('transaction_number', $paymentId)->first()
             : null;
 
         Log::warning('Razorpay webhook: refund received', [
             'refund' => $refund['id'] ?? null,
             'payment' => $paymentId,
-            'subscription' => $subscription?->id,
+            'order' => $order?->id,
             'amount_paise' => $amount,
         ]);
 
         // Super Admin feed (hostel_id = null) so it surfaces for manual handling.
+        // Still deliberately NOT auto-revoking coverage: that risks cutting off a
+        // customer who has since re-paid. Voiding the order (Account 360 → Orders)
+        // is the audited way to withdraw it.
         $this->notifications->push(
             null,
             'refund_review',
             'refund:'.($refund['id'] ?? $paymentId ?? uniqid()),
             'Refund received — manual review',
             'A refund of '.hostelease_money($amount / 100).' was issued'
-                .($subscription ? " for {$subscription->hostel?->name} (subscription #{$subscription->id})" : '')
-                .'. Review and adjust coverage if needed.',
+                .($order ? ' for '.($order->account?->owner?->name ?? 'account #'.$order->account_id)." ({$order->invoiceNumber()})" : '')
+                .'. Review and void the order if the coverage should be withdrawn.',
             'danger',
         );
     }

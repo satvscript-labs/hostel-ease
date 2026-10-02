@@ -11,6 +11,7 @@ use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
 use App\Services\HostelService;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,7 @@ class AccountController extends Controller
         protected AccountBillingService $billing,
         protected ActivityLogger $logger,
         protected HostelService $hostels,
+        protected NotificationService $notifications,
     ) {
     }
 
@@ -72,11 +74,31 @@ class AccountController extends Controller
             ->where('current_period_end', '<=', now()->addDays($days)->endOfDay())
             ->count();
 
+        // Receivables (S1 item 14) — real now that a pending charge mints an order
+        // (S0 · F3). `outstanding()` excludes the ₹0 kinds, which are never owed.
+        $outstanding = SubscriptionOrder::outstanding()->get(['amount', 'created_at']);
+        $aged = fn (?int $from, ?int $to) => (float) $outstanding
+            ->filter(function ($o) use ($from, $to) {
+                $days = (int) $o->created_at->diffInDays(now());
+
+                return ($from === null || $days >= $from) && ($to === null || $days <= $to);
+            })
+            ->sum('amount');
+
         $summary = [
             'accounts' => SubscriptionAccount::count(),
             'active' => SubscriptionAccount::where('status', 'active')->count(),
             'due_30' => $dueSoon(30),
             'revenue' => (float) SubscriptionOrder::paid()->sum('amount'),
+            'receivable' => (float) $outstanding->sum('amount'),
+            'receivable_count' => $outstanding->count(),
+            'receivable_aged' => [
+                'fresh' => $aged(null, 7),
+                'mid' => $aged(8, 30),
+                'old' => $aged(31, null),
+            ],
+            // Open removal requests, so an owner's ask is never quietly missed (D11).
+            'removal_requests' => Hostel::whereNotNull('cancellation_requested_at')->whereNull('cancelled_at')->count(),
         ];
 
         return view('superadmin.accounts.index', compact('accounts', 'summary', 'dueDays'));
@@ -111,9 +133,32 @@ class AccountController extends Controller
     public function show(SubscriptionAccount $account): View
     {
         $account->load('owner');
-        $branches = $this->billing->includedBranches($account);
+
+        // EVERY branch, cancelled ones included (D11): Account 360 is the operator's
+        // whole view of the estate, and a cancelled branch still needs its state,
+        // its run-out date and a Restore action. Quotes below use the BILLABLE set,
+        // which is what includedBranches() returns.
+        $branches = $this->billing->allBranches($account);
+        $billable = $this->billing->includedBranches($account);
         $orders = $account->orders()->with('lines.branch')->latest()->paginate(10);
         $discounts = $account->discounts()->with('branch')->latest()->get();
+
+        // What removing each live branch would do to the bill — the tier-loss warning
+        // in particular (D11 case 11), shown before the operator confirms.
+        $removalImpact = [];
+        foreach ($branches as $b) {
+            if ($b->isCancelled()) {
+                continue;
+            }
+
+            $removalImpact[$b->id] = $this->billing->removalImpact($account, $b) + [
+                'covered_to' => $b->subscription_end?->format('d M Y') ?? 'no coverage',
+                // D11 case 19: an unpaid charge against a branch being removed is a
+                // decision the operator has to make, not something to discover later.
+                'pending' => $this->billing->pendingOrdersForBranch($b)->count(),
+            ];
+        }
+        $accountClosing = $billable->isEmpty() && $branches->isNotEmpty();
 
         // Discount-aware renewal quotes for both terms, so the Renew modal shows
         // the true post-discount total live as the operator toggles Yearly/Monthly.
@@ -178,7 +223,7 @@ class AccountController extends Controller
         $addHostelQuote = $this->addHostelQuoteArray($account, $paidPeriod);
         $ownerEmail = $account->owner?->email;
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail'));
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -308,13 +353,19 @@ class AccountController extends Controller
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $order = $this->billing->renewAccount($account, $data['period'], [
-            'amount' => $data['amount'] ?? null,
-            'payment_status' => 'paid',
-            'payment_method' => $data['payment_method'] ?? 'cash',
-            'transaction_number' => $data['transaction_number'] ?? null,
-            'remarks' => $data['remarks'] ?? 'Consolidated renewal',
-        ]);
+        try {
+            $order = $this->billing->renewAccount($account, $data['period'], [
+                'amount' => $data['amount'] ?? null,
+                'payment_status' => 'paid',
+                'payment_method' => $data['payment_method'] ?? 'cash',
+                'transaction_number' => $data['transaction_number'] ?? null,
+                'remarks' => $data['remarks'] ?? 'Consolidated renewal',
+            ]);
+        } catch (\RuntimeException $e) {
+            // Nothing billable (D11 case 9) — every branch cancelled. Refusing beats
+            // writing a ₹0 order that would make a closed account look renewed.
+            return back()->with('error', $e->getMessage());
+        }
 
         $this->logger->log('subscription.paid', "Renewed all {$order->quantity} branch(es) — ".hostelease_money($order->amount), $order);
 
@@ -418,6 +469,161 @@ class AccountController extends Controller
         $this->logger->log('subscription.update', "Revoked discount #{$discount->id}", $discount);
 
         return back()->with('success', 'Discount revoked.');
+    }
+
+    // -----------------------------------------------------------------
+    // Orders — accept a pending charge, or write one off (S1 / D8)
+    // -----------------------------------------------------------------
+
+    /** The money arrived: flip a pending order to paid, which grants its coverage. */
+    public function acceptOrder(Request $request, SubscriptionAccount $account, SubscriptionOrder $order): RedirectResponse
+    {
+        abort_unless($order->account_id === $account->id, 404);
+
+        $data = $request->validate([
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
+            'transaction_number' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if ($order->payment_status->value === 'paid') {
+            return back()->with('info', 'That payment was already accepted.');
+        }
+
+        $this->billing->acceptOrder($order, [
+            'payment_method' => $data['payment_method'] ?? 'cash',
+            'transaction_number' => $data['transaction_number'] ?? null,
+        ]);
+
+        $this->logger->log('subscription.paid', "Accepted payment {$order->invoiceNumber()} — ".hostelease_money($order->amount), $order);
+
+        return back()->with('success', 'Payment accepted — coverage updated.');
+    }
+
+    /**
+     * Write an order off. Never a hard delete: the row and its invoice number stay,
+     * which is what an auditor expects. Voiding a PAID order withdraws the coverage
+     * it granted, so the reason is mandatory.
+     */
+    public function voidOrder(Request $request, SubscriptionAccount $account, SubscriptionOrder $order): RedirectResponse
+    {
+        abort_unless($order->account_id === $account->id, 404);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        $wasPaid = $order->payment_status->value === 'paid';
+        $this->billing->voidOrder($order, $data['reason']);
+
+        $this->logger->log('subscription.update', "Voided order {$order->invoiceNumber()} — {$data['reason']}", $order);
+
+        return back()->with('success', $wasPaid
+            ? 'Order voided — the coverage it granted has been withdrawn.'
+            : 'Order voided.');
+    }
+
+    // -----------------------------------------------------------------
+    // Branch removal (D11) — the operator decides
+    // -----------------------------------------------------------------
+
+    /**
+     * Confirm removal of a branch (BR-12). It keeps the coverage it paid for and
+     * stops being billed from the next cycle. No refund, no credit (BRD D6).
+     */
+    public function cancelBranch(Request $request, SubscriptionAccount $account, Hostel $hostel): RedirectResponse
+    {
+        abort_unless(in_array($hostel->id, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        $impact = $this->billing->removalImpact($account, $hostel);
+
+        if (! $this->billing->cancelBranch($hostel, $data['reason'])) {
+            return back()->with('info', "{$hostel->name} is already cancelled.");
+        }
+
+        $this->logger->log('subscription.update', "Cancelled branch {$hostel->name} — {$data['reason']}", $hostel);
+
+        // An account with nothing left to bill is a customer leaving. Make that
+        // impossible to miss rather than something noticed at the next renewal.
+        if ($impact['closes_account']) {
+            $this->notifications->push(
+                null,
+                'account_closing',
+                'account_closing:'.$account->id,
+                'Account closing — '.($account->owner?->name ?? 'account #'.$account->id),
+                'Every branch on this account is now cancelled. Coverage runs to '
+                    .(optional($hostel->subscription_end)->format('d M Y') ?? 'its end date').'.',
+                'danger',
+            );
+        }
+
+        // Tell the owner where they stand, in their own feed.
+        $this->notifications->push(
+            $hostel->id,
+            'branch_removal',
+            'branch_removal:'.$hostel->id,
+            'Branch removal confirmed',
+            "{$hostel->name} will not be billed at your next renewal. It stays active until "
+                .(optional($hostel->subscription_end)->format('d M Y') ?? 'its coverage ends').'.',
+            'warning',
+        );
+
+        $closes = $impact['closes_account'] ? ' This was the last billable branch — the account is now closing.' : '';
+
+        return back()->with('success',
+            "{$hostel->name} cancelled. It stays active until "
+            .(optional($hostel->subscription_end)->format('d M Y') ?? 'its coverage ends')
+            .' and is excluded from the next renewal.'.$closes);
+    }
+
+    /** Put a cancelled branch back into the billable set. */
+    public function restoreBranch(SubscriptionAccount $account, Hostel $hostel): RedirectResponse
+    {
+        abort_unless(in_array($hostel->id, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+
+        $result = $this->billing->restoreBranch($hostel);
+
+        if (! $result['restored']) {
+            return back()->with('info', "{$hostel->name} is not cancelled.");
+        }
+
+        $this->logger->log('subscription.update', "Restored branch {$hostel->name} to the billing cycle", $hostel);
+        $this->notifications->clear(null, 'account_closing', 'account_closing:'.$account->id);
+        $this->notifications->clear($hostel->id, 'branch_removal', 'branch_removal:'.$hostel->id);
+
+        // Restoring does not grant coverage — it only puts the branch back in the
+        // quantity. If its coverage already lapsed the operator needs to charge it.
+        return back()->with($result['coverageLapsed'] ? 'warning' : 'success',
+            $result['coverageLapsed']
+                ? "{$hostel->name} is back in the billing cycle, but its coverage has already lapsed — use \"Add to cycle\" to charge a prorated top-up and reactivate it."
+                : "{$hostel->name} is back in the billing cycle.");
+    }
+
+    /** Decline an owner's removal request — and tell them, so the ask doesn't just vanish. */
+    public function declineRemoval(Request $request, SubscriptionAccount $account, Hostel $hostel): RedirectResponse
+    {
+        abort_unless(in_array($hostel->id, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:255']]);
+
+        if (! $this->billing->clearRemovalRequest($hostel)) {
+            return back()->with('info', 'There is no open removal request for that branch.');
+        }
+
+        $this->logger->log('subscription.update',
+            "Declined removal request for {$hostel->name}".($data['note'] ? " — {$data['note']}" : ''), $hostel);
+
+        $this->notifications->clear(null, 'branch_removal_request', 'branch_removal_request:'.$hostel->id);
+        $this->notifications->push(
+            $hostel->id,
+            'branch_removal',
+            'branch_removal_declined:'.$hostel->id,
+            'Removal request closed',
+            "Your request to remove {$hostel->name} has been closed by HostelEase support."
+                .($data['note'] ? " Note: {$data['note']}" : ' Please get in touch if you still need it removed.'),
+            'info',
+        );
+
+        return back()->with('success', 'Removal request closed and the owner notified.');
     }
 
     /** Manual override: suspend the account and every included branch (BR-18). */

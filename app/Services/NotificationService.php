@@ -22,7 +22,12 @@ class NotificationService
      */
     public function push(?int $hostelId, string $type, string $sig, string $title, ?string $message = null, string $level = 'info'): Notification
     {
-        $existing = Notification::where('hostel_id', $hostelId)
+        // `where('hostel_id', null)` compiles to `hostel_id = NULL`, which is never
+        // true in SQL — so for the SUPER ADMIN feed (hostel_id null by design) this
+        // de-dupe silently never matched and every push created another row. Same bug
+        // in clear() below, where it meant a super-admin alert could never be cleared
+        // once raised. Found while testing branch-removal notifications (S1).
+        $existing = $this->scopeToFeed(Notification::query(), $hostelId)
             ->where('type', $type)
             ->whereNull('read_at')
             ->where('data->sig', $sig)
@@ -44,8 +49,22 @@ class NotificationService
      */
     public function clear(?int $hostelId, string $type, string $sig): void
     {
-        Notification::where('hostel_id', $hostelId)->where('type', $type)
-            ->whereNull('read_at')->where('data->sig', $sig)->delete();
+        $this->scopeToFeed(Notification::query(), $hostelId)
+            ->where('type', $type)
+            ->whereNull('read_at')
+            ->where('data->sig', $sig)
+            ->delete();
+    }
+
+    /**
+     * Target one feed: a hostel's, or the Super Admin's (hostel_id IS NULL).
+     * A bare `where('hostel_id', null)` would compile to `= NULL` and match nothing.
+     */
+    private function scopeToFeed($query, ?int $hostelId)
+    {
+        return $hostelId === null
+            ? $query->whereNull('hostel_id')
+            : $query->where('hostel_id', $hostelId);
     }
 
     /**

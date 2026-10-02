@@ -137,7 +137,17 @@ class HostelController extends Controller
     public function show(Hostel $hostel): View
     {
         $hostel->loadCount('students', 'rooms', 'beds')
-            ->load(['admins.hostels', 'subscriptions' => fn ($q) => $q->latest('end_date')]);
+            ->load('admins.hostels');
+
+        // Per-branch billing history now comes from the ORDER LEDGER, not the retired
+        // legacy `subscriptions` table (S1 · finding F4 / decision D8). That table was
+        // never written by consolidated renewals, so this card used to show nothing
+        // for a branch renewed through Account 360 — the common case.
+        $coverageLines = \App\Models\SubscriptionOrderLine::with('order')
+            ->where('branch_id', $hostel->id)
+            ->orderByDesc('end_date')
+            ->limit(25)
+            ->get();
 
         // The explicit owner FK is authoritative; billing's resolver self-heals
         // legacy rows (mobile / pivot fallbacks) onto it.
@@ -152,7 +162,7 @@ class HostelController extends Controller
         // with no linked hostel_admin login yet).
         $account = $this->billing->accountForBranch($hostel);
 
-        return view('superadmin.hostels.show', compact('hostel', 'branches', 'account'));
+        return view('superadmin.hostels.show', compact('hostel', 'branches', 'account', 'coverageLines'));
     }
 
 

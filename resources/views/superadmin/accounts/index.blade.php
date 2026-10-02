@@ -72,6 +72,49 @@
         <div class="col-6 col-md-3"><div class="card stat-card shadow-sm rounded-4"><div class="card-body py-4"><div class="stat-value text-dark mb-1">{{ hostelease_money($summary['revenue']) }}</div><div class="stat-label">Lifetime Revenue</div></div></div></div>
     </div>
 
+    {{-- ── Awaiting payment (S1 item 14) ──
+         Real receivables, available only because a pending charge now mints an order
+         (S0 · F3) — before that, money you were owed existed nowhere the app could
+         see. Aged, because a 40-day-old unpaid charge is a different conversation
+         from a 2-day-old one. Sits beside the open removal requests, since both are
+         "someone is waiting on you". --}}
+    @if($summary['receivable_count'] || $summary['removal_requests'])
+        <div class="row g-3 mb-4 stagger">
+            @if($summary['receivable_count'])
+                <div class="col-12 {{ $summary['removal_requests'] ? 'col-lg-8' : '' }}">
+                    <div class="card stat-card shadow-sm rounded-4 h-100">
+                        <div class="card-body py-3 px-4">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                                <div>
+                                    <div class="stat-label">Awaiting payment</div>
+                                    <div class="stat-value text-warning mb-0">{{ hostelease_money($summary['receivable']) }}</div>
+                                    <div class="small text-muted">{{ $summary['receivable_count'] }} unpaid {{ \Illuminate\Support\Str::plural('charge', $summary['receivable_count']) }}</div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-3 small">
+                                    <div><div class="stat-label">0–7 days</div><div class="fw-bold text-dark" style="font-variant-numeric:tabular-nums;">{{ hostelease_money($summary['receivable_aged']['fresh']) }}</div></div>
+                                    <div><div class="stat-label">8–30 days</div><div class="fw-bold text-warning" style="font-variant-numeric:tabular-nums;">{{ hostelease_money($summary['receivable_aged']['mid']) }}</div></div>
+                                    <div><div class="stat-label">30+ days</div><div class="fw-bold text-danger" style="font-variant-numeric:tabular-nums;">{{ hostelease_money($summary['receivable_aged']['old']) }}</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if($summary['removal_requests'])
+                <div class="col-12 {{ $summary['receivable_count'] ? 'col-lg-4' : '' }}">
+                    <div class="card stat-card shadow-sm rounded-4 h-100" style="border-color: rgba(234,88,12,.25);">
+                        <div class="card-body py-3 px-4">
+                            <div class="stat-label">Branch removal requests</div>
+                            <div class="stat-value mb-0" style="color:#ea580c;">{{ $summary['removal_requests'] }}</div>
+                            <div class="small text-muted">Owners waiting on a decision — open their account to confirm or decline.</div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- Filters — ONE canonical no-search row (§4.5): two matching he-selects
          (Renewals + Status), both auto-submitting the form. Fragment-driven so
          ONLY #cust-list swaps (W12 fix): the controls live OUTSIDE the swapped

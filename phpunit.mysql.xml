@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    MySQL test configuration (decision D10).
+
+    WHY THIS EXISTS. phpunit.xml runs against SQLite held in memory, which is why the
+    suite finishes in seconds and touches nothing real. The cost is that SQLite is not
+    MySQL: it IGNORES `ENUM` constraints entirely, is laxer about types, and differs on
+    dates and strict-mode violations. Production is MySQL with `strict => true`.
+
+    That gap hid a real bug (finding F6): code wrote `payment_method = 'comp'` into a
+    column MySQL declares as enum('cash','upi','cheque','rtgs','online'). Every test
+    passed; production would have 500'd. Nothing in the suite could have caught it.
+
+    USE IT as a pre-merge gate for the MONEY module, not for everyday work:
+
+        php artisan test --configuration=phpunit.mysql.xml --filter='Billing|Account|Subscription|Discount|Coverage|Proration|Removal'
+
+    ONE-TIME SETUP (the database must exist; RefreshDatabase migrates it each run):
+
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS hostelease_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+    Override the credentials below with env vars if yours differ:
+        DB_TEST_USERNAME=... DB_TEST_PASSWORD=... php artisan test --configuration=phpunit.mysql.xml
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- The whole point: a real MySQL connection, in strict mode. -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="hostelease_test"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+    </php>
+</phpunit>

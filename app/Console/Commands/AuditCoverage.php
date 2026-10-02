@@ -247,7 +247,7 @@ class AuditCoverage extends Command
         /** @var array<int, array{period:string, grants:int, entitled:int, first:?Carbon}> $perBranch */
         $perBranch = [];
 
-        $accrue = function (int $branchId, string $plan, ?Carbon $start, ?Carbon $end, bool $isComp) use (&$perBranch): void {
+        $accrue = function (int $branchId, string $plan, ?Carbon $start, ?Carbon $end, bool $fullSpanEntitled) use (&$perBranch): void {
             if (! $start || ! $end || $end->lessThanOrEqualTo($start)) {
                 return;
             }
@@ -257,9 +257,13 @@ class AuditCoverage extends Command
             $span = (int) $startDay->diffInDays($end->copy()->startOfDay());
             $oneTerm = (int) $startDay->diffInDays($period->extend($startDay->copy()));
 
-            // A comp is a deliberate multi-term gift, so its whole span is entitled.
-            // Everything else buys at most one term; a proration buys less.
-            $entitled = $isComp ? $span : min($span, $oneTerm);
+            // A COMP is a deliberate multi-term gift and an ADJUSTMENT is a deliberate
+            // operator correction (including the S1 migration's back-fill of coverage
+            // that predates the ledger) — for both, the whole span is entitled by
+            // definition, so measuring them against "one term" would invent an overage
+            // that never existed. Everything else buys at most one term; a proration
+            // buys less.
+            $entitled = $fullSpanEntitled ? $span : min($span, $oneTerm);
 
             $perBranch[$branchId] ??= ['period' => $period->value, 'grants' => 0, 'entitled' => 0, 'first' => null];
             $perBranch[$branchId]['grants']++;
@@ -291,7 +295,8 @@ class AuditCoverage extends Command
                 $line->order->period?->value ?? 'yearly',
                 $line->start_date,
                 $line->end_date,
-                $line->order->payment_method?->value === 'comp',
+                in_array($line->order->kind, [\App\Enums\OrderKind::Comp, \App\Enums\OrderKind::Adjustment], true)
+                    || $line->order->payment_method?->value === 'comp',
             );
         }
 

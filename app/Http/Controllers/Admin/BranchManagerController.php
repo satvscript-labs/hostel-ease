@@ -29,6 +29,7 @@ class BranchManagerController extends Controller
         protected AccountBillingService $accountBilling,
         protected RazorpayService $razorpay,
         protected ActivityLogger $logger,
+        protected \App\Services\NotificationService $notifications,
     ) {
     }
 
@@ -59,6 +60,63 @@ class BranchManagerController extends Controller
 
         return redirect()->route('admin.settings.index', ['tab' => 'branches'])
             ->with('success', 'Branch details updated.');
+    }
+
+    /**
+     * The owner ASKS for a branch to be removed (D11). They cannot cancel it
+     * themselves — removal changes what they are billed, and for a hands-on
+     * business the request is the retention conversation. Nothing billing-related
+     * changes here: the branch stays counted, charged and working until the Super
+     * Admin confirms.
+     *
+     * Deliberately NOT behind the owner_self_serve lock: asking is not a billing
+     * operation, and an owner must always be able to start the conversation.
+     */
+    public function requestRemoval(Request $request, Hostel $hostel): RedirectResponse
+    {
+        // The ACCOUNT OWNER only — not co-admins (who share the hostel_admin role),
+        // not staff. Same rule as rename(): a 404 rather than a 403, so the
+        // existence of another account's branch is never confirmed.
+        abort_unless($hostel->owner_id === $request->user()->id, 404);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        if ($hostel->isCancelled()) {
+            return back()->with('info', "{$hostel->name} is already scheduled for removal.");
+        }
+
+        if (! $this->accountBilling->requestRemoval($hostel, $data['reason'])) {
+            return back()->with('info', 'We already have your request for this branch — our team will be in touch.');
+        }
+
+        $this->logger->log('branch.removal_requested', "Removal requested for {$hostel->name} — {$data['reason']}", $hostel);
+
+        // Super Admin feed (hostel_id = null) so it lands on the operator's worklist.
+        $this->notifications->push(
+            null,
+            'branch_removal_request',
+            'branch_removal_request:'.$hostel->id,
+            'Branch removal requested — '.$hostel->name,
+            ($request->user()->name ?? 'The owner')." asked to remove {$hostel->name}. Reason: {$data['reason']}",
+            'warning',
+        );
+
+        return back()->with('success', 'Request received — our team will contact you before anything changes. Nothing has been cancelled yet.');
+    }
+
+    /** The owner changes their mind. Leaves no billing trace. */
+    public function withdrawRemoval(Request $request, Hostel $hostel): RedirectResponse
+    {
+        abort_unless($hostel->owner_id === $request->user()->id, 404);
+
+        if (! $this->accountBilling->clearRemovalRequest($hostel)) {
+            return back()->with('info', 'There is no open removal request for that branch.');
+        }
+
+        $this->logger->log('branch.removal_withdrawn', "Removal request withdrawn for {$hostel->name}", $hostel);
+        $this->notifications->clear(null, 'branch_removal_request', 'branch_removal_request:'.$hostel->id);
+
+        return back()->with('success', 'Request withdrawn — nothing changes.');
     }
 
     public function store(Request $request): RedirectResponse
@@ -179,7 +237,9 @@ class BranchManagerController extends Controller
         }
 
         // Idempotency fast-path; the DB unique index on transaction_number is the real guard (below).
-        if (Subscription::where('transaction_number', $data['razorpay_payment_id'])->exists()) {
+        // S1: the ledger is subscription_orders. Checking the legacy table here would
+        // have made every retried callback look like a new payment.
+        if (\App\Models\SubscriptionOrder::where('transaction_number', $data['razorpay_payment_id'])->exists()) {
             return response()->json([
                 'message' => 'Payment already confirmed — branch subscription is active.',
                 'redirect' => route('admin.settings.index').'?tab=branches',
@@ -215,7 +275,7 @@ class BranchManagerController extends Controller
         }
 
         try {
-            $subscription = $this->accountBilling->recordBranchRenewal($branch, $data['period'], [
+            $order = $this->accountBilling->recordBranchRenewal($branch, $data['period'], [
                 'amount' => $amount,
                 'payment_status' => 'paid',
                 'payment_method' => 'online',
@@ -227,7 +287,7 @@ class BranchManagerController extends Controller
             $this->logger->log(
                 'subscription.paid',
                 "Online {$data['period']} renewal for {$branch->name} — ".hostelease_money($amount),
-                $subscription,
+                $order,
             );
         } catch (QueryException $e) {
             // A concurrent delivery (the server-side webhook) already recorded this payment id.

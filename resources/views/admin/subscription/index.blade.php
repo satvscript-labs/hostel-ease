@@ -155,25 +155,63 @@
             <div class="panel-card shadow-sm h-100">
                 <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-hotel text-primary me-2"></i>Your branches</h6>
-                    <span class="text-muted small">{{ $branches->count() }} total</span>
+                    <span class="text-muted small">
+                        {{ $billableCount }} on your plan
+                        @if($branches->count() > $billableCount) · {{ $branches->count() - $billableCount }} closing @endif
+                    </span>
                 </div>
                 <div class="stagger">
                     @forelse($branches as $branch)
-                        @php($behind = $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
-                        <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
-                            <div>
-                                <div class="fw-bold text-dark">{{ $branch->name }}</div>
-                                <div class="small text-muted">Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}</div>
+                        @php($state = $branch->cancellationState())
+                        @php($behind = ! $branch->isCancelled() && $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
+                        <div class="px-4 py-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div class="min-w-0">
+                                    <div class="fw-bold text-dark">{{ $branch->name }}</div>
+                                    <div class="small text-muted">
+                                        @if($state === 'cancelled')
+                                            Closing {{ $branch->subscription_end?->format('d M Y') }} · not billed at your next renewal
+                                        @elseif($state === 'closed')
+                                            Closed {{ $branch->subscription_end?->format('d M Y') }}
+                                        @else
+                                            Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}
+                                        @endif
+                                    </div>
+                                    @if($state === 'removal_requested')
+                                        <div class="small mt-1" style="color:#ea580c;">
+                                            <i class="fa-solid fa-clock me-1"></i>Removal requested — our team will be in touch. Nothing has changed yet.
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="d-flex flex-column align-items-end gap-2">
+                                    @php($chip = match($state) {
+                                        'removal_requested' => ['warning', 'Removal asked'],
+                                        'cancelled' => ['secondary', 'Closing'],
+                                        'closed' => ['secondary', 'Closed'],
+                                        default => $branch->isActive() ? ($behind ? ['warning', 'Behind'] : ['success', 'Active']) : ['danger', 'Expired'],
+                                    })
+                                    <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2"
+                                          @if($behind) title="Renewing all will align this branch" @endif>{{ $chip[1] }}</span>
+
+                                    {{-- Removal is a REQUEST, never a self-service cancel (D11): it
+                                         changes what you are billed, so a person confirms it. Owner
+                                         only — a co-admin shares the role, so the gate is the FK. --}}
+                                    @if($viewerOwnsAccount && ! $branch->isCancelled())
+                                        @if($state === 'removal_requested')
+                                            <form method="POST" action="{{ route('admin.branches.withdraw-removal', $branch) }}"
+                                                  data-confirm="Withdraw your request to remove {{ $branch->name }}?">
+                                                @csrf @method('DELETE')
+                                                <button class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm">Withdraw</button>
+                                            </form>
+                                        @else
+                                            <button type="button" class="btn btn-sm btn-link text-muted p-0 small"
+                                                    @click="removeBranchId = {{ $branch->id }}; removeBranchName = @js($branch->name); removeOpen = true">
+                                                Request removal
+                                            </button>
+                                        @endif
+                                    @endif
+                                </div>
                             </div>
-                            @if($branch->isActive())
-                                @if($behind)
-                                    <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="Renewing all will align this branch">Behind</span>
-                                @else
-                                    <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">Active</span>
-                                @endif
-                            @else
-                                <span class="badge bg-danger-subtle text-danger rounded-pill px-3 py-2">Expired</span>
-                            @endif
                         </div>
                     @empty
                         <div class="p-4"><x-he-empty-state icon="hotel" title="No branches yet" subtitle="Add a branch to get started." /></div>
@@ -323,6 +361,43 @@
         </div>
     </template>
     @endif
+
+    {{-- ══ Request branch removal (D11) ══
+         A REQUEST, not a cancel. Removal changes what the customer is billed, so a
+         person confirms it — and for a hands-on business that conversation is worth
+         having. The copy is explicit that nothing changes yet and that the branch
+         keeps the time it has paid for, so nobody expects an instant shut-off or a
+         refund. Owner-only; the button is not rendered for co-admins. --}}
+    @if($viewerOwnsAccount)
+        <template x-teleport="body">
+            <div class="custom-overlay-backdrop" x-show="removeOpen" x-transition.opacity @click.self="removeOpen=false" x-cloak style="display:none;">
+                <form method="POST" :action="removeAction" class="custom-overlay-modal" style="max-width:520px;" :class="{'is-open':removeOpen}">
+                    @csrf
+                    <div class="custom-overlay-header">
+                        <h5 class="fw-bold mb-0">Request branch removal</h5>
+                        <button type="button" class="btn-close" @click="removeOpen=false"></button>
+                    </div>
+                    <div class="custom-overlay-body">
+                        <div class="fw-bold text-dark mb-2" x-text="removeBranchName"></div>
+                        <p class="small text-muted">
+                            We'll contact you before anything changes. Once it's confirmed, the branch
+                            <strong>keeps working until the end of the time you've already paid for</strong>
+                            and simply isn't billed at your next renewal. There's no refund for the
+                            remaining time, and nothing is cancelled today.
+                        </p>
+                        <label class="form-label fw-bold small text-muted">WHY ARE YOU REMOVING IT? <span class="text-danger">*</span></label>
+                        <input type="text" name="reason" class="form-control bg-white border shadow-sm" required maxlength="255"
+                               placeholder="e.g. we're closing this property">
+                        <div class="form-text">This helps us help you — if it's about price or a feature, tell us and we'll try to sort it.</div>
+                    </div>
+                    <div class="custom-overlay-footer d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="removeOpen=false">Never mind</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">Send request</button>
+                    </div>
+                </form>
+            </div>
+        </template>
+    @endif
 </div>
 @endsection
 
@@ -336,6 +411,14 @@ document.addEventListener('alpine:init', () => {
         renewOpen: false,
         addOpen: false,
         loading: false,
+        // Branch removal REQUEST (D11) — the owner asks, support confirms.
+        removeOpen: false,
+        removeBranchId: null,
+        removeBranchName: '',
+        removeUrlTemplate: @js(route('admin.branches.request-removal', '__BRANCH__')),
+        branchKeys: @json($branches->mapWithKeys(fn ($b) => [$b->id => $b->public_id])),
+        // The route key is the opaque public_id (hardening U4); an integer 404s.
+        get removeAction() { return this.removeUrlTemplate.replace('__BRANCH__', this.branchKeys[this.removeBranchId] || ''); },
         period: @json($displayPeriod),
         quotes: @json($quotes),
         add: { name: '', city: '' },

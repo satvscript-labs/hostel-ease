@@ -65,6 +65,11 @@ class Hostel extends Model
             'settings' => 'array',
             'curfew_notify' => 'boolean',
             'curfew_notified_at' => 'datetime',
+            // Branch removal (D11). Not in $fillable on purpose: only
+            // AccountBillingService's request/cancel/restore methods may set these,
+            // so no form or mass-assignment can change what a customer is billed.
+            'cancellation_requested_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -213,6 +218,43 @@ class Hostel extends Model
     public function isExpired(): bool
     {
         return $this->subscription_end && $this->subscription_end->isPast();
+    }
+
+    // -----------------------------------------------------------------
+    // Branch removal (D11). Deliberately NOT a `status` value: status already
+    // carries operator-hold (suspended) and lapsed-payment (expired), and a third
+    // overloaded meaning would make all three ambiguous — and churn would have to
+    // be inferred from dates instead of read off a column.
+    // -----------------------------------------------------------------
+
+    /** The operator has confirmed removal: not billed again, still working to its end date. */
+    public function isCancelled(): bool
+    {
+        return $this->cancelled_at !== null;
+    }
+
+    /** The owner has asked for removal and nobody has acted yet. Still fully billed. */
+    public function hasRemovalRequest(): bool
+    {
+        return $this->cancelled_at === null && $this->cancellation_requested_at !== null;
+    }
+
+    /** `live` · `removal_requested` · `cancelled` · `closed` — one label for every surface. */
+    public function cancellationState(): string
+    {
+        if (! $this->cancelled_at) {
+            return $this->cancellation_requested_at ? 'removal_requested' : 'live';
+        }
+
+        return ($this->subscription_end && $this->subscription_end->copy()->endOfDay()->isPast())
+            ? 'closed'
+            : 'cancelled';
+    }
+
+    /** Whether this branch counts toward the account's billing quantity (D11 · R1). */
+    public function isBillable(): bool
+    {
+        return $this->cancelled_at === null;
     }
 
     public function daysUntilExpiry(): ?int

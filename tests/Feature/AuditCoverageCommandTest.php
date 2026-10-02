@@ -55,14 +55,25 @@ class AuditCoverageCommandTest extends TestCase
 
     public function test_it_counts_one_payment_once_even_though_both_ledgers_hold_it(): void
     {
-        // recordBranchRenewal writes a legacy subscriptions row AND mirrors it into
-        // subscription_orders. Counting records rather than rolling up per branch
-        // would report this single ₹10,000 payment twice.
-        [, $branch] = $this->ownerWithBranch();
+        // PRE-S1 SHAPE. Until S1 a single charge was written twice — once as a legacy
+        // `subscriptions` row and once as the order mirrored from it — and those rows
+        // still exist in production. Counting records rather than rolling up per
+        // branch would report one ₹10,000 payment as two years of coverage and
+        // "find" an overage that never happened. Nothing writes this shape any more,
+        // so the fixture has to build it by hand.
+        [$owner, $branch] = $this->ownerWithBranch();
 
-        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+        $order = app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
             'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'dup_1',
         ]);
+
+        $legacy = Subscription::create([
+            'hostel_id' => $branch->id, 'plan' => 'yearly',
+            'start_date' => now(), 'end_date' => now()->addYear(),
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash',
+        ]);
+        // The link that marks the order as a mirror of the legacy row.
+        $order->forceFill(['legacy_subscription_id' => $legacy->id])->save();
 
         $this->assertSame(1, Subscription::count());
         $this->assertDatabaseCount('subscription_orders', 1);
@@ -184,6 +195,25 @@ class AuditCoverageCommandTest extends TestCase
             $account->current_period_end->copy()->subYear()->toDateString(),
             $account->current_period_start->toDateString(),
         );
+    }
+
+    public function test_a_backfilled_adjustment_is_not_reported_as_an_overage(): void
+    {
+        // The S1 migration gives coverage that predates the ledger a ₹0 `adjustment`
+        // order carrying its existing dates. Measuring that against "one term" would
+        // invent an overage: the adjustment's whole span is entitled by definition,
+        // exactly like a comp. Same for the operator's own hand-edits.
+        [, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'adj_1',
+        ]);
+
+        app(AccountBillingService::class)->adjustCoverage($branch->fresh(), now()->addYears(3), 'goodwill');
+
+        $this->artisan('hostelease:audit-coverage')
+            ->expectsOutputToContain('Every branch holds exactly the coverage its payments bought.')
+            ->expectsOutputToContain('0 days')
+            ->assertSuccessful();
     }
 
     public function test_fix_leaves_an_unledgered_trial_alone(): void

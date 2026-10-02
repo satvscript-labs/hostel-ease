@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OrderKind;
 use App\Models\Hostel;
 use App\Models\Subscription;
 use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
+use App\Models\SubscriptionOrderLine;
 use App\Models\User;
 use App\Services\Billing\AccountBillingService;
 use App\Services\HostelService;
@@ -61,12 +63,13 @@ class CoverageInvariantTest extends TestCase
             'A paid yearly provision granted two years — the F1 double-stamp is back.',
         );
 
-        // The legacy mirror must agree; it was the row that carried the doubled
-        // date into "accept payment" and then into the account anchor.
-        $this->assertSame(
-            now()->addYear()->toDateString(),
-            Subscription::where('hostel_id', $hostel->id)->firstOrFail()->end_date->toDateString(),
-        );
+        // And the LEDGER agrees, because since S1 the mirror is derived from it.
+        $line = SubscriptionOrderLine::where('branch_id', $hostel->id)->firstOrFail();
+        $this->assertSame(now()->addYear()->toDateString(), $line->end_date->toDateString());
+        $this->assertSame(OrderKind::Renewal, $line->order->kind);
+
+        // Nothing is written to the retired legacy table any more (D8).
+        $this->assertSame(0, Subscription::count(), 'The legacy subscriptions table was written again.');
     }
 
     public function test_paid_monthly_provision_grants_exactly_one_month(): void
@@ -102,17 +105,61 @@ class CoverageInvariantTest extends TestCase
         $order = SubscriptionOrder::firstOrFail();
         $this->assertSame('pending', $order->payment_status->value);
 
-        // The Super Admin accepts it the way the legacy page does.
-        $sub = Subscription::where('hostel_id', $hostel->id)->firstOrFail();
-        $sub->update(['payment_status' => 'paid']);
-        app(\App\Services\BranchBillingService::class)->syncBranchToSubscription($sub->fresh());
-        app(AccountBillingService::class)->syncLegacySubscription($sub->fresh());
+        // The Super Admin accepts it — the S1 replacement for the legacy page's
+        // one-click accept, and what makes the receivables worklist actionable.
+        app(AccountBillingService::class)->acceptOrder($order, ['payment_method' => 'cash']);
 
-        $this->assertSame(now()->addYear()->toDateString(), $hostel->fresh()->subscription_end->toDateString());
+        $this->assertSame(
+            now()->addYear()->toDateString(),
+            $hostel->fresh()->subscription_end->toDateString(),
+            'Accepting the payment granted the wrong amount of coverage.',
+        );
 
         // The same order flipped to paid — not a second one created beside it.
         $this->assertSame(1, SubscriptionOrder::count());
         $this->assertSame('paid', $order->fresh()->payment_status->value);
+    }
+
+    public function test_accepting_is_idempotent_and_voiding_withdraws_the_coverage(): void
+    {
+        $hostel = $this->provision(['payment_status' => 'pending'])['hostel'];
+        $order = SubscriptionOrder::firstOrFail();
+        $billing = app(AccountBillingService::class);
+
+        $billing->acceptOrder($order, ['payment_method' => 'cash']);
+        $billing->acceptOrder($order->fresh(), ['payment_method' => 'upi']);
+
+        $this->assertSame(1, SubscriptionOrder::count());
+        $this->assertSame('cash', $order->fresh()->payment_method->value, 'A second accept overwrote the recorded method.');
+
+        // Voiding is the audited way to withdraw coverage — and the only routine
+        // path allowed to shorten a mirror.
+        $billing->voidOrder($order->fresh(), 'recorded against the wrong customer');
+
+        $this->assertNull($hostel->fresh()->subscription_end);
+        $this->assertFalse($hostel->fresh()->isActive());
+        $this->assertSame('voided', $order->fresh()->payment_status->value);
+    }
+
+    public function test_a_routine_sync_never_shortens_coverage_it_cannot_explain(): void
+    {
+        // The safety rule in CoverageMirror: a branch holding coverage the ledger
+        // cannot account for (a pre-S1 grant, or any future path that slips past the
+        // invariant) must NOT be cut off by a maintenance pass. Drift is logged; only
+        // an explicit void or --fix may shorten.
+        $hostel = $this->provision()['hostel'];
+        $hostel->forceFill(['subscription_end' => now()->addYears(5)])->save();
+
+        $billing = app(AccountBillingService::class);
+        $account = SubscriptionAccount::firstOrFail();
+        $billing->refreshAccountAnchor($account);
+        app(\App\Services\Billing\CoverageMirror::class)->sync($account);
+
+        $this->assertSame(
+            now()->addYears(5)->toDateString(),
+            $hostel->fresh()->subscription_end->toDateString(),
+            'A routine sync shortened coverage — a paying tenant could be locked out by a cron job.',
+        );
     }
 
     // -----------------------------------------------------------------
@@ -175,10 +222,13 @@ class CoverageInvariantTest extends TestCase
         // period" — unusable for reporting and as a proration denominator.
         $mobile = '9000000444';
         $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => $mobile]);
-        $branch = Hostel::factory()->create(['mobile' => $mobile, 'status' => 'active', 'subscription_end' => now()->addDays(10)]);
+        $branch = Hostel::factory()->create(['mobile' => $mobile, 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => null]);
         $owner->hostels()->sync([$branch->id]);
 
         $billing = app(AccountBillingService::class);
+        // Coverage has to come from the ledger now, so the fixture grants it the way
+        // the product does rather than writing the column.
+        $billing->recordBranchRenewal($branch, 'trial', ['payment_status' => 'paid']);
         $account = $billing->accountFor($owner);
         $billing->refreshAccountAnchor($account);
 
@@ -209,25 +259,22 @@ class CoverageInvariantTest extends TestCase
         $this->assertLessThanOrEqual(366, $span);
     }
 
-    public function test_a_comped_offline_method_does_not_break_the_legacy_enum_path(): void
+    public function test_a_comped_offline_method_no_longer_touches_the_legacy_enum(): void
     {
-        // F6: 'comp' is not in the legacy subscriptions.payment_method ENUM, so on a
-        // strict MySQL connection this insert threw and 500d the request. SQLite
-        // does not enforce ENUM (F14), so this asserts the GUARD rather than the
-        // database's reaction: the legacy mirror must never be handed 'comp'.
+        // F6 is structurally gone in S1: nothing writes the legacy ENUM column, so
+        // 'comp' (which the ENUM never allowed) can no longer 500 a request on MySQL.
+        // It is recorded on the order, a plain string column.
         $mobile = '9000000555';
         $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => $mobile]);
-        $branch = Hostel::factory()->create(['mobile' => $mobile, 'status' => 'active', 'subscription_end' => null]);
+        $branch = Hostel::factory()->create(['mobile' => $mobile, 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => null]);
         $owner->hostels()->sync([$branch->id]);
 
         app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
             'amount' => 0, 'payment_status' => 'paid', 'payment_method' => 'comp', 'remarks' => 'favour',
         ]);
 
-        $this->assertNull(
-            Subscription::where('hostel_id', $branch->id)->firstOrFail()->payment_method,
-            "'comp' reached the legacy ENUM column — it will 500 on MySQL (F6).",
-        );
-        $this->assertSame(SubscriptionAccount::count(), 1);
+        $this->assertSame(0, Subscription::count(), 'The legacy table was written — the ENUM landmine is back.');
+        $this->assertSame('comp', SubscriptionOrder::firstOrFail()->payment_method->value);
+        $this->assertSame(1, SubscriptionAccount::count());
     }
 }

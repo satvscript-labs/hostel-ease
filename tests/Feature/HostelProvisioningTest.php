@@ -35,7 +35,12 @@ class HostelProvisioningTest extends TestCase
         // asserted the raw '9876543210' and passed while the owner it created
         // was unable to log in at all (fixed W6.3-followup).
         $this->assertDatabaseHas('users', ['mobile' => '+919876543210', 'role' => 'hostel_admin']);
-        $this->assertDatabaseHas('subscriptions', ['hostel_id' => $result['hostel']->id, 'amount' => 5000]);
+        // The charge lands in the ORDER ledger. Since S1 the legacy `subscriptions`
+        // table is never written (decision D8), so asserting it here would be
+        // asserting the bug back in.
+        $this->assertDatabaseHas('subscription_orders', ['amount' => 5000, 'kind' => 'renewal']);
+        $this->assertDatabaseHas('subscription_order_lines', ['branch_id' => $result['hostel']->id]);
+        $this->assertDatabaseCount('subscriptions', 0);
 
         // The generated password actually authenticates the admin.
         $this->assertTrue(Hash::check($result['password'], $result['admin']->password));
@@ -118,16 +123,20 @@ class HostelProvisioningTest extends TestCase
 
     public function test_renewal_extends_hostel_coverage_and_reactivates(): void
     {
-        $hostel = Hostel::factory()->expired()->create();
+        // S1: coverage is granted through the account engine, which is now the only
+        // writer. BranchBillingService::renewBranch() is gone — it was the other half
+        // of the F1 double-stamp and the last writer of the legacy table (D8).
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '+919000033333']);
+        $hostel = Hostel::factory()->expired()->create(['owner_id' => $owner->id, 'mobile' => '+919000033333']);
+        $owner->hostels()->sync([$hostel->id]);
         $this->assertSame('expired', $hostel->status);
 
-        // A paid renewal reactivates the branch and extends coverage into the future.
-        app(BranchBillingService::class)->renewBranch($hostel, 'yearly', [
-            'amount' => 5000, 'payment_status' => 'paid',
+        app(\App\Services\Billing\AccountBillingService::class)->recordBranchRenewal($hostel, 'yearly', [
+            'amount' => 5000, 'payment_status' => 'paid', 'payment_method' => 'cash',
         ]);
 
         $hostel->refresh();
-        $this->assertSame('active', $hostel->status);
+        $this->assertSame('active', $hostel->status, 'A paid renewal did not lift the branch out of expired.');
         $this->assertTrue($hostel->subscription_end->isFuture());
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\BillingPeriod;
+use App\Enums\CollectionMethod;
+use App\Enums\OrderKind;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Concerns\HasPublicId;
@@ -23,6 +25,8 @@ class SubscriptionOrder extends Model
     protected $fillable = [
         'account_id',
         'period',
+        'kind',
+        'collection',
         'quantity',
         'subtotal',
         'discount_total',
@@ -39,6 +43,8 @@ class SubscriptionOrder extends Model
     {
         return [
             'period' => BillingPeriod::class,
+            'kind' => OrderKind::class,
+            'collection' => CollectionMethod::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
             'quantity' => 'integer',
@@ -61,6 +67,17 @@ class SubscriptionOrder extends Model
     public function scopePaid(Builder $query): Builder
     {
         return $query->where('payment_status', PaymentStatus::Paid->value);
+    }
+
+    /**
+     * Money we are still waiting for — the receivables worklist (S1 item 14).
+     * Excludes the kinds that are ₹0 by definition (comp, trial, adjustment): a
+     * pending one of those is not owed, it would just inflate the figure.
+     */
+    public function scopeOutstanding(Builder $query): Builder
+    {
+        return $query->where('payment_status', PaymentStatus::Pending->value)
+            ->whereNotIn('kind', [OrderKind::Comp->value, OrderKind::Trial->value, OrderKind::Adjustment->value]);
     }
 
     /**

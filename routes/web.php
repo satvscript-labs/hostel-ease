@@ -115,6 +115,13 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('subscription/renew-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'renewOrder'])->name('subscription.renew-order');
         Route::post('subscription/add-branch-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranchOrder'])->name('subscription.add-branch-order');
         Route::post('subscription/verify', [\App\Http\Controllers\Admin\SubscriptionController::class, 'verify'])->name('subscription.verify');
+
+        // Branch removal REQUESTS (D11). The owner asks; only the Super Admin can
+        // actually cancel. Deliberately not gated by owner_self_serve — asking is
+        // not a billing operation, and an owner must always be able to start the
+        // conversation. Account-owner only (not co-admins), enforced in the controller.
+        Route::post('branches/{hostel}/request-removal', [\App\Http\Controllers\Admin\BranchManagerController::class, 'requestRemoval'])->name('branches.request-removal');
+        Route::delete('branches/{hostel}/request-removal', [\App\Http\Controllers\Admin\BranchManagerController::class, 'withdrawRemoval'])->name('branches.withdraw-removal');
     });
 
     /*
@@ -143,6 +150,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('accounts/{account}/discounts', [AccountController::class, 'storeDiscount'])->name('accounts.discounts.store');
         Route::delete('accounts/{account}/discounts/{discount}', [AccountController::class, 'revokeDiscount'])->name('accounts.discounts.revoke');
 
+        // Orders: accept a pending charge, or write off a mistaken one (S1 / D8 —
+        // the two capabilities inherited from the retired legacy Subscriptions page).
+        Route::patch('accounts/{account}/orders/{order}/accept', [AccountController::class, 'acceptOrder'])->name('accounts.orders.accept');
+        Route::patch('accounts/{account}/orders/{order}/void', [AccountController::class, 'voidOrder'])->name('accounts.orders.void');
+
+        // Branch removal (D11): the owner asks, the operator decides.
+        Route::post('accounts/{account}/branches/{hostel}/cancel', [AccountController::class, 'cancelBranch'])->name('accounts.branches.cancel');
+        Route::post('accounts/{account}/branches/{hostel}/restore', [AccountController::class, 'restoreBranch'])->name('accounts.branches.restore');
+        Route::post('accounts/{account}/branches/{hostel}/decline-removal', [AccountController::class, 'declineRemoval'])->name('accounts.branches.decline-removal');
+
         // Discounts management (volume tiers + manual discount overview)
         Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
         Route::post('discounts/rules', [DiscountController::class, 'storeRule'])->name('discounts.rules.store');
@@ -150,11 +167,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::patch('discounts/rules/{rule}/toggle', [DiscountController::class, 'toggleRule'])->name('discounts.rules.toggle');
         Route::delete('discounts/rules/{rule}', [DiscountController::class, 'destroyRule'])->name('discounts.rules.destroy');
 
+        // Legacy per-branch billing ARCHIVE — read-only since S1 (decision D8).
+        // Nothing writes `subscriptions` any more; its mutating routes were removed
+        // and every capability moved to Account 360 (record/renew/align/comp,
+        // accept a pending order, void a mistaken one). Kept reachable by URL.
         Route::get('subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
-        Route::post('subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');
-        Route::put('subscriptions/{subscription}', [SubscriptionController::class, 'update'])->name('subscriptions.update');
-        Route::patch('subscriptions/{subscription}/accept', [SubscriptionController::class, 'accept'])->name('subscriptions.accept');
-        Route::delete('subscriptions/{subscription}', [SubscriptionController::class, 'destroy'])->name('subscriptions.destroy');
 
         Route::post('admins', [AdminController::class, 'store'])->name('admins.store');
         Route::patch('admins/{admin}/toggle', [AdminController::class, 'toggle'])->name('admins.toggle');

@@ -196,20 +196,29 @@
                 {{-- Aligned rows (§4.11): subgrid columns ≥640 in this panel's
                      own container; stacked iOS-style rows below. Replaces a raw
                      table that horizontally scrolled on phones. --}}
+                {{-- Reads the ORDER LEDGER (S1 / F4): one row per coverage line this
+                     branch was granted, so a consolidated Account-360 renewal appears
+                     here — it never did when this card read the legacy table. --}}
                 <div class="he-adaptive">
                     <div class="hp-sub-list">
-                        @forelse($hostel->subscriptions as $s)
-                            @php($payColor = $s->payment_status === 'paid' ? 'success' : ($s->payment_status === 'pending' ? 'warning' : 'danger'))
+                        @forelse($coverageLines as $line)
+                            @php($status = $line->order?->payment_status)
+                            @php($payColor = $status?->color() ?? 'secondary')
                             <div class="hp-sub-row">
                                 <div class="hp-sub-period">
-                                    <div class="fw-semibold text-dark text-truncate" style="font-variant-numeric:tabular-nums;">{{ $s->start_date->format('d M Y') }} <i class="fa-solid fa-arrow-right-long mx-1 text-muted" style="font-size:.7rem;"></i> {{ $s->end_date->format('d M Y') }}</div>
-                                    <div class="hp-sub-meta"><span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1" style="font-size:.66rem; font-weight:700;">{{ $s->plan ? ucfirst($s->plan) : __('Custom') }}</span></div>
+                                    <div class="fw-semibold text-dark text-truncate" style="font-variant-numeric:tabular-nums;">{{ $line->start_date->format('d M Y') }} <i class="fa-solid fa-arrow-right-long mx-1 text-muted" style="font-size:.7rem;"></i> {{ $line->end_date->format('d M Y') }}</div>
+                                    <div class="hp-sub-meta">
+                                        <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1" style="font-size:.66rem; font-weight:700;">{{ $line->order?->kind?->label() ?? __('Charge') }}</span>
+                                        @if(($line->order?->quantity ?? 1) > 1)
+                                            <span class="text-muted ms-1" style="font-size:.66rem;">{{ __('part of a :n-branch payment', ['n' => $line->order->quantity]) }}</span>
+                                        @endif
+                                    </div>
                                 </div>
-                                <span class="badge bg-{{ $payColor }}-subtle text-{{ $payColor }} rounded-pill px-3 hp-sub-status">{{ ucfirst($s->payment_status) }}</span>
-                                <span class="fw-bold text-dark hp-sub-amt">{{ hostelease_money($s->amount) }}</span>
+                                <span class="badge bg-{{ $payColor }}-subtle text-{{ $payColor }} rounded-pill px-3 hp-sub-status">{{ $status?->label() ?? '—' }}</span>
+                                <span class="fw-bold text-dark hp-sub-amt">{{ hostelease_money($line->amount) }}</span>
                             </div>
                         @empty
-                            <div class="p-3" style="grid-column:1/-1;"><x-he-empty-state icon="receipt" title="{{ __('No billing history') }}" subtitle="{{ __('Renewals recorded for this branch will appear here.') }}" /></div>
+                            <div class="p-3" style="grid-column:1/-1;"><x-he-empty-state icon="receipt" title="{{ __('No billing history') }}" subtitle="{{ __('Charges recorded for this branch will appear here.') }}" /></div>
                         @endforelse
                     </div>
                 </div>

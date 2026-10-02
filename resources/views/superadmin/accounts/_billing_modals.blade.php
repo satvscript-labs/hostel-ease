@@ -308,3 +308,133 @@
         <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-check me-2"></i>Save</button>
     </x-slot:footer>
 </x-he-modal>
+
+{{-- ══════════════════════════════════════════════════════════════════════════
+     Branch removal (D11). The operator decides; the owner only ever asks.
+     The confirm modal leads with the CONSEQUENCES, because the two that surprise
+     people are (a) the branch keeps working — this is not a shut-off — and (b) a
+     lost volume tier can make the REMAINING branches dearer.
+   ══════════════════════════════════════════════════════════════════════════ --}}
+<x-he-modal open="cancelOpen" title="Remove a branch from billing" icon="circle-minus" :size="620"
+    ::action="cancelAction" method="POST">
+    <div class="od-label mb-2">Branch</div>
+    <div class="he-summary shadow-sm mb-3">
+        <div class="he-summary-row he-summary-row--line">
+            <span x-text="cancelBranchName"></span>
+            <span class="he-summary-amt" x-text="cancelImpact ? ('covered to ' + cancelImpact.covered_to) : ''"></span>
+        </div>
+    </div>
+
+    <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(79,70,229,.07); color:#3730a3;">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        <strong>It keeps working.</strong> The branch stays active until the coverage it has already paid for runs out — it is simply not billed again. No refund, no credit.
+    </div>
+
+    <template x-if="cancelImpact && cancelImpact.tier_lost">
+        <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(234,88,12,.1); color:#9a3412;">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            <strong>This loses a volume discount.</strong>
+            Per-branch price goes from <span class="fw-bold" x-text="heMoney(cancelImpact.per_branch_now)"></span>
+            to <span class="fw-bold" x-text="heMoney(cancelImpact.per_branch_after)"></span> —
+            the branches that stay get <em>more</em> expensive. Worth a conversation first.
+        </div>
+    </template>
+
+    <template x-if="cancelImpact && cancelImpact.closes_account">
+        <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(220,38,38,.1); color:#991b1b;">
+            <i class="fa-solid fa-circle-exclamation me-1"></i>
+            <strong>This is the last billable branch.</strong> The account will have nothing left to renew.
+        </div>
+    </template>
+
+    <template x-if="cancelImpact && cancelImpact.pending">
+        <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(234,88,12,.1); color:#9a3412;">
+            <i class="fa-solid fa-file-invoice me-1"></i>
+            There <span x-text="cancelImpact.pending === 1 ? 'is' : 'are'"></span>
+            <span class="fw-bold" x-text="cancelImpact.pending"></span>
+            unpaid <span x-text="cancelImpact.pending === 1 ? 'charge' : 'charges'"></span> against this branch.
+            Decide whether to collect or void <span class="fw-semibold">it</span> in the Orders list.
+        </div>
+    </template>
+
+    <div class="he-summary shadow-sm mb-3">
+        <div class="he-summary-row he-summary-row--line">
+            <span>Branches billed now</span>
+            <span class="he-summary-amt" x-text="cancelImpact ? cancelImpact.quantity_now : ''"></span>
+        </div>
+        <div class="he-summary-row he-summary-row--line">
+            <span>After removal</span>
+            <span class="he-summary-amt" x-text="cancelImpact ? cancelImpact.quantity_after : ''"></span>
+        </div>
+        <div class="he-summary-row he-summary-row--total">
+            <span>Next renewal</span>
+            <span class="he-summary-amt">
+                <span class="text-muted text-decoration-line-through me-2" x-text="cancelImpact ? heMoney(cancelImpact.total_now) : ''"></span>
+                <span x-text="cancelImpact ? heMoney(cancelImpact.total_after) : ''"></span>
+            </span>
+        </div>
+    </div>
+
+    <label class="form-label fw-bold small text-muted">REASON <span class="text-danger">*</span></label>
+    <input type="text" name="reason" class="form-control bg-white border shadow-sm" required maxlength="255"
+           placeholder="e.g. owner closing the property / consolidating branches">
+    <div class="form-text">Recorded on the branch and in the audit log — it is the churn reason you will want later.</div>
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="cancelOpen=false">Keep billing</button>
+        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-circle-minus me-2"></i>Remove from billing</button>
+    </x-slot:footer>
+</x-he-modal>
+
+<x-he-modal open="declineOpen" title="Close the removal request" icon="hand" :size="560"
+    ::action="declineAction" method="POST">
+    <p class="small text-muted mb-3">
+        <span class="fw-bold text-dark" x-text="declineBranchName"></span> stays on the plan and keeps being billed.
+        The owner is notified that the request was closed, so the ask does not just disappear on them.
+    </p>
+    <label class="form-label fw-bold small text-muted">NOTE TO THE OWNER</label>
+    <input type="text" name="note" class="form-control bg-white border shadow-sm" maxlength="255"
+           placeholder="e.g. agreed a discount instead — keeping the branch">
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="declineOpen=false">Back</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-check me-2"></i>Close request</button>
+    </x-slot:footer>
+</x-he-modal>
+
+{{-- Void an order (S1 / D8) — the "write off a mistaken record" capability the
+     retired legacy page used to hold. Never a delete: the row and its invoice
+     number survive. Voiding a PAID order WITHDRAWS the coverage it granted, which
+     is the one routine path allowed to shorten a branch's coverage, so the warning
+     is explicit and the reason mandatory. --}}
+<x-he-modal open="voidOpen" title="Void this order" icon="ban" :size="560" ::action="voidAction" method="POST">
+    @method('PATCH')
+    <div class="he-summary shadow-sm mb-3">
+        <div class="he-summary-row he-summary-row--line">
+            <span>Order</span>
+            <span class="he-summary-amt" x-text="voidOrderLabel"></span>
+        </div>
+    </div>
+
+    <template x-if="voidWasPaid">
+        <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(220,38,38,.1); color:#991b1b;">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            <strong>This order is paid.</strong> Voiding it withdraws the coverage it granted, so the
+            branches on it may lose access. Use this only for a record that should never have existed —
+            not for a refund.
+        </div>
+    </template>
+
+    <p class="small text-muted mb-3">
+        The order stays in the ledger marked <strong>voided</strong>, keeping its invoice number. It
+        stops counting as revenue and stops being owed.
+    </p>
+
+    <label class="form-label fw-bold small text-muted">REASON <span class="text-danger">*</span></label>
+    <input type="text" name="reason" class="form-control bg-white border shadow-sm" required maxlength="255"
+           placeholder="e.g. recorded against the wrong customer">
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="voidOpen=false">Cancel</button>
+        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-ban me-2"></i>Void order</button>
+    </x-slot:footer>
+</x-he-modal>

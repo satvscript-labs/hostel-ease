@@ -282,13 +282,18 @@ class PublicIdJsPayloadTest extends TestCase
         $html = $this->actingAs($super)->get(route('superadmin.subscriptions.index'))
             ->assertOk()->getContent();
 
-        // Same trap as the discounts map: the accept/delete form actions already
-        // render the public_id, so only asserting the MAP KEY (the token
-        // immediately followed by the record's fields) has any teeth.
-        $this->assertMatchesRegularExpression(
-            '/'.preg_quote($subscription->public_id, '/').'.{0,20}plan/s',
+        // S1 (decision D8): this page is now a READ-ONLY archive — its Add / Edit /
+        // Accept / Delete controls and the JS lookup map behind them are gone with the
+        // routes they posted to, so there is no map left to key by public_id. What
+        // still matters is the hardening rule itself: the page must not leak an
+        // enumerable integer id in a URL. It links to the hostel PROFILE, whose route
+        // key is opaque, and emits no per-record URL at all.
+        $this->assertStringContainsString($branch->name, $html);
+        $this->assertStringNotContainsString(
+            '/superadmin/subscriptions/'.$subscription->id,
             $html,
-            'The subs lookup map is not keyed by public_id — openEditModal() will miss and the modal will silently never open.'
+            'The archive emitted an integer-keyed record URL — public-id hardening regressed.'
         );
+        $this->assertStringContainsString(route('superadmin.hostels.show', $branch), $html);
     }
 }

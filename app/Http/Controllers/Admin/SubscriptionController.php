@@ -42,11 +42,16 @@ class SubscriptionController extends Controller
         $viewer = $request->user();
         $account = $this->accountBilling->accountForViewer($viewer);
 
-        // Keep the account's anchor/status in sync with its branches on load.
-        $this->accountBilling->refreshAccountAnchor($account);
-        $account->refresh();
-
-        $branches = $this->accountBilling->includedBranches($account);
+        // NO WRITE ON A GET (S1 · finding F10). This used to call
+        // refreshAccountAnchor() on every page view, so opening the Subscription page
+        // mutated subscription_accounts and raced the daily lifecycle tick. The tick
+        // owns that recompute now (07:30, before the alert refresh); this page reads.
+        // Nothing is stale in practice: every billing op syncs on the way out, and the
+        // status the hero shows is derived from the anchor at render time anyway.
+        //
+        // Cancelled branches are listed too (D11) — the owner needs to see a branch
+        // that is closing and when — but the quotes below price the BILLABLE set.
+        $branches = $this->accountBilling->allBranches($account);
         $orders = $account->orders()->latest()->limit(10)->get();
 
         // JS-friendly quotes for both terms so the renew modal shows an accurate,
@@ -74,6 +79,13 @@ class SubscriptionController extends Controller
             // Production lock (P4 item 15): while false, owners see everything
             // but every mutating billing op is supervised via the Super Admin.
             'selfServe' => (bool) config('hostelease.owner_self_serve'),
+            // Branch removal (D11): the owner may ASK, for branches they own. A
+            // co-admin shares the hostel_admin role, so the button has to be gated on
+            // the owner FK, not the role — same rule as rename.
+            'viewerOwnsAccount' => $account->owner_id === $viewer->id,
+            // The renewal quote already excludes cancelled branches, so the owner sees
+            // the lower total immediately; this is just how many are still billed.
+            'billableCount' => $this->accountBilling->includedBranches($account)->count(),
         ]);
     }
 

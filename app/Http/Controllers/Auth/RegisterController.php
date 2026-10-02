@@ -45,14 +45,20 @@ class RegisterController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Create the Hostel Tenant (Defaults to 14 days free trial)
+            // 1. Create the Hostel Tenant.
+            //
+            // NO COVERAGE IS WRITTEN HERE (S1 · the S0 invariant, finally applied to
+            // this path too). This used to stamp subscription_start/end inline, which
+            // made signup the last place outside the billing service that granted
+            // coverage — invisible to the order ledger, so the trial could not be
+            // counted, reported on, or converted into a trial→paid figure, and the
+            // coverage audit flagged it forever as "entitled with no paid record".
+            // The ₹0 trial order is created in step 5 and IS what grants the window.
             $hostel = Hostel::create([
                 'name' => $request->hostel_name,
                 'owner_name' => $request->name,
                 'mobile' => $mobile,
                 'status' => 'active',
-                'subscription_start' => now(),
-                'subscription_end' => now()->addDays(14), // 14-day free trial
             ]);
 
             // 2. Create the Owner User
@@ -74,9 +80,17 @@ class RegisterController extends Controller
             // record any payment) and no owner FK / account spine. Fix all three:
             $hostel->update(['owner_id' => $user->id]);
             app(\App\Services\HostelService::class)->seedPaymentModes($hostel);
-            // The account billing spine, so Account 360 / super-admin revenue
-            // resolve for a trial owner (firstOrCreate — harmless if it exists).
-            app(\App\Services\Billing\AccountBillingService::class)->accountFor($user);
+
+            // 5. Start the free trial THROUGH THE BILLER (S1). This creates the
+            // account spine, a ₹0 `trial` order with one line, and — via the coverage
+            // projection — the 14-day window itself. One code path for every grant of
+            // coverage in the product, and the trial becomes a measurable event.
+            app(\App\Services\Billing\AccountBillingService::class)
+                ->recordBranchRenewal($hostel->fresh(), 'trial', [
+                    'payment_status' => 'paid',
+                    'payment_method' => null,
+                    'remarks' => 'Self-signup free trial',
+                ]);
 
             DB::commit();
 

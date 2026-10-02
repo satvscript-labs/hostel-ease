@@ -203,27 +203,82 @@
             <div class="panel-card shadow-sm h-100">
                 <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-hotel text-primary me-2"></i>Branches</h6>
-                    <span class="text-muted small">{{ $branches->count() }} total</span>
+                    <span class="text-muted small">
+                        {{ $billable->count() }} billed
+                        @if($branches->count() > $billable->count()) · {{ $branches->count() - $billable->count() }} leaving @endif
+                    </span>
                 </div>
+
+                @if($accountClosing)
+                    {{-- Every branch cancelled: this customer is leaving. Renewal is
+                         refused server-side (D11 case 9); say so before it is tried. --}}
+                    <div class="px-4 py-3 border-bottom" style="background: rgba(220,38,38,.06);">
+                        <div class="fw-bold text-danger small"><i class="fa-solid fa-circle-exclamation me-1"></i>Account closing</div>
+                        <div class="small text-muted">Every branch has been cancelled, so there is nothing left to bill. Restore a branch, or add one, before renewing.</div>
+                    </div>
+                @endif
+
                 <div class="stagger">
                     @forelse($branches as $branch)
-                        @php($behind = $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
-                        <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
-                            <div>
-                                <a href="{{ route('superadmin.hostels.show', $branch) }}" class="fw-bold text-dark text-decoration-none branch-link" title="Open hostel profile">
-                                    {{ $branch->name }} <i class="fa-solid fa-arrow-up-right-from-square text-muted ms-1" style="font-size:.6rem;"></i>
-                                </a>
-                                <div class="small text-muted">Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}</div>
-                            </div>
-                            <div class="d-flex align-items-center gap-2">
-                                @if($branch->isActive())
-                                    <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">Active</span>
-                                @else
-                                    <span class="badge bg-danger-subtle text-danger rounded-pill px-3 py-2">Expired</span>
-                                @endif
-                                @if($behind)
-                                    <button class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openAdd({{ $branch->id }}, @js($branch->name))" title="Prorate to the renewal date"><i class="fa-solid fa-plus me-1"></i>Add to cycle</button>
-                                @endif
+                        @php($state = $branch->cancellationState())
+                        @php($behind = ! $branch->isCancelled() && $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
+                        <div class="px-4 py-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div class="min-w-0">
+                                    <a href="{{ route('superadmin.hostels.show', $branch) }}" class="fw-bold text-dark text-decoration-none branch-link" title="Open hostel profile">
+                                        {{ $branch->name }} <i class="fa-solid fa-arrow-up-right-from-square text-muted ms-1" style="font-size:.6rem;"></i>
+                                    </a>
+                                    <div class="small text-muted">
+                                        @if($state === 'cancelled')
+                                            Not billed again · works until {{ $branch->subscription_end?->format('d M Y') ?? '—' }}
+                                        @elseif($state === 'closed')
+                                            Closed {{ $branch->subscription_end?->format('d M Y') }}
+                                        @else
+                                            Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}
+                                        @endif
+                                    </div>
+                                    @if($state === 'removal_requested')
+                                        <div class="small mt-1" style="color:#ea580c;">
+                                            <i class="fa-solid fa-hand me-1"></i>Removal requested{{ $branch->cancellation_requested_at ? ' '.$branch->cancellation_requested_at->diffForHumans() : '' }}
+                                            @if($branch->cancellation_requested_reason)<br><span class="text-muted">“{{ $branch->cancellation_requested_reason }}”</span>@endif
+                                        </div>
+                                    @elseif($branch->cancellation_reason && $branch->isCancelled())
+                                        <div class="small text-muted mt-1">“{{ $branch->cancellation_reason }}”</div>
+                                    @endif
+                                </div>
+                                <div class="d-flex flex-column align-items-end gap-2">
+                                    @php($chip = match($state) {
+                                        'removal_requested' => ['warning', 'Removal asked'],
+                                        'cancelled' => ['secondary', 'Cancelled'],
+                                        'closed' => ['secondary', 'Closed'],
+                                        default => $branch->isActive() ? ['success', 'Active'] : ['danger', 'Expired'],
+                                    })
+                                    <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
+
+                                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                                        @if($behind)
+                                            <button class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openAdd({{ $branch->id }}, @js($branch->name))" title="Prorate to the renewal date"><i class="fa-solid fa-plus me-1"></i>Add to cycle</button>
+                                        @endif
+
+                                        @if($branch->isCancelled())
+                                            <form method="POST" action="{{ route('superadmin.accounts.branches.restore', [$account, $branch]) }}" class="d-inline"
+                                                  data-confirm="Put {{ $branch->name }} back into the billing cycle?">
+                                                @csrf
+                                                <button class="btn btn-sm btn-light text-dark rounded-pill px-3 fw-semibold shadow-sm"><i class="fa-solid fa-rotate-left me-1"></i>Restore</button>
+                                            </form>
+                                        @else
+                                            @if($state === 'removal_requested')
+                                                <button class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm"
+                                                        @click="openDecline({{ $branch->id }}, @js($branch->name))">Decline</button>
+                                            @endif
+                                            <button class="btn btn-sm btn-light rounded-pill px-3 fw-semibold shadow-sm" style="color:#dc2626;"
+                                                    @click="openCancel({{ $branch->id }}, @js($branch->name))"
+                                                    title="Stop billing this branch; it keeps the coverage it paid for">
+                                                <i class="fa-solid fa-circle-minus me-1"></i>{{ $state === 'removal_requested' ? 'Confirm removal' : 'Remove' }}
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     @empty
@@ -352,17 +407,37 @@
                                                 @endif
                                             </div>
 
-                                            {{-- Invoice download (W12). Paid → tax invoice; else proforma.
-                                                 Failed orders get no invoice at all. --}}
-                                            @if($order->isBillable())
-                                                <div class="col-12">
+                                            {{-- Invoice + the two actions inherited from the retired legacy
+                                                 Subscriptions page (S1 / D8): accept a pending charge, or
+                                                 write a mistaken one off. Void never deletes — the row and
+                                                 its invoice number stay, which is what an auditor expects. --}}
+                                            <div class="col-12 d-flex flex-wrap gap-2">
+                                                @if($order->isBillable())
                                                     <a href="{{ route('superadmin.accounts.orders.invoice', [$account, $order]) }}" target="_blank" rel="noopener"
                                                        class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
                                                         <i class="fa-solid fa-file-invoice me-1"></i>
-                                                        {{ $order->payment_status->value === 'paid' ? 'Download tax invoice' : 'Download proforma' }}
+                                                        {{ $order->payment_status->value === 'paid' ? 'Download invoice' : 'Download proforma' }}
                                                     </a>
-                                                </div>
-                                            @endif
+                                                @endif
+
+                                                @if($order->payment_status->value === 'pending')
+                                                    <form method="POST" action="{{ route('superadmin.accounts.orders.accept', [$account, $order]) }}"
+                                                          data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.">
+                                                        @csrf @method('PATCH')
+                                                        <input type="hidden" name="payment_method" value="cash">
+                                                        <button class="btn btn-sm btn-success rounded-pill px-3 fw-semibold shadow-sm">
+                                                            <i class="fa-solid fa-check me-1"></i>Accept payment
+                                                        </button>
+                                                    </form>
+                                                @endif
+
+                                                @if($order->payment_status->value !== 'voided')
+                                                    <button type="button" class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm"
+                                                            @click="openVoid(@js($order->public_id), @js($order->invoiceNumber()), @js((string) $order->payment_status->value))">
+                                                        <i class="fa-solid fa-ban me-1"></i>Void
+                                                    </button>
+                                                @endif
+                                            </div>
                                         </div>
                                     </div>
                         </div>
@@ -444,6 +519,31 @@ document.addEventListener('alpine:init', () => {
                 note: q.quantity ? ('Renews all branches to ' + q.new_anchor) : '',
             });
         },
+
+        // ── Void an order (S1 / D8) ──
+        voidOpen: false, voidOrderKey: null, voidOrderLabel: '', voidWasPaid: false,
+        voidUrlTemplate: @js(route('superadmin.accounts.orders.void', [$account, '__ORDER__'])),
+        openVoid(key, label, status) { this.voidOrderKey = key; this.voidOrderLabel = label; this.voidWasPaid = status === 'paid'; this.voidOpen = true; },
+        get voidAction() { return this.voidUrlTemplate.replace('__ORDER__', this.voidOrderKey || ''); },
+
+        // ── Branch removal (D11) ──
+        // Impact is computed server-side per branch (quantity, totals, tier loss,
+        // whether it closes the account) so the confirm modal states consequences
+        // rather than asking the operator to work them out.
+        cancelOpen: false, declineOpen: false,
+        cancelBranchId: null, cancelBranchName: '',
+        declineBranchId: null, declineBranchName: '',
+        removalImpact: @json($removalImpact),
+        cancelUrlTemplate: @js(route('superadmin.accounts.branches.cancel', [$account, '__BRANCH__'])),
+        declineUrlTemplate: @js(route('superadmin.accounts.branches.decline-removal', [$account, '__BRANCH__'])),
+        branchKeys: @json($branches->mapWithKeys(fn ($b) => [$b->id => $b->public_id])),
+        openCancel(id, name) { this.cancelBranchId = id; this.cancelBranchName = name; this.cancelOpen = true; },
+        openDecline(id, name) { this.declineBranchId = id; this.declineBranchName = name; this.declineOpen = true; },
+        get cancelImpact() { return this.removalImpact[this.cancelBranchId] || null; },
+        // The route key is the branch's OPAQUE public_id (hardening U4) — building
+        // these URLs from the integer id would 404.
+        get cancelAction() { return this.cancelUrlTemplate.replace('__BRANCH__', this.branchKeys[this.cancelBranchId] || ''); },
+        get declineAction() { return this.declineUrlTemplate.replace('__BRANCH__', this.branchKeys[this.declineBranchId] || ''); },
 
         // ── Add to cycle ──
         addBranchId: null, addBranchName: '', addOverride: '',
