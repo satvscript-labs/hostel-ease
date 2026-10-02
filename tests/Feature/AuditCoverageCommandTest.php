@@ -137,6 +137,120 @@ class AuditCoverageCommandTest extends TestCase
         $this->assertSame($before, $snapshot(), 'The audit modified data — it must be read-only.');
     }
 
+    // -----------------------------------------------------------------
+    // --fix (decision D1)
+    // -----------------------------------------------------------------
+
+    public function test_fix_shortens_coverage_to_what_the_payments_bought(): void
+    {
+        [$owner, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'fix_1',
+        ]);
+
+        $paidUpTo = $branch->fresh()->subscription_end->toDateString();
+
+        // The F1 state: two years held on one year's money, and the account anchor
+        // that was derived from it.
+        $branch->forceFill(['subscription_end' => now()->addYears(2)])->save();
+        $account = SubscriptionAccount::where('owner_id', $owner->id)->firstOrFail();
+        $account->forceFill(['current_period_end' => now()->addYears(2)])->save();
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true, '--force' => true])->assertSuccessful();
+
+        $this->assertSame($paidUpTo, $branch->fresh()->subscription_end->toDateString());
+        $this->assertSame(
+            $paidUpTo,
+            $account->fresh()->current_period_end->toDateString(),
+            'The account anchor was not re-derived from the corrected branch.',
+        );
+    }
+
+    public function test_fix_repairs_a_stale_cycle_start(): void
+    {
+        [$owner, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'fix_2',
+        ]);
+
+        // F15's signature: a start that never advanced, leaving a multi-year window.
+        $account = SubscriptionAccount::where('owner_id', $owner->id)->firstOrFail();
+        $account->forceFill(['current_period_start' => now()->subYears(3)])->save();
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true, '--force' => true])->assertSuccessful();
+
+        $account = $account->fresh();
+        $this->assertSame(
+            $account->current_period_end->copy()->subYear()->toDateString(),
+            $account->current_period_start->toDateString(),
+        );
+    }
+
+    public function test_fix_leaves_an_unledgered_trial_alone(): void
+    {
+        // Check 2's rows are NOT over-granted — they are grants that never reached
+        // the ledger (self-signup trials). Nulling their coverage would lock out a
+        // legitimately-trialling tenant, so --fix must not touch them.
+        $trial = Hostel::factory()->create([
+            'name' => 'Self Signup', 'status' => 'active', 'subscription_end' => now()->addDays(14),
+        ]);
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true, '--force' => true])->assertSuccessful();
+
+        $this->assertNotNull($trial->fresh()->subscription_end);
+        $this->assertTrue($trial->fresh()->isActive());
+    }
+
+    public function test_fix_without_force_can_be_declined(): void
+    {
+        [, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'fix_3',
+        ]);
+        $branch->forceFill(['subscription_end' => now()->addYears(2)])->save();
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true])
+            ->expectsConfirmation('Apply these corrections?', 'no')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertSuccessful();
+
+        $this->assertSame(now()->addYears(2)->toDateString(), $branch->fresh()->subscription_end->toDateString());
+    }
+
+    public function test_fix_writes_an_audit_entry_per_correction(): void
+    {
+        [, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'fix_4',
+        ]);
+        $branch->forceFill(['subscription_end' => now()->addYears(2)])->save();
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true, '--force' => true])->assertSuccessful();
+
+        $this->assertDatabaseHas('activity_logs', [
+            'action' => 'subscription.update',
+            'hostel_id' => $branch->id,
+            'subject_type' => $branch->getMorphClass(),
+            'subject_id' => $branch->id,
+        ]);
+    }
+
+    public function test_fix_on_a_clean_ledger_changes_nothing(): void
+    {
+        [, $branch] = $this->ownerWithBranch();
+        app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
+            'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'fix_5',
+        ]);
+
+        $end = $branch->fresh()->subscription_end->toDateString();
+
+        $this->artisan('hostelease:audit-coverage', ['--fix' => true, '--force' => true])
+            ->expectsOutputToContain('Nothing to fix')
+            ->assertSuccessful();
+
+        $this->assertSame($end, $branch->fresh()->subscription_end->toDateString());
+    }
+
     public function test_the_csv_option_writes_the_findings(): void
     {
         [, $branch] = $this->ownerWithBranch();

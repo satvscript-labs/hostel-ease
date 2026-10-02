@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionOrderLine;
+use App\Support\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -20,8 +21,9 @@ use Illuminate\Support\Carbon;
  * code is fixed; this command measures what the bug already handed out, so the
  * owner can decide what — if anything — to do about live customers (D1).
  *
- * It writes NOTHING. Safe to run on production. `--csv=` dumps the row-level
- * findings for a spreadsheet.
+ * Without `--fix` it writes NOTHING — safe to run anywhere. `--csv=` dumps the
+ * row-level findings for a spreadsheet. `--fix` applies the correction decided in
+ * D1 (see applyFixes()).
  *
  * Five checks:
  *   1. Coverage held vs coverage paid for, rolled up per branch.
@@ -35,9 +37,12 @@ use Illuminate\Support\Carbon;
  */
 class AuditCoverage extends Command
 {
-    protected $signature = 'hostelease:audit-coverage {--csv= : Write row-level findings to this CSV path}';
+    protected $signature = 'hostelease:audit-coverage
+        {--csv= : Write row-level findings to this CSV path}
+        {--fix : Correct what checks 1, 4 and 5 found (decision D1). Shortens over-granted coverage, re-derives account anchors, repairs stale cycle starts}
+        {--force : Skip the --fix confirmation prompt}';
 
-    protected $description = 'Read-only audit of subscription coverage vs what the ledger supports (S0 / decision D1).';
+    protected $description = 'Audit (and optionally correct) subscription coverage against what the ledger supports (S0 / decision D1).';
 
     /**
      * A window longer than this many terms is a double-stamp, not a rounding
@@ -49,10 +54,21 @@ class AuditCoverage extends Command
     /** @var array<int, array<string, mixed>> */
     private array $rows = [];
 
+    /**
+     * Corrections --fix would apply, collected by the checks that run before it.
+     *
+     * @var array{coverage: array<int, array{branch: Hostel, to: Carbon, over: int}>, cycle_start: array<int, array{account: SubscriptionAccount, to: Carbon}>}
+     */
+    private array $fixes = ['coverage' => [], 'cycle_start' => []];
+
     public function handle(): int
     {
+        $fix = (bool) $this->option('fix');
+
         $this->line('');
-        $this->info('  Coverage audit — read-only. Nothing is modified.');
+        $this->info($fix
+            ? '  Coverage audit — FIX MODE. Findings in checks 1, 4 and 5 will be corrected.'
+            : '  Coverage audit — read-only. Nothing is modified.');
         $this->line('  '.now()->format('d M Y H:i').'  ·  grace window: '.config('hostelease.grace_days').' days');
         $this->line('');
 
@@ -62,11 +78,137 @@ class AuditCoverage extends Command
         $this->checkAnchorDrift();
         $this->checkStalePeriodStart();
 
-        $this->summarise($over);
+        $this->summarise($over, $fix);
 
         if ($path = $this->option('csv')) {
             $this->writeCsv($path);
         }
+
+        if ($fix) {
+            return $this->applyFixes();
+        }
+
+        return self::SUCCESS;
+    }
+
+    // -----------------------------------------------------------------
+    // --fix (decision D1)
+    // -----------------------------------------------------------------
+
+    /**
+     * Correct the ledger. Owner decision D1, settled 2026-10-02 once it was clear
+     * there are no live customers yet: rather than carrying the over-granted
+     * coverage forward as goodwill, bring the data in line with what was actually
+     * paid for, so the invariants S1 is about to enforce start from a clean base.
+     *
+     * Three corrections, in this order because each depends on the last:
+     *   1. Shorten over-granted branch coverage to what its payments bought.
+     *   2. Re-derive every account anchor/status from the corrected mirrors.
+     *   3. Repair stale cycle starts from the corrected anchor (finding F15).
+     *
+     * Deliberately NOT corrected: check 2 (entitled branches with no paid record).
+     * Those are not over-granted — they are grants that never reached the ledger,
+     * mostly self-signup trials, and nulling their coverage would lock out
+     * legitimately-trialling tenants. The real fix is routing that path through the
+     * biller, which is S1.
+     *
+     * Every change is written to the activity log, tenant-bound to the branch.
+     */
+    private function applyFixes(): int
+    {
+        $coverage = $this->fixes['coverage'];
+        $cycleStarts = $this->fixes['cycle_start'];
+
+        if (! $coverage && ! $cycleStarts) {
+            $this->info('  Nothing to fix — the ledger already agrees with itself.');
+            $this->line('');
+
+            return self::SUCCESS;
+        }
+
+        $this->warn('  --fix will change data:');
+        $this->line('    · '.count($coverage).' branch(es) shortened to the coverage their payments bought');
+        $this->line('    · every account anchor + status re-derived from the corrected branches');
+        $this->line('    · '.count($cycleStarts).' account cycle start(s) repaired');
+        $this->line('');
+
+        if (! $this->option('force') && ! $this->confirm('Apply these corrections?', false)) {
+            $this->line('  Aborted. Nothing was changed.');
+
+            return self::SUCCESS;
+        }
+
+        $logger = app(\App\Services\ActivityLogger::class);
+
+        // 1. Branch coverage.
+        foreach ($coverage as $fix) {
+            $branch = $fix['branch'];
+            $was = $branch->subscription_end;
+
+            Tenant::set($branch->id);
+            try {
+                $branch->forceFill(['subscription_end' => $fix['to']])->save();
+                $logger->log(
+                    'subscription.update',
+                    "Coverage corrected (D1): {$branch->name} shortened from "
+                        .$was->format('d M Y').' to '.$fix['to']->format('d M Y')
+                        ." — {$fix['over']} days were not covered by any payment.",
+                    $branch,
+                    ['from' => $was->toDateString(), 'to' => $fix['to']->toDateString(), 'over_days' => $fix['over']],
+                );
+            } finally {
+                Tenant::clear();
+            }
+
+            $this->line("    ✓ {$branch->name}: ".$was->format('d M Y').' → '.$fix['to']->format('d M Y'));
+        }
+
+        // 2. Account anchors + status, from the corrected mirrors.
+        $billing = app(\App\Services\Billing\AccountBillingService::class);
+        $anchorsMoved = 0;
+        foreach (SubscriptionAccount::cursor() as $account) {
+            $before = $account->current_period_end?->toDateString();
+            $billing->refreshAccountAnchor($account);
+            $account->refresh();
+
+            if ($account->current_period_end?->toDateString() !== $before) {
+                $anchorsMoved++;
+                $this->line('    ✓ anchor for '.($account->owner?->name ?? 'account #'.$account->id)
+                    .': '.($before ?? 'none').' → '.($account->current_period_end?->toDateString() ?? 'none'));
+            }
+        }
+
+        // 3. Cycle starts, now that the anchors are right. Re-read each account so
+        //    the start is derived from the corrected anchor, not the stale one.
+        $startsFixed = 0;
+        foreach ($cycleStarts as $fix) {
+            $account = $fix['account']->fresh();
+            if (! $account || ! $account->current_period_end) {
+                continue;
+            }
+
+            $period = $account->period ?? BillingPeriod::Yearly;
+            $start = $period->cycleStart($account->current_period_end);
+            $was = $account->current_period_start?->toDateString();
+
+            $account->forceFill(['current_period_start' => $start])->save();
+            $startsFixed++;
+
+            app(\App\Services\ActivityLogger::class)->log(
+                'subscription.update',
+                'Cycle start corrected (D1, F15) for '.($account->owner?->name ?? 'account #'.$account->id)
+                    .': '.($was ?? 'none').' → '.$start->toDateString(),
+                $account,
+            );
+
+            $this->line('    ✓ cycle start for '.($account->owner?->name ?? 'account #'.$account->id)
+                .': '.($was ?? 'none').' → '.$start->toDateString());
+        }
+
+        $this->line('');
+        $this->info("  Corrected: ".count($coverage).' branch coverage · '.$anchorsMoved.' anchor(s) · '.$startsFixed.' cycle start(s).');
+        $this->line('  Re-run without --fix to confirm the ledger is clean.');
+        $this->line('');
 
         return self::SUCCESS;
     }
@@ -178,6 +320,9 @@ class AuditCoverage extends Command
             $futureDays += $future;
             $pastDays += $over - $future;
             $futureValue += $value;
+
+            // What --fix would set this branch to.
+            $this->fixes['coverage'][] = ['branch' => $branch, 'to' => $paidUpTo, 'over' => $over];
 
             $findings[] = [
                 $branch->name,
@@ -379,6 +524,8 @@ class AuditCoverage extends Command
                 continue;
             }
 
+            $this->fixes['cycle_start'][] = ['account' => $account, 'to' => $period->cycleStart($end)];
+
             $findings[] = [
                 $account->owner?->name ?? 'account #'.$account->id,
                 $period->value,
@@ -390,7 +537,7 @@ class AuditCoverage extends Command
 
         if ($findings) {
             $this->line('     Harmless to access, but the window is wrong for reporting. S0 fixes it going');
-            $this->line('     forward: the next renewal writes a correct start. No back-fill needed.');
+            $this->line('     forward (the next renewal writes a correct start); --fix repairs it now.');
         }
 
         $this->render($findings, ['Customer', 'Term', 'Cycle start', 'Cycle end', 'Days (actual/expected)'],
@@ -422,7 +569,7 @@ class AuditCoverage extends Command
     }
 
     /** @param  array{future_days:int, future_value:float, past_days:int}  $over */
-    private function summarise(array $over): void
+    private function summarise(array $over, bool $fix = false): void
     {
         $this->line('');
         $this->info('  ── Summary ────────────────────────────────────────────────');
@@ -440,11 +587,13 @@ class AuditCoverage extends Command
         );
         $this->components->twoColumnDetail('Over-granted coverage already consumed', $over['past_days'].' days (unrecoverable)');
         $this->line('');
-        $this->line('  The bolded figure is what decision <options=bold>D1</> is about: coverage live customers');
-        $this->line('  still hold and did not pay for. Options are in');
-        $this->line('  <fg=cyan>_artifact/saas_billing_autopay/03_FINDINGS.md</> (leave it · correct silently ·');
-        $this->line('  correct case-by-case with the customer). Default recommendation: leave it.');
-        $this->line('');
+
+        if (! $fix) {
+            $this->line('  That bolded figure is coverage customers hold and did not pay for (decision');
+            $this->line('  <options=bold>D1</>). Re-run with <options=bold>--fix</> to shorten it to what the ledger supports.');
+            $this->line('  <fg=cyan>_artifact/saas_billing_autopay/03_FINDINGS.md</>');
+            $this->line('');
+        }
     }
 
     private function writeCsv(string $path): void
