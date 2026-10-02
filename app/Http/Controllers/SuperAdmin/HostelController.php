@@ -110,10 +110,19 @@ class HostelController extends Controller
 
         $redirect = redirect()->route('superadmin.hostels.show', $result['hostel']);
 
+        // Make the S0 behaviour change visible instead of surprising (finding F1):
+        // an unpaid initial setup grants NO coverage now, where it used to silently
+        // hand out a full year. The branch is created and recorded as money owed —
+        // accept the payment, or grant a trial/comp, to let them start working.
+        $unpaid = ($request->validated()['payment_status'] ?? 'pending') !== 'paid';
+        $note = $unpaid
+            ? ' Payment is not marked paid, so no coverage has been granted yet — accept the payment (or grant a trial/comp) to activate the branch.'
+            : '';
+
         if ($result['password'] === null) {
             // Linked to an existing owner login (same mobile = another branch).
             return $redirect->with('success',
-                "Hostel created and linked to existing owner {$result['admin']->mobile} as a new branch. They use their current password.");
+                "Hostel created and linked to existing owner {$result['admin']->mobile} as a new branch. They use their current password.".$note);
         }
 
         // Surface the generated login once so the Super Admin can share it.
@@ -122,7 +131,7 @@ class HostelController extends Controller
                 'mobile' => $result['admin']->mobile,
                 'password' => $result['password'],
             ])
-            ->with('success', 'Hostel created and admin login generated.');
+            ->with('success', 'Hostel created and admin login generated.'.$note);
     }
 
     public function show(Hostel $hostel): View

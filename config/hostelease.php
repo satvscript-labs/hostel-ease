@@ -99,24 +99,48 @@ return [
     // Vacancy lookahead windows (days).
     'vacancy_windows' => [7, 15, 30],
 
-    'subscription_amount' => (float) env('hostelease_SUBSCRIPTION_AMOUNT', 5000),
-
     /*
     | The platform (seller) identity — the "from" on a subscription invoice the
     | Super Admin issues to a customer for their branches. Env-overridable so a
     | real GSTIN / address can land in production without a code change.
+    |
+    | Each key accepts the SAAS_* name as a fallback (S0 · finding F5): the
+    | production env has always carried SAAS_LEGAL_ENTITY / SAAS_GST_NUMBER /
+    | SAAS_SUPPORT_EMAIL / SAAS_CONTACT_ADDRESS, which nothing read — so the
+    | seller address was blank and the GSTIN could never have appeared on an
+    | invoice even once it existed. Reading both names fixes it without having to
+    | edit the server's .env. (Same pattern as services.razorpay's key aliases.)
     */
     'company' => [
         'name' => env('HOSTELEASE_COMPANY_NAME', 'HostelEase'),
-        'legal_name' => env('HOSTELEASE_COMPANY_LEGAL', 'SatvScript'),
+        'legal_name' => env('HOSTELEASE_COMPANY_LEGAL', env('SAAS_LEGAL_ENTITY', 'SatvScript')),
         'tagline' => env('HOSTELEASE_COMPANY_TAGLINE', 'Hostel Management Platform'),
-        'address' => env('HOSTELEASE_COMPANY_ADDRESS', ''),
+        'address' => env('HOSTELEASE_COMPANY_ADDRESS', env('SAAS_CONTACT_ADDRESS', '')),
         'city' => env('HOSTELEASE_COMPANY_CITY', ''),
         'state' => env('HOSTELEASE_COMPANY_STATE', ''),
-        'email' => env('HOSTELEASE_COMPANY_EMAIL', env('MAIL_FROM_ADDRESS', 'support@hostel-ease.satvscript.com')),
+        'email' => env('HOSTELEASE_COMPANY_EMAIL', env('SAAS_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS', 'support@hostel-ease.satvscript.com'))),
         'website' => env('HOSTELEASE_COMPANY_WEBSITE', 'hostel-ease.satvscript.com'),
-        'gstin' => env('HOSTELEASE_COMPANY_GSTIN', ''),
+        'gstin' => env('HOSTELEASE_COMPANY_GSTIN', env('SAAS_GST_NUMBER', '')),
         'invoice_prefix' => env('HOSTELEASE_INVOICE_PREFIX', 'HE'),
+    ],
+
+    /*
+    | GST on the platform's own subscription billing (decision D6, 2026-10-02).
+    |
+    | 'inclusive' => true  — the listed price IS the final price. ₹10,000 stays
+    | ₹10,000 and decomposes to taxable ₹8,474.58 + GST ₹1,525.42 at 18%. The
+    | customer always sees one round number.
+    |
+    | Nothing is charged or shown until a GSTIN exists: while company.gstin is
+    | empty the platform is not registered, so the subscription PDF is a RECEIPT,
+    | not a tax invoice, and no tax line is printed. Fill the GSTIN (env
+    | SAAS_GST_NUMBER / HOSTELEASE_COMPANY_GSTIN) and it promotes itself.
+    | Full tax columns + CGST/SGST/IGST split land in phase S7.
+    */
+    'gst' => [
+        'rate' => (float) env('HOSTELEASE_GST_RATE', 18),
+        'inclusive' => (bool) env('HOSTELEASE_GST_INCLUSIVE', true),
+        'sac_code' => env('HOSTELEASE_GST_SAC', '998314'),
     ],
 
     /*

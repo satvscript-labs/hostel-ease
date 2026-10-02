@@ -22,8 +22,17 @@ class HostelService
     public function provision(array $data): array
     {
         return DB::transaction(function () use ($data) {
-            $quote = app(\App\Services\BranchBillingService::class)->quote(new Hostel(), $data['plan'] ?? 'yearly');
-
+            // COVERAGE IS NOT WRITTEN HERE (S0 · finding F1). This method used to
+            // stamp subscription_start/end from a quote, and then
+            // recordBranchRenewal() below re-quoted against the branch it had just
+            // made "active until next year" — and, correctly honouring BR-9 (never
+            // lose paid time), stacked a SECOND term on top. A paid yearly
+            // provision granted TWO years for ₹10,000 and a trial ran 28 days.
+            //
+            // The invariant now: only the billing service writes coverage. A fresh
+            // branch has none until a charge grants it, which also means a branch
+            // recorded as `pending` is correctly NOT entitled until the payment is
+            // accepted (Hostel::isActive() requires a coverage end date).
             $hostel = Hostel::create([
                 'name' => $data['name'],
                 'owner_name' => $data['owner_name'],
@@ -33,8 +42,6 @@ class HostelService
                 'city' => $data['city'] ?? null,
                 'state' => $data['state'] ?? null,
                 'gst_number' => $data['gst_number'] ?? null,
-                'subscription_start' => $quote['start'],
-                'subscription_end' => $quote['end'],
                 'status' => $data['status'] ?? 'active',
             ]);
 
@@ -94,15 +101,18 @@ class HostelService
      * charge). The owner's name/mobile are inherited; the caller then routes the
      * first charge through the account path (AccountBillingService::addBranch)
      * so account-level discounts apply — which the Hostels-page provision flow
-     * cannot do (P4 item 3.1). Coverage is left blank for paid plans (the
-     * co-termination top-up sets it); trial keeps its 14-day window.
+     * cannot do (P4 item 3.1).
+     *
+     * COVERAGE IS NOT WRITTEN HERE (S0 · finding F1) — not even for a trial. It
+     * used to stamp the 14-day window, and every caller then called
+     * recordBranchRenewal($branch, 'trial'), which stacked a second window on top
+     * and handed out 28-day trials. The branch comes back with NO coverage; the
+     * caller MUST follow with a billing call (recordBranchRenewal for a trial,
+     * addBranch for a paid co-termination) which is what grants it.
      */
     public function createBranchForOwner(User $owner, array $data): Hostel
     {
         return DB::transaction(function () use ($owner, $data) {
-            $plan = $data['plan'] ?? 'yearly';
-            $quote = app(\App\Services\BranchBillingService::class)->quote(new Hostel(), $plan);
-
             $hostel = Hostel::create([
                 'name' => $data['name'],
                 'owner_name' => $owner->name,
@@ -113,8 +123,6 @@ class HostelService
                 'city' => $data['city'] ?? null,
                 'state' => $data['state'] ?? null,
                 'gst_number' => $data['gst_number'] ?? null,
-                'subscription_start' => $quote['start'],
-                'subscription_end' => $plan === 'trial' ? $quote['end'] : null,
                 'status' => 'active',
             ]);
 

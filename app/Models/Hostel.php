@@ -195,8 +195,14 @@ class Hostel extends Model
             return false;
         }
 
+        // NO COVERAGE = NOT ENTITLED (S0 · finding F1). This used to return true
+        // for a null end date, which meant "unlimited access": a branch created
+        // but never billed (a provision recorded as `pending`, or an abandoned
+        // paid add-branch) worked forever for free. Coverage is now written only
+        // by a charge, so its absence is the honest answer — grant a trial or a
+        // comp to let someone work before they pay.
         if (! $this->subscription_end) {
-            return true;
+            return false;
         }
 
         $graceDays = (int) config('hostelease.grace_days', 0);

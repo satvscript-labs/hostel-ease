@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\DB;
  */
 class BranchBillingService
 {
+    /** Methods the legacy `subscriptions.payment_method` ENUM column accepts. */
+    private const LEGACY_METHODS = ['cash', 'upi', 'cheque', 'rtgs', 'online'];
+
     /** Per-branch price for the given period ('yearly' | 'monthly'). */
     public function unitPrice(string $period): float
     {
@@ -64,7 +67,18 @@ class BranchBillingService
     {
         $quote = $this->quote($branch, $period);
 
-        return DB::transaction(function () use ($branch, $period, $payment, $quote) {
+        // The legacy column is a MySQL ENUM without 'comp' (S0 · finding F6), and
+        // the connection is strict — so a comped charge arriving here used to throw
+        // and 500 the request. Guarded at the single write point rather than in each
+        // caller's validator, because four controllers can reach this. The real
+        // method is still recorded on the subscription_order, which is a plain
+        // string column; only the legacy mirror is narrowed. Invisible to the test
+        // suite on SQLite, which does not enforce ENUM at all (finding F14).
+        $legacyMethod = in_array($payment['payment_method'] ?? null, self::LEGACY_METHODS, true)
+            ? $payment['payment_method']
+            : null;
+
+        return DB::transaction(function () use ($branch, $period, $payment, $quote, $legacyMethod) {
             $subscription = Subscription::create([
                 'hostel_id' => $branch->id,
                 'plan' => $period,
@@ -72,7 +86,7 @@ class BranchBillingService
                 'end_date' => $quote['end'],
                 'amount' => $payment['amount'] ?? $quote['amount'],
                 'payment_status' => $payment['payment_status'] ?? 'pending',
-                'payment_method' => $payment['payment_method'] ?? null,
+                'payment_method' => $legacyMethod,
                 'transaction_number' => $payment['transaction_number'] ?? null,
                 'razorpay_order_id' => $payment['razorpay_order_id'] ?? null,
                 'remarks' => $payment['remarks'] ?? "Branch renewal · {$branch->name}",

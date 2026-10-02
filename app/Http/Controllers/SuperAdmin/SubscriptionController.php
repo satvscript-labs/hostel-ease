@@ -87,7 +87,10 @@ class SubscriptionController extends Controller
             'period' => ['required', Rule::in(['yearly', 'monthly', 'trial'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_status' => ['required', Rule::in(['paid', 'pending', 'failed'])],
-            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
+            // NO 'comp' (S0 · finding F6) — it is not in the legacy
+            // subscriptions.payment_method enum and this path writes that table, so
+            // it 500s on a strict MySQL connection. Use Account 360 → Comp.
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
@@ -122,7 +125,9 @@ class SubscriptionController extends Controller
             'end_date' => ['required', 'date', 'after:start_date'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_status' => ['required', Rule::in(['paid', 'pending', 'failed'])],
-            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
+            // No 'comp' — see store() above (S0 · finding F6); this writes the
+            // legacy table directly.
+            'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);

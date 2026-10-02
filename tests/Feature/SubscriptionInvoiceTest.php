@@ -95,4 +95,45 @@ class SubscriptionInvoiceTest extends TestCase
 
         $this->assertTrue($this->order->fresh()->isBillable());
     }
+
+    /**
+     * S0 · finding F8 — the doctype follows GST REGISTRATION, not just payment.
+     * Until a GSTIN is configured the platform is not registered, so a paid order
+     * is a RECEIPT. Calling it a "Tax Invoice" with no tax line on it was a
+     * compliance exposure, and it told GST-registered customers they could claim
+     * input credit against a document carrying none.
+     */
+    public function test_a_paid_order_is_a_receipt_until_a_gstin_is_configured(): void
+    {
+        config(['hostelease.company.gstin' => '']);
+
+        $html = $this->renderedInvoice();
+
+        $this->assertStringContainsString('RECEIPT', $html);
+        $this->assertStringNotContainsString('TAX INVOICE', $html);
+        $this->assertStringContainsString('inclusive of all applicable taxes', $html);
+    }
+
+    public function test_it_promotes_itself_to_a_tax_invoice_once_the_gstin_exists(): void
+    {
+        config(['hostelease.company.gstin' => '24ABCDE1234F1Z5']);
+
+        $html = $this->renderedInvoice();
+
+        $this->assertStringContainsString('TAX INVOICE', $html);
+        $this->assertStringContainsString('24ABCDE1234F1Z5', $html);
+        $this->assertStringNotContainsString('inclusive of all applicable taxes', $html);
+    }
+
+    /** The invoice Blade rendered to HTML — the PDF bytes can't be asserted against. */
+    private function renderedInvoice(): string
+    {
+        $this->order->load(['lines.branch', 'account.owner']);
+
+        return view('superadmin.orders.invoice_pdf', [
+            'order' => $this->order,
+            'account' => $this->account,
+            'company' => config('hostelease.company'),
+        ])->render();
+    }
 }

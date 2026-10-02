@@ -178,10 +178,15 @@ class AccountBillingService
 
             $account = $this->accountForBranch($branch);
             if ($account) {
-                // A settled payment becomes an order; pending/failed just refreshes state.
-                if (($payment['payment_status'] ?? 'pending') === PaymentStatus::Paid->value) {
-                    $this->orderFromLegacy($account, $branch, $subscription, $period);
-                }
+                // EVERY charge becomes an order, whatever its status (S0 · finding
+                // F3). This used to run only for a settled payment, so recording
+                // "they'll pay next week" wrote a legacy subscriptions row and
+                // nothing the new ledger could see: the expected money was absent
+                // from Account 360, from the owner's history and from receivables.
+                // The order carries payment_status, and only `paid` grants coverage
+                // (BranchBillingService above), so an unpaid order is a proforma —
+                // which is exactly what the invoice view already renders.
+                $this->orderFromLegacy($account, $branch, $subscription, $period);
                 $this->refreshAccountAnchor($account, BillingPeriod::tryFrom($period));
             }
 
@@ -206,9 +211,11 @@ class AccountBillingService
         }
 
         DB::transaction(function () use ($account, $branch, $subscription) {
-            if ($subscription->payment_status === PaymentStatus::Paid->value) {
-                $this->orderFromLegacy($account, $branch, $subscription, (string) $subscription->plan);
-            }
+            // Unconditional, like recordBranchRenewal (S0 · F3): orderFromLegacy is
+            // an updateOrCreate keyed on legacy_subscription_id, so accepting a
+            // pending payment now FLIPS the existing proforma order to paid instead
+            // of minting the account's first record of money it was already owed.
+            $this->orderFromLegacy($account, $branch, $subscription, (string) $subscription->plan);
             $this->refreshAccountAnchor($account, BillingPeriod::tryFrom((string) $subscription->plan));
         });
     }
@@ -380,9 +387,20 @@ class AccountBillingService
                 $this->addLineAndMirror($order, $branch, $share, $anchor);
             }
 
+            // The cycle START advances with the cycle END (S0 · finding F15). It
+            // used to be written `?? now()`, i.e. once and never again, so after
+            // three yearly renewals an account read start 2026 / end 2029 — a
+            // "current period" three years long, useless for reporting. The new
+            // start is the same base quoteRenewal() extended to get the new anchor,
+            // so start and end stay a matched pair describing one real term.
+            $previousAnchor = $account->current_period_end;
+            $cycleStart = ($account->isEntitled() && $previousAnchor && $previousAnchor->isFuture())
+                ? $previousAnchor->copy()
+                : Carbon::now();
+
             $account->update([
                 'period' => $quote['period']->value,
-                'current_period_start' => $account->current_period_start ?? now(),
+                'current_period_start' => $cycleStart,
                 'current_period_end' => $anchor,
                 'status' => $this->computeStatus($account, $anchor, $quote['period'])->value,
             ]);
@@ -411,18 +429,68 @@ class AccountBillingService
         $anchor = $account->current_period_end;
         $unit = $this->unitPrice($account, $bp);
 
-        $from = $branch && $branch->subscription_end && $branch->subscription_end->isFuture()
-            ? $branch->subscription_end->copy()
-            : Carbon::now();
-        $days = ($anchor && $anchor->greaterThan($from)) ? $from->diffInDays($anchor) : 0;
-        $prorated = round($unit * $days / max(1, $bp->days()), 2);
+        $from = $this->prorationStart($branch);
+        $line = $this->prorate($anchor, $from, $unit, $bp);
 
         return [
-            'prorated' => $prorated,
-            'days_remaining' => (int) $days,
+            'prorated' => $line['amount'],
+            'days_remaining' => $line['days'],
+            'cycle_days' => $line['cycle_days'],
             'anchor' => $anchor,
             'unit' => $unit,
-            'breakdown' => $this->discounts->preview($account, $prorated, 1, 'add_branch'),
+            'breakdown' => $this->discounts->preview($account, $line['amount'], 1, 'add_branch'),
+        ];
+    }
+
+    /**
+     * Where a branch's prorated top-up starts: its own coverage end if it still
+     * holds future coverage (never re-bill time it already has), else today.
+     */
+    protected function prorationStart(?Hostel $branch): Carbon
+    {
+        return $branch && $branch->subscription_end && $branch->subscription_end->isFuture()
+            ? $branch->subscription_end->copy()
+            : Carbon::now();
+    }
+
+    /**
+     * THE proration helper — the single place a part-cycle charge is computed
+     * (S0 · finding F2, decision D5). Cost of covering ONE branch from $from up
+     * to $anchor, priced at the daily rate of the cycle that ENDS on that anchor.
+     *
+     * Three things this gets right that the old inline math did not:
+     *
+     *  1. The denominator is the REAL length of the cycle being prorated into
+     *     (BillingPeriod::cycleDays), not a hard-coded 365 / 30. Numerator and
+     *     denominator are therefore days of the SAME calendar stretch, which is
+     *     what makes "half a cycle costs half a unit" true in February, in a leap
+     *     year, everywhere.
+     *  2. It is clamped at one unit price. A top-up TO the anchor can never cost
+     *     more than a full term — if it would, the account needs a renewal, not a
+     *     top-up. (Before the clamp, a branch added against a two-year-out anchor
+     *     was quoted ₹20,014 for one branch.)
+     *  3. Both ends are pinned to midnight, so the same action costs the same
+     *     whether it is done at 9am or 11pm, and the branch is covered for the
+     *     day it is added.
+     *
+     * @return array{days:int, cycle_days:int, amount:float}
+     */
+    protected function prorate(?Carbon $anchor, Carbon $from, float $unit, BillingPeriod $period): array
+    {
+        if (! $anchor) {
+            return ['days' => 0, 'cycle_days' => $period->days(), 'amount' => 0.0];
+        }
+
+        $anchorDay = $anchor->copy()->startOfDay();
+        $fromDay = $from->copy()->startOfDay();
+
+        $cycleDays = $period->cycleDays($anchorDay);
+        $days = $anchorDay->greaterThan($fromDay) ? (int) $fromDay->diffInDays($anchorDay) : 0;
+
+        return [
+            'days' => $days,
+            'cycle_days' => $cycleDays,
+            'amount' => $days > 0 ? min($unit, round($unit * $days / $cycleDays, 2)) : 0.0,
         ];
     }
 
@@ -495,11 +563,11 @@ class AccountBillingService
             $unit = $this->unitPrice($account, $bp);
 
             foreach ($this->branchesBehind($account, $anchor) as $branch) {
-                $from = $branch->subscription_end && $branch->subscription_end->isFuture() ? $branch->subscription_end : Carbon::now();
-                $days = (int) $from->diffInDays($anchor);
-                $amount = round($unit * $days / max(1, $bp->days()), 2);
-                $subtotal += $amount;
-                $lines[] = ['branch' => $branch, 'days' => $days, 'amount' => $amount];
+                // Same helper as quoteAddBranch, so Align and Add-to-cycle price an
+                // identical branch identically (S0 · F2).
+                $line = $this->prorate($anchor, $this->prorationStart($branch), $unit, $bp);
+                $subtotal += $line['amount'];
+                $lines[] = ['branch' => $branch, 'days' => $line['days'], 'amount' => $line['amount']];
             }
         }
 

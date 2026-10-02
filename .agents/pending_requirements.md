@@ -59,6 +59,24 @@ base with consistently smaller per-renewal totals emerges, or if Razorpay change
 binds, (2) decide the quantity-change UX, (3) design the opt-in UI, (4) extend `RazorpayService` +
 `WebhookController`.
 
+**UPDATE 2026-10-02 — superseded by the `dev_saas_billing` workstream.** All four action items are
+now answered in `_artifact/saas_billing_autopay/` (docs 04 §5, 05 §1.1, 06):
+
+- **(1) The cap still binds — and it only binds on the YEARLY term.** Verified against Razorpay's
+  docs: UPI Autopay and card e-mandates are both AFA-free to **₹15,000 per debit** (UPI max mandate
+  ₹99,999; the ₹1,00,000 tier is insurance/mutual-funds/credit-card-bills only, not SaaS). A
+  pre-debit notice ≥24h before every debit is mandatory. Five branches **monthly** is ₹5,000 — well
+  under. So auto-debit is a **monthly-term feature** (owner decision D3), with a payment-link
+  fallback above the ceiling.
+- **(2) Quantity changes stop being a problem** because we are **not** using Plans/Subscriptions:
+  the design is **mandate + charge-at-will** (Razorpay's Recurring Payments API — *"no built-in plan
+  or automatic schedule; you trigger charges via API based on your business logic"*). Our engine
+  computes every charge exactly as it does for offline and link payments; Razorpay holds only a
+  mandate with a `max_amount`.
+- **(3)/(4)** designed in doc 04 §5.3 and scheduled as phase **S6** — deliberately last, after
+  operator payment links (S2) and owner self-serve (S3), since by then renewing is already one tap.
+- Owner decision **D4: no autopay price incentive** — autopay pays normal list price.
+
 ---
 
 ## 4. AC Meter Reading Validation (DONE — 2026-07-18)
@@ -122,7 +140,7 @@ Report: `_artifact/ui_ux_audit/08_MF_aligned_rows.md`.
 
 1. In mobile UI, use short relative-time forms ("45m ago", not "45 minutes ago"). — *pending*
 2. ~~Tablet-view rows not visually aligned~~ — **DONE**, folded into the Aligned Row System rollout (§8 / §4.11).
-3. Creating a new branch, adding hosted with pending payment mode still add records in Orders & payments...right now nothing gets there ... if i create one with pending still adds 1 year (2027) to subscription and when renew it takes only 10k but renews till 2028 means 2 years with everything paid up ...
+3. ~~Creating a new branch, adding hosted with pending payment mode still add records in Orders & payments...right now nothing gets there ... if i create one with pending still adds 1 year (2027) to subscription and when renew it takes only 10k but renews till 2028 means 2 years with everything paid up ...~~ — **DONE (2026-10-02, phase S0 on `dev_saas_billing`).** You were right on both counts, and it was worse than reported: provisioning marked **paid** also granted two years, and trials ran 28 days. Root cause: `HostelService` stamped coverage at `Hostel::create` and then `recordBranchRenewal()` re-quoted against that already-"active" branch and stacked a second term (correctly honouring BR-9). Fixed by one invariant — **only the billing service writes coverage** — plus: a pending charge now creates its order (so it *does* appear in Orders & payments, as a proforma), a pending provision grants no coverage until accepted, and proration became day-exact and clamped. Analysis, remediation options for existing customers, and the `php artisan hostelease:audit-coverage` report: `_artifact/saas_billing_autopay/` (docs 03 + 05).
 
 ---
 

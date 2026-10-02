@@ -164,12 +164,25 @@ class SubscriptionController extends Controller
         $account = $this->accountBilling->accountForViewer($owner);
 
         // Invariant-keeping creation (P4 item 14): owner_id + pivot + primary
-        // branch — the old inline Hostel::create() set none of them. Trial plan
-        // keeps its 14-day window until the payment lands.
+        // branch — the old inline Hostel::create() set none of them.
         $branch = app(\App\Services\HostelService::class)->createBranchForOwner($owner, $data + ['plan' => 'trial']);
+
+        // The trial clock is started by the BILLER, not by branch creation (S0 ·
+        // finding F1 — creation no longer stamps coverage, and when it did, this
+        // combination handed out 28-day trials elsewhere). Doing it here keeps the
+        // documented promise that an abandoned payment still leaves a working
+        // trial branch, and it gives the trial a ₹0 ledger row like every other
+        // grant of coverage.
+        $this->accountBilling->recordBranchRenewal($branch, 'trial', [
+            'payment_status' => 'paid', 'payment_method' => null, 'remarks' => 'Owner self-serve branch (trial)',
+        ]);
         $this->logger->log('branch.created', "New branch created: {$branch->name}");
 
-        $quote = $this->accountBilling->quoteAddBranch($account);
+        // Quote WITH the branch so the amount charged, the amount re-verified in
+        // verify(), and the amount addBranch() recomputes all agree — the branch
+        // now holds a trial window, and proration must start from its coverage end
+        // rather than today, or we would bill days it already has.
+        $quote = $this->accountBilling->quoteAddBranch($account, $branch->fresh());
         $paise = (int) round($quote['breakdown']['final'] * 100);
 
         // Nothing meaningful to charge (e.g. no live anchor) — leave the branch on trial.
@@ -239,7 +252,10 @@ class SubscriptionController extends Controller
             if (! $branch || ! $owner->canAccessHostel($branch->id)) {
                 return response()->json(['message' => 'Unauthorized branch.'], 403);
             }
-            $expectedPaise = (int) round($this->accountBilling->quoteAddBranch($account)['breakdown']['final'] * 100);
+            // WITH the branch (S0): the order was quoted from that branch's own
+            // coverage end, so the verification must use the same basis or every
+            // add-branch payment logs a spurious amount mismatch.
+            $expectedPaise = (int) round($this->accountBilling->quoteAddBranch($account, $branch)['breakdown']['final'] * 100);
         } else {
             $branch = null;
             $expectedPaise = (int) round($this->accountBilling->quoteRenewal($account, $data['period'])['breakdown']['final'] * 100);

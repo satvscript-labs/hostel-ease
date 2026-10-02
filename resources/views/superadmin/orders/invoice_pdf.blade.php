@@ -4,13 +4,22 @@
     payment receipt: seller/buyer blocks, per-branch coverage lines, GST-ready.
 
     DomPDF, not a browser: tables + floats only, literal hex (indigo #4f46e5 =
-    --he-primary), DejaVu Sans for the ₹ glyph. Status drives the doctype —
-    paid = TAX INVOICE, else PROFORMA.
+    --he-primary), DejaVu Sans for the ₹ glyph.
+
+    DOCTYPE (S0 · finding F8): status AND registration drive it. A paid order is a
+    RECEIPT while the platform has no GSTIN configured, and promotes itself to TAX
+    INVOICE the moment one is set (config hostelease.company.gstin / env
+    SAAS_GST_NUMBER). Calling an untaxed document a "Tax Invoice" is a compliance
+    exposure, and it also told GST-registered customers they could claim input
+    credit against a document carrying no tax. Unpaid stays a proforma either way.
+    The tax breakdown itself (CGST/SGST/IGST, SAC, place of supply) lands in S7;
+    pricing is GST-INCLUSIVE by decision D6, so no total ever changes.
 --}}
 @php
     $statusValue = $order->payment_status->value;
     $paid = $statusValue === 'paid';
-    $doctype = $paid ? 'TAX INVOICE' : 'PROFORMA INVOICE';
+    $gstRegistered = filled($company['gstin'] ?? null);
+    $doctype = $paid ? ($gstRegistered ? 'TAX INVOICE' : 'RECEIPT') : 'PROFORMA INVOICE';
     $owner = $account->owner;
     $words = hostelease_amount_words($order->amount);
     $monogram = strtoupper(mb_substr($company['name'] ?? 'H', 0, 1));
@@ -182,9 +191,18 @@
 
         @unless($paid)
             <div style="margin-top: 16px; border: 1px dashed #d1d5db; border-radius: 8px; padding: 10px 12px; color: #6b7280;">
-                This is a proforma invoice — <span class="strong">not a proof of payment</span>. A tax invoice is issued once payment is received.
+                This is a proforma invoice — <span class="strong">not a proof of payment</span>.
+                {{ $gstRegistered ? 'A tax invoice is issued once payment is received.' : 'A receipt is issued once payment is received.' }}
             </div>
         @endunless
+
+        @if($paid && ! $gstRegistered)
+            {{-- Says plainly why there is no tax line, so nobody treats this as an
+                 input-credit document. Disappears once the GSTIN is configured. --}}
+            <div style="margin-top: 16px; color: #9ca3af; font-size: 10px;">
+                Amounts are inclusive of all applicable taxes. GST is not charged separately on this receipt.
+            </div>
+        @endif
 
     </div>
 
