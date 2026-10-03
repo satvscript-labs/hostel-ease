@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Enums\BillingPeriod;
+use App\Enums\CollectionMethod;
 use App\Http\Controllers\Controller;
 use App\Models\Discount;
 use App\Models\Hostel;
@@ -10,10 +11,13 @@ use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
+use App\Services\Billing\PaymentLinkService;
 use App\Services\HostelService;
 use App\Services\NotificationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -28,7 +32,70 @@ class AccountController extends Controller
         protected ActivityLogger $logger,
         protected HostelService $hostels,
         protected NotificationService $notifications,
-    ) {
+        protected PaymentLinkService $paymentLinks,
+    ) {}
+
+    /**
+     * Shared tail for the three charge actions (renew / add-branch / align).
+     *
+     * S2 gives each of them two ways to collect, and they must stay ONE code path
+     * up to this point: the same quote, the same validation, the same order. If
+     * "record it offline" and "send a payment link" ever became separate routes
+     * they could drift apart and price the same charge differently, which is the
+     * whole failure mode the one-engine design exists to prevent.
+     *
+     *  · offline — the order is created PAID, exactly as it was before S2.
+     *  · link    — the order is created PENDING and a Razorpay link is attached
+     *              inside the same transaction, so a gateway failure leaves no
+     *              orphan proforma behind (design §6 BP4).
+     *
+     * @param  \Closure(array): SubscriptionOrder  $charge  receives the payment array
+     */
+    protected function collectOrRecord(string $collect, array $payment, \Closure $charge): array
+    {
+        if ($collect !== 'link') {
+            return [$charge($payment + ['payment_status' => 'paid']), false];
+        }
+
+        // A link has no payment instrument yet, so carrying the modal's method and
+        // reference across would stamp a pending charge "Cash" and leave a
+        // misleading method on the order right up until Razorpay fills in the real
+        // one. Drop them; the webhook sets method = online when the money lands.
+        unset($payment['payment_method'], $payment['transaction_number']);
+
+        $order = $this->paymentLinks->collect(function () use ($charge, $payment) {
+            $order = $charge($payment + [
+                'payment_status' => 'pending',
+                // Stamped up front so the order reads honestly even in the window
+                // before the link id comes back from Razorpay.
+                'collection' => CollectionMethod::Link->value,
+            ]);
+
+            // align() legitimately returns null when there is nothing behind the
+            // anchor. Refuse rather than hand a null to the link service — and the
+            // transaction rolls back, so nothing is half-created.
+            if (! $order) {
+                throw new \RuntimeException('There is nothing to charge for right now, so no payment link was created.');
+            }
+
+            return $order;
+        });
+
+        return [$order, true];
+    }
+
+    /** The flash message for a freshly issued link — the URL is the deliverable. */
+    protected function linkIssued(SubscriptionOrder $order, string $what): RedirectResponse
+    {
+        return back()
+            ->with('success', "{$what} — payment link for ".hostelease_money($order->amount).' is ready to send.')
+            ->with('payment_link', [
+                'url' => $order->payment_link_url,
+                'amount' => (float) $order->amount,
+                'invoice' => $order->invoiceNumber(),
+                'order_id' => $order->id,
+                'expires' => $order->payment_link_expires_at?->format('d M Y'),
+            ]);
     }
 
     /** Customers list — one row per account. */
@@ -99,6 +166,12 @@ class AccountController extends Controller
             ],
             // Open removal requests, so an owner's ask is never quietly missed (D11).
             'removal_requests' => Hostel::whereNotNull('cancellation_requested_at')->whereNull('cancelled_at')->count(),
+            // Payment links sent and not yet paid (S2). A different question from
+            // "awaiting payment": a charge can be owed with no link at all, and a
+            // link can be dead while the charge is still owed. This is the one that
+            // says "the customer has been asked and has not acted".
+            'live_links' => SubscriptionOrder::withLiveLink()->count(),
+            'live_links_value' => (float) SubscriptionOrder::withLiveLink()->sum('amount'),
         ];
 
         return view('superadmin.accounts.index', compact('accounts', 'summary', 'dueDays'));
@@ -117,7 +190,7 @@ class AccountController extends Controller
 
         $order->load(['lines.branch', 'account.owner']);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('superadmin.orders.invoice_pdf', [
+        $pdf = Pdf::loadView('superadmin.orders.invoice_pdf', [
             'order' => $order,
             'account' => $account,
             'company' => config('hostelease.company'),
@@ -235,7 +308,25 @@ class AccountController extends Controller
         $addHostelQuote = $this->addHostelQuoteArray($account, $paidPeriod);
         $ownerEmail = $account->owner?->email;
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing'));
+        // S2 — online collection. When Razorpay is not configured the link options
+        // are hidden rather than shown-and-broken: offering a button that always
+        // errors is worse than not offering it, and offline recording is a complete
+        // path on its own (06 §4 — it is also the cheapest one for large amounts).
+        $linksEnabled = $this->paymentLinks->isEnabled();
+        $liveLinks = $account->orders()->withLiveLink()->get(['id', 'amount', 'payment_link_url', 'payment_link_expires_at']);
+
+        // The share panel's seed data, built here rather than in the view. The view
+        // CANNOT use a `@php … @endphp` block — it already uses the inline
+        // `@php(...)` form, and Blade pairs the first `@php` with the first
+        // `@endphp`, which swallows everything between them into one raw PHP region.
+        $shareSeed = session('payment_link') ?: ['url' => '', 'amount' => 0, 'invoice' => '', 'expires' => null];
+        $shareTo = [
+            'mobile' => preg_replace('/\D/', '', (string) $account->owner?->mobile),
+            'email' => $ownerEmail,
+            'company' => config('hostelease.company.name', 'HostelEase'),
+        ];
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -286,6 +377,7 @@ class AccountController extends Controller
         $data = $request->validate([
             'branch_id' => ['required', 'integer'],
             'amount' => ['nullable', 'numeric', 'min:0'],
+            'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
@@ -293,12 +385,23 @@ class AccountController extends Controller
         $branch = Hostel::findOrFail($data['branch_id']);
         abort_unless(in_array($branch->id, $account->owner?->accessibleHostelIds() ?? [], true), 403);
 
-        $order = $this->billing->addBranch($account, $branch, [
-            'amount' => $data['amount'] ?? null,
-            'payment_status' => 'paid',
-            'payment_method' => $data['payment_method'] ?? 'cash',
-            'remarks' => $data['remarks'] ?? 'Added branch (prorated)',
-        ]);
+        try {
+            [$order, $viaLink] = $this->collectOrRecord(
+                $data['collect'] ?? 'offline',
+                [
+                    'amount' => $data['amount'] ?? null,
+                    'payment_method' => $data['payment_method'] ?? 'cash',
+                    'remarks' => $data['remarks'] ?? 'Added branch (prorated)',
+                ],
+                fn (array $payment) => $this->billing->addBranch($account, $branch, $payment),
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($viaLink) {
+            return $this->linkIssued($order, "{$branch->name} quoted for the renewal cycle");
+        }
 
         $this->logger->log('subscription.paid', "Added branch {$branch->name} (prorated) — ".hostelease_money($order->amount), $order);
 
@@ -327,7 +430,7 @@ class AccountController extends Controller
         $owner = $account->owner;
         abort_unless($owner, 404);
 
-        $hostel = \Illuminate\Support\Facades\DB::transaction(function () use ($account, $owner, $data) {
+        $hostel = DB::transaction(function () use ($account, $owner, $data) {
             $hostel = $this->hostels->createBranchForOwner($owner, $data);
 
             if ($data['plan'] === 'trial') {
@@ -360,23 +463,35 @@ class AccountController extends Controller
         $data = $request->validate([
             'period' => ['required', Rule::in(['yearly', 'monthly'])],
             'amount' => ['nullable', 'numeric', 'min:0'],
+            'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
         try {
-            $order = $this->billing->renewAccount($account, $data['period'], [
-                'amount' => $data['amount'] ?? null,
-                'payment_status' => 'paid',
-                'payment_method' => $data['payment_method'] ?? 'cash',
-                'transaction_number' => $data['transaction_number'] ?? null,
-                'remarks' => $data['remarks'] ?? 'Consolidated renewal',
-            ]);
+            [$order, $viaLink] = $this->collectOrRecord(
+                $data['collect'] ?? 'offline',
+                [
+                    'amount' => $data['amount'] ?? null,
+                    'payment_method' => $data['payment_method'] ?? 'cash',
+                    'transaction_number' => $data['transaction_number'] ?? null,
+                    'remarks' => $data['remarks'] ?? 'Consolidated renewal',
+                ],
+                fn (array $payment) => $this->billing->renewAccount($account, $data['period'], $payment),
+            );
         } catch (\RuntimeException $e) {
-            // Nothing billable (D11 case 9) — every branch cancelled. Refusing beats
-            // writing a ₹0 order that would make a closed account look renewed.
+            // Two reasons to land here, both the operator's to resolve:
+            //  · nothing billable (D11 case 9) — every branch cancelled. Refusing
+            //    beats writing a ₹0 order that would make a closed account look
+            //    renewed, forever.
+            //  · a payment-link guard refused, or Razorpay did. The order was rolled
+            //    back with the transaction, so there is nothing to clean up.
             return back()->with('error', $e->getMessage());
+        }
+
+        if ($viaLink) {
+            return $this->linkIssued($order, "Renewal quoted for {$order->quantity} branch(es)");
         }
 
         $this->logger->log('subscription.paid', "Renewed all {$order->quantity} branch(es) — ".hostelease_money($order->amount), $order);
@@ -389,19 +504,38 @@ class AccountController extends Controller
     {
         $data = $request->validate([
             'amount' => ['nullable', 'numeric', 'min:0'],
+            'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $order = $this->billing->align($account, [
-            'amount' => $data['amount'] ?? null,
-            'payment_status' => 'paid',
-            'payment_method' => $data['payment_method'] ?? 'cash',
-            'remarks' => $data['remarks'] ?? 'Align to anchor',
-        ]);
+        // align() returns null when there is nothing behind the anchor. On the link
+        // path that null would reach PaymentLinkService with no order to attach to,
+        // so the "nothing to do" case is caught here, before a transaction opens.
+        if ($this->billing->quoteAlign($account)['count'] === 0) {
+            return back()->with('info', 'Nothing to align — all branches already reach the renewal date.');
+        }
+
+        try {
+            [$order, $viaLink] = $this->collectOrRecord(
+                $data['collect'] ?? 'offline',
+                [
+                    'amount' => $data['amount'] ?? null,
+                    'payment_method' => $data['payment_method'] ?? 'cash',
+                    'remarks' => $data['remarks'] ?? 'Align to anchor',
+                ],
+                fn (array $payment) => $this->billing->align($account, $payment),
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         if (! $order) {
             return back()->with('info', 'Nothing to align — all branches already reach the renewal date.');
+        }
+
+        if ($viaLink) {
+            return $this->linkIssued($order, "Alignment quoted for {$order->quantity} branch(es)");
         }
 
         $this->logger->log('subscription.create', "Aligned {$order->quantity} branch(es) — ".hostelease_money($order->amount), $order);
@@ -501,6 +635,15 @@ class AccountController extends Controller
             return back()->with('info', 'That payment was already accepted.');
         }
 
+        // ── KILL THE LINK FIRST (S2 · design §6 BP2) ──
+        // The charge is being settled some other way, so a live link is now a
+        // loaded gun: the customer who paid by bank transfer taps the week-old link
+        // in their inbox and pays again. Cancelling never throws — if Razorpay
+        // refuses, it reads the real status back instead, so the operator's action
+        // cannot fail because of upstream state they do not control.
+        $hadLink = $order->hasLiveLink();
+        $this->paymentLinks->cancelIfLive($order, 'charge accepted offline');
+
         $this->billing->acceptOrder($order, [
             'payment_method' => $data['payment_method'] ?? 'cash',
             'transaction_number' => $data['transaction_number'] ?? null,
@@ -508,7 +651,115 @@ class AccountController extends Controller
 
         $this->logger->log('subscription.paid', "Accepted payment {$order->invoiceNumber()} — ".hostelease_money($order->amount), $order);
 
-        return back()->with('success', 'Payment accepted — coverage updated.');
+        return back()->with('success', $hadLink
+            ? 'Payment accepted — coverage updated, and the payment link was cancelled so it cannot be paid twice.'
+            : 'Payment accepted — coverage updated.');
+    }
+
+    // -----------------------------------------------------------------
+    // Payment links (S2) — operator-initiated online collection
+    //
+    // Each action takes its target as a POSTED INTEGER resolved against this
+    // account's own orders, never a URL segment assembled in the browser
+    // (development_standards.md §1.1 rule 3, and the S1 defect that rule exists
+    // to prevent — 08_S1_VERIFICATION.md §2).
+    // -----------------------------------------------------------------
+
+    /** Issue a link for an existing pending charge, or re-issue after one lapsed. */
+    public function issueLink(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $order = $this->orderOnAccount($account, (int) $request->validate([
+            'order_id' => ['required', 'integer'],
+        ])['order_id']);
+
+        try {
+            $order = $this->paymentLinks->issue($order);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return $this->linkIssued($order, $order->payment_link_attempts > 1 ? 'Link re-issued' : 'Link issued');
+    }
+
+    /** Kill a live link so it can never take money again. */
+    public function cancelLink(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate([
+            'order_id' => ['required', 'integer'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $order = $this->orderOnAccount($account, (int) $data['order_id']);
+
+        if (! $order->payment_link_id) {
+            return back()->with('info', 'There is no payment link on that charge.');
+        }
+
+        $cancelled = $this->paymentLinks->cancel($order, $data['reason'] ?? '');
+
+        return back()->with(
+            $cancelled ? 'success' : 'error',
+            $cancelled
+                ? 'Payment link cancelled — it can no longer be paid. The charge is still owed.'
+                : 'Razorpay would not cancel that link; its status has been refreshed above. If it now reads Paid, use "Check with Razorpay" to apply the payment.',
+        );
+    }
+
+    /** Ask Razorpay to re-send a live link — the free nudge. */
+    public function resendLink(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate([
+            'order_id' => ['required', 'integer'],
+            'medium' => ['nullable', Rule::in(['sms', 'email'])],
+        ]);
+
+        $order = $this->orderOnAccount($account, (int) $data['order_id']);
+        $medium = $data['medium'] ?? 'sms';
+
+        if ($medium === 'email' && ! $account->owner?->email) {
+            return back()->with('error', 'This owner has no email on file, so Razorpay has nowhere to send it. Re-send by SMS, or share the link yourself.');
+        }
+
+        try {
+            $this->paymentLinks->resend($order, $medium);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Razorpay has re-sent the payment link by '.strtoupper($medium).'.');
+    }
+
+    /**
+     * Read the link's true state from Razorpay and apply a payment we missed.
+     *
+     * This is the safety valve for the phase's most likely production failure: an
+     * unsubscribed webhook event or a mismatched webhook secret fails SILENTLY, so
+     * a customer pays and nothing happens here. One button turns that from an
+     * invisible money bug into a five-second fix (design §6 BP6).
+     */
+    public function checkLink(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $order = $this->orderOnAccount($account, (int) $request->validate([
+            'order_id' => ['required', 'integer'],
+        ])['order_id']);
+
+        try {
+            $result = $this->paymentLinks->checkWithRazorpay($order);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with($result['applied'] ? 'success' : 'info', $result['message']);
+    }
+
+    /**
+     * Resolve a posted order id against THIS account's orders. Scoped by the
+     * query rather than by trusting the id, so a crafted one reaches a 404 instead
+     * of someone else's charge.
+     */
+    private function orderOnAccount(SubscriptionAccount $account, int $orderId): SubscriptionOrder
+    {
+        return $account->orders()->whereKey($orderId)->firstOr(fn () => abort(404));
     }
 
     /**
@@ -528,13 +779,22 @@ class AccountController extends Controller
         $order = $account->orders()->whereKey($data['order_id'])->firstOr(fn () => abort(404));
 
         $wasPaid = $order->payment_status->value === 'paid';
+
+        // A voided charge must not remain payable. Same reasoning as acceptOrder():
+        // a live link on a written-off order would take money for something that no
+        // longer exists here (design §6 BP2).
+        $hadLink = $order->hasLiveLink();
+        $this->paymentLinks->cancelIfLive($order, 'charge voided: '.$data['reason']);
+
         $this->billing->voidOrder($order, $data['reason']);
 
         $this->logger->log('subscription.update', "Voided order {$order->invoiceNumber()} — {$data['reason']}", $order);
 
-        return back()->with('success', $wasPaid
+        $suffix = $hadLink ? ' Its payment link was cancelled too.' : '';
+
+        return back()->with('success', ($wasPaid
             ? 'Order voided — the coverage it granted has been withdrawn.'
-            : 'Order voided.');
+            : 'Order voided.').$suffix);
     }
 
     // -----------------------------------------------------------------

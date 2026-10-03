@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\BillingPeriod;
 use App\Enums\CollectionMethod;
 use App\Enums\OrderKind;
+use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Concerns\HasPublicId;
@@ -30,11 +31,18 @@ class SubscriptionOrder extends Model
         'quantity',
         'subtotal',
         'discount_total',
+        'manual_discount_id',
         'amount',
         'payment_status',
         'payment_method',
         'transaction_number',
         'razorpay_order_id',
+        'payment_link_id',
+        'payment_link_url',
+        'payment_link_ref',
+        'payment_link_status',
+        'payment_link_expires_at',
+        'payment_link_attempts',
         'remarks',
         'legacy_subscription_id',
     ];
@@ -47,6 +55,9 @@ class SubscriptionOrder extends Model
             'collection' => CollectionMethod::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
+            'payment_link_status' => PaymentLinkStatus::class,
+            'payment_link_expires_at' => 'datetime',
+            'payment_link_attempts' => 'integer',
             'quantity' => 'integer',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
@@ -85,6 +96,49 @@ class SubscriptionOrder extends Model
         // this is a belt for a row that arrives any other way.
         return $query->where('payment_status', PaymentStatus::Pending->value)
             ->where(fn (Builder $q) => $q->whereNotIn('kind', $free)->orWhereNull('kind'));
+    }
+
+    /**
+     * Orders carrying a payment link that can still take money (S2).
+     *
+     * This is the operator's "sent, not yet paid" worklist, and it is a different
+     * question from `outstanding()`: a charge can be owed with no link at all (an
+     * offline proforma), and a link can be dead (expired/cancelled) while the
+     * charge is still owed.
+     */
+    public function scopeWithLiveLink(Builder $query): Builder
+    {
+        return $query->whereNotNull('payment_link_id')
+            ->whereIn('payment_link_status', [
+                PaymentLinkStatus::Created->value,
+                PaymentLinkStatus::PartiallyPaid->value,
+            ]);
+    }
+
+    /** Whether this charge has a link that can still take money. */
+    public function hasLiveLink(): bool
+    {
+        return (bool) $this->payment_link_id && (bool) $this->payment_link_status?->isLive();
+    }
+
+    /** Whether a replacement link may be issued for this charge. */
+    public function canIssueLink(): bool
+    {
+        return $this->payment_status === PaymentStatus::Pending
+            && ! $this->hasLiveLink()
+            && $this->amountPaise() >= 100;
+    }
+
+    /**
+     * The charge in paise, which is the only unit Razorpay accepts.
+     *
+     * The `decimal:2` cast returns a STRING, so the float cast is load-bearing
+     * rather than decorative, and round() before the int cast stops 19999.999…
+     * truncating to ₹199.99 short.
+     */
+    public function amountPaise(): int
+    {
+        return (int) round(((float) $this->amount) * 100);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
+use App\Services\Billing\PaymentLinkService;
 use App\Services\BranchBillingService;
 use App\Services\NotificationService;
 use App\Services\RazorpayService;
@@ -37,8 +38,8 @@ class WebhookController extends Controller
         protected AccountBillingService $accountBilling,
         protected ActivityLogger $logger,
         protected NotificationService $notifications,
-    ) {
-    }
+        protected PaymentLinkService $paymentLinks,
+    ) {}
 
     public function razorpay(Request $request): JsonResponse
     {
@@ -56,6 +57,11 @@ class WebhookController extends Controller
             'order.paid' => $this->handleOrderPaid($payload),
             'payment.failed' => $this->handlePaymentFailed($payload),
             'refund.created', 'refund.processed' => $this->handleRefund($payload),
+            // S2 — operator-issued payment links.
+            'payment_link.paid' => $this->handlePaymentLinkPaid($payload),
+            'payment_link.partially_paid' => $this->handlePaymentLinkPartiallyPaid($payload),
+            'payment_link.expired' => $this->handlePaymentLinkClosed($payload, 'expired'),
+            'payment_link.cancelled' => $this->handlePaymentLinkClosed($payload, 'cancelled'),
             default => null,
         };
 
@@ -86,8 +92,137 @@ class WebhookController extends Controller
 
         match ($type) {
             'renew_account', 'add_branch' => $this->applyAccountOrder($type, $notes, $paymentId, $orderId, $capturedPaise),
+
+            // ── A PAYMENT LINK'S OWN ORDER (S2 · design §6 BP1) ──
+            // Every payment link has a Razorpay order behind it, and Razorpay may
+            // propagate the link's notes onto it — so this event can arrive for a
+            // payment that `payment_link.paid` also reports. The link arm owns it;
+            // applying it here as well would grant the same coverage twice.
+            //
+            // This case is the explicit half of a three-part guard. The other two:
+            // link notes never use `branch_id`/`period`, so even a fall-through can
+            // only log and return; and `transaction_number` is UNIQUE, so whichever
+            // event lands first wins and the second short-circuits.
+            'payment_link' => null,
+
             default => $this->applyBranchOrder($notes, $paymentId, $orderId, $capturedPaise),
         };
+    }
+
+    // -----------------------------------------------------------------
+    // Payment links (S2)
+    // -----------------------------------------------------------------
+
+    /**
+     * A customer paid a link the operator sent them.
+     *
+     * The payload carries three entities — the link, its Razorpay order, and the
+     * payment. We resolve OUR order from the link, then hand it to the single
+     * shared apply path, which ends in AccountBillingService::acceptOrder(). No
+     * coverage logic lives here; this arm's whole job is resolution and honesty
+     * about what it could not do.
+     */
+    protected function handlePaymentLinkPaid(array $payload): void
+    {
+        $link = $payload['payload']['payment_link']['entity'] ?? [];
+        $payment = $payload['payload']['payment']['entity'] ?? [];
+
+        $paymentId = $payment['id'] ?? null;
+        // `amount_paid` on the link is the authority on how much actually landed;
+        // the payment entity is the fallback when a payload omits it.
+        $paidPaise = max((int) ($link['amount_paid'] ?? 0), (int) ($payment['amount'] ?? 0));
+
+        if (! $paymentId) {
+            Log::warning('Razorpay webhook: payment_link.paid with no payment id', [
+                'payment_link_id' => $link['id'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $order = $this->paymentLinks->resolveOrder($link);
+
+        if (! $order) {
+            // Money captured with nothing here to apply it to. This must NOT throw:
+            // a 500 makes Razorpay retry forever and still never succeed. Alert a
+            // human and return 200.
+            $this->paymentLinks->alertUnresolved($link, $paymentId, $paidPaise);
+
+            return;
+        }
+
+        // Bind the tenant so the audit entry lands against a real branch — the
+        // order's own first line, which is more precise than guessing from the
+        // account's branch list.
+        $branchId = $order->lines()->value('branch_id');
+        if ($branchId) {
+            Tenant::set((int) $branchId);
+        }
+
+        try {
+            $this->paymentLinks->applyPaid($order, $paymentId, $paidPaise, 'webhook');
+        } finally {
+            Tenant::clear();
+        }
+    }
+
+    /**
+     * A link was partly paid. We create links with partial payments DISABLED, so
+     * this is an anomaly: it grants nothing and raises an alert, because granting a
+     * full term for part of the money is the one mistake here that costs revenue.
+     */
+    protected function handlePaymentLinkPartiallyPaid(array $payload): void
+    {
+        $link = $payload['payload']['payment_link']['entity'] ?? [];
+        $order = $this->paymentLinks->resolveOrder($link);
+
+        if (! $order) {
+            Log::warning('Razorpay webhook: payment_link.partially_paid for an unknown link', [
+                'payment_link_id' => $link['id'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $this->paymentLinks->markPartiallyPaid($order, (int) ($link['amount_paid'] ?? 0));
+    }
+
+    /**
+     * A link lapsed or was cancelled. The CHARGE is still owed — only the link
+     * died — so the order stays `pending` and stays in receivables. All that
+     * changes is that the operator can now re-issue it.
+     */
+    protected function handlePaymentLinkClosed(array $payload, string $how): void
+    {
+        $link = $payload['payload']['payment_link']['entity'] ?? [];
+        $order = $this->paymentLinks->resolveOrder($link);
+
+        if (! $order) {
+            Log::warning("Razorpay webhook: payment_link.{$how} for an unknown link", [
+                'payment_link_id' => $link['id'] ?? null,
+            ]);
+
+            return;
+        }
+
+        // A link that is already paid here cannot be re-opened by a late expiry
+        // notice — Razorpay can deliver these out of order.
+        if ($order->payment_link_status?->value === 'paid') {
+            return;
+        }
+
+        $branchId = $order->lines()->value('branch_id');
+        if ($branchId) {
+            Tenant::set((int) $branchId);
+        }
+
+        try {
+            $how === 'expired'
+                ? $this->paymentLinks->markExpired($order)
+                : $this->paymentLinks->markCancelled($order);
+        } finally {
+            Tenant::clear();
+        }
     }
 
     /** Legacy/per-branch order (notes.branch_id) — one branch's coverage. */

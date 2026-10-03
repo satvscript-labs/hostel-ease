@@ -144,6 +144,29 @@ return [
     ],
 
     /*
+    |--------------------------------------------------------------------------
+    | Payment links (S2) — operator-initiated online collection
+    |--------------------------------------------------------------------------
+    | Defaults for the Razorpay Payment Links the operator sends from Account 360.
+    |
+    | `expiry_days` is clamped to Razorpay's own window (at least 15 minutes, at
+    | most 6 months) when the link is created. Seven days is the default because a
+    | link that outlives the conversation that produced it is how a customer pays
+    | for a charge everyone has forgotten about.
+    |
+    | `notify_*` hand the chasing to Razorpay, which sends the link and (with
+    | `reminders`) follows up for free. Each channel is switched off automatically
+    | when the owner has no address on file for it, so these are ceilings, not
+    | promises.
+    */
+    'payment_links' => [
+        'expiry_days' => (int) env('SAAS_LINK_EXPIRY_DAYS', 7),
+        'notify_sms' => (bool) env('SAAS_LINK_NOTIFY_SMS', true),
+        'notify_email' => (bool) env('SAAS_LINK_NOTIFY_EMAIL', true),
+        'reminders' => (bool) env('SAAS_LINK_REMINDERS', true),
+    ],
+
+    /*
     | Branch-level subscription pricing.
     | Billing is handled individually per branch.
     */
@@ -204,4 +227,3 @@ return [
     ],
 
 ];
-

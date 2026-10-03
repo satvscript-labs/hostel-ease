@@ -40,8 +40,7 @@ class AccountBillingService
         protected BranchBillingService $branchBilling,
         protected DiscountService $discounts,
         protected CoverageMirror $mirror,
-    ) {
-    }
+    ) {}
 
     // -----------------------------------------------------------------
     // Account resolution
@@ -268,8 +267,36 @@ class AccountBillingService
             $account = $order->account;
             if ($account) {
                 $this->mirror->sync($account);
-                $this->refreshAccountAnchor($account);
+
+                // Carry the ORDER's own period, not the account's stale one (S2).
+                // Accepting a monthly link on a yearly account has to switch the
+                // account to monthly; passing nothing would have kept the old cadence
+                // and then priced the next renewal off it.
+                $period = ($order->kind === OrderKind::Renewal && $order->period?->isPaid())
+                    ? $order->period
+                    : null;
+
+                // A renewal bought in advance carries its real cycle start on its
+                // lines (see renewAccount), so the cycle window stays a matched pair
+                // when the money arrives days or weeks after the quote. Without this
+                // the start date would stick at whatever it was — finding F15 again,
+                // reached down the payment-link path instead of the renewal one.
+                $cycleStart = $order->kind === OrderKind::Renewal
+                    ? $order->lines()->min('start_date')
+                    : null;
+
+                $this->refreshAccountAnchor(
+                    $account,
+                    $period,
+                    $cycleStart ? Carbon::parse($cycleStart) : null,
+                );
             }
+
+            // The negotiated discount is consumed HERE, when the money is actually
+            // in, rather than when the charge was quoted (design §5.2). For an
+            // offline order — created already paid — creation consumed it and this
+            // is a harmless no-op, because consume() only acts on an Active one.
+            $this->discounts->consume($order->manual_discount_id);
 
             return $order->fresh();
         });
@@ -348,7 +375,7 @@ class AccountBillingService
      * must not hold the renewal date open for everyone else. Its own coverage is
      * untouched — that projects from its own lines.
      */
-    public function refreshAccountAnchor(SubscriptionAccount $account, ?BillingPeriod $period = null): void
+    public function refreshAccountAnchor(SubscriptionAccount $account, ?BillingPeriod $period = null, ?Carbon $cycleStart = null): void
     {
         // Fetch the estate ONCE and share it: this method ran allBranches() three
         // times (here, and twice inside drift) plus supportedEnds() twice, for every
@@ -366,7 +393,14 @@ class AccountBillingService
         $resolvedPeriod = $period ?? $account->period ?? BillingPeriod::Yearly;
 
         $account->update([
-            'current_period_start' => $account->current_period_start ?? $branches->min('subscription_start') ?? now(),
+            // `?? ` means the stored start is normally left alone — a long-standing
+            // customer's cycle start must not drift on every daily tick. $cycleStart
+            // is the deliberate exception: acceptOrder() passes the cycle a renewal
+            // actually bought, which is the only event that legitimately moves it.
+            'current_period_start' => $cycleStart
+                ?? $account->current_period_start
+                ?? $branches->min('subscription_start')
+                ?? now(),
             'current_period_end' => $anchor,
             'status' => $this->computeStatus($account, $anchor, $resolvedPeriod)->value,
             'period' => $resolvedPeriod->value,
@@ -513,7 +547,31 @@ class AccountBillingService
             $anchor = $quote['new_anchor'];
             [$amount, $discountTotal] = $this->resolveCharge($quote['subtotal'], $quote['breakdown'], $payment);
 
-            $order = $this->makeOrder($account, $quote['period'], $quote['quantity'], $quote['subtotal'], $discountTotal, $amount, $payment, OrderKind::Renewal);
+            // The cycle START advances with the cycle END (S0 · finding F15). It
+            // used to be written `?? now()`, i.e. once and never again, so after
+            // three yearly renewals an account read start 2026 / end 2029 — a
+            // "current period" three years long, useless for reporting. The new
+            // start is the same base quoteRenewal() extended to get the new anchor,
+            // so start and end stay a matched pair describing one real term.
+            //
+            // Computed BEFORE the order is written (S2): the lines now carry it, so
+            // a renewal that is paid later can read its own cycle start back out of
+            // the ledger instead of needing a column to remember it.
+            $previousAnchor = $account->current_period_end;
+            $cycleStart = ($account->isEntitled() && $previousAnchor && $previousAnchor->isFuture())
+                ? $previousAnchor->copy()
+                : Carbon::now();
+
+            $order = $this->makeOrder(
+                $account,
+                $quote['period'],
+                $quote['quantity'],
+                $quote['subtotal'],
+                $discountTotal,
+                $amount,
+                $payment + ['manual_discount_id' => $quote['breakdown']['manual_discount_id'] ?? null],
+                OrderKind::Renewal,
+            );
 
             // Largest-remainder allocation (finding F12): an equal rounded share left
             // Σ lines ≠ order amount (three branches on ₹20,000 gave ₹20,000.01).
@@ -521,29 +579,36 @@ class AccountBillingService
             // carry tax (S7), and confusing on an invoice long before that.
             $shares = $this->allocate($amount, $branches->count());
             foreach ($branches->values() as $i => $branch) {
-                $this->addLine($order, $branch, $shares[$i], $anchor);
+                // start_date = the real cycle start, not "now". An advance renewal's
+                // line should read 01 Oct 2027 → 01 Oct 2028 on the invoice, not
+                // 03 Oct 2026 → 01 Oct 2028, and acceptOrder() reads it back to
+                // advance current_period_start.
+                $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart);
             }
             $this->mirror->sync($account);
 
-            // The cycle START advances with the cycle END (S0 · finding F15). It
-            // used to be written `?? now()`, i.e. once and never again, so after
-            // three yearly renewals an account read start 2026 / end 2029 — a
-            // "current period" three years long, useless for reporting. The new
-            // start is the same base quoteRenewal() extended to get the new anchor,
-            // so start and end stay a matched pair describing one real term.
-            $previousAnchor = $account->current_period_end;
-            $cycleStart = ($account->isEntitled() && $previousAnchor && $previousAnchor->isFuture())
-                ? $previousAnchor->copy()
-                : Carbon::now();
+            // ── THE ACCOUNT CLOCK MOVES ONLY FOR MONEY (S2) ──
+            // This block used to run unconditionally, which was safe only because
+            // every operator path created the order already PAID. S2 creates PENDING
+            // renewals (a payment link is a pending order with a URL attached), and
+            // on one of those this would have pushed the renewal date a year forward
+            // and painted the badge green with nothing received — so the renewals
+            // worklist, the dunning windows and the owner's "Renews on" line would
+            // all have stopped chasing money we are still owed.
+            //
+            // A pending renewal therefore leaves the account exactly as it was.
+            // acceptOrder() re-derives the anchor from the ledger when the money
+            // lands, which is the same number by a safer route.
+            if ($order->payment_status->grantsCoverage()) {
+                $account->update([
+                    'period' => $quote['period']->value,
+                    'current_period_start' => $cycleStart,
+                    'current_period_end' => $anchor,
+                    'status' => $this->computeStatus($account, $anchor, $quote['period'])->value,
+                ]);
 
-            $account->update([
-                'period' => $quote['period']->value,
-                'current_period_start' => $cycleStart,
-                'current_period_end' => $anchor,
-                'status' => $this->computeStatus($account, $anchor, $quote['period'])->value,
-            ]);
-
-            $this->discounts->consume($quote['breakdown']['manual_discount_id']);
+                $this->discounts->consume($quote['breakdown']['manual_discount_id']);
+            }
 
             return $order;
         });
@@ -669,7 +734,16 @@ class AccountBillingService
             $quote = $this->quoteAddBranch($account, $branch);
             [$amount, $discountTotal] = $this->resolveCharge($quote['prorated'], $quote['breakdown'], $payment);
 
-            $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, 1, $quote['prorated'], $discountTotal, $amount, $payment, OrderKind::AddBranch);
+            $order = $this->makeOrder(
+                $account,
+                $account->period ?? BillingPeriod::Yearly,
+                1,
+                $quote['prorated'],
+                $discountTotal,
+                $amount,
+                $payment + ['manual_discount_id' => $quote['breakdown']['manual_discount_id'] ?? null],
+                OrderKind::AddBranch,
+            );
             $this->addLine($order, $branch, $amount, $anchor);
             $this->mirror->sync($account);
 
@@ -677,8 +751,18 @@ class AccountBillingService
             // cadence, not whatever it was left on (e.g. 'trial' from the branch's
             // own provisioning). Otherwise the account keeps reading Trial even
             // though the branch is now fully paid through the anchor (BR-18-adjacent).
+            //
+            // Safe for a PENDING order too, unlike renewAccount's direct write: this
+            // derives the anchor from PAID lines, so an unpaid top-up moves nothing.
             $this->refreshAccountAnchor($account, $this->paidPeriod($account->period?->value));
-            $this->discounts->consume($quote['breakdown']['manual_discount_id']);
+
+            // Consume the one-shot discount only once the money is in (S2 · design
+            // §5.2). On a pending payment link this used to mark a single-use
+            // negotiated discount Consumed before anyone had paid, so a link that
+            // expired took the discount with it and the re-issue was full price.
+            if ($order->payment_status->grantsCoverage()) {
+                $this->discounts->consume($quote['breakdown']['manual_discount_id']);
+            }
 
             return $order;
         });
@@ -777,7 +861,7 @@ class AccountBillingService
      * always holds and the order row reads "list − discount = paid" (BR: 5.1).
      *
      * @param  array{final:float, discount_total:float}  $breakdown
-     * @return array{0:float, 1:float}  [amount, discountTotal]
+     * @return array{0:float, 1:float} [amount, discountTotal]
      */
     protected function resolveCharge(float $subtotal, array $breakdown, array $payment): array
     {
@@ -1004,7 +1088,7 @@ class AccountBillingService
      * lookup NFR-4 exists to prevent.
      *
      * @param  iterable<Hostel>  $branches
-     * @return array<int, int>  branch id => count of outstanding orders touching it
+     * @return array<int, int> branch id => count of outstanding orders touching it
      */
     public function pendingOrderCountsByBranch(iterable $branches): array
     {
@@ -1038,6 +1122,10 @@ class AccountBillingService
             'quantity' => $quantity,
             'subtotal' => round($subtotal, 2),
             'discount_total' => round($discountTotal, 2),
+            // Which negotiated discount this charge consumed (or will consume, if it
+            // is still pending). Needed so acceptOrder() can consume it when the
+            // money lands rather than at quote time — design §5.2.
+            'manual_discount_id' => $payment['manual_discount_id'] ?? null,
             'amount' => round($amount, 2),
             'payment_status' => $payment['payment_status'] ?? PaymentStatus::Paid->value,
             'payment_method' => $payment['payment_method'] ?? null,

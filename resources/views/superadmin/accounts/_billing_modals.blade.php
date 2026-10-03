@@ -23,16 +23,26 @@
         class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(renewSummary.final) + ')'">
     <div class="form-text">Enter a lower amount to record a manual discount; the difference is logged on the order.</div>
 
-    <label class="form-label fw-bold small text-muted mt-3">METHOD</label>
-    <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    <hr class="my-3 text-muted">
+    @include('superadmin.accounts._collect_toggle', ['model' => 'renewCollect'])
 
-    <label class="form-label fw-bold small text-muted mt-3">TXN / REMARKS</label>
-    <input type="text" name="transaction_number" class="form-control bg-white border shadow-sm mb-2" placeholder="Reference (optional)">
+    {{-- Only meaningful when the money is already in hand. A link has no payment
+         instrument yet, and the controller drops these on that path anyway. --}}
+    <div x-show="renewCollect === 'offline'" x-collapse>
+        <label class="form-label fw-bold small text-muted">METHOD</label>
+        <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+
+        <label class="form-label fw-bold small text-muted mt-3">TXN / REMARKS</label>
+        <input type="text" name="transaction_number" class="form-control bg-white border shadow-sm mb-2" placeholder="Reference (optional)">
+    </div>
     <input type="text" name="remarks" class="form-control bg-white border shadow-sm" placeholder="Remarks (optional)">
 
     <x-slot:footer>
         <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="renewOpen=false">Cancel</button>
-        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-arrows-rotate me-2"></i>Renew</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+            <i class="fa-solid me-2" :class="renewCollect === 'link' ? 'fa-link' : 'fa-arrows-rotate'"></i>
+            <span x-text="renewCollect === 'link' ? 'Create link' : 'Renew'"></span>
+        </button>
     </x-slot:footer>
 </x-he-modal>
 
@@ -53,12 +63,27 @@
         class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(addSummary.final) + ')'">
     <div class="form-text">Enter a lower amount to record a manual discount; the difference is logged on the order.</div>
 
-    <label class="form-label fw-bold small text-muted mt-3">METHOD</label>
-    <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    <hr class="my-3 text-muted">
+    @include('superadmin.accounts._collect_toggle', ['model' => 'addCollect'])
+
+    <div x-show="addCollect === 'offline'" x-collapse>
+        <label class="form-label fw-bold small text-muted">METHOD</label>
+        <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    </div>
+
+    <div class="alert border-0 rounded-4 small mt-3 mb-0" x-show="addCollect === 'link'" x-cloak
+         style="background: rgba(79,70,229,.07); color:#3730a3;">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        The branch is <strong>not</strong> co-terminated until the link is paid — until then this is a
+        quote, and the branch keeps whatever coverage it already has.
+    </div>
 
     <x-slot:footer>
         <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="addOpen=false">Cancel</button>
-        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-plus me-2"></i>Add branch</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+            <i class="fa-solid me-2" :class="addCollect === 'link' ? 'fa-link' : 'fa-plus'"></i>
+            <span x-text="addCollect === 'link' ? 'Create link' : 'Add branch'"></span>
+        </button>
     </x-slot:footer>
 </x-he-modal>
 
@@ -77,15 +102,23 @@
         class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(alignSummary.final) + ')'">
     <div class="form-text">Enter a lower total to record a manual discount, spread across the branches above.</div>
 
-    <label class="form-label fw-bold small text-muted mt-3">METHOD</label>
-    <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    <hr class="my-3 text-muted">
+    @include('superadmin.accounts._collect_toggle', ['model' => 'alignCollect'])
+
+    <div x-show="alignCollect === 'offline'" x-collapse>
+        <label class="form-label fw-bold small text-muted">METHOD</label>
+        <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="$methods" />
+    </div>
 
     <label class="form-label fw-bold small text-muted mt-3">REMARKS</label>
     <input type="text" name="remarks" class="form-control bg-white border shadow-sm" placeholder="Remarks (optional)">
 
     <x-slot:footer>
         <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="alignOpen=false">Cancel</button>
-        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-diagram-project me-2"></i>Align</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+            <i class="fa-solid me-2" :class="alignCollect === 'link' ? 'fa-link' : 'fa-diagram-project'"></i>
+            <span x-text="alignCollect === 'link' ? 'Create link' : 'Align'"></span>
+        </button>
     </x-slot:footer>
 </x-he-modal>
 
@@ -443,5 +476,91 @@
     <x-slot:footer>
         <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="voidOpen=false">Cancel</button>
         <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-ban me-2"></i>Void order</button>
+    </x-slot:footer>
+</x-he-modal>
+
+{{-- ══════════════════════════════════════════════════════════════════════════
+     Payment links (S2). Issuing is NOT here — it is the `collect` toggle above,
+     deliberately on the same route that records the charge offline, so the two
+     can never price it differently. What lives here is the lifecycle: share the
+     link you just made, and kill one that should not be payable any more.
+   ══════════════════════════════════════════════════════════════════════════ --}}
+
+{{-- Share. Opens by itself after a link is created (the URL is the deliverable —
+     making the operator hunt for it would be the whole point missed), and on
+     demand from any live link in the Orders list. --}}
+<x-he-modal open="shareOpen" title="Send this payment link" icon="paper-plane" :size="560">
+    <div class="he-summary shadow-sm mb-3">
+        <div class="he-summary-row he-summary-row--line">
+            <span x-text="share.invoice"></span>
+            <span class="he-summary-amt" x-text="heMoney(share.amount)"></span>
+        </div>
+        <div class="he-summary-row he-summary-row--line" x-show="share.expires" x-cloak>
+            <span>Expires</span>
+            <span class="he-summary-amt" x-text="share.expires"></span>
+        </div>
+    </div>
+
+    <label class="form-label fw-bold small text-muted">LINK</label>
+    <div class="input-group shadow-sm mb-3">
+        <input type="text" class="form-control bg-white border font-monospace" :value="share.url" readonly
+               @click="$event.target.select()">
+        <button type="button" class="btn btn-primary fw-bold px-3" @click="copyShare()">
+            <i class="fa-solid fa-copy me-1"></i>Copy
+        </button>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-light border rounded-pill px-3 fw-semibold" target="_blank" rel="noopener"
+           :href="waHref()" x-show="share.url" x-cloak>
+            <i class="fa-brands fa-whatsapp text-success me-1"></i>WhatsApp
+        </a>
+        <a class="btn btn-light border rounded-pill px-3 fw-semibold" :href="mailHref()" x-show="share.url" x-cloak>
+            <i class="fa-regular fa-envelope text-primary me-1"></i>Email
+        </a>
+        <a class="btn btn-light border rounded-pill px-3 fw-semibold" target="_blank" rel="noopener"
+           :href="share.url" x-show="share.url" x-cloak>
+            <i class="fa-solid fa-arrow-up-right-from-square text-muted me-1"></i>Open
+        </a>
+    </div>
+
+    <p class="small text-muted mt-3 mb-0">
+        Razorpay has already sent this to the owner by SMS (and email, if one is on file) and will
+        chase it on its own. Sending it yourself as well is belt and braces, not a duplicate charge —
+        the link can only be paid once.
+    </p>
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" @click="shareOpen=false">Done</button>
+    </x-slot:footer>
+</x-he-modal>
+
+{{-- Cancel a live link. STATIC action + posted integer order_id — `::action` would
+     land in $attributes and the component would render a <div>, giving a button
+     that silently does nothing (08_S1_VERIFICATION.md §2). --}}
+<x-he-modal open="linkCancelOpen" title="Cancel this payment link" icon="link-slash" :size="560"
+    :action="route('superadmin.accounts.orders.link.cancel', $account)" method="POST">
+    <input type="hidden" name="order_id" :value="linkOrderId">
+
+    <div class="he-summary shadow-sm mb-3">
+        <div class="he-summary-row he-summary-row--line">
+            <span>Charge</span>
+            <span class="he-summary-amt" x-text="linkOrderLabel"></span>
+        </div>
+    </div>
+
+    <div class="alert border-0 rounded-4 small mb-3" style="background: rgba(79,70,229,.07); color:#3730a3;">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        <strong>The charge stays owed.</strong> Only the link dies — the order remains unpaid and in
+        receivables, and you can issue a fresh link or record the money offline at any time.
+    </div>
+
+    <label class="form-label fw-bold small text-muted">REASON <span class="fw-normal">— optional</span></label>
+    <input type="text" name="reason" class="form-control bg-white border shadow-sm" maxlength="255"
+           placeholder="e.g. customer is paying by bank transfer instead">
+
+    <x-slot:footer>
+        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="linkCancelOpen=false">Keep it live</button>
+        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-link-slash me-2"></i>Cancel link</button>
     </x-slot:footer>
 </x-he-modal>

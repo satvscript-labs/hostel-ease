@@ -78,10 +78,23 @@
          see. Aged, because a 40-day-old unpaid charge is a different conversation
          from a 2-day-old one. Sits beside the open removal requests, since both are
          "someone is waiting on you". --}}
-    @if($summary['receivable_count'] || $summary['removal_requests'])
+    @php
+        // Three "someone is waiting on you" tiles, any subset of which may be
+        // present. Widths are derived rather than hard-coded so the row stays
+        // balanced at 1, 2 or 3 — and receivables keeps the larger share because
+        // it carries the aged breakdown inside it.
+        $waitingTiles = collect([
+            'receivable' => (bool) $summary['receivable_count'],
+            'links' => (bool) ($summary['live_links'] ?? 0),
+            'removals' => (bool) $summary['removal_requests'],
+        ])->filter()->count();
+        $sideCol = $waitingTiles === 1 ? 'col-12' : ($waitingTiles === 2 ? 'col-md-6' : 'col-md-6 col-lg-3');
+        $mainCol = $waitingTiles === 1 ? 'col-12' : ($waitingTiles === 2 ? 'col-lg-8' : 'col-lg-6');
+    @endphp
+    @if($waitingTiles)
         <div class="row g-3 mb-4 stagger">
             @if($summary['receivable_count'])
-                <div class="col-12 {{ $summary['removal_requests'] ? 'col-lg-8' : '' }}">
+                <div class="col-12 {{ $mainCol }}">
                     <div class="card stat-card shadow-sm rounded-4 h-100">
                         <div class="card-body py-3 px-4">
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -101,8 +114,27 @@
                 </div>
             @endif
 
+            {{-- ── Payment links sent, not yet paid (S2) ──
+                 A different question from "awaiting payment": a charge can be owed
+                 with no link at all (an offline proforma), and a link can be dead
+                 while the charge is still owed. THIS one says the customer has been
+                 asked and has not acted — which is the one you chase. --}}
+            @if($summary['live_links'] ?? 0)
+                <div class="col-12 {{ $sideCol }}">
+                    <div class="card stat-card shadow-sm rounded-4 h-100" style="border-color: rgba(14,165,233,.25);">
+                        <div class="card-body py-3 px-4">
+                            <div class="stat-label">Payment links sent</div>
+                            <div class="stat-value mb-0" style="color:#0284c7;">{{ hostelease_money($summary['live_links_value']) }}</div>
+                            <div class="small text-muted">
+                                {{ $summary['live_links'] }} live {{ \Illuminate\Support\Str::plural('link', $summary['live_links']) }} awaiting payment — open the account to re-send or cancel.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if($summary['removal_requests'])
-                <div class="col-12 {{ $summary['receivable_count'] ? 'col-lg-4' : '' }}">
+                <div class="col-12 {{ $sideCol }}">
                     <div class="card stat-card shadow-sm rounded-4 h-100" style="border-color: rgba(234,88,12,.25);">
                         <div class="card-body py-3 px-4">
                             <div class="stat-label">Branch removal requests</div>

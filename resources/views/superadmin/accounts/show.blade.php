@@ -322,6 +322,45 @@
         </div>
     </div>
 
+    {{-- ── Live payment links (S2) ──
+         Sits ABOVE the orders list rather than inside it, because the question
+         "has this customer been asked for money and not acted?" is one the
+         operator should be able to answer without expanding a single row. --}}
+    @if($liveLinks->isNotEmpty())
+        <div class="panel-card shadow-sm mt-4" style="border-color: rgba(14,165,233,.3);">
+            <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-paper-plane text-info me-2"></i>Payment links awaiting payment</h6>
+                <span class="badge bg-info-subtle text-info rounded-pill px-3 py-2">{{ $liveLinks->count() }}</span>
+            </div>
+            <div class="px-4 py-2">
+                @foreach($liveLinks as $live)
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
+                        <div>
+                            <span class="fw-bold text-dark a360-metric">{{ hostelease_money($live->amount) }}</span>
+                            <span class="small text-muted ms-2">
+                                @if($live->payment_link_expires_at)
+                                    expires {{ $live->payment_link_expires_at->format('d M Y') }}
+                                @else
+                                    no expiry set
+                                @endif
+                            </span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-info text-white rounded-pill px-3 fw-semibold"
+                                    @click="openShare(@js($live->payment_link_url), {{ (float) $live->amount }}, @js('Order #'.$live->id), @js($live->payment_link_expires_at?->format('d M Y')))">
+                                <i class="fa-solid fa-paper-plane me-1"></i>Send
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold"
+                                    @click="copyUrl(@js($live->payment_link_url))">
+                                <i class="fa-solid fa-copy me-1"></i>Copy
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- ── Payment history ── --}}
     <div class="panel-card shadow-sm mt-4">
         <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>Orders &amp; payments</h6></div>
@@ -377,8 +416,25 @@
                                                     <div><span class="od-k">Method</span><span class="od-v">{{ $order->payment_method?->label() ?? '—' }}</span></div>
                                                     <div><span class="od-k">Status</span><span class="od-v text-{{ $statusColor }}">{{ $order->payment_status->label() }}</span></div>
                                                     <div><span class="od-k">Branches</span><span class="od-v">{{ $order->quantity }}</span></div>
+                                                    @if($order->collection)<div><span class="od-k">Collected</span><span class="od-v">{{ $order->collection->label() }}</span></div>@endif
                                                     @if($order->transaction_number)<div><span class="od-k">Txn / Ref</span><span class="od-v font-monospace">{{ $order->transaction_number }}</span></div>@endif
                                                     @if($order->razorpay_order_id)<div><span class="od-k">Razorpay</span><span class="od-v font-monospace">{{ $order->razorpay_order_id }}</span></div>@endif
+                                                    {{-- S2: the LINK's own status, which is not the order's. A link
+                                                         Razorpay reports as paid while the charge is still pending
+                                                         here is a missed webhook, and seeing the two side by side is
+                                                         what makes that visible rather than invisible. --}}
+                                                    @if($order->payment_link_id)
+                                                        <div>
+                                                            <span class="od-k">Payment link</span>
+                                                            <span class="od-v text-{{ $order->payment_link_status?->color() ?? 'muted' }}">
+                                                                <i class="fa-solid fa-{{ $order->payment_link_status?->icon() ?? 'link' }} me-1"></i>{{ $order->payment_link_status?->label() ?? 'Unknown' }}
+                                                                @if($order->payment_link_attempts > 1)<span class="text-muted">· attempt {{ $order->payment_link_attempts }}</span>@endif
+                                                            </span>
+                                                        </div>
+                                                        @if($order->payment_link_expires_at)
+                                                            <div><span class="od-k">Link expires</span><span class="od-v">{{ $order->payment_link_expires_at->format('d M Y') }}</span></div>
+                                                        @endif
+                                                    @endif
                                                     @if($order->legacy_subscription_id)<div><span class="od-k">Migrated</span><span class="od-v">legacy #{{ $order->legacy_subscription_id }}</span></div>@endif
                                                 </div>
                                                 @if($order->remarks)
@@ -431,6 +487,52 @@
                                                     </form>
                                                 @endif
 
+                                                {{-- ── Payment link (S2) ──
+                                                     A live link is shareable, nudgeable, checkable and killable.
+                                                     A dead one can be replaced. A charge with no link at all can
+                                                     get one — which is how an offline proforma becomes collectable
+                                                     online without re-quoting it. --}}
+                                                @if($linksEnabled && $order->payment_status->value === 'pending')
+                                                    @if($order->hasLiveLink())
+                                                        <button type="button" class="btn btn-sm btn-info text-white rounded-pill px-3 fw-semibold shadow-sm"
+                                                                @click="openShare(@js($order->payment_link_url), {{ (float) $order->amount }}, @js($order->invoiceNumber()), @js($order->payment_link_expires_at?->format('d M Y')))">
+                                                            <i class="fa-solid fa-paper-plane me-1"></i>Send link
+                                                        </button>
+
+                                                        <form method="POST" action="{{ route('superadmin.accounts.orders.link.resend', $account) }}">
+                                                            @csrf
+                                                            <input type="hidden" name="order_id" value="{{ $order->id }}">
+                                                            <input type="hidden" name="medium" value="sms">
+                                                            <button class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold shadow-sm">
+                                                                <i class="fa-solid fa-bell me-1"></i>Nudge by SMS
+                                                            </button>
+                                                        </form>
+
+                                                        {{-- The safety valve for a webhook that never arrived: reads
+                                                             the truth from Razorpay and applies a payment we missed. --}}
+                                                        <form method="POST" action="{{ route('superadmin.accounts.orders.link.check', $account) }}">
+                                                            @csrf
+                                                            <input type="hidden" name="order_id" value="{{ $order->id }}">
+                                                            <button class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold shadow-sm">
+                                                                <i class="fa-solid fa-rotate me-1"></i>Check with Razorpay
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button" class="btn btn-sm btn-light text-danger border rounded-pill px-3 fw-semibold shadow-sm"
+                                                                @click="openLinkCancel({{ $order->id }}, @js($order->invoiceNumber()))">
+                                                            <i class="fa-solid fa-link-slash me-1"></i>Cancel link
+                                                        </button>
+                                                    @elseif($order->canIssueLink())
+                                                        <form method="POST" action="{{ route('superadmin.accounts.orders.link.issue', $account) }}">
+                                                            @csrf
+                                                            <input type="hidden" name="order_id" value="{{ $order->id }}">
+                                                            <button class="btn btn-sm btn-info text-white rounded-pill px-3 fw-semibold shadow-sm">
+                                                                <i class="fa-solid fa-link me-1"></i>{{ $order->payment_link_id ? 'Re-issue link' : 'Collect online' }}
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endif
+
                                                 @if($order->payment_status->value !== 'voided')
                                                     {{-- The INTEGER id: a posted DB reference, never a URL segment
                                                          (standards §1.1 rule 3). The form action is static. --}}
@@ -477,6 +579,15 @@
 </div>
 @endsection
 
+{{-- WARNING: do NOT add a multi-line PHP block to this file (the paren-less
+     directive form with its closing partner). This file already uses the INLINE
+     single-expression form above, for the branch-state chips — and Blade's raw
+     block extraction pairs the first opener it finds with the first closer,
+     BEFORE comments are stripped. A block added anywhere below therefore pairs
+     with the inline opener on the Branches card and swallows ~350 lines into one
+     raw PHP region, so the page dies with "unexpected end of file" and the
+     stack trace points nowhere near the real cause. Computed values belong in
+     the controller: $shareSeed / $shareTo come from AccountController::show(). --}}
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
@@ -520,6 +631,49 @@ document.addEventListener('alpine:init', () => {
                 override: this.renewOverride,
                 note: q.quantity ? ('Renews all branches to ' + q.new_anchor) : '',
             });
+        },
+
+        // ── Payment links (S2) ──
+        // One `collect` choice per modal rather than one shared flag: the operator
+        // may well take a renewal by bank transfer and a prorated add-branch by
+        // link in the same sitting, and a shared flag would silently carry the
+        // last choice into the next modal.
+        renewCollect: 'offline', addCollect: 'offline', alignCollect: 'offline',
+
+        // Opens by itself right after a link is created, because the URL IS the
+        // deliverable — making the operator hunt for it would miss the point.
+        shareOpen: {{ session('payment_link') ? 'true' : 'false' }},
+        share: @json($shareSeed),
+        shareTo: @json($shareTo),
+        linkCancelOpen: false, linkOrderId: null, linkOrderLabel: '',
+
+        openShare(url, amount, invoice, expires) {
+            this.share = { url: url, amount: amount, invoice: invoice, expires: expires };
+            this.shareOpen = true;
+        },
+        openLinkCancel(id, label) { this.linkOrderId = id; this.linkOrderLabel = label; this.linkCancelOpen = true; },
+
+        shareMessage() {
+            return 'Hi, here is your ' + this.shareTo.company + ' payment link for '
+                + heMoney(this.share.amount) + ' (' + this.share.invoice + '): ' + this.share.url;
+        },
+        // No WhatsApp Business API and no cost — a wa.me deep link is the same free
+        // channel S4's dunning nudge will use.
+        waHref() {
+            const base = this.shareTo.mobile ? 'https://wa.me/' + this.shareTo.mobile : 'https://wa.me/';
+            return base + '?text=' + encodeURIComponent(this.shareMessage());
+        },
+        mailHref() {
+            const subject = this.shareTo.company + ' — payment link ' + this.share.invoice;
+            return 'mailto:' + (this.shareTo.email || '')
+                + '?subject=' + encodeURIComponent(subject)
+                + '&body=' + encodeURIComponent(this.shareMessage());
+        },
+        copyShare() { this.copyUrl(this.share.url); },
+        copyUrl(url) {
+            if (!url) return;
+            navigator.clipboard?.writeText(url);
+            window.Swal && Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Link copied', showConfirmButton: false, timer: 1800 });
         },
 
         // ── Void an order (S1 / D8) ──

@@ -166,6 +166,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::patch('accounts/{account}/orders/{order}/accept', [AccountController::class, 'acceptOrder'])->name('accounts.orders.accept');
         Route::patch('accounts/{account}/orders/void', [AccountController::class, 'voidOrder'])->name('accounts.orders.void');
 
+        // Payment links (S2) — operator-initiated online collection. Modal-driven,
+        // so the target rides as a posted integer for the reason spelled out above.
+        // Issuing a link for a NEW charge is deliberately NOT here: it is
+        // `collect=link` on accounts.renew / add-branch / align, the same route that
+        // records that charge offline, so the two can never price it differently.
+        Route::post('accounts/{account}/orders/link', [AccountController::class, 'issueLink'])->name('accounts.orders.link.issue');
+        Route::post('accounts/{account}/orders/link/cancel', [AccountController::class, 'cancelLink'])->name('accounts.orders.link.cancel');
+        Route::post('accounts/{account}/orders/link/resend', [AccountController::class, 'resendLink'])->name('accounts.orders.link.resend');
+        Route::post('accounts/{account}/orders/link/check', [AccountController::class, 'checkLink'])->name('accounts.orders.link.check');
+
         // Branch removal (D11): the owner asks, the operator decides.
         Route::post('accounts/{account}/branches/cancel', [AccountController::class, 'cancelBranch'])->name('accounts.branches.cancel');
         Route::post('accounts/{account}/branches/decline-removal', [AccountController::class, 'declineRemoval'])->name('accounts.branches.decline-removal');
