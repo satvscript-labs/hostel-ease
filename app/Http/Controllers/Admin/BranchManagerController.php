@@ -72,14 +72,22 @@ class BranchManagerController extends Controller
      * Deliberately NOT behind the owner_self_serve lock: asking is not a billing
      * operation, and an owner must always be able to start the conversation.
      */
-    public function requestRemoval(Request $request, Hostel $hostel): RedirectResponse
+    public function requestRemoval(Request $request): RedirectResponse
     {
+        $data = $request->validate([
+            // A posted DB reference, so an integer (standards §1.1 rule 3): the modal
+            // is shared across branch rows, and a URL built in the browser is the one
+            // that fails silently (rule 2).
+            'branch_id' => ['required', 'integer'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $hostel = Hostel::findOr((int) $data['branch_id'], fn () => abort(404));
+
         // The ACCOUNT OWNER only — not co-admins (who share the hostel_admin role),
         // not staff. Same rule as rename(): a 404 rather than a 403, so the
         // existence of another account's branch is never confirmed.
         abort_unless($hostel->owner_id === $request->user()->id, 404);
-
-        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
 
         if ($hostel->isCancelled()) {
             return back()->with('info', "{$hostel->name} is already scheduled for removal.");

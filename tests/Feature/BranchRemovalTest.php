@@ -76,7 +76,7 @@ class BranchRemovalTest extends TestCase
         $branch = $branches->first();
 
         $this->actingAs($owner)
-            ->post(route('admin.branches.request-removal', $branch), ['reason' => 'closing this property'])
+            ->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'closing this property'])
             ->assertRedirect();
 
         $branch->refresh();
@@ -98,7 +98,7 @@ class BranchRemovalTest extends TestCase
         [$owner, $branches] = $this->owner();
         $branch = $branches->first();
 
-        $this->actingAs($owner)->post(route('admin.branches.request-removal', $branch), ['reason' => 'maybe'])->assertRedirect();
+        $this->actingAs($owner)->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'maybe'])->assertRedirect();
         $this->actingAs($owner)->delete(route('admin.branches.withdraw-removal', $branch))->assertRedirect();
 
         $branch->refresh();
@@ -116,10 +116,10 @@ class BranchRemovalTest extends TestCase
         $branch = $branches->first();
         $super = User::factory()->superAdmin()->create();
 
-        $this->actingAs($owner)->post(route('admin.branches.request-removal', $branch), ['reason' => 'too expensive']);
+        $this->actingAs($owner)->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'too expensive']);
 
         $this->actingAs($super)
-            ->post(route('superadmin.accounts.branches.decline-removal', [$account, $branch]), ['note' => 'agreed a discount instead'])
+            ->post(route('superadmin.accounts.branches.decline-removal', $account), ['branch_id' => $branch->id, 'note' => 'agreed a discount instead'])
             ->assertRedirect();
 
         $this->assertSame('live', $branch->fresh()->cancellationState());
@@ -258,9 +258,7 @@ class BranchRemovalTest extends TestCase
         [, $branches, $account] = $this->owner(1);
         $super = User::factory()->superAdmin()->create();
 
-        $this->actingAs($super)->post(route('superadmin.accounts.branches.cancel', [$account, $branches->first()]), [
-            'reason' => 'closing the business',
-        ])->assertRedirect();
+        $this->actingAs($super)->post(route('superadmin.accounts.branches.cancel', $account), ['branch_id' => $branches->first()->id, 'reason' => 'closing the business'])->assertRedirect();
 
         $anchorBefore = $account->fresh()->current_period_end?->toDateString();
         $ordersBefore = SubscriptionOrder::count();
@@ -407,7 +405,7 @@ class BranchRemovalTest extends TestCase
         $coAdmin->hostels()->sync([$branch->id]);
 
         $this->actingAs($coAdmin)
-            ->post(route('admin.branches.request-removal', $branch), ['reason' => 'not mine to ask'])
+            ->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'not mine to ask'])
             ->assertNotFound();
 
         $this->assertSame('live', $branch->fresh()->cancellationState());
@@ -419,7 +417,7 @@ class BranchRemovalTest extends TestCase
         [$stranger] = $this->owner(1, '+919880000022');
 
         $this->actingAs($stranger)
-            ->post(route('admin.branches.request-removal', $branches->first()), ['reason' => 'nope'])
+            ->post(route('admin.branches.request-removal'), ['branch_id' => $branches->first()->id, 'reason' => 'nope'])
             ->assertNotFound();
     }
 
@@ -430,7 +428,7 @@ class BranchRemovalTest extends TestCase
         // `role:super_admin` bounces rather than 403s (EnsureUserRole redirects back
         // with an error) — what matters is that nothing was cancelled.
         $this->actingAs($owner)
-            ->post(route('superadmin.accounts.branches.cancel', [$account, $branches->first()]), ['reason' => 'me cancelling myself'])
+            ->post(route('superadmin.accounts.branches.cancel', $account), ['branch_id' => $branches->first()->id, 'reason' => 'me cancelling myself'])
             ->assertRedirect();
 
         $this->assertFalse($branches->first()->fresh()->isCancelled(), 'An owner cancelled their own branch — removal is operator-only (D11).');
@@ -441,10 +439,10 @@ class BranchRemovalTest extends TestCase
         [$owner, $branches] = $this->owner(2);
         $branch = $branches->first();
 
-        $this->actingAs($owner)->post(route('admin.branches.request-removal', $branch), ['reason' => 'first ask']);
+        $this->actingAs($owner)->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'first ask']);
         $requestedAt = $branch->fresh()->cancellation_requested_at;
 
-        $this->actingAs($owner)->post(route('admin.branches.request-removal', $branch->fresh()), ['reason' => 'second ask'])
+        $this->actingAs($owner)->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'second ask'])
             ->assertRedirect()->assertSessionHas('info');
 
         $this->assertEquals($requestedAt, $branch->fresh()->cancellation_requested_at);
@@ -503,6 +501,78 @@ class BranchRemovalTest extends TestCase
             ->assertSee($branches->get(2)->public_id, false);
     }
 
+    /**
+     * THE TEST THAT WAS MISSING. The three modal actions shipped broken and every
+     * other test passed: they were declared as `<x-he-modal ::action="...">`, which
+     * puts `:action` in $attributes instead of filling the component's $action prop,
+     * so the component rendered a <div> — no form, no CSRF, no method. The buttons
+     * did nothing, silently, exactly as `development_standards.md` §1.1 rule 2 warns.
+     *
+     * So: assert the markup actually submits. A rendered <form> with the right action
+     * and the posted integer id — none of which a "page renders" assertion can see.
+     */
+    public function test_the_removal_and_void_modals_are_real_forms_posting_to_the_right_routes(): void
+    {
+        [$owner, $branches, $account] = $this->owner(2);
+        $branch = $branches->first();
+        $super = User::factory()->superAdmin()->create();
+
+        // A pending order so the Void control is rendered too.
+        $this->billing()->recordBranchRenewal($branch, 'yearly', ['amount' => 10000, 'payment_status' => 'pending']);
+        $this->billing()->requestRemoval($branch->fresh(), 'please remove');
+
+        $html = $this->actingAs($super)->get(route('superadmin.accounts.show', $account))->assertOk()->getContent();
+
+        foreach ([
+            route('superadmin.accounts.branches.cancel', $account),
+            route('superadmin.accounts.branches.decline-removal', $account),
+            route('superadmin.accounts.orders.void', $account),
+        ] as $action) {
+            $this->assertMatchesRegularExpression(
+                '/<form[^>]*action="'.preg_quote($action, '/').'"/',
+                $html,
+                "No <form> posts to {$action} — the modal cannot submit (an ::action on x-he-modal renders a div).",
+            );
+        }
+
+        // The targets ride as posted integers, bound by Alpine.
+        $this->assertStringContainsString('name="branch_id" :value="cancelBranchId"', $html);
+        $this->assertStringContainsString('name="branch_id" :value="declineBranchId"', $html);
+        $this->assertStringContainsString('name="order_id" :value="voidOrderId"', $html);
+        // PATCH is spoofed by the component, not hand-written into the body.
+        $this->assertStringContainsString('name="_method" value="PATCH"', $html);
+
+        // Owner side: the same shape.
+        $ownerHtml = $this->actingAs($owner)->get(route('admin.subscription.index'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression(
+            '/<form[^>]*action="'.preg_quote(route('admin.branches.request-removal'), '/').'"/',
+            $ownerHtml,
+            'The owner removal-request modal is not a form posting to the request route.',
+        );
+        $this->assertStringContainsString('name="branch_id" :value="removeBranchId"', $ownerHtml);
+    }
+
+    /** A crafted id must not reach another customer's branch or order. */
+    public function test_a_posted_id_cannot_reach_another_accounts_branch_or_order(): void
+    {
+        [, , $account] = $this->owner(1, '+919880000031');
+        [, $otherBranches, $otherAccount] = $this->owner(1, '+919880000032');
+        $super = User::factory()->superAdmin()->create();
+
+        $this->actingAs($super)->post(route('superadmin.accounts.branches.cancel', $account), [
+            'branch_id' => $otherBranches->first()->id, 'reason' => 'wrong customer',
+        ])->assertNotFound();
+
+        $this->assertFalse($otherBranches->first()->fresh()->isCancelled());
+
+        $foreignOrder = $otherAccount->orders()->firstOrFail();
+        $this->actingAs($super)->patch(route('superadmin.accounts.orders.void', $account), [
+            'order_id' => $foreignOrder->id, 'reason' => 'wrong customer',
+        ])->assertNotFound();
+
+        $this->assertSame('paid', $foreignOrder->fresh()->payment_status->value);
+    }
+
     public function test_a_co_admin_sees_no_removal_controls(): void
     {
         [, $branches] = $this->owner(2);
@@ -520,8 +590,8 @@ class BranchRemovalTest extends TestCase
         $branch = $branches->first();
         $super = User::factory()->superAdmin()->create();
 
-        $this->actingAs($owner)->post(route('admin.branches.request-removal', $branch), ['reason' => 'closing']);
-        $this->actingAs($super)->post(route('superadmin.accounts.branches.cancel', [$account, $branch]), ['reason' => 'confirmed with the owner']);
+        $this->actingAs($owner)->post(route('admin.branches.request-removal'), ['branch_id' => $branch->id, 'reason' => 'closing']);
+        $this->actingAs($super)->post(route('superadmin.accounts.branches.cancel', $account), ['branch_id' => $branch->id, 'reason' => 'confirmed with the owner']);
         $this->actingAs($super)->post(route('superadmin.accounts.branches.restore', [$account, $branch]));
 
         foreach (['branch.removal_requested', 'subscription.update'] as $action) {

@@ -350,9 +350,13 @@ class AccountBillingService
      */
     public function refreshAccountAnchor(SubscriptionAccount $account, ?BillingPeriod $period = null): void
     {
-        $branches = $this->includedBranches($account);
+        // Fetch the estate ONCE and share it: this method ran allBranches() three
+        // times (here, and twice inside drift) plus supportedEnds() twice, for every
+        // account on every daily tick.
+        $all = $this->allBranches($account);
+        $branches = $all->whereNull('cancelled_at')->values();
 
-        foreach ($this->mirror->drift($account) as $row) {
+        foreach ($this->mirror->drift($account, $all) as $row) {
             Log::warning('Account anchor refresh: branch coverage differs from the ledger', $row + [
                 'account_id' => $account->id,
             ]);
@@ -388,9 +392,28 @@ class AccountBillingService
             return AccountStatus::Suspended;
         }
 
-        $anchor = $anchor ?? $account->current_period_end;
+        // `$anchor ?? $account->current_period_end` was wrong once an anchor could
+        // legitimately BE null: passing null meant "this account has no coverage",
+        // but the ?? read it as "argument omitted" and fell back to the stale stored
+        // date — so voiding the last order wrote `current_period_end = null` and
+        // `status = active` in the same statement. func_num_args() distinguishes the
+        // two, which is the only thing that can.
+        if (func_num_args() < 2) {
+            $anchor = $account->current_period_end;
+        }
+
         if (! $anchor) {
-            return $account->status ?? AccountStatus::Trial;
+            // NO ANCHOR means one of two very different things, and conflating them
+            // left an account with zero coverage showing a green "Active" badge
+            // (found verifying S1: void the only paid order, or cancel the only
+            // branch, and the anchor goes null):
+            //   · it never had coverage — a fresh trial. Leave it alone.
+            //   · it HAD coverage and no longer does — that is Expired. The access
+            //     gate already blocks it (Hostel::isActive() needs an end date), so
+            //     this is about the operator and the owner being told the truth.
+            return in_array($account->status, [AccountStatus::Active, AccountStatus::Grace], true)
+                ? AccountStatus::Expired
+                : ($account->status ?? AccountStatus::Trial);
         }
 
         $period = $period ?? $account->period ?? BillingPeriod::Yearly;
@@ -969,11 +992,35 @@ class AccountBillingService
     public function pendingOrdersForBranch(Hostel $branch): Collection
     {
         return SubscriptionOrder::query()
-            ->where('payment_status', PaymentStatus::Pending->value)
+            ->outstanding()
             ->whereHas('lines', fn ($q) => $q->where('branch_id', $branch->id))
-            ->get()
-            ->filter(fn (SubscriptionOrder $o) => $o->kind?->isChargeable() ?? true)
-            ->values();
+            ->get();
+    }
+
+    /**
+     * The same question for a whole page, in ONE grouped query.
+     *
+     * Account 360 asked it per branch, which cost a query each — the kind of per-row
+     * lookup NFR-4 exists to prevent.
+     *
+     * @param  iterable<Hostel>  $branches
+     * @return array<int, int>  branch id => count of outstanding orders touching it
+     */
+    public function pendingOrderCountsByBranch(iterable $branches): array
+    {
+        $ids = collect($branches)->pluck('id')->all();
+        if (! $ids) {
+            return [];
+        }
+
+        return SubscriptionOrderLine::query()
+            ->whereIn('branch_id', $ids)
+            ->whereIn('order_id', SubscriptionOrder::outstanding()->select('id'))
+            ->selectRaw('branch_id, COUNT(DISTINCT order_id) as total')
+            ->groupBy('branch_id')
+            ->pluck('total', 'branch_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
     }
 
     // -----------------------------------------------------------------

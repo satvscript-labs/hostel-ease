@@ -432,8 +432,10 @@
                                                 @endif
 
                                                 @if($order->payment_status->value !== 'voided')
+                                                    {{-- The INTEGER id: a posted DB reference, never a URL segment
+                                                         (standards §1.1 rule 3). The form action is static. --}}
                                                     <button type="button" class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm"
-                                                            @click="openVoid(@js($order->public_id), @js($order->invoiceNumber()), @js((string) $order->payment_status->value))">
+                                                            @click="openVoid({{ $order->id }}, @js($order->invoiceNumber()), @js((string) $order->payment_status->value))">
                                                         <i class="fa-solid fa-ban me-1"></i>Void
                                                     </button>
                                                 @endif
@@ -521,10 +523,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ── Void an order (S1 / D8) ──
-        voidOpen: false, voidOrderKey: null, voidOrderLabel: '', voidWasPaid: false,
-        voidUrlTemplate: @js(route('superadmin.accounts.orders.void', [$account, '__ORDER__'])),
-        openVoid(key, label, status) { this.voidOrderKey = key; this.voidOrderLabel = label; this.voidWasPaid = status === 'paid'; this.voidOpen = true; },
-        get voidAction() { return this.voidUrlTemplate.replace('__ORDER__', this.voidOrderKey || ''); },
+        // The form action is rendered server-side and the target rides as a posted
+        // integer — no URL is assembled here. See the note in routes/web.php.
+        voidOpen: false, voidOrderId: null, voidOrderLabel: '', voidWasPaid: false,
+        openVoid(id, label, status) { this.voidOrderId = id; this.voidOrderLabel = label; this.voidWasPaid = status === 'paid'; this.voidOpen = true; },
 
         // ── Branch removal (D11) ──
         // Impact is computed server-side per branch (quantity, totals, tier loss,
@@ -534,16 +536,9 @@ document.addEventListener('alpine:init', () => {
         cancelBranchId: null, cancelBranchName: '',
         declineBranchId: null, declineBranchName: '',
         removalImpact: @json($removalImpact),
-        cancelUrlTemplate: @js(route('superadmin.accounts.branches.cancel', [$account, '__BRANCH__'])),
-        declineUrlTemplate: @js(route('superadmin.accounts.branches.decline-removal', [$account, '__BRANCH__'])),
-        branchKeys: @json($branches->mapWithKeys(fn ($b) => [$b->id => $b->public_id])),
         openCancel(id, name) { this.cancelBranchId = id; this.cancelBranchName = name; this.cancelOpen = true; },
         openDecline(id, name) { this.declineBranchId = id; this.declineBranchName = name; this.declineOpen = true; },
         get cancelImpact() { return this.removalImpact[this.cancelBranchId] || null; },
-        // The route key is the branch's OPAQUE public_id (hardening U4) — building
-        // these URLs from the integer id would 404.
-        get cancelAction() { return this.cancelUrlTemplate.replace('__BRANCH__', this.branchKeys[this.cancelBranchId] || ''); },
-        get declineAction() { return this.declineUrlTemplate.replace('__BRANCH__', this.branchKeys[this.declineBranchId] || ''); },
 
         // ── Add to cycle ──
         addBranchId: null, addBranchName: '', addOverride: '',

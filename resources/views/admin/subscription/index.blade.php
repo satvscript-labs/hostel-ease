@@ -371,8 +371,9 @@
     @if($viewerOwnsAccount)
         <template x-teleport="body">
             <div class="custom-overlay-backdrop" x-show="removeOpen" x-transition.opacity @click.self="removeOpen=false" x-cloak style="display:none;">
-                <form method="POST" :action="removeAction" class="custom-overlay-modal" style="max-width:520px;" :class="{'is-open':removeOpen}">
+                <form method="POST" action="{{ route('admin.branches.request-removal') }}" class="custom-overlay-modal" style="max-width:520px;" :class="{'is-open':removeOpen}">
                     @csrf
+                    <input type="hidden" name="branch_id" :value="removeBranchId">
                     <div class="custom-overlay-header">
                         <h5 class="fw-bold mb-0">Request branch removal</h5>
                         <button type="button" class="btn-close" @click="removeOpen=false"></button>
@@ -412,13 +413,11 @@ document.addEventListener('alpine:init', () => {
         addOpen: false,
         loading: false,
         // Branch removal REQUEST (D11) — the owner asks, support confirms.
+        // The form action is rendered server-side; the branch rides as a posted
+        // integer (standards §1.1 rule 3), so no URL is built in the browser.
         removeOpen: false,
         removeBranchId: null,
         removeBranchName: '',
-        removeUrlTemplate: @js(route('admin.branches.request-removal', '__BRANCH__')),
-        branchKeys: @json($branches->mapWithKeys(fn ($b) => [$b->id => $b->public_id])),
-        // The route key is the opaque public_id (hardening U4); an integer 404s.
-        get removeAction() { return this.removeUrlTemplate.replace('__BRANCH__', this.branchKeys[this.removeBranchId] || ''); },
         period: @json($displayPeriod),
         quotes: @json($quotes),
         add: { name: '', city: '' },

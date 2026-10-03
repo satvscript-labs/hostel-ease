@@ -99,9 +99,12 @@ class CoverageMirror
      *
      * @return array<int, array{branch: string, mirror: ?string, ledger: ?string, days: int}>
      */
-    public function drift(SubscriptionAccount $account): array
+    public function drift(SubscriptionAccount $account, ?\Illuminate\Support\Collection $branches = null): array
     {
-        $branches = $this->allBranches($account);
+        // The caller may already hold the branch collection (refreshAccountAnchor
+        // does) — reuse it rather than re-querying. This runs once per account in the
+        // daily tick, so the duplicate queries added up.
+        $branches ??= $this->allBranches($account);
         $supported = $this->supportedEnds($branches->pluck('id')->all());
         $out = [];
 

@@ -120,7 +120,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         // actually cancel. Deliberately not gated by owner_self_serve — asking is
         // not a billing operation, and an owner must always be able to start the
         // conversation. Account-owner only (not co-admins), enforced in the controller.
-        Route::post('branches/{hostel}/request-removal', [\App\Http\Controllers\Admin\BranchManagerController::class, 'requestRemoval'])->name('branches.request-removal');
+        // The request is modal-driven, so its target is a posted integer (see the
+        // Super Admin block below for why). Withdraw is a per-row form, so it keeps
+        // the opaque route key.
+        Route::post('branches/request-removal', [\App\Http\Controllers\Admin\BranchManagerController::class, 'requestRemoval'])->name('branches.request-removal');
         Route::delete('branches/{hostel}/request-removal', [\App\Http\Controllers\Admin\BranchManagerController::class, 'withdrawRemoval'])->name('branches.withdraw-removal');
     });
 
@@ -152,13 +155,21 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
         // Orders: accept a pending charge, or write off a mistaken one (S1 / D8 —
         // the two capabilities inherited from the retired legacy Subscriptions page).
+        //
+        // Per-row actions keep their target in the URL (rendered server-side from the
+        // model, so it carries the opaque public_id). MODAL-driven actions take their
+        // target as a POSTED INTEGER instead — `development_standards.md` §1.1 rule 3,
+        // and the same shape accounts.add-branch already uses. The reason is concrete:
+        // a modal is shared across rows, so a URL in its form action has to be
+        // assembled in the browser, and a wrong payload there fails SILENTLY with a
+        // green test suite (rule 2). A static action cannot.
         Route::patch('accounts/{account}/orders/{order}/accept', [AccountController::class, 'acceptOrder'])->name('accounts.orders.accept');
-        Route::patch('accounts/{account}/orders/{order}/void', [AccountController::class, 'voidOrder'])->name('accounts.orders.void');
+        Route::patch('accounts/{account}/orders/void', [AccountController::class, 'voidOrder'])->name('accounts.orders.void');
 
         // Branch removal (D11): the owner asks, the operator decides.
-        Route::post('accounts/{account}/branches/{hostel}/cancel', [AccountController::class, 'cancelBranch'])->name('accounts.branches.cancel');
+        Route::post('accounts/{account}/branches/cancel', [AccountController::class, 'cancelBranch'])->name('accounts.branches.cancel');
+        Route::post('accounts/{account}/branches/decline-removal', [AccountController::class, 'declineRemoval'])->name('accounts.branches.decline-removal');
         Route::post('accounts/{account}/branches/{hostel}/restore', [AccountController::class, 'restoreBranch'])->name('accounts.branches.restore');
-        Route::post('accounts/{account}/branches/{hostel}/decline-removal', [AccountController::class, 'declineRemoval'])->name('accounts.branches.decline-removal');
 
         // Discounts management (volume tiers + manual discount overview)
         Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');

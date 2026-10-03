@@ -76,8 +76,15 @@ class SubscriptionOrder extends Model
      */
     public function scopeOutstanding(Builder $query): Builder
     {
+        $free = [OrderKind::Comp->value, OrderKind::Trial->value, OrderKind::Adjustment->value];
+
+        // The orWhereNull matters: in SQL `kind NOT IN (…)` is UNKNOWN when kind is
+        // NULL, so a bare whereNotIn would silently DROP any order whose kind was
+        // never set — money you are owed, invisible in receivables. Every order the
+        // service writes has a kind and the S1 migration back-filled the rest, so
+        // this is a belt for a row that arrives any other way.
         return $query->where('payment_status', PaymentStatus::Pending->value)
-            ->whereNotIn('kind', [OrderKind::Comp->value, OrderKind::Trial->value, OrderKind::Adjustment->value]);
+            ->where(fn (Builder $q) => $q->whereNotIn('kind', $free)->orWhereNull('kind'));
     }
 
     /**

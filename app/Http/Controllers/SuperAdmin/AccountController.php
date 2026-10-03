@@ -145,17 +145,29 @@ class AccountController extends Controller
 
         // What removing each live branch would do to the bill — the tier-loss warning
         // in particular (D11 case 11), shown before the operator confirms.
+        // Removing ANY live branch has the same effect on the bill — quantity drops by
+        // one, and the tier maths follows from that — so the impact is computed ONCE
+        // and shared, rather than per branch. It used to run per branch (plus a
+        // pending-orders query each), which cost ~6 queries per branch: 96 on a
+        // 10-branch customer's Account 360 (NFR-4).
+        $sharedImpact = $billable->isNotEmpty()
+            ? $this->billing->removalImpact($account, $billable->first())
+            : null;
+
+        // D11 case 19: an unpaid charge against a branch being removed is a decision
+        // the operator has to make, not something to discover later. One grouped
+        // query for the whole page.
+        $pendingByBranch = $this->billing->pendingOrderCountsByBranch($branches);
+
         $removalImpact = [];
         foreach ($branches as $b) {
-            if ($b->isCancelled()) {
+            if ($b->isCancelled() || ! $sharedImpact) {
                 continue;
             }
 
-            $removalImpact[$b->id] = $this->billing->removalImpact($account, $b) + [
+            $removalImpact[$b->id] = $sharedImpact + [
                 'covered_to' => $b->subscription_end?->format('d M Y') ?? 'no coverage',
-                // D11 case 19: an unpaid charge against a branch being removed is a
-                // decision the operator has to make, not something to discover later.
-                'pending' => $this->billing->pendingOrdersForBranch($b)->count(),
+                'pending' => $pendingByBranch[$b->id] ?? 0,
             ];
         }
         $accountClosing = $billable->isEmpty() && $branches->isNotEmpty();
@@ -504,11 +516,16 @@ class AccountController extends Controller
      * which is what an auditor expects. Voiding a PAID order withdraws the coverage
      * it granted, so the reason is mandatory.
      */
-    public function voidOrder(Request $request, SubscriptionAccount $account, SubscriptionOrder $order): RedirectResponse
+    public function voidOrder(Request $request, SubscriptionAccount $account): RedirectResponse
     {
-        abort_unless($order->account_id === $account->id, 404);
+        $data = $request->validate([
+            // A posted DB reference, so an integer (standards §1.1 rule 3). Scoped to
+            // this account by the query, not by trusting the id.
+            'order_id' => ['required', 'integer'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
 
-        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+        $order = $account->orders()->whereKey($data['order_id'])->firstOr(fn () => abort(404));
 
         $wasPaid = $order->payment_status->value === 'paid';
         $this->billing->voidOrder($order, $data['reason']);
@@ -528,11 +545,14 @@ class AccountController extends Controller
      * Confirm removal of a branch (BR-12). It keeps the coverage it paid for and
      * stops being billed from the next cycle. No refund, no credit (BRD D6).
      */
-    public function cancelBranch(Request $request, SubscriptionAccount $account, Hostel $hostel): RedirectResponse
+    public function cancelBranch(Request $request, SubscriptionAccount $account): RedirectResponse
     {
-        abort_unless(in_array($hostel->id, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
 
-        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+        $hostel = $this->branchOnAccount($account, (int) $data['branch_id']);
 
         $impact = $this->billing->removalImpact($account, $hostel);
 
@@ -575,6 +595,20 @@ class AccountController extends Controller
             .' and is excluded from the next renewal.'.$closes);
     }
 
+    /**
+     * A branch that genuinely belongs to this account, or a 404.
+     *
+     * Never trusts the posted id: it is matched against the branches the account's
+     * owner actually holds, so a crafted id reaches nothing. A 404 rather than a 403
+     * so the existence of another customer's branch is never confirmed.
+     */
+    private function branchOnAccount(SubscriptionAccount $account, int $branchId): Hostel
+    {
+        abort_unless(in_array($branchId, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+
+        return Hostel::findOr($branchId, fn () => abort(404));
+    }
+
     /** Put a cancelled branch back into the billable set. */
     public function restoreBranch(SubscriptionAccount $account, Hostel $hostel): RedirectResponse
     {
@@ -599,11 +633,14 @@ class AccountController extends Controller
     }
 
     /** Decline an owner's removal request — and tell them, so the ask doesn't just vanish. */
-    public function declineRemoval(Request $request, SubscriptionAccount $account, Hostel $hostel): RedirectResponse
+    public function declineRemoval(Request $request, SubscriptionAccount $account): RedirectResponse
     {
-        abort_unless(in_array($hostel->id, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
 
-        $data = $request->validate(['note' => ['nullable', 'string', 'max:255']]);
+        $hostel = $this->branchOnAccount($account, (int) $data['branch_id']);
 
         if (! $this->billing->clearRemovalRequest($hostel)) {
             return back()->with('info', 'There is no open removal request for that branch.');

@@ -104,7 +104,13 @@ return new class extends Migration
                 ->whereNull('subscription_orders.deleted_at')
                 ->max('subscription_order_lines.end_date');
 
-            if ($supported !== null && $supported >= $hostel->subscription_end) {
+            // Compare as DATES, not as raw strings. On MySQL both columns are DATE so
+            // both come back 'YYYY-MM-DD' and a string compare would work; SQLite can
+            // hand back 'YYYY-MM-DD 00:00:00' for one and not the other, and
+            // '2027-10-02' >= '2027-10-02 00:00:00' is false lexicographically — which
+            // would mint a pointless back-fill order for a branch that is already
+            // fully backed.
+            if ($supported !== null && ! $this->isBefore($supported, $hostel->subscription_end)) {
                 continue;   // already fully backed by the ledger
             }
 
@@ -154,6 +160,13 @@ return new class extends Migration
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    /** Is $a strictly before $b, comparing calendar days across either driver's formatting? */
+    private function isBefore(string $a, string $b): bool
+    {
+        return \Illuminate\Support\Carbon::parse($a)->startOfDay()
+            ->lessThan(\Illuminate\Support\Carbon::parse($b)->startOfDay());
     }
 
     /** The subscription account a branch belongs to, by the explicit owner FK then the pivot. */

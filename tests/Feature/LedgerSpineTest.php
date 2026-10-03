@@ -198,6 +198,90 @@ class LedgerSpineTest extends TestCase
         $this->assertSame(1, SubscriptionOrder::outstanding()->count());
     }
 
+    public function test_receivables_do_not_hide_an_order_whose_kind_was_never_set(): void
+    {
+        // `kind NOT IN (…)` is UNKNOWN when kind is NULL, so a bare whereNotIn DROPS
+        // such a row — money owed, invisible in the worklist. Found verifying S1.
+        [, $branches, ] = $this->account(1);
+        $order = $this->billing()->recordBranchRenewal($branches->first(), 'yearly', [
+            'amount' => 7777, 'payment_status' => 'pending',
+        ]);
+        \Illuminate\Support\Facades\DB::table('subscription_orders')->where('id', $order->id)->update(['kind' => null]);
+
+        $this->assertSame(1, SubscriptionOrder::outstanding()->count(), 'A pending order with no kind vanished from receivables.');
+        $this->assertSame(7777.0, (float) SubscriptionOrder::outstanding()->sum('amount'));
+    }
+
+    public function test_an_account_left_with_no_coverage_does_not_still_report_active(): void
+    {
+        // Void the only paid order (or cancel the only branch) and the anchor goes
+        // null. computeStatus() used to return "whatever it already was", so the
+        // Customers list showed a green Active badge for a customer with no coverage
+        // at all. The gate was right; the display was lying.
+        [, $branches, $account] = $this->account(1);
+        $this->assertSame('active', $account->status->value);
+
+        $this->billing()->voidOrder(SubscriptionOrder::paid()->firstOrFail(), 'recorded in error');
+
+        $account = $account->fresh();
+        $this->assertNull($account->current_period_end);
+        $this->assertSame('expired', $account->status->value, 'An account with no coverage still reports Active.');
+        $this->assertFalse($branches->first()->fresh()->isActive());
+    }
+
+    public function test_a_fresh_trial_with_no_anchor_is_still_a_trial(): void
+    {
+        // The other half of that fix: "no anchor" must keep meaning Trial for an
+        // account that never had coverage, or signup would read Expired.
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '+919990000099']);
+        $account = $this->billing()->accountFor($owner);
+
+        $this->billing()->refreshAccountAnchor($account);
+
+        $this->assertNull($account->fresh()->current_period_end);
+        $this->assertSame('trial', $account->fresh()->status->value);
+    }
+
+    public function test_account_360_query_count_does_not_grow_with_branch_count(): void
+    {
+        // NFR-4. The removal impact was computed per branch (plus a pending-orders
+        // query each), which cost ~6 queries per branch: 40 at two branches, 96 at
+        // ten. Removing ANY live branch has the same effect on the bill, so it is
+        // computed once and the pending counts come from one grouped query.
+        $counts = [];
+
+        foreach ([2, 10] as $n) {
+            [, , $account] = $this->account($n, '+9199900001'.$n);
+            $super = User::factory()->superAdmin()->create();
+
+            \Illuminate\Support\Facades\DB::flushQueryLog();
+            \Illuminate\Support\Facades\DB::enableQueryLog();
+            $this->actingAs($super)->get(route('superadmin.accounts.show', $account->fresh()))->assertOk();
+            $counts[$n] = count(\Illuminate\Support\Facades\DB::getQueryLog());
+            \Illuminate\Support\Facades\DB::disableQueryLog();
+        }
+
+        $this->assertLessThanOrEqual(
+            $counts[2] + 2,
+            $counts[10],
+            "Account 360 ran {$counts[2]} queries for 2 branches and {$counts[10]} for 10 — something is per-branch again.",
+        );
+    }
+
+    public function test_refreshing_an_anchor_does_not_re_query_the_estate_three_times(): void
+    {
+        // It did: allBranches() ran three times (here and twice inside drift) plus
+        // supportedEnds() twice, for every account on every daily tick.
+        [, , $account] = $this->account(3);
+
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        $this->billing()->refreshAccountAnchor($account->fresh());
+        $count = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        \Illuminate\Support\Facades\DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(6, $count, "refreshAccountAnchor ran {$count} queries for one account — the estate is being re-fetched.");
+    }
+
     public function test_a_branch_renewed_through_the_account_appears_in_its_own_history(): void
     {
         // F4: the hostel profile read the legacy table, which consolidated renewals

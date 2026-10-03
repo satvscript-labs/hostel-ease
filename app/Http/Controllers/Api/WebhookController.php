@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
-use App\Models\Subscription;
 use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;

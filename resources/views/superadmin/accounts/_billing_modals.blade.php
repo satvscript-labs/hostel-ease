@@ -315,8 +315,12 @@
      people are (a) the branch keeps working — this is not a shut-off — and (b) a
      lost volume tier can make the REMAINING branches dearer.
    ══════════════════════════════════════════════════════════════════════════ --}}
+{{-- STATIC action + a posted integer branch_id. `::action="..."` would NOT fill the
+     component's $action prop — it lands in $attributes, the component falls back to
+     rendering a <div> instead of a <form>, and the button silently does nothing. --}}
 <x-he-modal open="cancelOpen" title="Remove a branch from billing" icon="circle-minus" :size="620"
-    ::action="cancelAction" method="POST">
+    :action="route('superadmin.accounts.branches.cancel', $account)" method="POST">
+    <input type="hidden" name="branch_id" :value="cancelBranchId">
     <div class="od-label mb-2">Branch</div>
     <div class="he-summary shadow-sm mb-3">
         <div class="he-summary-row he-summary-row--line">
@@ -387,7 +391,8 @@
 </x-he-modal>
 
 <x-he-modal open="declineOpen" title="Close the removal request" icon="hand" :size="560"
-    ::action="declineAction" method="POST">
+    :action="route('superadmin.accounts.branches.decline-removal', $account)" method="POST">
+    <input type="hidden" name="branch_id" :value="declineBranchId">
     <p class="small text-muted mb-3">
         <span class="fw-bold text-dark" x-text="declineBranchName"></span> stays on the plan and keeps being billed.
         The owner is notified that the request was closed, so the ask does not just disappear on them.
@@ -406,8 +411,10 @@
      number survive. Voiding a PAID order WITHDRAWS the coverage it granted, which
      is the one routine path allowed to shorten a branch's coverage, so the warning
      is explicit and the reason mandatory. --}}
-<x-he-modal open="voidOpen" title="Void this order" icon="ban" :size="560" ::action="voidAction" method="POST">
-    @method('PATCH')
+{{-- method="PATCH" is a PROP: the component emits the @method spoof itself. --}}
+<x-he-modal open="voidOpen" title="Void this order" icon="ban" :size="560"
+    :action="route('superadmin.accounts.orders.void', $account)" method="PATCH">
+    <input type="hidden" name="order_id" :value="voidOrderId">
     <div class="he-summary shadow-sm mb-3">
         <div class="he-summary-row he-summary-row--line">
             <span>Order</span>
