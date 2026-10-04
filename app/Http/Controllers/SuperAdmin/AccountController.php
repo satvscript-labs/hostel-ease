@@ -349,7 +349,11 @@ class AccountController extends Controller
             'company' => config('hostelease.company.name', 'HostelEase'),
         ];
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo'));
+        // The account's one free trial (owner decision, 2026-10-04): only offered on
+        // Add hostel while it is still unused. The server refuses it regardless.
+        $trialAvailable = $this->billing->trialAvailable($account);
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -453,11 +457,17 @@ class AccountController extends Controller
         $owner = $account->owner;
         abort_unless($owner, 404);
 
-        $hostel = DB::transaction(function () use ($account, $owner, $data) {
+        // Both billing calls below can REFUSE — a second trial for an account that
+        // has had its one (owner decision, 2026-10-04), or an amount override above
+        // the quote (S2 audit) — and there was no catch here, so either was a 500.
+        // The transaction rolls the new branch back with the refusal.
+        try {
+            $hostel = DB::transaction(function () use ($account, $owner, $data) {
             $hostel = $this->hostels->createBranchForOwner($owner, $data);
 
             if ($data['plan'] === 'trial') {
-                // 14-day free trial — its own clock, no co-termination, no charge.
+                // The account's one free trial — only possible for an owner with no
+                // branch yet; recordBranchRenewal() refuses it otherwise.
                 $this->billing->recordBranchRenewal($hostel, 'trial', [
                     'payment_status' => 'paid', 'payment_method' => null, 'remarks' => 'Added branch (trial)',
                 ]);
@@ -473,7 +483,10 @@ class AccountController extends Controller
             }
 
             return $hostel;
-        });
+            });
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->with('error', Refusal::message($e));
+        }
 
         $this->logger->log('hostel.provision', "Added branch {$hostel->name} to {$owner->name}", $hostel);
 

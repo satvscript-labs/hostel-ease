@@ -403,8 +403,9 @@
         </div>
     </template>
 
-    {{-- ══ Add a branch ══ It always starts on a free trial, so an abandoned payment
-         still leaves a working branch. "Add & pay" then brings it onto the plan. --}}
+    {{-- ══ Add a branch ══ No trial — the account's one free trial went to its first
+         branch. The branch is created either way; it becomes active once paid for, so
+         an abandoned payment leaves it waiting with an "Add to plan" button, not lost. --}}
     <template x-teleport="body">
         <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen = false" x-cloak style="display:none;">
             <div class="custom-overlay-modal" style="max-width:500px;" :class="{ 'is-open': addOpen }">
@@ -417,17 +418,23 @@
 
                     <div class="alert bg-info-subtle text-info border-0 rounded-3 small mb-0">
                         <i class="fa-solid fa-circle-info me-1"></i>
-                        {{ __('The new branch starts on a 14-day free trial straight away.') }}
+                        {{-- The free trial belongs to the ACCOUNT, once (owner decision,
+                             2026-10-04) — a branch added later is never a trial branch. --}}
                         @if($canAddPaid)
-                            {{ __('Choose "Add & pay" to bring it onto your plan now, prorated to') }} {{ $anchorFmt }} — {{ __('so everything renews together. You will see the exact amount before you pay.') }}
+                            {{ __('A new branch becomes active once it is paid for — prorated to') }} {{ $anchorFmt }} {{ __('so everything renews together. You will see the exact amount before you pay.') }}
                         @else
-                            {{ __('It will join your plan at your next renewal.') }}
+                            {{ __('A new branch becomes active when you subscribe — it is included in your plan from your first payment.') }}
                         @endif
                     </div>
                 </div>
                 <div class="custom-overlay-footer d-flex flex-column flex-sm-row gap-2">
-                    <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none px-0 order-2 order-sm-1 me-sm-auto"
-                            @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Start the free trial only') }}</button>
+                    @if($canAddPaid)
+                        <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none px-0 order-2 order-sm-1 me-sm-auto"
+                                @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Add now, pay later') }}</button>
+                    @else
+                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm"
+                                @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Add branch') }}</button>
+                    @endif
                     @if($canAddPaid)
                         <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm order-1 order-sm-2 d-flex align-items-center justify-content-center gap-2"
                                 @click="addBranch(true)" :disabled="!add.name || loading">

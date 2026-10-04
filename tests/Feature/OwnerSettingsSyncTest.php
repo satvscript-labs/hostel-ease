@@ -111,7 +111,10 @@ class OwnerSettingsSyncTest extends TestCase
         $branch = Hostel::where('name', 'Legit Wing')->firstOrFail();
         $this->assertSame($owner->id, $branch->owner_id);                                   // explicit owner
         $this->assertTrue($owner->hostels()->where('hostels.id', $branch->id)->exists());   // pivot access
-        $this->assertNotNull($branch->subscription_end);                                    // trial clock started
+        // No trial: the account's one free trial went to its first branch. The new
+        // branch is inactive until it is paid for (owner decision, 2026-10-04).
+        $this->assertNull($branch->subscription_end);
+        $this->assertFalse($branch->isActive());
     }
 
     public function test_staff_created_on_another_branch_is_still_manageable(): void

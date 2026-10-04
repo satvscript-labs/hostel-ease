@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\BillingPeriod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
@@ -175,33 +174,32 @@ class SubscriptionController extends Controller
         // co-admin, which then minted a phantom account for them (design §1 P4).
         // managedAccount() already restricts this to the owner — this makes the
         // ownership correct even if that gate ever loosens.
-        $branch = DB::transaction(function () use ($account, $data, $hostels) {
-            $branch = $hostels->createBranchForOwner($account->owner, [
-                'name' => $data['name'],
-                'city' => $data['city'] ?? null,
-                'plan' => 'trial',
-            ]);
+        //
+        // NO TRIAL (owner decision, 2026-10-04): the free trial belongs to the
+        // ACCOUNT, once — to its first branch. A branch added later starts with no
+        // coverage and is activated by paying for it: prorated onto the renewal date
+        // on a live paid plan, or as part of the plan when the owner subscribes or
+        // renews. recordBranchRenewal() refuses a second trial anyway; this path
+        // simply never asks for one.
+        $branch = DB::transaction(fn () => $hostels->createBranchForOwner($account->owner, [
+            'name' => $data['name'],
+            'city' => $data['city'] ?? null,
+        ]));
 
-            // The trial clock is started by the BILLER (S0 · F1). It no longer
-            // relabels a paying account as a trial (design §1 P1).
-            $this->billing->recordBranchRenewal($branch, BillingPeriod::Trial->value, [
-                'payment_status' => PaymentStatus::Paid->value,
-                'payment_method' => null,
-                'remarks' => 'Branch added by the owner — free trial',
-            ]);
+        $this->logger->log('branch.created', "Owner added branch {$branch->name} (inactive until paid)", $branch);
 
-            return $branch;
-        });
+        $onPaidPlan = $account->period?->isPaid() && $account->current_period_end?->isFuture();
 
-        $this->logger->log('branch.created', "Owner added branch {$branch->name} (free trial)", $branch);
+        $created = $onPaidPlan
+            ? "{$branch->name} has been added. It becomes active as soon as it is paid for."
+            : "{$branch->name} has been added. It becomes active when you subscribe — it is included in your plan from your first payment.";
 
-        $created = "{$branch->name} is ready, on a 14-day free trial.";
-
-        if (! ($data['pay_now'] ?? false)) {
+        if (! ($data['pay_now'] ?? false) || ! $onPaidPlan) {
             return response()->json(['mode' => 'created', 'message' => $created, 'redirect' => route('admin.subscription.index')]);
         }
 
-        // Committed above, so whatever happens here the branch survives.
+        // Committed above, so whatever happens here the branch survives — and can be
+        // paid for later from its "Add to plan" button.
         try {
             $result = $this->checkout->startAddBranch($account->fresh(), $branch->fresh());
         } catch (RuntimeException $e) {

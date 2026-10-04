@@ -158,7 +158,11 @@
         <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='paid'?'btn-primary':'btn-light border'" @click="ahPlan='paid'">
             Paid · co-terminate <span class="text-capitalize" x-text="'(' + ahPaidPeriod + ')'"></span>
         </button>
+        {{-- One free trial per ACCOUNT, not per branch (owner decision, 2026-10-04):
+             only offered while this account's trial is still unused. --}}
+        @if($trialAvailable)
         <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='trial'?'btn-primary':'btn-light border'" @click="ahPlan='trial'">Trial (14 days)</button>
+        @endif
     </div>
 
     <x-he-billing-summary data="addHostelSummary" />

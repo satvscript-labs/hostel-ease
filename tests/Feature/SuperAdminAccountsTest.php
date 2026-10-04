@@ -186,18 +186,24 @@ class SuperAdminAccountsTest extends TestCase
         $this->assertDatabaseHas('subscription_order_lines', ['branch_id' => $hostel->id]);
     }
 
-    public function test_add_hostel_on_trial_starts_a_free_14_day_clock(): void
+    /**
+     * One free trial per ACCOUNT, not per branch (owner decision, 2026-10-04). This
+     * account already has branches, so a "trial" Add hostel is refused — with a
+     * message, not a 500 — and the new branch is rolled back with it.
+     */
+    public function test_add_hostel_on_trial_is_refused_for_an_account_that_already_has_branches(): void
     {
-        [$owner, $account] = $this->seedAccount();
+        [, $account] = $this->seedAccount();
         $super = User::factory()->superAdmin()->create();
 
         $this->actingAs($super)->post(route('superadmin.accounts.add-hostel', $account), [
             'name' => 'Trial Wing', 'plan' => 'trial',
-        ])->assertRedirect();
+        ])->assertRedirect()->assertSessionHas('error');
 
-        $hostel = Hostel::where('name', 'Trial Wing')->firstOrFail();
-        $this->assertTrue($owner->fresh()->hostels->contains($hostel->id));
-        // Its own ~14-day window, not co-terminated onto the 3-month anchor.
-        $this->assertTrue($hostel->subscription_end->lessThan($account->current_period_end));
+        $this->assertNull(Hostel::where('name', 'Trial Wing')->first());
+
+        // And the option is not even offered.
+        $this->actingAs($super)->get(route('superadmin.accounts.show', $account))
+            ->assertOk()->assertDontSee('Trial (14 days)');
     }
 }

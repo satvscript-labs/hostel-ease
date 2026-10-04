@@ -218,6 +218,15 @@ class AccountBillingService
 
         return DB::transaction(function () use ($account, $branch, $period, $payment) {
             $bp = BillingPeriod::tryFrom($period) ?? BillingPeriod::Yearly;
+
+            // ONE FREE TRIAL PER ACCOUNT (owner decision, 2026-10-04). Every trial in
+            // the product is granted through this method, so the rule lives here and
+            // nowhere else: self-signup, the owner's Add branch, and the operator's
+            // Add hostel / provisioning all meet it.
+            if ($bp === BillingPeriod::Trial && ! $this->trialAvailable($account, $branch)) {
+                throw new RuntimeException('This customer has already had their free trial — the trial belongs to the account, once, not to each branch. Choose a paid plan for this branch.');
+            }
+
             $quote = $this->branchBilling->quote($branch, $bp->value);
             $amount = $payment['amount'] ?? $quote['amount'];
 
@@ -261,6 +270,39 @@ class AccountBillingService
 
             return $order;
         });
+    }
+
+    /**
+     * Can this account still have its free trial?
+     *
+     * The trial belongs to the ACCOUNT and is granted once — to its first branch,
+     * when the customer first joins (owner decision, 2026-10-04). It is gone if:
+     *
+     *  · the account has ever had a trial — a trial order that was not voided (a
+     *    voided one was a mistake, so it does not count as used); or
+     *  · the account already holds any branch other than the one being set up — a
+     *    second branch is never a trial branch, whatever the account's state.
+     *
+     * The second rule also catches accounts whose trial predates the ledger (S1
+     * back-filled those as adjustments, not trials): they already have a branch.
+     *
+     * This also retires the trial-vs-renewal-date problem (16_S3_AUDIT.md §4): a
+     * trial can no longer be added to an account that has a renewal date of its own.
+     */
+    public function trialAvailable(SubscriptionAccount $account, ?Hostel $forBranch = null): bool
+    {
+        $hadTrial = $account->orders()
+            ->where('kind', OrderKind::Trial->value)
+            ->where('payment_status', '!=', PaymentStatus::Voided->value)
+            ->exists();
+
+        if ($hadTrial) {
+            return false;
+        }
+
+        return $this->allBranches($account)
+            ->reject(fn (Hostel $b) => $forBranch && $b->id === $forBranch->id)
+            ->isEmpty();
     }
 
     /**

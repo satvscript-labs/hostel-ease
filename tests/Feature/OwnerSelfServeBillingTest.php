@@ -545,33 +545,105 @@ class OwnerSelfServeBillingTest extends TestCase
     // =================================================================
 
     /**
-     * 🔴 P1 — live in production before S3. Adding a trial branch to a PAYING account
-     * relabelled the whole account as a trial.
+     * One free trial per ACCOUNT (owner decision, 2026-10-04). A branch the owner
+     * adds later gets no trial — it is inactive until paid for — and the account is
+     * left exactly as it was (P1: it used to be relabelled a trial).
      */
-    public function test_adding_a_trial_branch_never_demotes_a_paying_account(): void
+    public function test_a_branch_added_later_gets_no_trial_and_leaves_the_account_alone(): void
     {
         [$owner, $account] = $this->owner(2);
 
         $this->actingAs($owner)->postJson(route('admin.subscription.add-branch'), ['name' => 'New Wing'])
             ->assertOk()->assertJsonPath('mode', 'created');
 
+        $branch = Hostel::where('name', 'New Wing')->sole();
+        $this->assertNull($branch->subscription_end, 'No trial coverage for a later branch.');
+        $this->assertFalse($branch->isActive());
+        $this->assertSame(0, SubscriptionOrder::where('kind', 'trial')->count());
+
         $account->refresh();
         $this->assertSame('yearly', $account->period->value);
         $this->assertSame('active', $account->status->value);
+
+        // It is offered to be paid for, from the same quote the operator sees.
+        $this->assertArrayHasKey($branch->id, $this->actingAs($owner)->get(route('admin.subscription.index'))->viewData('addable'));
     }
 
-    /** Same path from the operator side — Account 360's "Add hostel → trial". */
-    public function test_the_operators_add_hostel_on_trial_never_demotes_a_paying_account(): void
+    /** The operator cannot hand an existing account a second trial either. */
+    public function test_the_operator_cannot_give_an_existing_account_a_trial_branch(): void
     {
         [, $account] = $this->owner(2);
 
         $this->actingAs(User::factory()->superAdmin()->create())
             ->post(route('superadmin.accounts.add-hostel', $account), ['name' => 'Ops Wing', 'plan' => 'trial'])
-            ->assertSessionHas('success');
+            ->assertSessionHas('error');
 
+        $this->assertNull(Hostel::where('name', 'Ops Wing')->first());
         $account->refresh();
         $this->assertSame('yearly', $account->period->value);
         $this->assertSame('active', $account->status->value);
+    }
+
+    /** Provisioning onto an EXISTING owner (same mobile) cannot carry a trial. */
+    public function test_provisioning_a_trial_hostel_for_an_existing_owner_is_refused(): void
+    {
+        [$owner] = $this->owner(1, [], '9700000041');
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->post(route('superadmin.hostels.store'), [
+                'name' => 'Second Site', 'owner_name' => $owner->name, 'mobile' => '+919700000041',
+                'status' => 'active', 'plan' => 'trial', 'payment_status' => 'paid',
+            ])
+            ->assertSessionHasErrors('plan');
+
+        $this->assertNull(Hostel::where('name', 'Second Site')->first());
+    }
+
+    /** The rule itself, at the one place every trial is granted. */
+    public function test_the_trial_is_granted_once_per_account_and_never_to_a_second_branch(): void
+    {
+        $billing = app(AccountBillingService::class);
+
+        // A brand-new owner's first branch: the trial is available, and granted.
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9700000051']);
+        $first = Hostel::factory()->create(['mobile' => '9700000051', 'owner_id' => $owner->id]);
+        $owner->hostels()->sync([$first->id]);
+        $account = $billing->accountFor($owner);
+
+        $this->assertTrue($billing->trialAvailable($account, $first));
+        $trial = $billing->recordBranchRenewal($first, 'trial', ['payment_status' => 'paid']);
+
+        // Used. A second branch — or the first again — cannot have one.
+        $second = Hostel::factory()->create(['mobile' => '9700000051', 'owner_id' => $owner->id]);
+        $owner->hostels()->syncWithoutDetaching([$second->id]);
+        $this->assertFalse($billing->trialAvailable($account->fresh(), $second));
+
+        try {
+            $billing->recordBranchRenewal($second, 'trial', ['payment_status' => 'paid']);
+            $this->fail('A second trial must be refused.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('already had their free trial', $e->getMessage());
+        }
+        $this->assertSame(1, SubscriptionOrder::where('kind', 'trial')->count());
+
+        // A trial voided as a MISTAKE does not count as used — but the account still
+        // has another branch, so it stays unavailable.
+        $billing->voidOrder($trial, 'recorded in error');
+        $this->assertFalse($billing->trialAvailable($account->fresh(), $second));
+    }
+
+    /** A voided trial on a single-branch account can be granted again. */
+    public function test_a_trial_voided_as_a_mistake_can_be_granted_again(): void
+    {
+        $billing = app(AccountBillingService::class);
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9700000052']);
+        $only = Hostel::factory()->create(['mobile' => '9700000052', 'owner_id' => $owner->id]);
+        $owner->hostels()->sync([$only->id]);
+
+        $trial = $billing->recordBranchRenewal($only, 'trial', ['payment_status' => 'paid']);
+        $billing->voidOrder($trial, 'recorded in error');
+
+        $this->assertTrue($billing->trialAvailable($billing->accountFor($owner), $only));
     }
 
     /** A brand-new account still takes its trial cadence from its first branch. */
@@ -588,7 +660,7 @@ class OwnerSelfServeBillingTest extends TestCase
         $this->assertSame('trial', $account->status->value);
     }
 
-    public function test_add_and_pay_charges_the_operators_prorated_quote_and_an_abandoned_payment_keeps_the_trial(): void
+    public function test_add_and_pay_charges_the_operators_prorated_quote_and_an_abandoned_payment_keeps_the_branch(): void
     {
         [$owner, $account] = $this->owner(1, ['current_period_end' => now()->addMonths(6)]);
         Hostel::where('owner_id', $owner->id)->update(['subscription_end' => now()->addMonths(6)]);
@@ -601,8 +673,10 @@ class OwnerSelfServeBillingTest extends TestCase
         $expected = (int) round(app(AccountBillingService::class)->quoteAddBranch($account->fresh(), $branch)['breakdown']['final'] * 100);
         $this->assertSame($expected, $res->json('razorpay.amount'));
 
-        // The owner closes the checkout without paying: the branch still works, on trial.
-        $this->assertTrue($branch->fresh()->isActive());
+        // The owner closes the checkout without paying: the branch is kept — owned by
+        // the owner, inactive (no trial for a later branch), and payable from its
+        // "Add to plan" button.
+        $this->assertFalse($branch->fresh()->isActive());
         $this->assertSame($owner->id, $branch->owner_id);
         $this->assertSame('pending', SubscriptionOrder::where('kind', 'add_branch')->sole()->payment_status->value);
     }

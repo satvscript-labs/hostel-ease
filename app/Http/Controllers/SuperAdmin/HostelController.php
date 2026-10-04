@@ -104,7 +104,16 @@ class HostelController extends Controller
 
     public function store(StoreHostelRequest $request): RedirectResponse
     {
-        $result = $this->hostels->provision($request->validated());
+        // provision() links the hostel to an EXISTING owner when the mobile matches —
+        // and that owner has had their account's one free trial (owner decision,
+        // 2026-10-04), so a "trial" plan is refused by the biller. provision() is one
+        // transaction, so the refusal rolls the new hostel back; answer it as a form
+        // error, never a 500.
+        try {
+            $result = $this->hostels->provision($request->validated());
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->withErrors(['plan' => \App\Support\Refusal::message($e)]);
+        }
 
         $this->logger->log('hostel.provision', "Provisioned hostel {$result['hostel']->name}", $result['hostel']);
 

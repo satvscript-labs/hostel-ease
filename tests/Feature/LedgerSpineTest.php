@@ -122,7 +122,12 @@ class LedgerSpineTest extends TestCase
         $this->billing()->renewAccount($account->fresh(), 'monthly', ['payment_status' => 'paid', 'payment_method' => 'upi']);
         $this->billing()->comp($account->fresh(), 'yearly', 1, [$branches->first()->id], 'gift');
         $this->billing()->align($account->fresh(), ['payment_status' => 'paid']);
-        $this->billing()->recordBranchRenewal($branches->last(), 'trial', ['payment_status' => 'paid']);
+        // A trial, through the only path one can now take: a brand-new account's
+        // first branch (one free trial per account — owner decision, 2026-10-04).
+        $newOwner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9990000777']);
+        $firstBranch = Hostel::factory()->create(['mobile' => '9990000777', 'owner_id' => $newOwner->id]);
+        $newOwner->hostels()->sync([$firstBranch->id]);
+        $this->billing()->recordBranchRenewal($firstBranch, 'trial', ['payment_status' => 'paid']);
 
         $this->assertSame(0, Subscription::count(), 'Something still writes the retired legacy ledger (D8).');
     }
