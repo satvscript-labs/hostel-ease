@@ -172,9 +172,6 @@
     .branch-tile.is-selected .branch-tile-check i { opacity:1; }
 
     /* Plan cards (renew modal) */
-    .plan-card { border:1.5px solid rgba(15,23,42,.08); border-radius:var(--he-radius-lg,16px); padding:1.25rem; cursor:pointer; transition:all .25s ease; height:100%; background:#fff; }
-    .plan-card:hover { border-color:rgba(79,70,229,.3); }
-    .plan-card.selected { border-color:var(--he-primary,#4f46e5); background:var(--he-primary-soft, rgba(79,70,229,.04)); box-shadow:0 8px 24px rgba(79,70,229,.08); }
 </style>
 @endpush
 
@@ -424,17 +421,12 @@
     {{-- ══ TAB: MY BRANCHES ══ --}}
     <div x-show="activeTab === 'branches'" x-transition:enter="st-panel-enter" x-transition:enter-start="st-panel-from" x-transition:enter-end="st-panel-to" x-cloak style="display:none;">
 
-        @unless($selfServe)
-            {{-- Production lock (P4 item 15): visible plans, supervised operations. --}}
-            <div class="st-lock mb-4">
-                <i class="fa-solid fa-shield-halved fs-5"></i>
-                <div>
-                    <div class="fw-bold text-dark" style="font-size:.9rem;">{{ __('Billing is managed by HostelEase support') }}</div>
-                    <div class="small text-muted">{{ __('Renewals and new branches are set up for you by our team — contact support and we\'ll handle it. Your coverage below is always up to date.') }}</div>
-                </div>
-            </div>
-        @endunless
-
+        {{-- S3: billing lives on ONE page. This tab used to carry a second, older
+             billing surface — a per-branch Renew that renewed one branch from its own
+             end at LIST price (ignoring the account's negotiated price, discounts and
+             co-termination, right under "All branches renew together"), and an Add
+             branch form that differed from the Subscription page's. Both are gone;
+             this tab is the portfolio view, and billing is one click away. --}}
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div class="d-flex align-items-center gap-2 text-muted small">
                 <i class="fa-solid fa-calendar-check text-primary"></i>
@@ -443,15 +435,9 @@
                     — <span class="fw-bold text-dark">{{ $account->current_period_end->format('d M Y') }}</span>
                 @endif
             </div>
-            @if($selfServe)
-                <button type="button" @click="modals.branch.open = true" class="btn btn-primary rounded-pill shadow-sm px-4 fw-semibold tactile-btn d-none d-md-inline-flex align-items-center">
-                    <i class="fa-solid fa-plus me-1"></i> {{ __('Add New Branch') }}
-                </button>
-            @else
-                <button type="button" class="btn btn-light border rounded-pill shadow-sm px-4 fw-semibold d-none d-md-inline-flex align-items-center" disabled title="{{ __('Contact HostelEase support to add a branch') }}">
-                    <i class="fa-solid fa-lock me-1 text-muted"></i> {{ __('Add New Branch') }}
-                </button>
-            @endif
+            <a href="{{ route('admin.subscription.index') }}" class="btn btn-light border rounded-pill shadow-sm px-4 fw-semibold tactile-btn d-inline-flex align-items-center">
+                <i class="fa-solid fa-credit-card me-2 text-primary"></i> {{ __('Billing & branches') }}
+            </a>
         </div>
 
         <div class="row g-4 stagger">
@@ -513,17 +499,6 @@
                                 <i class="fa-solid fa-right-left me-1"></i> {{ __('Switch') }}
                             </a>
                         @endif
-                        @if($selfServe && $razorpayEnabled)
-                            <button type="button" @click="openRenewModal({{ $branch->id }}, @js($branch->name))"
-                                class="btn {{ $isCurrent ? 'btn-light text-dark' : 'btn-outline-primary' }} rounded-circle d-flex align-items-center justify-content-center tactile-btn"
-                                style="width:42px; height:42px;" title="{{ __('Renew subscription') }}">
-                                <i class="fa-solid fa-bolt text-warning"></i>
-                            </button>
-                        @else
-                            <span class="btn {{ $isCurrent ? 'btn-light text-dark' : 'btn-light border' }} rounded-circle d-flex align-items-center justify-content-center opacity-50" style="width:42px; height:42px; cursor:not-allowed;" title="{{ __('Renewals are handled by HostelEase support') }}">
-                                <i class="fa-solid fa-lock text-muted" style="font-size:.85rem;"></i>
-                            </span>
-                        @endif
                     </div>
                 </div>
             </div>
@@ -541,14 +516,6 @@
             <i class="fa-solid fa-user-plus"></i>
         </button>
     </template>
-    @if($selfServe)
-    <template x-teleport="body">
-        <button type="button" class="fab" x-show="activeTab === 'branches'" x-transition.opacity
-                @click="modals.branch.open = true" title="{{ __('Add New Branch') }}" aria-label="{{ __('Add New Branch') }}">
-            <i class="fa-solid fa-plus"></i>
-        </button>
-    </template>
-    @endif
 
     {{-- ══ Row action sheet (phones) — iOS pattern: the row shows identity,
          the ⋯ opens actions as full-width thumb rows. Same forms, same
@@ -706,102 +673,11 @@
         </div>
     </template>
 
-    {{-- ══ Add branch modal (self-serve only) ══ --}}
-    @if($selfServe)
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="modals.branch.open" x-transition.opacity @click="modals.branch.open = false" x-cloak style="display:none;">
-            <form action="{{ route('admin.branches.store') }}" method="POST" class="custom-overlay-modal" style="max-width:520px;" :class="{ 'is-open': modals.branch.open }" x-show="modals.branch.open" @click.stop>
-                @csrf
-                <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-building-circle-arrow-right text-primary me-2"></i>{{ __('Add New Branch') }}</h5>
-                    <button type="button" class="btn-close" @click="modals.branch.open = false"></button>
-                </div>
-                <div class="custom-overlay-body">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">{{ __('BRANCH NAME') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control bg-white border shadow-sm" placeholder="e.g. Skyline Hostel North" required>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">{{ __('ADDRESS') }}</label>
-                            <input type="text" name="address" class="form-control bg-white border shadow-sm" placeholder="{{ __('Street Address') }}">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">{{ __('CITY') }}</label>
-                            <input type="text" name="city" class="form-control bg-white border shadow-sm">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">{{ __('STATE') }}</label>
-                            <input type="text" name="state" class="form-control bg-white border shadow-sm">
-                        </div>
-                    </div>
-                </div>
-                <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="modals.branch.open = false">{{ __('Cancel') }}</button>
-                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">{{ __('Create Branch') }}</button>
-                </div>
-            </form>
-        </div>
-    </template>
-
-    {{-- ══ Renew modal (self-serve only) ══ --}}
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="modals.renew.open" x-transition.opacity @click="modals.renew.open = false" x-cloak style="display:none;">
-            <div class="custom-overlay-modal" style="max-width:600px;" :class="{ 'is-open': modals.renew.open }" x-show="modals.renew.open" @click.stop>
-                <div class="custom-overlay-header">
-                    <div>
-                        <h5 class="fw-bold mb-1">{{ __('Renew Subscription') }}</h5>
-                        <div class="text-muted small" x-text="modals.renew.branchName"></div>
-                    </div>
-                    <button type="button" class="btn-close" @click="modals.renew.open = false"></button>
-                </div>
-                <div class="custom-overlay-body">
-                    <div class="row g-3 mb-2">
-                        <div class="col-6">
-                            <div class="plan-card d-flex flex-column h-100" :class="{ selected: modals.renew.period === 'monthly' }" @click="modals.renew.period = 'monthly'">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div class="fw-bold text-uppercase small text-muted" :class="{ 'text-primary': modals.renew.period === 'monthly' }">{{ __('Monthly') }}</div>
-                                    <i class="fa-solid fa-circle-check text-primary" x-show="modals.renew.period === 'monthly'"></i>
-                                </div>
-                                <h3 class="fw-bold text-dark mb-1">{{ hostelease_money($monthlyPrice) }}</h3>
-                                <div class="small text-muted mt-auto pt-2">{{ __('Billed monthly') }}</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="plan-card d-flex flex-column h-100" :class="{ selected: modals.renew.period === 'yearly' }" @click="modals.renew.period = 'yearly'">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div class="fw-bold text-uppercase small text-muted" :class="{ 'text-primary': modals.renew.period === 'yearly' }">{{ __('Yearly') }}</div>
-                                    <i class="fa-solid fa-circle-check text-primary" x-show="modals.renew.period === 'yearly'"></i>
-                                </div>
-                                <h3 class="fw-bold text-dark mb-1">{{ hostelease_money($yearlyPrice) }}</h3>
-                                <div class="small text-success fw-bold mt-auto pt-2">{{ __('Save 16% annually') }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="modals.renew.open = false">{{ __('Cancel') }}</button>
-                    @if($razorpayEnabled)
-                        <button type="button" @click="payWithRazorpay()" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm d-flex align-items-center gap-2" :disabled="modals.renew.loading">
-                            <span x-show="!modals.renew.loading">{{ __('Proceed to Payment') }}</span>
-                            <span x-show="modals.renew.loading" class="spinner-border spinner-border-sm"></span>
-                        </button>
-                    @else
-                        <button type="button" class="btn btn-secondary rounded-pill px-5 fw-bold" disabled>{{ __('Payments Disabled') }}</button>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </template>
-    @endif
 
 </div>
 @endsection
 
 @push('scripts')
-@if($selfServe && $razorpayEnabled)
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-@endif
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('settingsManager', () => ({
@@ -846,9 +722,7 @@
                         is_active: true,
                     },
                 },
-                branch: { open: false },
                 rename: { open: false, action: '', form: { name: '', address: '', city: '' } },
-                renew: { open: false, branchId: null, branchName: '', period: 'yearly', loading: false },
             },
 
             // Phone row action sheet (W9 row system).
@@ -895,61 +769,6 @@
                 m.open = true;
             },
 
-            openRenewModal(id, name) {
-                this.modals.renew.branchId = id;
-                this.modals.renew.branchName = name;
-                this.modals.renew.period = 'yearly';
-                this.modals.renew.loading = false;
-                this.modals.renew.open = true;
-            },
-
-            @if($selfServe && $razorpayEnabled)
-            async payWithRazorpay() {
-                this.modals.renew.loading = true;
-                try {
-                    const orderRes = await fetch('{{ route('admin.branches.order') }}', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                        body: JSON.stringify({ branch_id: this.modals.renew.branchId, period: this.modals.renew.period }),
-                    });
-                    const orderData = await orderRes.json();
-                    if (!orderRes.ok) throw new Error(orderData.message || 'Failed to create order');
-
-                    const rzp = new Razorpay({
-                        key: orderData.key,
-                        amount: orderData.amount,
-                        currency: orderData.currency,
-                        name: orderData.name,
-                        description: orderData.description,
-                        order_id: orderData.order_id,
-                        prefill: orderData.prefill,
-                        theme: { color: '#4f46e5' },
-                        handler: async (response) => {
-                            const verifyRes = await fetch('{{ route('admin.branches.verify') }}', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                                body: JSON.stringify({
-                                    branch_id: this.modals.renew.branchId,
-                                    period: orderData.period,
-                                    razorpay_order_id: response.razorpay_order_id,
-                                    razorpay_payment_id: response.razorpay_payment_id,
-                                    razorpay_signature: response.razorpay_signature,
-                                }),
-                            });
-                            const verifyData = await verifyRes.json();
-                            if (verifyRes.ok) window.location.href = verifyData.redirect;
-                            else alert(verifyData.message || 'Payment verification failed');
-                        },
-                    });
-                    rzp.on('payment.failed', (response) => alert('Payment Failed: ' + response.error.description));
-                    rzp.open();
-                } catch (error) {
-                    alert(error.message);
-                } finally {
-                    this.modals.renew.loading = false;
-                }
-            },
-            @endif
         }));
     });
 </script>

@@ -121,11 +121,26 @@ class SubscriptionOrder extends Model
         return (bool) $this->payment_link_id && (bool) $this->payment_link_status?->isLive();
     }
 
-    /** Whether a replacement link may be issued for this charge. */
+    /**
+     * Whether the owner has opened this charge for online checkout (S3) — a Razorpay
+     * order exists for it and it is still unpaid. Razorpay orders cannot be
+     * cancelled, so this instrument stays payable for as long as the charge is open.
+     */
+    public function hasOpenCheckout(): bool
+    {
+        return $this->payment_status === PaymentStatus::Pending && (bool) $this->razorpay_order_id;
+    }
+
+    /**
+     * Whether a link may be issued for this charge. Not while one is live, and not
+     * while the owner has it open in checkout: one live instrument per charge, or the
+     * customer has two ways to pay one bill (design 14 §3).
+     */
     public function canIssueLink(): bool
     {
         return $this->payment_status === PaymentStatus::Pending
             && ! $this->hasLiveLink()
+            && ! $this->hasOpenCheckout()
             && $this->amountPaise() >= 100;
     }
 

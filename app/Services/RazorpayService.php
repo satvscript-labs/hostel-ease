@@ -89,6 +89,31 @@ class RazorpayService
         ];
     }
 
+    /**
+     * Every payment attempt on an order, with its status (S3).
+     *
+     * Used before an owner's abandoned checkout is superseded: Razorpay orders
+     * cannot be cancelled, so the attempt may in fact have been PAID with the
+     * webhook still in flight. Voiding it then would turn a successful payment into
+     * a refund case. Asking first turns it into what it is — a payment.
+     *
+     * @return array<int, array{id:string, amount:int, status:string}>
+     *
+     * @throws RuntimeException on auth failure or API error.
+     */
+    public function fetchOrderPayments(string $orderId): array
+    {
+        $data = $this->send('get', '/orders/'.$orderId.'/payments', [], 'Razorpay order payments fetch failed.');
+
+        return collect($data['items'] ?? [])
+            ->map(fn ($p) => [
+                'id' => (string) ($p['id'] ?? ''),
+                'amount' => (int) ($p['amount'] ?? 0),
+                'status' => (string) ($p['status'] ?? ''),
+            ])
+            ->all();
+    }
+
     // -----------------------------------------------------------------
     // Payment Links (S2) — operator-initiated collection
     // -----------------------------------------------------------------

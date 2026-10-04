@@ -423,6 +423,15 @@
                                                          Razorpay reports as paid while the charge is still pending
                                                          here is a missed webhook, and seeing the two side by side is
                                                          what makes that visible rather than invisible. --}}
+                                                    {{-- S3: the owner has this charge open in online checkout.
+                                                         Razorpay orders cannot be cancelled, so it stays payable —
+                                                         worth knowing before taking cash for it, or voiding it. --}}
+                                                    @if($order->hasOpenCheckout())
+                                                        <div>
+                                                            <span class="od-k">Online</span>
+                                                            <span class="od-v text-info"><i class="fa-solid fa-cart-shopping me-1"></i>Owner opened checkout — still payable by them</span>
+                                                        </div>
+                                                    @endif
                                                     @if($order->payment_link_id)
                                                         <div>
                                                             <span class="od-k">Payment link</span>
@@ -478,7 +487,7 @@
 
                                                 @if($order->payment_status->value === 'pending')
                                                     <form method="POST" action="{{ route('superadmin.accounts.orders.accept', [$account, $order]) }}"
-                                                          data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.">
+                                                          data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.{{ $order->hasOpenCheckout() ? ' The owner also has this open in online checkout — if they pay there as well, that payment will be flagged for a refund.' : '' }}">
                                                         @csrf @method('PATCH')
                                                         <input type="hidden" name="payment_method" value="cash">
                                                         <button class="btn btn-sm btn-success rounded-pill px-3 fw-semibold shadow-sm">

@@ -41,7 +41,7 @@ class OwnerSettingsSyncTest extends TestCase
         return $owner;
     }
 
-    public function test_settings_hub_renders_all_three_tabs_with_the_lock(): void
+    public function test_settings_hub_renders_all_three_tabs_and_points_billing_at_one_page(): void
     {
         $owner = $this->owner();
 
@@ -50,8 +50,14 @@ class OwnerSettingsSyncTest extends TestCase
             ->assertSee('Profile')
             ->assertSee('Users &amp; Roles', false)
             ->assertSee('My Branches')
-            ->assertSee('Billing is managed by HostelEase support')  // lock banner
-            ->assertSee('profile', false);                            // profile tab wiring
+            ->assertSee('profile', false)                                  // profile tab wiring
+            // S3: billing lives on ONE page. My Branches links to it...
+            ->assertSee(route('admin.subscription.index'), false)
+            // ...and no longer carries the per-branch Renew that charged LIST price
+            // and renewed one branch out of step with the rest (design 14 §1 P3).
+            ->assertDontSee('openRenewModal', false)
+            ->assertDontSee('payWithRazorpay', false)
+            ->assertDontSee('checkout.razorpay.com', false);
     }
 
     public function test_owner_can_update_their_basic_profile_but_not_the_login_mobile(): void
@@ -76,15 +82,21 @@ class OwnerSettingsSyncTest extends TestCase
         $owner = $this->owner();
         $before = Hostel::count();
 
-        $this->actingAs($owner)->post(route('admin.branches.store'), ['name' => 'Sneaky Wing'])
-            ->assertRedirect()->assertSessionHas('error');
+        // owner_self_serve is the kill switch: off (the default) refuses every way of
+        // STARTING a charge or adding a branch, regardless of Razorpay config.
+        $this->actingAs($owner)->postJson(route('admin.subscription.add-branch'), ['name' => 'Sneaky Wing'])->assertStatus(503);
+        $this->actingAs($owner)->postJson(route('admin.subscription.checkout'), ['charge' => 'renewal', 'period' => 'yearly'])->assertStatus(503);
 
         $this->assertSame($before, Hostel::count());
+    }
 
-        // The payment endpoints are locked too, regardless of Razorpay config.
-        $this->actingAs($owner)->postJson(route('admin.branches.order'), ['branch_id' => 1, 'period' => 'yearly'])->assertStatus(503);
-        $this->actingAs($owner)->postJson(route('admin.subscription.renew-order'), ['period' => 'yearly'])->assertStatus(503);
-        $this->actingAs($owner)->postJson(route('admin.subscription.add-branch-order'), ['name' => 'X'])->assertStatus(503);
+    /** The Phase 6 owner billing routes are gone, not merely locked (design 14 §5). */
+    public function test_the_retired_owner_billing_routes_no_longer_exist(): void
+    {
+        foreach (['admin.branches.store', 'admin.branches.order', 'admin.branches.verify',
+                  'admin.subscription.renew-order', 'admin.subscription.add-branch-order', 'admin.subscription.verify'] as $name) {
+            $this->assertFalse(\Illuminate\Support\Facades\Route::has($name), "Route {$name} should have been retired in S3.");
+        }
     }
 
     public function test_unlocked_branch_creation_keeps_the_item_14_invariants(): void
@@ -92,8 +104,9 @@ class OwnerSettingsSyncTest extends TestCase
         config(['hostelease.owner_self_serve' => true]);
         $owner = $this->owner();
 
-        $this->actingAs($owner)->post(route('admin.branches.store'), ['name' => 'Legit Wing', 'city' => 'Surat'])
-            ->assertRedirect()->assertSessionHas('success');
+        $this->actingAs($owner)->postJson(route('admin.subscription.add-branch'), ['name' => 'Legit Wing', 'city' => 'Surat'])
+            ->assertOk()
+            ->assertJsonPath('mode', 'created');
 
         $branch = Hostel::where('name', 'Legit Wing')->firstOrFail();
         $this->assertSame($owner->id, $branch->owner_id);                                   // explicit owner

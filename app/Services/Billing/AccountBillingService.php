@@ -244,10 +244,20 @@ class AccountBillingService
             // any money arrived — the same defect as addBranch()/align(). A paid or
             // trial grant passes its own period; a pending charge passes nothing and
             // leaves the account as it was until acceptOrder() settles it.
-            $this->refreshAccountAnchor(
-                $account,
-                $order->payment_status->grantsCoverage() ? $bp : null,
-            );
+            //
+            // A TRIAL grant must also never override an established paid cadence
+            // (S3 · design 14 §1 P1). A trial is a property of ONE BRANCH's first two
+            // weeks, not of the account. Handing `trial` through relabelled a paying
+            // yearly account as period=trial / status=trial the moment its owner — or
+            // the operator, via Account 360's "Add hostel → trial", which is live in
+            // production — added a branch on a free trial. Only an account that has
+            // never had a paid cadence takes the trial cadence from its first branch.
+            $cadence = $order->payment_status->grantsCoverage() ? $bp : null;
+            if ($cadence === BillingPeriod::Trial && $account->period?->isPaid()) {
+                $cadence = null;
+            }
+
+            $this->refreshAccountAnchor($account, $cadence);
 
             return $order;
         });

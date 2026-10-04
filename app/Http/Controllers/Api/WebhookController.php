@@ -3,17 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Hostel;
-use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
-use App\Services\ActivityLogger;
-use App\Services\Billing\AccountBillingService;
+use App\Models\SubscriptionOrderLine;
+use App\Services\Billing\CheckoutService;
 use App\Services\Billing\PaymentLinkService;
-use App\Services\BranchBillingService;
 use App\Services\NotificationService;
 use App\Services\RazorpayService;
 use App\Support\Tenant;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -27,18 +23,18 @@ use Illuminate\Support\Facades\Log;
  * Idempotent: keyed on the payment id (DB unique index), so a duplicate
  * delivery — or a race with the browser callback — is a clean no-op.
  *
- * Billing is per-branch (mirrors App\Http\Controllers\Admin\BranchManagerController::verify()):
- * the order's notes carry the branch_id stamped at checkout creation.
+ * Every payment this receives settles a PENDING ORDER that already exists — an
+ * owner checkout (`order.paid`, notes.type = checkout) or an operator payment link
+ * (`payment_link.*`). Both go through PaymentSettlement, so the two channels apply
+ * money by exactly one set of rules. Nothing here prices anything.
  */
 class WebhookController extends Controller
 {
     public function __construct(
         protected RazorpayService $razorpay,
-        protected BranchBillingService $billing,
-        protected AccountBillingService $accountBilling,
-        protected ActivityLogger $logger,
         protected NotificationService $notifications,
         protected PaymentLinkService $paymentLinks,
+        protected CheckoutService $checkout,
     ) {}
 
     public function razorpay(Request $request): JsonResponse
@@ -70,9 +66,21 @@ class WebhookController extends Controller
     }
 
     /**
-     * order.paid carries the order entity (with the notes we set at creation)
-     * plus the payment entity. `notes.type` routes to the right billing action;
-     * legacy per-branch orders have no type and carry `notes.branch_id`.
+     * order.paid — a Razorpay order was paid in full.
+     *
+     * Since S3 the only orders this system creates are OWNER CHECKOUT orders, each
+     * opened for a pending order that already exists (`notes.type = checkout`, with
+     * `he_order_id`). Those settle through CheckoutService — the same
+     * PaymentSettlement payment links use.
+     *
+     * The Phase 6 arms that used to live here ("renew_account", "add_branch", and a
+     * notes-less default that renewed one branch at list price) are RETIRED. They
+     * re-quoted at payment time and built the order from whatever the account looked
+     * like then, so a branch cancelled mid-checkout left a customer who paid for two
+     * branches with one renewed (14_S3_DESIGN.md §1 P2). Production never created an
+     * order they would match — every endpoint that did checked owner_self_serve, which
+     * .env.production has never set — so retiring them strands nothing. Anything
+     * legacy-shaped that arrives anyway goes to a human rather than being applied.
      */
     protected function handleOrderPaid(array $payload): void
     {
@@ -82,7 +90,6 @@ class WebhookController extends Controller
         $paymentId = $payment['id'] ?? null;
         $orderId = $order['id'] ?? null;
         $capturedPaise = (int) ($payment['amount'] ?? 0);
-        $type = $notes['type'] ?? 'renew_branch';
 
         if (! $paymentId) {
             Log::warning('Razorpay webhook: missing payment id', ['order' => $orderId, 'event' => 'order.paid']);
@@ -90,23 +97,58 @@ class WebhookController extends Controller
             return;
         }
 
-        match ($type) {
-            'renew_account', 'add_branch' => $this->applyAccountOrder($type, $notes, $paymentId, $orderId, $capturedPaise),
+        match ($notes['type'] ?? null) {
+            'checkout' => $this->handleCheckoutPaid($order, $payment),
 
-            // ── A PAYMENT LINK'S OWN ORDER (S2 · design §6 BP1) ──
+            // ── A PAYMENT LINK'S OWN ORDER (S2 · design 10 §6 BP1) ──
             // Every payment link has a Razorpay order behind it, and Razorpay may
             // propagate the link's notes onto it — so this event can arrive for a
-            // payment that `payment_link.paid` also reports. The link arm owns it;
-            // applying it here as well would grant the same coverage twice.
-            //
-            // This case is the explicit half of a three-part guard. The other two:
-            // link notes never use `branch_id`/`period`, so even a fall-through can
-            // only log and return; and `transaction_number` is UNIQUE, so whichever
-            // event lands first wins and the second short-circuits.
+            // payment `payment_link.paid` also reports. The link arm owns it.
             'payment_link' => null,
 
-            default => $this->applyBranchOrder($notes, $paymentId, $orderId, $capturedPaise),
+            // Retired Phase 6 shapes, or an order created outside this system (from
+            // the Razorpay dashboard, say). Money was captured, so this must neither
+            // 500 nor vanish: alert, and let a human decide where it belongs.
+            default => $this->alertUnrecognisedOrder($orderId, $paymentId, $capturedPaise, $notes),
         };
+    }
+
+    /** An owner checkout was paid. Bind the tenant for the audit line, then settle. */
+    protected function handleCheckoutPaid(array $order, array $payment): void
+    {
+        $noteId = $order['notes']['he_order_id'] ?? null;
+        $branchId = ($noteId && ctype_digit((string) $noteId))
+            ? SubscriptionOrderLine::where('order_id', (int) $noteId)->value('branch_id')
+            : null;
+
+        if ($branchId) {
+            Tenant::set((int) $branchId);
+        }
+
+        try {
+            $this->checkout->settleFromWebhook($order, $payment);
+        } finally {
+            Tenant::clear();
+        }
+    }
+
+    /** A paid Razorpay order this system does not recognise. */
+    protected function alertUnrecognisedOrder(?string $orderId, string $paymentId, int $capturedPaise, array $notes): void
+    {
+        Log::error('Razorpay webhook: order.paid for an order this system did not create', [
+            'order' => $orderId, 'payment' => $paymentId, 'captured_paise' => $capturedPaise, 'notes' => $notes,
+        ]);
+
+        $this->notifications->push(
+            null,
+            'payment_unapplied',
+            'payment_unapplied:'.$paymentId,
+            'Payment received for an unrecognised order — manual review',
+            hostelease_money($capturedPaise / 100)." was paid on Razorpay order {$orderId}, which this system"
+                .' did not create (or created with a format it no longer uses), so nothing was applied.'
+                .' Find the customer in the Razorpay dashboard, then record the payment from Account 360 — or refund it.',
+            'danger',
+        );
     }
 
     // -----------------------------------------------------------------
@@ -238,163 +280,6 @@ class WebhookController extends Controller
             $how === 'expired'
                 ? $this->paymentLinks->markExpired($order)
                 : $this->paymentLinks->markCancelled($order);
-        } finally {
-            Tenant::clear();
-        }
-    }
-
-    /** Legacy/per-branch order (notes.branch_id) — one branch's coverage. */
-    protected function applyBranchOrder(array $notes, string $paymentId, ?string $orderId, int $capturedPaise): void
-    {
-        $branchId = $notes['branch_id'] ?? null;
-        $period = $notes['period'] ?? null;
-
-        if (! $branchId || ! in_array($period, ['yearly', 'monthly'], true)) {
-            Log::warning('Razorpay webhook: missing branch notes', ['order' => $orderId, 'event' => 'order.paid']);
-
-            return;
-        }
-
-        // Idempotency fast-path; the unique index on subscription_orders.transaction_number
-        // is the real guard (below). S1: this used to check the legacy `subscriptions`
-        // table, which is no longer written — leaving it there would have made every
-        // retried delivery look new and granted coverage twice.
-        if (SubscriptionOrder::where('transaction_number', $paymentId)->exists()) {
-            return;
-        }
-
-        $branch = Hostel::find($branchId);
-        if (! $branch) {
-            Log::warning('Razorpay webhook: branch not found', ['branch_id' => $branchId, 'order' => $orderId]);
-
-            return;
-        }
-
-        // Bind tenant so the audit log records the right hostel.
-        Tenant::set($branch->id);
-        try {
-            $quote = $this->billing->quote($branch, $period);
-
-            // The payment entity is authoritative for the amount; log if it diverges from the quote.
-            if ($capturedPaise > 0 && $capturedPaise !== $quote['amount_paise']) {
-                Log::warning('Razorpay webhook: captured amount differs from quote', [
-                    'payment' => $paymentId, 'expected_paise' => $quote['amount_paise'], 'captured_paise' => $capturedPaise,
-                ]);
-            }
-            $amount = $capturedPaise > 0 ? $capturedPaise / 100 : $quote['amount'];
-
-            $order = $this->accountBilling->recordBranchRenewal($branch, $period, [
-                'amount' => $amount,
-                'payment_status' => 'paid',
-                'payment_method' => 'online',
-                'transaction_number' => $paymentId,
-                'razorpay_order_id' => $orderId,
-                'remarks' => 'Razorpay webhook · order '.$orderId,
-            ]);
-
-            $this->logger->log(
-                'subscription.paid',
-                "Webhook {$period} renewal — ".hostelease_money($amount),
-                $order,
-            );
-        } catch (QueryException $e) {
-            // A concurrent delivery (the browser callback) already recorded this payment id.
-            if ((string) $e->getCode() !== '23000') {
-                throw $e;
-            }
-        } catch (\RuntimeException $e) {
-            // The branch has no resolvable owner account, so there is nothing to bill
-            // it against (S1). Money HAS been captured, so this must not throw: a 500
-            // makes Razorpay retry forever and still never succeed. Record it loudly
-            // and let a human reconcile it.
-            Log::error('Razorpay webhook: captured payment could not be applied', [
-                'payment' => $paymentId, 'order' => $orderId, 'branch_id' => $branchId, 'error' => $e->getMessage(),
-            ]);
-
-            $this->notifications->push(
-                null,
-                'payment_unapplied',
-                'payment_unapplied:'.$paymentId,
-                'Payment received but not applied — manual review',
-                hostelease_money($capturedPaise / 100)." was captured for branch #{$branchId} but could not be"
-                    .' recorded: '.$e->getMessage().' Resolve the branch owner, then record the charge from Account 360.',
-                'danger',
-            );
-        } finally {
-            Tenant::clear();
-        }
-    }
-
-    /**
-     * Account-level order (notes.type = renew_account | add_branch) — the
-     * self-serve consolidated payments (Phase 6). Authoritative confirmation for
-     * when the owner's browser closed before the callback posted.
-     */
-    protected function applyAccountOrder(string $type, array $notes, string $paymentId, ?string $orderId, int $capturedPaise): void
-    {
-        $accountId = $notes['account_id'] ?? null;
-        $period = $notes['period'] ?? null;
-
-        if (! $accountId || ! in_array($period, ['yearly', 'monthly'], true)) {
-            Log::warning('Razorpay webhook: missing account notes', ['order' => $orderId, 'type' => $type]);
-
-            return;
-        }
-
-        // Idempotency fast-path; the unique index on subscription_orders.transaction_number is the real guard.
-        if (SubscriptionOrder::where('transaction_number', $paymentId)->exists()) {
-            return;
-        }
-
-        $account = SubscriptionAccount::find($accountId);
-        if (! $account) {
-            Log::warning('Razorpay webhook: account not found', ['account_id' => $accountId, 'order' => $orderId]);
-
-            return;
-        }
-
-        // Bind tenant to one of the account's branches for audit context.
-        $tenantBranch = $this->accountBilling->includedBranches($account)->first();
-        if ($tenantBranch) {
-            Tenant::set($tenantBranch->id);
-        }
-
-        try {
-            $payment = [
-                'amount' => $capturedPaise > 0 ? $capturedPaise / 100 : null,
-                // This figure is what Razorpay says it CAPTURED, so it is the truth
-                // and must be recorded as-is — exempt from the operator-override
-                // guard, which may only ever reduce a charge. It legitimately exceeds
-                // the current quote when the quote has moved since checkout opened
-                // (proration shrinks by the day), and clamping it here would both
-                // understate real money and 500 this webhook into an infinite
-                // Razorpay retry loop.
-                'amount_authoritative' => true,
-                'payment_status' => 'paid',
-                'payment_method' => 'online',
-                'transaction_number' => $paymentId,
-                'razorpay_order_id' => $orderId,
-                'remarks' => 'Razorpay webhook · order '.$orderId,
-            ];
-
-            if ($type === 'add_branch') {
-                $branch = ($notes['branch_id'] ?? null) ? Hostel::find($notes['branch_id']) : null;
-                if (! $branch) {
-                    Log::warning('Razorpay webhook: add_branch branch not found', ['order' => $orderId]);
-
-                    return;
-                }
-                $result = $this->accountBilling->addBranch($account, $branch, $payment);
-                $this->logger->log('subscription.paid', "Webhook add branch {$branch->name} — ".hostelease_money($result->amount), $result);
-            } else {
-                $result = $this->accountBilling->renewAccount($account, $period, $payment);
-                $this->logger->log('subscription.paid', "Webhook account {$period} renewal ({$result->quantity} branches) — ".hostelease_money($result->amount), $result);
-            }
-        } catch (QueryException $e) {
-            // Concurrent browser-callback delivery already recorded this payment id.
-            if ((string) $e->getCode() !== '23000') {
-                throw $e;
-            }
         } finally {
             Tenant::clear();
         }

@@ -2,323 +2,396 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\BillingPeriod;
+use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
+use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
-use App\Services\RazorpayService;
-use Illuminate\Database\QueryException;
+use App\Services\Billing\CheckoutService;
+use App\Services\HostelService;
+use App\Support\Refusal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
 
 /**
- * Owner self-serve consolidated billing (Phase 6). The account-level, one-payment
- * counterpart to the operator's Account 360 — renew every branch on one date in a
- * single Razorpay payment, or add a branch mid-cycle (prorated).
+ * The owner's billing page — the second front door onto the same billing core the
+ * operator's Account 360 uses (S3 · design 14).
  *
- * Lives outside the subscription.active gate (see routes/web.php) so an expired
- * owner can still reach it to pay.
+ * Rebuilt in S3. The Phase 6 version charged a quote and then rebuilt the order from
+ * a fresh quote when the money arrived, trusted the browser to say what a payment
+ * had bought, and refused to confirm money already taken whenever the kill switch was
+ * off. All of that is gone: charges are pending orders written when the price is
+ * shown, and payments settle through the same PaymentSettlement as payment links.
+ *
+ * WHO MAY DO WHAT (design §4):
+ *   · anyone on the account sees the page;
+ *   · only the ACCOUNT OWNER starts a charge — gated on the owner FK, never the role,
+ *     because a co-admin IS a hostel_admin;
+ *   · starting a charge needs `owner_self_serve` ON — it is the kill switch;
+ *   · confirming a payment needs neither: it settles money already taken.
+ *
+ * Lives outside the subscription.active gate (routes/web.php) so an expired owner can
+ * still reach it to pay.
  */
 class SubscriptionController extends Controller
 {
     public function __construct(
-        protected AccountBillingService $accountBilling,
-        protected RazorpayService $razorpay,
+        protected AccountBillingService $billing,
+        protected CheckoutService $checkout,
         protected ActivityLogger $logger,
-    ) {
-    }
+    ) {}
 
-    /** The owner's Subscription page — status, branches, renew-all quote, history. */
+    /** The owner's billing page. Reads only — no write on a GET (S1 · F10). */
     public function index(Request $request): View
     {
         // The viewer is not necessarily the owner — a co-admin shares the role.
-        // accountForViewer() resolves the branches' real owner instead of
-        // minting a phantom account for whoever opened the page.
+        // accountForViewer() resolves the branches' real owner instead of minting a
+        // phantom account for whoever opened the page (CoAdminBillingTest).
         $viewer = $request->user();
-        $account = $this->accountBilling->accountForViewer($viewer);
+        $account = $this->billing->accountForViewer($viewer);
+        $viewerOwnsAccount = $account->owner_id === $viewer->id;
 
-        // NO WRITE ON A GET (S1 · finding F10). This used to call
-        // refreshAccountAnchor() on every page view, so opening the Subscription page
-        // mutated subscription_accounts and raced the daily lifecycle tick. The tick
-        // owns that recompute now (07:30, before the alert refresh); this page reads.
-        // Nothing is stale in practice: every billing op syncs on the way out, and the
-        // status the hero shows is derived from the anchor at render time anyway.
-        //
-        // Cancelled branches are listed too (D11) — the owner needs to see a branch
-        // that is closing and when — but the quotes below price the BILLABLE set.
-        $branches = $this->accountBilling->allBranches($account);
-        $orders = $account->orders()->latest()->limit(10)->get();
+        $branches = $this->billing->allBranches($account);
+        $billable = $this->billing->includedBranches($account);
 
-        // JS-friendly quotes for both terms so the renew modal shows an accurate,
-        // discount-aware breakdown as the owner toggles Yearly/Monthly.
+        // Both terms, priced by the SAME function Account 360 uses — so the owner
+        // sees their own negotiated price and discounts, and the two surfaces cannot
+        // disagree (design §7).
         $quotes = [
             'yearly' => $this->quoteArray($account, 'yearly'),
             'monthly' => $this->quoteArray($account, 'monthly'),
         ];
         $displayPeriod = $account->period?->isPaid() ? $account->period->value : 'yearly';
 
-        $addQuote = $this->accountBilling->quoteAddBranch($account);
+        // Charges already open on the account — whoever opened them. The operator's
+        // payment links are payable here even with the kill switch off: a link is
+        // the operator's instrument, not self-serve (design §4).
+        $due = $account->orders()->outstanding()->latest('id')->get();
+        $openRenewal = $due->first(fn (SubscriptionOrder $o) => $o->kind?->value === 'renewal');
+
+        $selfServe = (bool) config('hostelease.owner_self_serve');
+        $canManage = $viewerOwnsAccount && $selfServe && $this->checkout->isEnabled();
 
         return view('admin.subscription.index', [
             'account' => $account,
             'branches' => $branches,
-            'orders' => $orders,
+            'billableCount' => $billable->count(),
+            'orders' => $account->orders()->where('payment_status', PaymentStatus::Paid->value)->latest('id')->limit(10)->get(),
             'quotes' => $quotes,
             'displayPeriod' => $displayPeriod,
-            'addBranch' => [
-                'prorated' => (float) $addQuote['breakdown']['final'],
-                'days' => (int) $addQuote['days_remaining'],
-                'anchor' => $account->current_period_end?->format('d M Y'),
-            ],
-            'razorpayEnabled' => $this->razorpay->isConfigured(),
-            // Production lock (P4 item 15): while false, owners see everything
-            // but every mutating billing op is supervised via the Super Admin.
-            'selfServe' => (bool) config('hostelease.owner_self_serve'),
-            // Branch removal (D11): the owner may ASK, for branches they own. A
-            // co-admin shares the hostel_admin role, so the button has to be gated on
-            // the owner FK, not the role — same rule as rename.
-            'viewerOwnsAccount' => $account->owner_id === $viewer->id,
-            // The renewal quote already excludes cancelled branches, so the owner sees
-            // the lower total immediately; this is just how many are still billed.
-            'billableCount' => $this->accountBilling->includedBranches($account)->count(),
+            'yearlySaving' => $this->yearlySaving($quotes),
+            'due' => $due->map(fn (SubscriptionOrder $o) => $this->dueRow($o))->values()->all(),
+            'openRenewal' => $openRenewal ? $this->dueRow($openRenewal) : null,
+            'addable' => $canManage ? $this->addableBranches($account, $branches) : [],
+            // "Add & pay" only means something against a live PAID cycle; on a trial
+            // account a new branch simply joins the plan at the first renewal.
+            'canAddPaid' => $canManage
+                && $account->period?->isPaid()
+                && $account->current_period_end?->isFuture(),
+            'selfServe' => $selfServe,
+            'razorpayEnabled' => $this->checkout->isEnabled(),
+            'canManage' => $canManage,
+            'viewerOwnsAccount' => $viewerOwnsAccount,
         ]);
     }
 
-    /** Flatten a renewal quote into a JS/Blade-friendly shape. */
-    protected function quoteArray(\App\Models\SubscriptionAccount $account, string $period): array
+    /**
+     * Start paying for something. Returns either a payment link to open (when the
+     * operator has already sent one for this charge), or Razorpay Checkout options
+     * for a pending order that now exists for it.
+     *
+     * The browser posts a charge SHAPE, never an amount — the brief from the S2 audit.
+     */
+    public function checkout(Request $request): JsonResponse
     {
-        $q = $this->accountBilling->quoteRenewal($account, $period);
+        $data = $request->validate([
+            'charge' => ['required', Rule::in(['renewal', 'add_branch', 'order'])],
+            'period' => ['required_if:charge,renewal', 'nullable', Rule::in(['yearly', 'monthly'])],
+            // Posted DB references, so integers (standards §1.1 rule 3), resolved
+            // inside this account below — never trusted as they arrive.
+            'branch_id' => ['required_if:charge,add_branch', 'nullable', 'integer'],
+            'order_id' => ['required_if:charge,order', 'nullable', 'integer'],
+        ]);
+
+        [$account, $refusal] = $this->managedAccount($request);
+        if ($refusal) {
+            return $refusal;
+        }
+
+        // Resolve posted ids OUTSIDE the try. abort(404) throws NotFoundHttpException,
+        // which extends \RuntimeException — inside the try below, the catch would
+        // swallow an authorization refusal and answer 422 with an empty message.
+        $branch = $data['charge'] === 'add_branch' ? $this->branchOnAccount($account, (int) $data['branch_id']) : null;
+        $order = $data['charge'] === 'order' ? $this->orderOnAccount($account, (int) $data['order_id']) : null;
+
+        try {
+            $result = match ($data['charge']) {
+                'renewal' => $this->checkout->startRenewal($account, $data['period']),
+                'add_branch' => $this->checkout->startAddBranch($account, $branch),
+                'order' => $this->checkout->startForOrder($account, $order),
+            };
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => Refusal::message($e)], 422);
+        }
+
+        return response()->json($this->present($result));
+    }
+
+    /**
+     * Add a new branch. It ALWAYS starts on a 14-day trial, so an abandoned or failed
+     * payment still leaves a working branch — never a dead end (05 §3). With
+     * `pay_now`, checkout for bringing it onto the plan is opened straight after.
+     *
+     * Replaces two Phase 6 doors (Settings' trial-only form, and this page's
+     * create-and-charge endpoint) that gave the same action different outcomes.
+     */
+    public function addBranch(Request $request, HostelService $hostels): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'pay_now' => ['nullable', 'boolean'],
+        ]);
+
+        [$account, $refusal] = $this->managedAccount($request);
+        if ($refusal) {
+            return $refusal;
+        }
+
+        // Created for the ACCOUNT OWNER, never for whoever is signed in. The Phase 6
+        // code used $request->user(): a co-admin's branch came out owned by the
+        // co-admin, which then minted a phantom account for them (design §1 P4).
+        // managedAccount() already restricts this to the owner — this makes the
+        // ownership correct even if that gate ever loosens.
+        $branch = DB::transaction(function () use ($account, $data, $hostels) {
+            $branch = $hostels->createBranchForOwner($account->owner, [
+                'name' => $data['name'],
+                'city' => $data['city'] ?? null,
+                'plan' => 'trial',
+            ]);
+
+            // The trial clock is started by the BILLER (S0 · F1). It no longer
+            // relabels a paying account as a trial (design §1 P1).
+            $this->billing->recordBranchRenewal($branch, BillingPeriod::Trial->value, [
+                'payment_status' => PaymentStatus::Paid->value,
+                'payment_method' => null,
+                'remarks' => 'Branch added by the owner — free trial',
+            ]);
+
+            return $branch;
+        });
+
+        $this->logger->log('branch.created', "Owner added branch {$branch->name} (free trial)", $branch);
+
+        $created = "{$branch->name} is ready, on a 14-day free trial.";
+
+        if (! ($data['pay_now'] ?? false)) {
+            return response()->json(['mode' => 'created', 'message' => $created, 'redirect' => route('admin.subscription.index')]);
+        }
+
+        // Committed above, so whatever happens here the branch survives.
+        try {
+            $result = $this->checkout->startAddBranch($account->fresh(), $branch->fresh());
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'mode' => 'created',
+                'message' => $created.' '.Refusal::message($e),
+                'redirect' => route('admin.subscription.index'),
+            ]);
+        }
+
+        return response()->json($this->present($result) + ['created' => $created]);
+    }
+
+    /**
+     * The Razorpay Checkout callback. ONLY Razorpay's three ids are accepted: which
+     * charge this paid for is looked up from the Razorpay order id inside this
+     * account, and the amount is read back from Razorpay. The Phase 6 version took
+     * `type`, `period` and `branch_id` from the browser and let them choose how the
+     * payment was priced (design §1 P7).
+     *
+     * NOT behind the kill switch and not owner-only: it never starts a charge, it
+     * settles one already paid. Refusing it told paying customers their payment had
+     * failed (design §1 P5).
+     */
+    public function confirm(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'razorpay_order_id' => ['required', 'string', 'max:64'],
+            'razorpay_payment_id' => ['required', 'string', 'max:64'],
+            'razorpay_signature' => ['required', 'string', 'max:255'],
+        ]);
+
+        $account = $this->billing->accountForViewer($request->user());
+
+        try {
+            $result = $this->checkout->confirm(
+                $account,
+                $data['razorpay_order_id'],
+                $data['razorpay_payment_id'],
+                $data['razorpay_signature'],
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => Refusal::message($e)], 422);
+        }
+
+        return response()->json($result + ['redirect' => route('admin.subscription.index')]);
+    }
+
+    // -----------------------------------------------------------------
+    // Internals
+    // -----------------------------------------------------------------
+
+    /**
+     * The account, if this viewer may start a charge on it — else the refusal.
+     *
+     * @return array{0: SubscriptionAccount, 1: ?JsonResponse}
+     */
+    protected function managedAccount(Request $request): array
+    {
+        $viewer = $request->user();
+        $account = $this->billing->accountForViewer($viewer);
+
+        if (! config('hostelease.owner_self_serve')) {
+            return [$account, response()->json([
+                'message' => 'Online billing is handled by HostelEase support right now — please contact us and we will set it up for you.',
+            ], 503)];
+        }
+
+        if ($account->owner_id !== $viewer->id) {
+            return [$account, response()->json([
+                'message' => 'Only the account owner can make payments or add branches. Please ask them to do it from their login.',
+            ], 403)];
+        }
+
+        return [$account, null];
+    }
+
+    /** A branch this account holds — a crafted id from elsewhere is a 404. */
+    protected function branchOnAccount(SubscriptionAccount $account, int $branchId): Hostel
+    {
+        abort_unless(in_array($branchId, $account->owner?->accessibleHostelIds() ?? [], true), 404);
+
+        return Hostel::findOrFail($branchId);
+    }
+
+    protected function orderOnAccount(SubscriptionAccount $account, int $orderId): SubscriptionOrder
+    {
+        return $account->orders()->whereKey($orderId)->firstOr(fn () => abort(404));
+    }
+
+    /** What the browser needs, and nothing it should not see. */
+    protected function present(array $result): array
+    {
+        return match ($result['mode']) {
+            'link' => [
+                'mode' => 'link',
+                'url' => $result['url'],
+                'message' => 'We have already sent you a secure payment link for this — opening it now.',
+            ],
+            'paid' => [
+                'mode' => 'paid',
+                'message' => $result['message'],
+                'redirect' => route('admin.subscription.index'),
+            ],
+            default => [
+                'mode' => 'checkout',
+                'razorpay' => $result['razorpay'],
+            ],
+        };
+    }
+
+    /**
+     * A renewal quote flattened for the page. WHITELISTED fields only: the discount
+     * engine's breakdown also carries the negotiated discount's id, and the reason
+     * behind a negotiated price is internal — it never leaves the server (design §7).
+     */
+    protected function quoteArray(SubscriptionAccount $account, string $period): array
+    {
+        $q = $this->billing->quoteRenewal($account, $period);
+        $b = $q['breakdown'];
 
         return [
-            'quantity' => $q['quantity'],
+            'quantity' => (int) $q['quantity'],
             'unit' => (float) $q['unit'],
-            'subtotal' => (float) $q['subtotal'],
-            'discount' => (float) $q['breakdown']['discount_total'],
-            'final' => (float) $q['breakdown']['final'],
+            'subtotal' => round((float) $q['subtotal'], 2),
+            'volume' => round((float) ($b['volume_amount'] ?? 0), 2),
+            'manual' => round((float) ($b['manual_amount'] ?? 0), 2),
+            'discount' => round((float) ($b['discount_total'] ?? 0), 2),
+            'final' => round((float) $b['final'], 2),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
         ];
     }
 
-    /** Create a Razorpay order for a consolidated account renewal (all branches). */
-    public function renewOrder(Request $request): JsonResponse
+    /**
+     * The real saving of yearly over twelve monthly payments, from THIS account's
+     * prices. Replaces a hard-coded "Save 16%" that was wrong for anyone on a custom
+     * rate (design §1 P9). Null when there is no saving to claim.
+     */
+    protected function yearlySaving(array $quotes): ?int
     {
-        if (! config('hostelease.owner_self_serve')) {
-            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now — please contact us to renew.'], 503);
+        $yearly = $quotes['yearly']['unit'];
+        $twelveMonths = $quotes['monthly']['unit'] * 12;
+
+        if ($twelveMonths <= 0 || $yearly >= $twelveMonths) {
+            return null;
         }
 
-        $data = $request->validate(['period' => ['required', Rule::in(['yearly', 'monthly'])]]);
-
-        if (! $this->razorpay->isConfigured()) {
-            return response()->json(['message' => 'Online payment is not available right now.'], 503);
-        }
-
-        $owner = $request->user();
-        $account = $this->accountBilling->accountForViewer($owner);
-        $quote = $this->accountBilling->quoteRenewal($account, $data['period']);
-
-        $paise = (int) round($quote['breakdown']['final'] * 100);
-        if ($paise < 100) {
-            return response()->json(['message' => 'There is nothing payable on your account.'], 422);
-        }
-
-        try {
-            $order = $this->razorpay->createOrder(
-                $paise,
-                'he_acct_'.$account->id.'_'.now()->timestamp,
-                ['account_id' => (string) $account->id, 'type' => 'renew_account', 'period' => $data['period']],
-            );
-        } catch (RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], $e->getCode() === 401 ? 401 : 500);
-        }
-
-        return response()->json([
-            'key' => $this->razorpay->keyId(),
-            'order_id' => $order['id'],
-            'amount' => $order['amount'],
-            'currency' => $order['currency'],
-            'type' => 'renew_account',
-            'period' => $data['period'],
-            'name' => config('app.name'),
-            'description' => ucfirst($data['period']).' renewal · '.$quote['quantity'].' branch(es)',
-            'prefill' => ['name' => $owner->name, 'email' => $owner->email, 'contact' => $owner->mobile],
-        ]);
+        return (int) floor((1 - $yearly / $twelveMonths) * 100);
     }
 
-    /**
-     * Create a branch and (optionally) a Razorpay order to co-terminate it onto
-     * the account's renewal date with a prorated charge. If the account has no
-     * live anchor, this is priced as a fresh single-branch term.
-     *
-     * The branch is created first (on a trial window) so that if the owner
-     * abandons the payment they still have a working trial branch — never a dead end.
-     */
-    public function addBranchOrder(Request $request): JsonResponse
+    protected function dueRow(SubscriptionOrder $o): array
     {
-        if (! config('hostelease.owner_self_serve')) {
-            return response()->json(['message' => 'Adding branches is handled by HostelEase support right now — please contact us and we\'ll set it up for you.'], 503);
-        }
+        // The link URL comes from Razorpay's API, not from us, and lands in an href
+        // on a customer's page. Only an https URL is ever rendered — a hostile or
+        // malformed value (`javascript:` …) is dropped, and the row falls back to
+        // checkout or "contact us" rather than to a dangerous link.
+        $linkUrl = $o->hasLiveLink() && str_starts_with((string) $o->payment_link_url, 'https://')
+            ? $o->payment_link_url
+            : null;
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:100'],
-        ]);
-
-        if (! $this->razorpay->isConfigured()) {
-            return response()->json(['message' => 'Online payment is not available right now.'], 503);
-        }
-
-        $owner = $request->user();
-        $account = $this->accountBilling->accountForViewer($owner);
-
-        // Invariant-keeping creation (P4 item 14): owner_id + pivot + primary
-        // branch — the old inline Hostel::create() set none of them.
-        $branch = app(\App\Services\HostelService::class)->createBranchForOwner($owner, $data + ['plan' => 'trial']);
-
-        // The trial clock is started by the BILLER, not by branch creation (S0 ·
-        // finding F1 — creation no longer stamps coverage, and when it did, this
-        // combination handed out 28-day trials elsewhere). Doing it here keeps the
-        // documented promise that an abandoned payment still leaves a working
-        // trial branch, and it gives the trial a ₹0 ledger row like every other
-        // grant of coverage.
-        $this->accountBilling->recordBranchRenewal($branch, 'trial', [
-            'payment_status' => 'paid', 'payment_method' => null, 'remarks' => 'Owner self-serve branch (trial)',
-        ]);
-        $this->logger->log('branch.created', "New branch created: {$branch->name}");
-
-        // Quote WITH the branch so the amount charged, the amount re-verified in
-        // verify(), and the amount addBranch() recomputes all agree — the branch
-        // now holds a trial window, and proration must start from its coverage end
-        // rather than today, or we would bill days it already has.
-        $quote = $this->accountBilling->quoteAddBranch($account, $branch->fresh());
-        $paise = (int) round($quote['breakdown']['final'] * 100);
-
-        // Nothing meaningful to charge (e.g. no live anchor) — leave the branch on trial.
-        if ($paise < 100) {
-            return response()->json(['trial_only' => true, 'redirect' => route('admin.subscription.index'), 'message' => 'Branch created on a free trial.']);
-        }
-
-        try {
-            $order = $this->razorpay->createOrder(
-                $paise,
-                'he_add_'.$branch->id.'_'.now()->timestamp,
-                ['account_id' => (string) $account->id, 'branch_id' => (string) $branch->id, 'type' => 'add_branch', 'period' => $account->period?->isPaid() ? $account->period->value : 'yearly'],
-            );
-        } catch (RuntimeException $e) {
-            // Branch already exists on trial; surface the failure but don't lose it.
-            return response()->json(['message' => 'Branch created on a trial, but online payment could not start: '.$e->getMessage(), 'redirect' => route('admin.subscription.index')], 200);
-        }
-
-        return response()->json([
-            'key' => $this->razorpay->keyId(),
-            'order_id' => $order['id'],
-            'amount' => $order['amount'],
-            'currency' => $order['currency'],
-            'type' => 'add_branch',
-            'branch_id' => $branch->id,
-            'period' => $account->period?->isPaid() ? $account->period->value : 'yearly',
-            'name' => config('app.name'),
-            'description' => 'Add branch · '.$branch->name.' (prorated)',
-            'prefill' => ['name' => $owner->name, 'email' => $owner->email, 'contact' => $owner->mobile],
-        ]);
-    }
-
-    /**
-     * Verify a completed Razorpay payment and apply it. Authoritative confirmation
-     * is the webhook; this is the browser-callback UX path. Idempotent + amount-verified.
-     */
-    public function verify(Request $request): JsonResponse
-    {
-        if (! config('hostelease.owner_self_serve')) {
-            return response()->json(['message' => 'Online renewals are handled by HostelEase support right now.'], 503);
-        }
-
-        $data = $request->validate([
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
-            'type' => ['required', Rule::in(['renew_account', 'add_branch'])],
-            'period' => ['required', Rule::in(['yearly', 'monthly'])],
-            'branch_id' => ['nullable', 'integer'],
-        ]);
-
-        $owner = $request->user();
-        $account = $this->accountBilling->accountForViewer($owner);
-
-        if (! $this->razorpay->verifySignature($data['razorpay_order_id'], $data['razorpay_payment_id'], $data['razorpay_signature'])) {
-            return response()->json(['message' => 'Payment verification failed. You have not been charged.'], 400);
-        }
-
-        // Idempotency fast-path; the unique index on subscription_orders.transaction_number is the real guard.
-        if (SubscriptionOrder::where('transaction_number', $data['razorpay_payment_id'])->exists()) {
-            return response()->json(['message' => 'Payment already confirmed.', 'redirect' => route('admin.subscription.index')]);
-        }
-
-        // Resolve the expected amount for this charge type.
-        if ($data['type'] === 'add_branch') {
-            $branch = $data['branch_id'] ? Hostel::find($data['branch_id']) : null;
-            if (! $branch || ! $owner->canAccessHostel($branch->id)) {
-                return response()->json(['message' => 'Unauthorized branch.'], 403);
-            }
-            // WITH the branch (S0): the order was quoted from that branch's own
-            // coverage end, so the verification must use the same basis or every
-            // add-branch payment logs a spurious amount mismatch.
-            $expectedPaise = (int) round($this->accountBilling->quoteAddBranch($account, $branch)['breakdown']['final'] * 100);
-        } else {
-            $branch = null;
-            $expectedPaise = (int) round($this->accountBilling->quoteRenewal($account, $data['period'])['breakdown']['final'] * 100);
-        }
-
-        // Server-side amount verification (never trust the client for the captured amount).
-        $amount = $expectedPaise / 100;
-        try {
-            $payment = $this->razorpay->fetchPayment($data['razorpay_payment_id']);
-            if ($payment['order_id'] && $payment['order_id'] !== $data['razorpay_order_id']) {
-                Log::warning('Subscription verify: payment/order mismatch', ['payment' => $payment['id'], 'expected_order' => $data['razorpay_order_id']]);
-
-                return response()->json(['message' => 'Payment verification failed.'], 400);
-            }
-            if ($payment['amount'] !== $expectedPaise) {
-                Log::warning('Subscription verify: captured amount differs from quote', ['payment' => $payment['id'], 'expected_paise' => $expectedPaise, 'captured_paise' => $payment['amount']]);
-            }
-            $amount = $payment['amount'] / 100;
-        } catch (RuntimeException $e) {
-            Log::warning('Subscription verify: payment fetch failed, using quote amount', ['error' => $e->getMessage()]);
-        }
-
-        $payload = [
-            'amount' => $amount,
-            // Fetched from Razorpay above, not taken from the client — so it is the
-            // captured truth and is recorded as-is, exempt from the operator-override
-            // guard that may only reduce a charge. It legitimately exceeds the
-            // current quote when the quote moved while checkout was open.
-            'amount_authoritative' => true,
-            'payment_status' => 'paid',
-            'payment_method' => 'online',
-            'transaction_number' => $data['razorpay_payment_id'],
-            'razorpay_order_id' => $data['razorpay_order_id'],
-            'remarks' => 'Razorpay (self-serve)',
+        return [
+            'id' => $o->id,
+            'label' => $o->kind?->label() ?? 'Charge',
+            'invoice' => $o->invoiceNumber(),
+            'amount' => (float) $o->amount,
+            'period' => $o->period?->label(),
+            'quantity' => $o->quantity,
+            'raised' => $o->created_at?->format('d M Y'),
+            'link_url' => $linkUrl,
+            'link_expires' => $linkUrl ? $o->payment_link_expires_at?->format('d M Y') : null,
         ];
+    }
 
-        try {
-            if ($data['type'] === 'add_branch') {
-                $order = $this->accountBilling->addBranch($account, $branch, $payload);
-                $this->logger->log('subscription.paid', "Self-serve add branch {$branch->name} — ".hostelease_money($amount), $order);
-            } else {
-                $order = $this->accountBilling->renewAccount($account, $data['period'], $payload);
-                $this->logger->log('subscription.paid', "Self-serve {$data['period']} renewal ({$order->quantity} branches) — ".hostelease_money($amount), $order);
-            }
-        } catch (QueryException $e) {
-            // Concurrent webhook delivery already recorded this payment id — clean no-op.
-            if ((string) $e->getCode() !== '23000') {
-                throw $e;
-            }
+    /**
+     * Branches the owner can bring onto the renewal date now — behind a live, PAID
+     * cycle — with what that costs, from the same quote the operator sees.
+     */
+    protected function addableBranches(SubscriptionAccount $account, $branches): array
+    {
+        $anchor = $account->current_period_end;
+        if (! $account->period?->isPaid() || ! $anchor || ! $anchor->isFuture()) {
+            return [];
         }
 
-        return response()->json(['message' => 'Payment successful — your subscription is updated.', 'redirect' => route('admin.subscription.index')]);
+        return $branches
+            ->filter(fn (Hostel $b) => ! $b->isCancelled() && (! $b->subscription_end || $b->subscription_end->lt($anchor)))
+            ->mapWithKeys(function (Hostel $b) use ($account) {
+                $q = $this->billing->quoteAddBranch($account, $b);
+
+                return [$b->id => [
+                    'amount' => round((float) $q['breakdown']['final'], 2),
+                    'days' => (int) $q['days_remaining'],
+                ]];
+            })
+            ->filter(fn (array $q) => $q['amount'] >= 1)
+            ->all();
     }
 }

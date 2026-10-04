@@ -105,16 +105,26 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     // subscription.active gate so an expired owner can still reach the pay page and manage branches.
     Route::middleware('role:hostel_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
-        Route::post('branches', [\App\Http\Controllers\Admin\BranchManagerController::class, 'store'])->name('branches.store');
         Route::patch('branches/{hostel}/rename', [\App\Http\Controllers\Admin\BranchManagerController::class, 'rename'])->name('branches.rename');
-        Route::post('branches/order', [\App\Http\Controllers\Admin\BranchManagerController::class, 'createOrder'])->name('branches.order');
-        Route::post('branches/verify', [\App\Http\Controllers\Admin\BranchManagerController::class, 'verify'])->name('branches.verify');
 
-        // Owner self-serve consolidated billing (Phase 6)
+        // Owner self-serve billing (S3 · _artifact/saas_billing_autopay/14_S3_DESIGN.md).
+        // ONE billing page. The Phase 6 routes this replaces — branches.store,
+        // branches.order, branches.verify, subscription.renew-order,
+        // subscription.add-branch-order and subscription.verify — are gone: per-branch
+        // renewals at list price, a second add-branch door, and a pay-first flow that
+        // rebuilt each order from whatever the account looked like when the money
+        // arrived. Charges are now pending orders written when the price is shown.
+        //
+        // Starting a charge is throttled: each one can open a Razorpay order and
+        // create a branch. Confirm is throttled more loosely — it only settles money
+        // already taken, and must never be the thing a paying customer is refused by.
         Route::get('subscription', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('subscription.index');
-        Route::post('subscription/renew-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'renewOrder'])->name('subscription.renew-order');
-        Route::post('subscription/add-branch-order', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranchOrder'])->name('subscription.add-branch-order');
-        Route::post('subscription/verify', [\App\Http\Controllers\Admin\SubscriptionController::class, 'verify'])->name('subscription.verify');
+        Route::post('subscription/checkout', [\App\Http\Controllers\Admin\SubscriptionController::class, 'checkout'])
+            ->middleware('throttle:12,1')->name('subscription.checkout');
+        Route::post('subscription/branches', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranch'])
+            ->middleware('throttle:6,1')->name('subscription.add-branch');
+        Route::post('subscription/confirm', [\App\Http\Controllers\Admin\SubscriptionController::class, 'confirm'])
+            ->middleware('throttle:30,1')->name('subscription.confirm');
 
         // Branch removal REQUESTS (D11). The owner asks; only the Super Admin can
         // actually cancel. Deliberately not gated by owner_self_serve — asking is

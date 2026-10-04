@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\User;
 use App\Services\Billing\AccountBillingService;
-use App\Services\BranchBillingService;
-use App\Services\RazorpayService;
 use App\Support\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,16 +13,17 @@ use Illuminate\View\View;
 /**
  * Owner Settings hub: Profile · Users & Roles · My Branches (P4 item 15 —
  * synced with the Super Admin systems: pivot-based access, explicit owner,
- * account-level anchor, and the owner_self_serve production lock).
+ * account-level anchor).
+ *
+ * S3: the My Branches tab is a portfolio view only. It used to feed LIST prices to a
+ * per-branch Renew modal, which charged them regardless of the account's negotiated
+ * rate; all billing now lives on Admin\SubscriptionController's one page.
  */
 class SettingsController extends Controller
 {
     public function __construct(
-        protected BranchBillingService $billing,
         protected AccountBillingService $accountBilling,
-        protected RazorpayService $razorpay,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -90,10 +89,6 @@ class SettingsController extends Controller
             'studentStats' => $studentStats,
             'account' => $account,
             'activeHostelId' => Tenant::id(),
-            'razorpayEnabled' => $this->razorpay->isConfigured(),
-            'selfServe' => (bool) config('hostelease.owner_self_serve'),
-            'monthlyPrice' => $this->billing->unitPrice('monthly'),
-            'yearlyPrice' => $this->billing->unitPrice('yearly'),
         ]);
     }
 }

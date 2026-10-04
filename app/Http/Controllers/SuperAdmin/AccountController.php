@@ -14,6 +14,7 @@ use App\Services\Billing\AccountBillingService;
 use App\Services\Billing\PaymentLinkService;
 use App\Services\HostelService;
 use App\Services\NotificationService;
+use App\Support\Refusal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -396,7 +397,7 @@ class AccountController extends Controller
                 fn (array $payment) => $this->billing->addBranch($account, $branch, $payment),
             );
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         if ($viaLink) {
@@ -487,7 +488,7 @@ class AccountController extends Controller
             //    renewed, forever.
             //  · a payment-link guard refused, or Razorpay did. The order was rolled
             //    back with the transaction, so there is nothing to clean up.
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         if ($viaLink) {
@@ -527,7 +528,7 @@ class AccountController extends Controller
                 fn (array $payment) => $this->billing->align($account, $payment),
             );
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         if (! $order) {
@@ -675,7 +676,7 @@ class AccountController extends Controller
         try {
             $order = $this->paymentLinks->issue($order);
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         return $this->linkIssued($order, $order->payment_link_attempts > 1 ? 'Link re-issued' : 'Link issued');
@@ -723,7 +724,7 @@ class AccountController extends Controller
         try {
             $this->paymentLinks->resend($order, $medium);
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         return back()->with('success', 'Razorpay has re-sent the payment link by '.strtoupper($medium).'.');
@@ -746,7 +747,7 @@ class AccountController extends Controller
         try {
             $result = $this->paymentLinks->checkWithRazorpay($order);
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', Refusal::message($e));
         }
 
         return back()->with($result['applied'] ? 'success' : 'info', $result['message']);

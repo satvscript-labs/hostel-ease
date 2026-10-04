@@ -2,18 +2,23 @@
 @section('title', 'My Subscription')
 
 {{-- ─────────────────────────────────────────────────────────────────────────
-     REFERENCE (P4 item 15 — do not remove until the owner self-serve redesign):
-     The Super Admin billing terminal (Account 360) was heavily reworked in the
-     P4 fix rounds — live discount-aware summaries, per-period custom prices,
-     scoped comps, explicit owner FK (see _artifact/subscription_update/
-     07_phase4_manual_testing_fixes.md). THIS owner-facing page has NOT been
-     redesigned to match yet; it is deliberately deferred.
+     The owner's billing page — rebuilt in S3 on the same core as the operator's
+     Account 360 (_artifact/saas_billing_autopay/14_S3_DESIGN.md).
 
-     Until then it runs PRODUCTION-LOCKED via config('hostelease.owner_self_serve')
-     (default false): owners can view plans/coverage/history, but renewals,
-     add-branch payments, and self-serve branch creation are supervised — the
-     Super Admin performs them from Account 360. The same flag gates the
-     server-side ops (Admin\SubscriptionController / BranchManagerController).
+     · Every figure comes from the same quote functions Account 360 uses, so the
+       owner sees their own negotiated price and the two surfaces cannot disagree.
+     · Paying anything goes through a PENDING ORDER written when the price is shown,
+       never a quote re-priced when the money arrives.
+     · The browser sends a charge shape, never an amount; confirming sends only
+       Razorpay's three ids.
+     · A charge already open — a link we sent, a proforma, the owner's own earlier
+       attempt — is what gets paid. Never a second demand beside it.
+
+     BLADE ORDER MATTERS: the one multi-line PHP block below must stay ABOVE every
+     inline single-expression use further down (the branch-state chips). Blade pairs
+     the first opener it finds with the first closer, before comments are stripped —
+     a second block added lower down swallows the page (see show.blade.php for
+     Account 360, where that bit).
    ───────────────────────────────────────────────────────────────────────── --}}
 
 @php
@@ -23,13 +28,12 @@
     $q = $quotes[$displayPeriod];
     $anchorFmt = $account->current_period_end?->format('d M Y');
 
-    // Hero presentation per lifecycle state.
     $hero = match ($status) {
-        AccountStatus::Trial => ['tone' => 'trial', 'icon' => 'gift', 'label' => 'Free trial', 'cta' => 'Subscribe now'],
-        AccountStatus::Grace => ['tone' => 'warn',  'icon' => 'triangle-exclamation', 'label' => 'Expired — grace period', 'cta' => 'Renew now to restore'],
-        AccountStatus::Expired => ['tone' => 'danger', 'icon' => 'circle-xmark', 'label' => 'Subscription expired', 'cta' => 'Renew now'],
-        AccountStatus::Suspended => ['tone' => 'muted', 'icon' => 'lock', 'label' => 'Account on hold', 'cta' => null],
-        default => ['tone' => ($days !== null && $days <= 30) ? 'due' : 'active', 'icon' => 'circle-check', 'label' => 'Active', 'cta' => 'Renew all now'],
+        AccountStatus::Trial => ['tone' => 'trial', 'icon' => 'gift', 'label' => __('Free trial'), 'cta' => __('Subscribe now')],
+        AccountStatus::Grace => ['tone' => 'warn', 'icon' => 'triangle-exclamation', 'label' => __('Expired — grace period'), 'cta' => __('Renew now to restore')],
+        AccountStatus::Expired => ['tone' => 'danger', 'icon' => 'circle-xmark', 'label' => __('Subscription expired'), 'cta' => __('Renew now')],
+        AccountStatus::Suspended => ['tone' => 'muted', 'icon' => 'lock', 'label' => __('Account on hold'), 'cta' => null],
+        default => ['tone' => ($days !== null && $days <= 30) ? 'due' : 'active', 'icon' => 'circle-check', 'label' => __('Active'), 'cta' => __('Renew all now')],
     };
 @endphp
 
@@ -79,11 +83,10 @@
 
 @section('content')
 <div class="page-enter" x-data="ownerSubscription()">
-    {{-- Standard page head (W9 mobile pass): title scale follows the system. --}}
     <div class="he-page-head mb-4">
         <div>
             <h1 class="he-page-title">{{ __('My Subscription') }}</h1>
-            <p class="he-page-sub">{{ __('Renew every branch together, on one date, in one payment.') }}</p>
+            <p class="he-page-sub">{{ __('Every branch renews together, on one date, in one payment.') }}</p>
         </div>
     </div>
 
@@ -96,31 +99,45 @@
                     <span class="badge bg-white bg-opacity-25 rounded-pill px-3 py-2 mb-2"><i class="fa-solid fa-{{ $hero['icon'] }} me-1"></i>{{ $hero['label'] }}</span>
                     <div class="text-white-50 small">
                         @if($status === AccountStatus::Trial)
-                            Trial ends {{ $anchorFmt ?? '—' }}@if($days !== null && $days >= 0) · {{ $days }} day(s) left @endif
+                            {{ __('Trial ends') }} {{ $anchorFmt ?? '—' }}@if($days !== null && $days >= 0) · {{ $days }} {{ __('day(s) left') }} @endif
                         @elseif($status === AccountStatus::Grace)
-                            Access ends soon — renew to keep your hostels running.
+                            {{ __('Access ends soon — renew to keep your hostels running.') }}
                         @elseif($status === AccountStatus::Expired)
-                            Your hostels are blocked until you renew.
+                            {{ __('Your hostels are blocked until you renew.') }}
                         @elseif($status === AccountStatus::Suspended)
-                            Your account is on hold. Please contact support.
+                            {{ __('Your account is on hold. Please contact support.') }}
                         @else
-                            @if($days !== null && $days >= 0) Renews in {{ $days }} day(s). @else Renews on the date below. @endif
+                            @if($days !== null && $days >= 0) {{ __('Renews in') }} {{ $days }} {{ __('day(s).') }} @else {{ __('Renews on the date below.') }} @endif
                         @endif
                     </div>
                 </div>
-                @if($hero['cta'] && $status !== AccountStatus::Suspended && $selfServe)
+
+                {{-- The one primary action. If a renewal is ALREADY billed — by us, or
+                     by the owner's own earlier attempt — the button pays THAT, never
+                     raises a second one beside it (design 14 §3). --}}
+                @if($status === AccountStatus::Suspended)
+                    <a href="mailto:{{ config('hostelease.company.email') }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>{{ __('Contact support') }}</a>
+                @elseif($openRenewal && ($openRenewal['link_url'] || $canManage))
                     <div class="d-flex flex-wrap gap-2">
-                        @if($razorpayEnabled)
-                            <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
+                        @if($openRenewal['link_url'])
+                            <a href="{{ $openRenewal['link_url'] }}" target="_blank" rel="noopener" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn">
+                                <i class="fa-solid fa-lock me-2"></i>{{ __('Pay') }} {{ hostelease_money($openRenewal['amount']) }}
+                            </a>
                         @else
-                            <button class="btn btn-light rounded-pill px-4 fw-bold" disabled title="Online payment unavailable">Payments unavailable</button>
+                            <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="payOrder({{ $openRenewal['id'] }})" :disabled="loading">
+                                <i class="fa-solid fa-lock me-2"></i>{{ __('Pay') }} {{ hostelease_money($openRenewal['amount']) }}
+                            </button>
                         @endif
-                        <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="openAdd()"><i class="fa-solid fa-plus me-2"></i>Add a branch</button>
+                        @if($canManage)
+                            <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="openAdd()"><i class="fa-solid fa-plus me-2"></i>{{ __('Add a branch') }}</button>
+                        @endif
                     </div>
-                @elseif($status === AccountStatus::Suspended)
-                    <a href="tel:" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>Contact support</a>
+                @elseif($canManage && $hero['cta'])
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
+                        <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="openAdd()"><i class="fa-solid fa-plus me-2"></i>{{ __('Add a branch') }}</button>
+                    </div>
                 @elseif(! $selfServe)
-                    {{-- Production lock: supervised billing (P4 item 15). --}}
                     <div class="sub-lock">
                         <span class="sub-lock-ic"><i class="fa-solid fa-shield-halved"></i></span>
                         <span>
@@ -128,36 +145,74 @@
                             <span class="sub-lock-sub d-block">{{ __('Renewals and new branches are set up for you — contact support anytime.') }}</span>
                         </span>
                     </div>
+                @elseif(! $viewerOwnsAccount)
+                    <div class="sub-lock">
+                        <span class="sub-lock-ic"><i class="fa-solid fa-user-shield"></i></span>
+                        <span>
+                            <span class="sub-lock-title d-block">{{ __('Managed by the account owner') }}</span>
+                            <span class="sub-lock-sub d-block">{{ __('Only the account owner can renew or add branches.') }}</span>
+                        </span>
+                    </div>
                 @endif
             </div>
 
-            {{-- Metric grid: ASYMMETRIC columns (owner). Branches and Term are
-                 short (a digit, a word) — dates and money are long. Equal
-                 halves starved the long pair on a 344px Fold; auto|1fr gives
-                 each side what it actually needs. One grid on phones, four
-                 across when the hero is wide. --}}
             <div class="sub-metrics mt-3">
-                <div><div class="sub-metric-lbl">Branches</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
-                <div><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? 'Trial ends' : 'Renews on' }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
-                <div><div class="sub-metric-lbl">Term</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->label() ?? 'Yearly' }}</div></div>
+                <div><div class="sub-metric-lbl">{{ __('Branches') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
+                <div><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? __('Trial ends') : __('Renews on') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
+                <div><div class="sub-metric-lbl">{{ __('Term') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->isPaid() ? $account->period->label() : __('Trial') }}</div></div>
                 <div>
-                    <div class="sub-metric-lbl">Next total</div>
+                    <div class="sub-metric-lbl">{{ __('Next total') }}</div>
                     <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($q['final']) }}</div>
-                    @if($q['discount'] > 0)<div class="small text-white-50" style="white-space:nowrap;">Discount −{{ hostelease_money($q['discount']) }}</div>@endif
+                    @if($q['discount'] > 0)<div class="small text-white-50" style="white-space:nowrap;">{{ __('Discount') }} −{{ hostelease_money($q['discount']) }}</div>@endif
                 </div>
             </div>
         </div>
     </div>
+
+    {{-- ── Payment due ──
+         Every charge already open on the account, whoever opened it. A payment link
+         the HostelEase team sent is payable here even with self-serve switched off:
+         it is OUR instrument, not self-serve (design 14 §4, roadmap item 23). --}}
+    @if(count($due))
+        <div class="panel-card shadow-sm mb-4" style="border-color: rgba(79,70,229,.25);">
+            <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-file-invoice text-primary me-2"></i>{{ __('Payment due') }}</h6>
+                <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">{{ count($due) }}</span>
+            </div>
+            @foreach($due as $row)
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-4 py-3 {{ ! $loop->last ? 'border-bottom' : '' }}">
+                    <div class="min-w-0">
+                        <div class="fw-bold text-dark">{{ hostelease_money($row['amount']) }} <span class="fw-normal text-muted small">· {{ $row['label'] }}@if($row['period']) · {{ $row['period'] }}@endif</span></div>
+                        <div class="small text-muted">
+                            {{ $row['invoice'] }} · {{ __('raised') }} {{ $row['raised'] }}
+                            @if($row['link_expires']) · {{ __('link valid until') }} {{ $row['link_expires'] }} @endif
+                        </div>
+                    </div>
+                    @if($row['link_url'])
+                        <a href="{{ $row['link_url'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
+                            <i class="fa-solid fa-lock me-1"></i>{{ __('Pay securely') }}
+                        </a>
+                    @elseif($canManage)
+                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="payOrder({{ $row['id'] }})" :disabled="loading">
+                            <i class="fa-solid fa-lock me-1"></i>{{ __('Pay now') }}
+                        </button>
+                    @else
+                        <span class="small text-muted">{{ __('Contact us to pay') }}</span>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
 
     <div class="row g-4">
         {{-- ── Branches ── --}}
         <div class="col-lg-7">
             <div class="panel-card shadow-sm h-100">
                 <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-hotel text-primary me-2"></i>Your branches</h6>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-hotel text-primary me-2"></i>{{ __('Your branches') }}</h6>
                     <span class="text-muted small">
-                        {{ $billableCount }} on your plan
-                        @if($branches->count() > $billableCount) · {{ $branches->count() - $billableCount }} closing @endif
+                        {{ $billableCount }} {{ __('on your plan') }}
+                        @if($branches->count() > $billableCount) · {{ $branches->count() - $billableCount }} {{ __('closing') }} @endif
                     </span>
                 </div>
                 <div class="stagger">
@@ -170,43 +225,50 @@
                                     <div class="fw-bold text-dark">{{ $branch->name }}</div>
                                     <div class="small text-muted">
                                         @if($state === 'cancelled')
-                                            Closing {{ $branch->subscription_end?->format('d M Y') }} · not billed at your next renewal
+                                            {{ __('Closing') }} {{ $branch->subscription_end?->format('d M Y') }} · {{ __('not billed at your next renewal') }}
                                         @elseif($state === 'closed')
-                                            Closed {{ $branch->subscription_end?->format('d M Y') }}
+                                            {{ __('Closed') }} {{ $branch->subscription_end?->format('d M Y') }}
                                         @else
-                                            Ends {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}
+                                            {{ __('Ends') }} {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}
                                         @endif
                                     </div>
                                     @if($state === 'removal_requested')
                                         <div class="small mt-1" style="color:#ea580c;">
-                                            <i class="fa-solid fa-clock me-1"></i>Removal requested — our team will be in touch. Nothing has changed yet.
+                                            <i class="fa-solid fa-clock me-1"></i>{{ __('Removal requested — our team will be in touch. Nothing has changed yet.') }}
                                         </div>
                                     @endif
                                 </div>
                                 <div class="d-flex flex-column align-items-end gap-2">
                                     @php($chip = match($state) {
-                                        'removal_requested' => ['warning', 'Removal asked'],
-                                        'cancelled' => ['secondary', 'Closing'],
-                                        'closed' => ['secondary', 'Closed'],
-                                        default => $branch->isActive() ? ($behind ? ['warning', 'Behind'] : ['success', 'Active']) : ['danger', 'Expired'],
+                                        'removal_requested' => ['warning', __('Removal asked')],
+                                        'cancelled' => ['secondary', __('Closing')],
+                                        'closed' => ['secondary', __('Closed')],
+                                        default => $branch->isActive() ? ($behind ? ['warning', __('Behind')] : ['success', __('Active')]) : ['danger', __('Expired')],
                                     })
-                                    <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2"
-                                          @if($behind) title="Renewing all will align this branch" @endif>{{ $chip[1] }}</span>
+                                    <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
 
-                                    {{-- Removal is a REQUEST, never a self-service cancel (D11): it
-                                         changes what you are billed, so a person confirms it. Owner
+                                    {{-- Bring a behind branch onto the renewal date, at the price
+                                         the operator would quote — the same function prices both. --}}
+                                    @if(isset($addable[$branch->id]))
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold"
+                                                @click="payAddBranch({{ $branch->id }})" :disabled="loading">
+                                            {{ __('Add to plan') }} · {{ hostelease_money($addable[$branch->id]['amount']) }}
+                                        </button>
+                                    @endif
+
+                                    {{-- Removal is a REQUEST, never a self-service cancel (D11). Owner
                                          only — a co-admin shares the role, so the gate is the FK. --}}
                                     @if($viewerOwnsAccount && ! $branch->isCancelled())
                                         @if($state === 'removal_requested')
                                             <form method="POST" action="{{ route('admin.branches.withdraw-removal', $branch) }}"
-                                                  data-confirm="Withdraw your request to remove {{ $branch->name }}?">
+                                                  data-confirm="{{ __('Withdraw your request to remove') }} {{ $branch->name }}?">
                                                 @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm">Withdraw</button>
+                                                <button class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm">{{ __('Withdraw') }}</button>
                                             </form>
                                         @else
                                             <button type="button" class="btn btn-sm btn-link text-muted p-0 small"
                                                     @click="removeBranchId = {{ $branch->id }}; removeBranchName = @js($branch->name); removeOpen = true">
-                                                Request removal
+                                                {{ __('Request removal') }}
                                             </button>
                                         @endif
                                     @endif
@@ -214,11 +276,11 @@
                             </div>
                         </div>
                     @empty
-                        <div class="p-4"><x-he-empty-state icon="hotel" title="No branches yet" subtitle="Add a branch to get started." /></div>
+                        <div class="p-4"><x-he-empty-state icon="hotel" title="{{ __('No branches yet') }}" subtitle="{{ __('Add a branch to get started.') }}" /></div>
                     @endforelse
                 </div>
-                @if($branches->contains(fn($b) => $account->current_period_end && $account->current_period_end->isFuture() && (! $b->subscription_end || $b->subscription_end->lt($account->current_period_end))))
-                    <div class="px-4 py-3 small text-muted bg-light bg-opacity-50"><i class="fa-solid fa-circle-info text-warning me-1"></i>Renewing all brings every branch onto the same date.</div>
+                @if($branches->contains(fn ($b) => ! $b->isCancelled() && $account->current_period_end && $account->current_period_end->isFuture() && (! $b->subscription_end || $b->subscription_end->lt($account->current_period_end))))
+                    <div class="px-4 py-3 small text-muted bg-light bg-opacity-50"><i class="fa-solid fa-circle-info text-warning me-1"></i>{{ __('Renewing all brings every branch onto the same date.') }}</div>
                 @endif
             </div>
         </div>
@@ -226,84 +288,143 @@
         {{-- ── Payment history ── --}}
         <div class="col-lg-5">
             <div class="panel-card shadow-sm h-100">
-                <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>Recent payments</h6></div>
-                @forelse($orders->where('payment_status', \App\Enums\PaymentStatus::Paid) as $order)
+                <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>{{ __('Recent payments') }}</h6></div>
+                @forelse($orders as $order)
                     <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
                         <div>
                             <div class="fw-bold text-dark">{{ hostelease_money($order->amount) }}</div>
-                            <div class="small text-muted">{{ $order->period?->label() ?? '' }} · {{ $order->quantity }} branch(es) · {{ $order->created_at?->format('d M Y') }}</div>
+                            <div class="small text-muted">{{ $order->kind?->label() ?? '' }} · {{ $order->quantity }} {{ __('branch(es)') }} · {{ $order->created_at?->format('d M Y') }}</div>
                         </div>
-                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1">Paid</span>
+                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1">{{ __('Paid') }}</span>
                     </div>
                 @empty
-                    <div class="p-4"><x-he-empty-state icon="receipt" title="No payments yet" subtitle="Your renewals will appear here." /></div>
+                    <div class="p-4"><x-he-empty-state icon="receipt" title="{{ __('No payments yet') }}" subtitle="{{ __('Your renewals will appear here.') }}" /></div>
                 @endforelse
             </div>
         </div>
     </div>
 
-    {{-- ── Mobile sticky renew bar ── --}}
-    @if($hero['cta'] && $status !== AccountStatus::Suspended && $razorpayEnabled && $selfServe)
+    {{-- ── Mobile sticky action bar ── --}}
+    @if($status !== AccountStatus::Suspended && (($openRenewal && ($openRenewal['link_url'] || $canManage)) || ($canManage && $hero['cta'])))
         <div class="d-lg-none" style="height:76px;"></div>
         <div class="sub-sticky d-lg-none">
             <div class="d-flex align-items-center justify-content-between gap-3">
-                <div class="flex-shrink-0">
-                    <div class="small text-muted lh-1">Next total</div>
-                    <div class="fw-bold text-dark" x-text="money(q().final)"></div>
-                </div>
-                <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
+                @if($openRenewal)
+                    <div class="flex-shrink-0">
+                        <div class="small text-muted lh-1">{{ __('Due now') }}</div>
+                        <div class="fw-bold text-dark">{{ hostelease_money($openRenewal['amount']) }}</div>
+                    </div>
+                    @if($openRenewal['link_url'])
+                        <a href="{{ $openRenewal['link_url'] }}" target="_blank" rel="noopener" class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1"><i class="fa-solid fa-lock me-2"></i>{{ __('Pay now') }}</a>
+                    @else
+                        <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="payOrder({{ $openRenewal['id'] }})" :disabled="loading"><i class="fa-solid fa-lock me-2"></i>{{ __('Pay now') }}</button>
+                    @endif
+                @else
+                    <div class="flex-shrink-0">
+                        <div class="small text-muted lh-1">{{ __('Next total') }}</div>
+                        <div class="fw-bold text-dark" x-text="money(q().final)"></div>
+                    </div>
+                    <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
+                @endif
             </div>
         </div>
     @endif
 
     @unless($selfServe)
-        {{-- Production lock notice (P4 item 15): view-only billing. --}}
         <div class="d-flex align-items-start gap-3 mt-4 p-3 px-4 rounded-4 shadow-sm" style="background:var(--he-warning-soft,#fef3c7); border:1px solid rgba(245,158,11,.25);">
             <i class="fa-solid fa-shield-halved fs-5 mt-1" style="color:var(--he-warning,#f59e0b);"></i>
             <div>
-                <div class="fw-bold text-dark" style="font-size:.92rem;">Billing is managed by HostelEase support</div>
-                <div class="small text-muted">Your plans and coverage above are always up to date. To renew, add a branch, or change your plan, contact support and our team will set it up on your account.</div>
+                <div class="fw-bold text-dark" style="font-size:.92rem;">{{ __('Billing is managed by HostelEase support') }}</div>
+                <div class="small text-muted">{{ __('Your plans and coverage above are always up to date. To renew, add a branch, or change your plan, contact support and our team will set it up on your account. Any payment link we send you can be paid right here.') }}</div>
             </div>
         </div>
     @endunless
 
-    @if($selfServe)
-    {{-- ══ Add-branch modal ══ --}}
+    @if($canManage)
+    {{-- ══ Renew-all ══ Itemised from the SAME quote the operator sees. The term is
+         the only thing the owner chooses; every figure is the server's. --}}
     <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen=false" x-cloak style="display:none;">
-            <div class="custom-overlay-modal" style="max-width:500px;" :class="{'is-open':addOpen}">
-                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Add a branch</h5><button type="button" class="btn-close" @click="addOpen=false" :disabled="loading"></button></div>
+        <div class="custom-overlay-backdrop" x-show="renewOpen" x-transition.opacity @click.self="renewOpen = false" x-cloak style="display:none;">
+            <div class="custom-overlay-modal" style="max-width:520px;" :class="{ 'is-open': renewOpen }">
+                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">{{ __('Renew all branches') }}</h5><button type="button" class="btn-close" @click="renewOpen = false" :disabled="loading"></button></div>
                 <div class="custom-overlay-body">
-                    <label class="form-label fw-bold small text-muted">BRANCH NAME</label>
-                    <input type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Sunrise Riverside" maxlength="255">
-                    <label class="form-label fw-bold small text-muted">CITY <span class="fw-normal">— optional</span></label>
-                    <input type="text" x-model="add.city" class="form-control bg-white border shadow-sm mb-4" placeholder="e.g. Surat" maxlength="100">
-
-                    @if($account->current_period_end && $account->current_period_end->isFuture() && $addBranch['prorated'] > 0)
-                        <div class="bg-white border rounded-4 p-3 mb-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-bold text-dark">Add to my plan now</div>
-                                    <div class="small text-muted">Prorated to {{ $addBranch['anchor'] }} · {{ $addBranch['days'] }} day(s)</div>
-                                </div>
-                                <div class="h5 fw-bold text-primary mb-0">{{ hostelease_money($addBranch['prorated']) }}</div>
+                    <div class="text-muted small text-uppercase mb-2" style="letter-spacing:.5px;">{{ __('Choose term') }}</div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="plan-pick h-100" :class="{ 'on': period === 'yearly' }" @click="period = 'yearly'">
+                                <div class="fw-bold text-uppercase small" :class="period === 'yearly' ? 'text-primary' : 'text-muted'">{{ __('Yearly') }}</div>
+                                <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.yearly.unit)"></div>
+                                <div class="small text-muted">{{ __('per branch') }}</div>
+                                @if($yearlySaving)<div class="small text-success fw-bold">{{ __('Save') }} {{ $yearlySaving }}%</div>@endif
                             </div>
                         </div>
-                        <div class="small text-muted mb-1">Co-terminates with your other branches, so everything renews together.</div>
-                    @else
-                        <div class="alert bg-info-subtle text-info border-0 rounded-3 small mb-0"><i class="fa-solid fa-circle-info me-1"></i>This branch will start on a 14-day free trial.</div>
-                    @endif
+                        <div class="col-6">
+                            <div class="plan-pick h-100" :class="{ 'on': period === 'monthly' }" @click="period = 'monthly'">
+                                <div class="fw-bold text-uppercase small" :class="period === 'monthly' ? 'text-primary' : 'text-muted'">{{ __('Monthly') }}</div>
+                                <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.monthly.unit)"></div>
+                                <div class="small text-muted">{{ __('per branch') }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border rounded-4 p-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted"><span x-text="q().quantity"></span> {{ __('branch(es)') }} × <span x-text="money(q().unit)"></span></span>
+                            <span class="fw-semibold" x-text="money(q().subtotal)"></span>
+                        </div>
+                        <template x-if="q().volume > 0">
+                            <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Multi-branch discount') }}</span><span x-text="'−' + money(q().volume)"></span></div>
+                        </template>
+                        <template x-if="q().manual > 0">
+                            <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Your discount') }}</span><span x-text="'−' + money(q().manual)"></span></div>
+                        </template>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="fw-bold">{{ __('Total payable') }}</span>
+                            <span class="h4 fw-bold mb-0 text-primary" x-text="money(q().final)"></span>
+                        </div>
+                        <div class="small text-muted mt-2"><i class="fa-solid fa-calendar-check me-1"></i>{{ __('New renewal date') }}: <span class="fw-semibold text-dark" x-text="q().new_anchor"></span> — {{ __('all branches together.') }}</div>
+                    </div>
+                </div>
+                <div class="custom-overlay-footer">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="renewOpen = false" :disabled="loading">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2" @click="payRenewal()" :disabled="loading">
+                        <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Pay') }} <span x-text="money(q().final)"></span></span>
+                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    {{-- ══ Add a branch ══ It always starts on a free trial, so an abandoned payment
+         still leaves a working branch. "Add & pay" then brings it onto the plan. --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen = false" x-cloak style="display:none;">
+            <div class="custom-overlay-modal" style="max-width:500px;" :class="{ 'is-open': addOpen }">
+                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">{{ __('Add a branch') }}</h5><button type="button" class="btn-close" @click="addOpen = false" :disabled="loading"></button></div>
+                <div class="custom-overlay-body">
+                    <label class="form-label fw-bold small text-muted">{{ __('BRANCH NAME') }}</label>
+                    <input type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Sunrise Riverside" maxlength="255">
+                    <label class="form-label fw-bold small text-muted">{{ __('CITY') }} <span class="fw-normal">— {{ __('optional') }}</span></label>
+                    <input type="text" x-model="add.city" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Surat" maxlength="100">
+
+                    <div class="alert bg-info-subtle text-info border-0 rounded-3 small mb-0">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        {{ __('The new branch starts on a 14-day free trial straight away.') }}
+                        @if($canAddPaid)
+                            {{ __('Choose "Add & pay" to bring it onto your plan now, prorated to') }} {{ $anchorFmt }} — {{ __('so everything renews together. You will see the exact amount before you pay.') }}
+                        @else
+                            {{ __('It will join your plan at your next renewal.') }}
+                        @endif
+                    </div>
                 </div>
                 <div class="custom-overlay-footer d-flex flex-column flex-sm-row gap-2">
-                    <form method="POST" action="{{ route('admin.branches.store') }}" class="order-2 order-sm-1 me-sm-auto w-100 w-sm-auto">
-                        @csrf
-                        <input type="hidden" name="name" :value="add.name">
-                        <input type="hidden" name="city" :value="add.city">
-                        <button type="submit" class="btn btn-link text-muted fw-semibold text-decoration-none px-0" :disabled="!add.name || loading">Start a 14-day free trial instead</button>
-                    </form>
-                    @if($razorpayEnabled && $account->current_period_end && $account->current_period_end->isFuture() && $addBranch['prorated'] > 0)
-                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm order-1 order-sm-2 d-flex align-items-center justify-content-center gap-2" @click="payAdd()" :disabled="!add.name || loading">
-                            <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>Add &amp; pay {{ hostelease_money($addBranch['prorated']) }}</span>
+                    <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none px-0 order-2 order-sm-1 me-sm-auto"
+                            @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Start the free trial only') }}</button>
+                    @if($canAddPaid)
+                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm order-1 order-sm-2 d-flex align-items-center justify-content-center gap-2"
+                                @click="addBranch(true)" :disabled="!add.name || loading">
+                            <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Add & pay') }}</span>
                             <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                         </button>
                     @endif
@@ -311,89 +432,33 @@
             </div>
         </div>
     </template>
-
-    {{-- ══ Renew-all modal ══ --}}
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="renewOpen" x-transition.opacity @click.self="renewOpen=false" x-cloak style="display:none;">
-            <div class="custom-overlay-modal" style="max-width:520px;" :class="{'is-open':renewOpen}">
-                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">Renew all branches</h5><button type="button" class="btn-close" @click="renewOpen=false" :disabled="loading"></button></div>
-                <div class="custom-overlay-body">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="text-muted small text-uppercase" style="letter-spacing:.5px;">Choose term</div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <div class="plan-pick h-100" :class="{'on':period==='yearly'}" @click="period='yearly'">
-                                <div class="fw-bold text-uppercase small" :class="period==='yearly'?'text-primary':'text-muted'">Yearly</div>
-                                <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.yearly.unit)"></div>
-                                <div class="small text-success fw-bold">Save 16%</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="plan-pick h-100" :class="{'on':period==='monthly'}" @click="period='monthly'">
-                                <div class="fw-bold text-uppercase small" :class="period==='monthly'?'text-primary':'text-muted'">Monthly</div>
-                                <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.monthly.unit)"></div>
-                                <div class="small text-muted">per branch</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white border rounded-4 p-3">
-                        <div class="d-flex justify-content-between mb-1"><span class="text-muted"><span x-text="q().quantity"></span> branch(es) × <span x-text="money(q().unit)"></span></span><span class="fw-semibold" x-text="money(q().subtotal)"></span></div>
-                        <template x-if="q().discount > 0">
-                            <div class="d-flex justify-content-between mb-1 text-success"><span>Discount applied</span><span x-text="'−'+money(q().discount)"></span></div>
-                        </template>
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <span class="fw-bold">Total payable</span>
-                            <span class="h4 fw-bold mb-0 text-primary" x-text="money(q().final)"></span>
-                        </div>
-                        <div class="small text-muted mt-2"><i class="fa-solid fa-calendar-check me-1"></i>New renewal date: <span class="fw-semibold text-dark" x-text="q().new_anchor"></span> — all branches together.</div>
-                    </div>
-                </div>
-                <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="renewOpen=false" :disabled="loading">Cancel</button>
-                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2" @click="pay()" :disabled="loading">
-                        <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>Pay <span x-text="money(q().final)"></span></span>
-                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
     @endif
 
-    {{-- ══ Request branch removal (D11) ══
-         A REQUEST, not a cancel. Removal changes what the customer is billed, so a
-         person confirms it — and for a hands-on business that conversation is worth
-         having. The copy is explicit that nothing changes yet and that the branch
-         keeps the time it has paid for, so nobody expects an instant shut-off or a
-         refund. Owner-only; the button is not rendered for co-admins. --}}
+    {{-- ══ Request branch removal (D11) ══ A REQUEST, not a cancel. Owner-only. --}}
     @if($viewerOwnsAccount)
         <template x-teleport="body">
-            <div class="custom-overlay-backdrop" x-show="removeOpen" x-transition.opacity @click.self="removeOpen=false" x-cloak style="display:none;">
-                <form method="POST" action="{{ route('admin.branches.request-removal') }}" class="custom-overlay-modal" style="max-width:520px;" :class="{'is-open':removeOpen}">
+            <div class="custom-overlay-backdrop" x-show="removeOpen" x-transition.opacity @click.self="removeOpen = false" x-cloak style="display:none;">
+                <form method="POST" action="{{ route('admin.branches.request-removal') }}" class="custom-overlay-modal" style="max-width:520px;" :class="{ 'is-open': removeOpen }">
                     @csrf
                     <input type="hidden" name="branch_id" :value="removeBranchId">
                     <div class="custom-overlay-header">
-                        <h5 class="fw-bold mb-0">Request branch removal</h5>
-                        <button type="button" class="btn-close" @click="removeOpen=false"></button>
+                        <h5 class="fw-bold mb-0">{{ __('Request branch removal') }}</h5>
+                        <button type="button" class="btn-close" @click="removeOpen = false"></button>
                     </div>
                     <div class="custom-overlay-body">
                         <div class="fw-bold text-dark mb-2" x-text="removeBranchName"></div>
                         <p class="small text-muted">
-                            We'll contact you before anything changes. Once it's confirmed, the branch
-                            <strong>keeps working until the end of the time you've already paid for</strong>
-                            and simply isn't billed at your next renewal. There's no refund for the
-                            remaining time, and nothing is cancelled today.
+                            {{ __('We\'ll contact you before anything changes. Once it\'s confirmed, the branch') }}
+                            <strong>{{ __('keeps working until the end of the time you\'ve already paid for') }}</strong>
+                            {{ __('and simply isn\'t billed at your next renewal. There\'s no refund for the remaining time, and nothing is cancelled today.') }}
                         </p>
-                        <label class="form-label fw-bold small text-muted">WHY ARE YOU REMOVING IT? <span class="text-danger">*</span></label>
-                        <input type="text" name="reason" class="form-control bg-white border shadow-sm" required maxlength="255"
-                               placeholder="e.g. we're closing this property">
-                        <div class="form-text">This helps us help you — if it's about price or a feature, tell us and we'll try to sort it.</div>
+                        <label class="form-label fw-bold small text-muted">{{ __('WHY ARE YOU REMOVING IT?') }} <span class="text-danger">*</span></label>
+                        <input type="text" name="reason" class="form-control bg-white border shadow-sm" required maxlength="255" placeholder="{{ __('e.g. we\'re closing this property') }}">
+                        <div class="form-text">{{ __('This helps us help you — if it\'s about price or a feature, tell us and we\'ll try to sort it.') }}</div>
                     </div>
                     <div class="custom-overlay-footer d-flex justify-content-end gap-2">
-                        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="removeOpen=false">Never mind</button>
-                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">Send request</button>
+                        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="removeOpen = false">{{ __('Never mind') }}</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">{{ __('Send request') }}</button>
                     </div>
                 </form>
             </div>
@@ -403,7 +468,7 @@
 @endsection
 
 @push('scripts')
-@if($razorpayEnabled && $selfServe)
+@if($canManage)
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 @endif
 <script>
@@ -412,117 +477,123 @@ document.addEventListener('alpine:init', () => {
         renewOpen: false,
         addOpen: false,
         loading: false,
-        // Branch removal REQUEST (D11) — the owner asks, support confirms.
-        // The form action is rendered server-side; the branch rides as a posted
-        // integer (standards §1.1 rule 3), so no URL is built in the browser.
         removeOpen: false,
         removeBranchId: null,
         removeBranchName: '',
         period: @json($displayPeriod),
         quotes: @json($quotes),
         add: { name: '', city: '' },
-        prefill: @json(['name' => $account->owner?->name, 'email' => $account->owner?->email, 'contact' => $account->owner?->mobile]),
-        rzpKeyName: @json(config('app.name')),
-        money(v) { return '₹' + Number(v || 0).toLocaleString('en-IN', {minimumFractionDigits:0, maximumFractionDigits:2}); },
+
+        money(v) { return '₹' + Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); },
         q() { return this.quotes[this.period]; },
         openRenew() { this.renewOpen = true; },
         openAdd() { this.add = { name: '', city: '' }; this.addOpen = true; },
-        async payAdd() {
-            @if(!$razorpayEnabled)
-                return;
-            @endif
-            if (!this.add.name) return;
+
+        // Never alert(): it blocks the page. The app's toast if present, else a
+        // SweetAlert toast, else the console — never a dialog.
+        toast(message, type) {
+            if (window.showToast) return window.showToast(message, type || 'info');
+            if (window.Swal) return Swal.fire({ toast: true, position: 'top-end', icon: type === 'error' ? 'error' : (type || 'info'), title: message, showConfirmButton: false, timer: 4500 });
+            console.log(message);
+        },
+
+        async post(url, body) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
+                body: JSON.stringify(body),
+            });
+            let data = {};
+            try { data = await res.json(); } catch (e) { /* non-JSON error page */ }
+            if (!res.ok) throw new Error(data.message || (res.status === 429 ? 'Too many attempts — please wait a minute.' : 'Something went wrong. Please try again.'));
+            return data;
+        },
+
+        // ── Starting a charge ──
+        // The browser sends a charge SHAPE — never an amount. Every figure the
+        // customer pays is read from the server's pending order (S2 audit brief).
+        payRenewal() { return this.start({ charge: 'renewal', period: this.period }); },
+        payAddBranch(id) { return this.start({ charge: 'add_branch', branch_id: id }); },
+        payOrder(id) { return this.start({ charge: 'order', order_id: id }); },
+
+        async start(body) {
             this.loading = true;
             try {
-                const orderRes = await fetch('{{ route('admin.subscription.add-branch-order') }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                    body: JSON.stringify({ name: this.add.name, city: this.add.city }),
-                });
-                const order = await orderRes.json();
-                if (!orderRes.ok) { window.showToast ? window.showToast(order.message || 'Could not start payment', 'error') : alert(order.message); this.loading = false; return; }
-                // Branch created but nothing to charge (trial), or payment couldn't start — just go back.
-                if (order.trial_only || !order.order_id) { window.location = order.redirect || '{{ route('admin.subscription.index') }}'; return; }
-
-                const rzp = new Razorpay({
-                    key: order.key, order_id: order.order_id, amount: order.amount, currency: order.currency,
-                    name: this.rzpKeyName, description: order.description, prefill: this.prefill,
-                    theme: { color: '#4f46e5' },
-                    modal: { ondismiss: () => { this.loading = false; } },
-                    handler: async (response) => {
-                        const verifyRes = await fetch('{{ route('admin.subscription.verify') }}', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                            body: JSON.stringify({
-                                type: 'add_branch', period: order.period, branch_id: order.branch_id,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        });
-                        const result = await verifyRes.json();
-                        if (verifyRes.ok) {
-                            if (window.Swal) { await Swal.fire({ icon: 'success', title: 'Branch added!', text: result.message, confirmButtonColor: '#4f46e5' }); }
-                            window.location = result.redirect || '{{ route('admin.subscription.index') }}';
-                        } else {
-                            window.showToast ? window.showToast(result.message || 'Verification failed', 'error') : alert(result.message);
-                            this.loading = false;
-                        }
-                    },
-                });
-                rzp.on('payment.failed', () => { window.showToast ? window.showToast('Payment failed — you were not charged. The branch is on a free trial.', 'error') : null; this.loading = false; });
-                rzp.open();
+                this.handle(await this.post(@json(route('admin.subscription.checkout')), body));
             } catch (e) {
-                window.showToast ? window.showToast('Something went wrong. Please try again.', 'error') : alert('Something went wrong.');
+                this.toast(e.message, 'error');
                 this.loading = false;
             }
         },
-        async pay() {
-            @if(!$razorpayEnabled)
-                return;
-            @endif
+
+        async addBranch(payNow) {
+            if (!this.add.name) return;
             this.loading = true;
             try {
-                const orderRes = await fetch('{{ route('admin.subscription.renew-order') }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                    body: JSON.stringify({ period: this.period }),
-                });
-                const order = await orderRes.json();
-                if (!orderRes.ok) { window.showToast ? window.showToast(order.message || 'Could not start payment', 'error') : alert(order.message); this.loading = false; return; }
-
-                const rzp = new Razorpay({
-                    key: order.key, order_id: order.order_id, amount: order.amount, currency: order.currency,
-                    name: this.rzpKeyName, description: order.description, prefill: this.prefill,
-                    theme: { color: '#4f46e5' },
-                    modal: { ondismiss: () => { this.loading = false; } },
-                    handler: async (response) => {
-                        const verifyRes = await fetch('{{ route('admin.subscription.verify') }}', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                            body: JSON.stringify({
-                                type: 'renew_account', period: order.period,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        });
-                        const result = await verifyRes.json();
-                        if (verifyRes.ok) {
-                            if (window.Swal) {
-                                await Swal.fire({ icon: 'success', title: "You're all set!", text: result.message, confirmButtonColor: '#4f46e5' });
-                            }
-                            window.location = result.redirect || '{{ route('admin.subscription.index') }}';
-                        } else {
-                            window.showToast ? window.showToast(result.message || 'Verification failed', 'error') : alert(result.message);
-                            this.loading = false;
-                        }
-                    },
-                });
-                rzp.on('payment.failed', () => { window.showToast ? window.showToast('Payment failed — you were not charged. Please try again.', 'error') : null; this.loading = false; });
-                rzp.open();
+                const result = await this.post(@json(route('admin.subscription.add-branch')), { name: this.add.name, city: this.add.city, pay_now: payNow });
+                if (result.created) this.toast(result.created, 'success');
+                this.handle(result);
             } catch (e) {
-                window.showToast ? window.showToast('Something went wrong. Please try again.', 'error') : alert('Something went wrong.');
+                this.toast(e.message, 'error');
+                this.loading = false;
+            }
+        },
+
+        handle(result) {
+            if (result.mode === 'link') {
+                // The team already sent a link for this charge — pay THAT, never a
+                // second demand beside it. Same tab, so the page reflects it on return.
+                this.toast(result.message, 'info');
+                window.location.href = result.url;
+                return;
+            }
+            if (result.mode === 'checkout') {
+                this.renewOpen = false;
+                this.addOpen = false;
+                return this.openCheckout(result.razorpay);
+            }
+            // 'paid' or 'created' — nothing to pay right now.
+            this.toast(result.message, 'success');
+            setTimeout(() => { window.location.href = result.redirect || window.location.href; }, 1200);
+        },
+
+        openCheckout(opts) {
+            const rzp = new Razorpay({
+                key: opts.key, order_id: opts.order_id, amount: opts.amount, currency: opts.currency,
+                name: opts.name, description: opts.description, prefill: opts.prefill,
+                theme: { color: '#4f46e5' },
+                modal: { ondismiss: () => { this.loading = false; } },
+                handler: (response) => this.confirm(response),
+            });
+            rzp.on('payment.failed', () => {
+                this.toast('That payment did not go through, and you have not been charged. You can try again.', 'error');
+                this.loading = false;
+            });
+            rzp.open();
+        },
+
+        // ── Confirming ──
+        // ONLY Razorpay's three ids. Which charge this paid for is looked up on the
+        // server from the Razorpay order id; the amount is read back from Razorpay.
+        async confirm(response) {
+            try {
+                const result = await this.post(@json(route('admin.subscription.confirm')), {
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature,
+                });
+                if (window.Swal) {
+                    await Swal.fire({
+                        icon: result.state === 'pending' ? 'info' : (result.state === 'refused' ? 'warning' : 'success'),
+                        title: result.state === 'pending' ? 'Almost done' : (result.state === 'refused' ? 'We are checking it' : "You're all set!"),
+                        text: result.message, confirmButtonColor: '#4f46e5',
+                    });
+                } else {
+                    this.toast(result.message, result.state === 'refused' ? 'warning' : 'success');
+                }
+                window.location.href = result.redirect || window.location.href;
+            } catch (e) {
+                this.toast(e.message, 'error');
                 this.loading = false;
             }
         },

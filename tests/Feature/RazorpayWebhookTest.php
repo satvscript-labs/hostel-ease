@@ -3,7 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Hostel;
-use App\Models\SubscriptionOrder;
+use App\Models\Notification;
+use App\Models\SubscriptionAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -26,59 +27,85 @@ class RazorpayWebhookTest extends TestCase
         return $branch;
     }
 
-    public function test_order_paid_webhook_renews_the_branch_and_is_idempotent(): void
+    /**
+     * The retired Phase 6 shape — notes carrying `branch_id` + `period`, which used to
+     * renew that ONE branch at list price from whatever the account looked like when
+     * the money arrived (14_S3_DESIGN.md §1 P2/P3). It is no longer applied, and it
+     * must not vanish either: money was captured, so it reaches a human, and the
+     * webhook still returns 200 so Razorpay stops retrying.
+     */
+    public function test_a_legacy_per_branch_order_is_never_applied_and_is_raised_for_review(): void
     {
         config(['services.razorpay.webhook_secret' => 'whsec_test']);
 
         $hostel = $this->ownedBranch('+919770000001', ['subscription_end' => now()->addDays(5)]);
+        $coverageBefore = $hostel->subscription_end->copy();
 
         $payload = json_encode([
             'event' => 'order.paid',
             'payload' => [
                 'order' => ['entity' => [
-                    'id' => 'order_test123',
+                    'id' => 'order_legacy',
                     'notes' => ['branch_id' => (string) $hostel->id, 'period' => 'monthly'],
                 ]],
-                'payment' => ['entity' => ['id' => 'pay_test123']],
+                'payment' => ['entity' => ['id' => 'pay_legacy', 'amount' => 100000]],
             ],
         ]);
-
-        $signature = hash_hmac('sha256', $payload, 'whsec_test');
-        $headers = ['HTTP_X-Razorpay-Signature' => $signature, 'CONTENT_TYPE' => 'application/json'];
+        $headers = ['HTTP_X-Razorpay-Signature' => hash_hmac('sha256', $payload, 'whsec_test'), 'CONTENT_TYPE' => 'application/json'];
 
         $this->call('POST', '/api/v1/webhooks/razorpay', [], [], [], $headers, $payload)->assertOk();
 
-        // The ORDER ledger is where a charge lands since S1 (D8) — the legacy
-        // `subscriptions` table is never written.
-        $this->assertDatabaseHas('subscription_orders', [
-            'transaction_number' => 'pay_test123',
-            'payment_status' => 'paid',
-        ]);
-        $this->assertSame(1, SubscriptionOrder::where('transaction_number', 'pay_test123')->count());
+        $this->assertDatabaseMissing('subscription_orders', ['transaction_number' => 'pay_legacy']);
+        $this->assertTrue($coverageBefore->equalTo($hostel->fresh()->subscription_end), 'No coverage may be granted.');
+        $this->assertDatabaseHas('notifications', ['type' => 'payment_unapplied', 'hostel_id' => null]);
         $this->assertDatabaseCount('subscriptions', 0);
+    }
 
-        $hostel->refresh();
-        $this->assertTrue($hostel->subscription_end->isAfter(now()->addDays(25))); // stacked a month on top
+    /** Same for the retired account-level shapes. */
+    public function test_legacy_account_renewal_and_add_branch_orders_are_never_applied(): void
+    {
+        config(['services.razorpay.webhook_secret' => 'whsec_test']);
 
-        // Replay the identical payload — must not create a second order.
-        $this->call('POST', '/api/v1/webhooks/razorpay', [], [], [], $headers, $payload)->assertOk();
-        $this->assertSame(1, SubscriptionOrder::where('transaction_number', 'pay_test123')->count());
+        $hostel = $this->ownedBranch('+919770000003', ['subscription_end' => now()->addMonths(2)]);
+        $account = SubscriptionAccount::create([
+            'owner_id' => $hostel->owner_id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(2),
+        ]);
+
+        foreach (['renew_account' => 'pay_l1', 'add_branch' => 'pay_l2'] as $type => $paymentId) {
+            $payload = json_encode([
+                'event' => 'order.paid',
+                'payload' => [
+                    'order' => ['entity' => ['id' => 'order_'.$paymentId, 'notes' => [
+                        'account_id' => (string) $account->id, 'branch_id' => (string) $hostel->id, 'type' => $type, 'period' => 'yearly',
+                    ]]],
+                    'payment' => ['entity' => ['id' => $paymentId, 'amount' => 1000000]],
+                ],
+            ]);
+
+            $this->call('POST', '/api/v1/webhooks/razorpay', [], [], [], [
+                'HTTP_X-Razorpay-Signature' => hash_hmac('sha256', $payload, 'whsec_test'),
+                'CONTENT_TYPE' => 'application/json',
+            ], $payload)->assertOk();
+
+            $this->assertDatabaseMissing('subscription_orders', ['transaction_number' => $paymentId]);
+        }
+
+        $this->assertSame(2, Notification::where('type', 'payment_unapplied')->count());
     }
 
     /**
-     * Money was captured but cannot be attributed. It must NOT 500 — Razorpay would
-     * retry forever and never succeed — and it must not vanish either.
+     * Money was captured on an order with no notes at all — created in the Razorpay
+     * dashboard, say. It must NOT 500 — Razorpay would retry forever and never
+     * succeed — and it must not vanish either.
      */
     public function test_an_unattributable_payment_is_acknowledged_and_raised_for_review(): void
     {
         config(['services.razorpay.webhook_secret' => 'whsec_test']);
 
-        $orphan = Hostel::factory()->create(['owner_id' => null, 'mobile' => '+919779999999', 'subscription_end' => now()->addDays(5)]);
-
         $payload = json_encode([
             'event' => 'order.paid',
             'payload' => [
-                'order' => ['entity' => ['id' => 'order_orphan', 'notes' => ['branch_id' => (string) $orphan->id, 'period' => 'yearly']]],
+                'order' => ['entity' => ['id' => 'order_orphan', 'notes' => []]],
                 'payment' => ['entity' => ['id' => 'pay_orphan', 'amount' => 1000000]],
             ],
         ]);
@@ -90,35 +117,6 @@ class RazorpayWebhookTest extends TestCase
 
         $this->assertDatabaseMissing('subscription_orders', ['transaction_number' => 'pay_orphan']);
         $this->assertDatabaseHas('notifications', ['type' => 'payment_unapplied', 'hostel_id' => null]);
-    }
-
-    public function test_order_paid_records_the_captured_amount_and_order_id(): void
-    {
-        config(['services.razorpay.webhook_secret' => 'whsec_test']);
-
-        $hostel = $this->ownedBranch('+919770000002', ['subscription_end' => now()->addDays(5)]);
-
-        $payload = json_encode([
-            'event' => 'order.paid',
-            'payload' => [
-                'order' => ['entity' => [
-                    'id' => 'order_amt1',
-                    'notes' => ['branch_id' => (string) $hostel->id, 'period' => 'yearly'],
-                ]],
-                'payment' => ['entity' => ['id' => 'pay_amt1', 'amount' => 1000000]], // ₹10,000 in paise
-            ],
-        ]);
-
-        $signature = hash_hmac('sha256', $payload, 'whsec_test');
-        $headers = ['HTTP_X-Razorpay-Signature' => $signature, 'CONTENT_TYPE' => 'application/json'];
-
-        $this->call('POST', '/api/v1/webhooks/razorpay', [], [], [], $headers, $payload)->assertOk();
-
-        $order = SubscriptionOrder::where('transaction_number', 'pay_amt1')->firstOrFail();
-        $this->assertSame('order_amt1', $order->razorpay_order_id);
-        $this->assertSame(10000.0, (float) $order->amount); // recorded what was captured, not just the quote
-        // Razorpay handled it, so the collection channel is the online one.
-        $this->assertSame('checkout', $order->collection->value);
     }
 
     public function test_payment_failed_is_acknowledged_without_granting_coverage(): void

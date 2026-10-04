@@ -5,7 +5,6 @@ namespace App\Services\Billing;
 use App\Enums\CollectionMethod;
 use App\Enums\OrderKind;
 use App\Enums\PaymentLinkStatus;
-use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
@@ -14,7 +13,6 @@ use App\Services\ActivityLogger;
 use App\Services\NotificationService;
 use App\Services\RazorpayService;
 use Closure;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -51,6 +49,7 @@ class PaymentLinkService
         protected AccountBillingService $billing,
         protected ActivityLogger $logger,
         protected NotificationService $notifications,
+        protected PaymentSettlement $settlement,
     ) {}
 
     public function isEnabled(): bool
@@ -143,6 +142,13 @@ class PaymentLinkService
         }
         if ($order->hasLiveLink()) {
             throw new RuntimeException('This charge already has a live payment link. Cancel it before issuing another — two live links for one charge is how a customer pays twice.');
+        }
+
+        // The owner has this charge open in online checkout (S3). Razorpay orders
+        // cannot be cancelled, so that checkout stays payable — a link beside it
+        // would give the customer two ways to pay one bill.
+        if ($order->hasOpenCheckout()) {
+            throw new RuntimeException('The customer has opened this charge for online checkout, which stays payable. Ask them to complete it there — or void this charge and quote a fresh one if it needs to change.');
         }
 
         $this->assertNoDuplicateLiveLink($account, $order);
@@ -408,92 +414,35 @@ class PaymentLinkService
     // -----------------------------------------------------------------
 
     /**
-     * THE single apply path, shared by the webhook and the manual check. If these
-     * two ever diverge, one of them is wrong and nobody will know which.
+     * Apply a payment that arrived on a link — from the webhook or the manual check.
+     *
+     * The money rules are NOT here any more: they live in PaymentSettlement, which
+     * owner checkout (S3) shares, so the two channels cannot apply money by
+     * different rules. This method only adds what is link-specific — the link's own
+     * status, and the audit line.
      *
      * @param  int  $paidPaise  what Razorpay says was actually paid
      * @param  string  $source  for the audit trail: 'webhook' | 'manual check'
-     * @return bool whether the charge was applied
+     * @return bool whether the charge is now paid by this payment
      */
     public function applyPaid(SubscriptionOrder $order, string $paymentId, int $paidPaise, string $source = 'webhook'): bool
     {
-        // ── Already settled ──
-        if ($order->payment_status === PaymentStatus::Paid) {
-            if ($order->transaction_number === $paymentId) {
-                return true;    // the same delivery again — a clean no-op
-            }
+        $result = $this->settlement->settle($order, $paymentId, $paidPaise, 'payment link', $source);
 
-            // A DIFFERENT payment against a charge we have already recorded as
-            // paid. Money has been captured that grants nothing, so it must not be
-            // swallowed: a human has to refund it or move it (design §6 BP7).
-            $this->alertUnapplied(
-                $order,
-                $paymentId,
-                $paidPaise,
-                'the charge was already recorded as paid by '.($order->transaction_number ?: 'another payment'),
+        if ($result === PaymentSettlement::REFUSED) {
+            return false;
+        }
+
+        if ($result === PaymentSettlement::APPLIED) {
+            $order->update(['payment_link_status' => PaymentLinkStatus::Paid->value]);
+
+            $this->logger->log(
+                'subscription.paid',
+                "Payment link paid ({$source}) — {$order->invoiceNumber()} · ".hostelease_money($order->amount),
+                $order->fresh(),
+                ['payment' => $paymentId, 'payment_link_id' => $order->payment_link_id],
             );
-
-            return false;
         }
-
-        if ($order->payment_status === PaymentStatus::Voided) {
-            $this->alertUnapplied($order, $paymentId, $paidPaise, 'the charge had been voided');
-
-            return false;
-        }
-
-        // ── Amount check (design §6 BP5) ──
-        // Partial payments are disabled at link creation, so a short capture is an
-        // anomaly. Granting a full term for part of the money is the one mistake
-        // here that costs real revenue, so it grants nothing and asks for a human.
-        $expectedPaise = $order->amountPaise();
-
-        if ($paidPaise > 0 && $paidPaise < $expectedPaise) {
-            $this->alertUnapplied(
-                $order,
-                $paymentId,
-                $paidPaise,
-                'only '.hostelease_money($paidPaise / 100).' of '.hostelease_money($expectedPaise / 100).' was paid',
-            );
-
-            return false;
-        }
-
-        if ($paidPaise > $expectedPaise) {
-            Log::warning('Payment link: captured more than the charge', [
-                'order_id' => $order->id,
-                'expected_paise' => $expectedPaise,
-                'captured_paise' => $paidPaise,
-                'payment' => $paymentId,
-            ]);
-        }
-
-        try {
-            $this->billing->acceptOrder($order, [
-                'payment_method' => PaymentMethod::Online->value,
-                'transaction_number' => $paymentId,
-                'remarks' => trim(($order->remarks ? $order->remarks.' · ' : '')
-                    ."Paid by payment link ({$source})"),
-            ]);
-        } catch (QueryException $e) {
-            // A concurrent delivery already recorded this payment id — the UNIQUE
-            // index on transaction_number is the real idempotency guard, and losing
-            // that race means the work is already done.
-            if ((string) $e->getCode() !== '23000') {
-                throw $e;
-            }
-
-            return true;
-        }
-
-        $order->update(['payment_link_status' => PaymentLinkStatus::Paid->value]);
-
-        $this->logger->log(
-            'subscription.paid',
-            "Payment link paid ({$source}) — {$order->invoiceNumber()} · ".hostelease_money($order->amount),
-            $order->fresh(),
-            ['payment' => $paymentId, 'payment_link_id' => $order->payment_link_id],
-        );
 
         return true;
     }
@@ -733,32 +682,10 @@ class PaymentLinkService
         return ($expiry->lessThan($floor) ? $floor : $expiry)->getTimestamp();
     }
 
-    /**
-     * Money captured that we could not apply. Never silent, never a 500: the
-     * webhook must return 200 or Razorpay retries forever and still never
-     * succeeds, so the only correct response is to shout at a human.
-     */
+    /** Delegates to the shared settlement — one alert format for every channel. */
     protected function alertUnapplied(?SubscriptionOrder $order, string $paymentId, int $paidPaise, string $why, string $lead = ''): void
     {
-        $who = $order?->account?->owner?->name ?? ($order ? 'account #'.$order->account_id : 'an unknown customer');
-
-        Log::error('Payment link: captured payment not applied', [
-            'order_id' => $order?->id,
-            'payment' => $paymentId,
-            'captured_paise' => $paidPaise,
-            'reason' => $why,
-        ]);
-
-        $this->notifications->push(
-            null,
-            'payment_unapplied',
-            'payment_unapplied:'.$paymentId,
-            'Payment received but not applied — manual review',
-            $lead.hostelease_money($paidPaise / 100).' was captured for '.$who
-                .($order ? " ({$order->invoiceNumber()})" : '')
-                ." but was not applied because {$why}. Review it and either refund the payment or record the charge from Account 360.",
-            'danger',
-        );
+        $this->settlement->alertUnapplied($order, $paymentId, $paidPaise, $why, $lead);
     }
 
     /** A paid link we could not match to any order at all. */
