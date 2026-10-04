@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Models\SubscriptionOrder;
 use App\Services\NotificationService;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -52,10 +53,19 @@ class PaymentSettlement
      */
     public function settle(SubscriptionOrder $order, string $paymentId, int $paidPaise, string $channel, string $source): string
     {
-        // Read the CURRENT row. The callback and the webhook routinely race on the
-        // same payment; acting on a stale instance would skip the "already paid"
-        // branch and fall through to acceptOrder(), where only the unique index on
-        // transaction_number stands between us and a double grant.
+        return DB::transaction(fn () => $this->settleLocked($order, $paymentId, $paidPaise, $channel, $source));
+    }
+
+    protected function settleLocked(SubscriptionOrder $order, string $paymentId, int $paidPaise, string $channel, string $source): string
+    {
+        // LOCK, then read the current row (S3 audit). A refresh alone was not
+        // enough: two deliveries — the callback and the webhook, or a payment and
+        // the operator's "Accept" — could both read "pending" before either wrote,
+        // and both proceed. With the same payment id that is harmless; with two
+        // DIFFERENT ones the second overwrote the first's transaction number and
+        // one real payment vanished from the ledger. The row lock makes the
+        // "already paid?" check and the write one indivisible step.
+        SubscriptionOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
         $order->refresh();
 
         // ── Already settled ──
@@ -112,6 +122,14 @@ class PaymentSettlement
             ]);
         }
 
+        // ── Would it buy anything? ──
+        // The money is captured either way, so it is RECORDED either way — leaving
+        // the order pending would keep it on the customer's "Payment due" list and
+        // invite them to pay it again. But a payment that extends no coverage is
+        // almost certainly a duplicate (a stale link paid from an old SMS, a second
+        // renewal raised for the same period), so a human is told to refund it.
+        $buysSomething = $order->wouldExtendCoverage(fresh: true);
+
         try {
             $this->billing->acceptOrder($order, [
                 'payment_method' => PaymentMethod::Online->value,
@@ -127,6 +145,23 @@ class PaymentSettlement
             }
 
             return self::ALREADY;
+        }
+
+        if (! $buysSomething) {
+            $this->notifications->push(
+                null,
+                'payment_no_coverage',
+                'payment_no_coverage:'.$paymentId,
+                'Payment received for coverage already in place — likely a duplicate',
+                hostelease_money($paidPaise / 100).' was paid by '.($order->account?->owner?->name ?? 'account #'.$order->account_id)
+                    ." on {$order->invoiceNumber()}, but every date it would grant was already covered, so it extended nothing."
+                    .' It has been recorded against the charge. Check whether the customer paid twice, and refund if so.',
+                'danger',
+            );
+
+            Log::warning('Online payment applied but extended no coverage', [
+                'order_id' => $order->id, 'payment' => $paymentId, 'channel' => $channel,
+            ]);
         }
 
         return self::APPLIED;

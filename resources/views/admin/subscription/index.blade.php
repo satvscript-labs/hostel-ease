@@ -188,7 +188,14 @@
                             @if($row['link_expires']) · {{ __('link valid until') }} {{ $row['link_expires'] }} @endif
                         </div>
                     </div>
-                    @if($row['link_url'])
+                    {{-- An OVERTAKEN charge — every date it would grant is already
+                         covered — is shown, but never offered: paying it would buy
+                         nothing (S3 audit). We clear it up on our side. --}}
+                    @if(! $row['payable'])
+                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
+                            <i class="fa-solid fa-circle-check me-1"></i>{{ __('Already covered — nothing to pay') }}
+                        </span>
+                    @elseif($row['link_url'])
                         <a href="{{ $row['link_url'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
                             <i class="fa-solid fa-lock me-1"></i>{{ __('Pay securely') }}
                         </a>
@@ -512,14 +519,26 @@ document.addEventListener('alpine:init', () => {
         // ── Starting a charge ──
         // The browser sends a charge SHAPE — never an amount. Every figure the
         // customer pays is read from the server's pending order (S2 audit brief).
-        payRenewal() { return this.start({ charge: 'renewal', period: this.period }); },
+        // `expected` is ONLY for telling the customer if the price moved since the page
+        // loaded — it is never sent to the server, and never what they are charged.
+        payRenewal() { return this.start({ charge: 'renewal', period: this.period }, this.q().final); },
         payAddBranch(id) { return this.start({ charge: 'add_branch', branch_id: id }); },
         payOrder(id) { return this.start({ charge: 'order', order_id: id }); },
 
-        async start(body) {
+        async start(body, expected) {
             this.loading = true;
             try {
-                this.handle(await this.post(@json(route('admin.subscription.checkout')), body));
+                const result = await this.post(@json(route('admin.subscription.checkout')), body);
+
+                // The page can be hours old. If the server's amount differs from what
+                // this page showed, say so BEFORE the payment window opens — Razorpay
+                // shows the right figure, but nobody should be surprised by it.
+                if (result.mode === 'checkout' && expected !== undefined
+                    && Math.abs(result.razorpay.amount / 100 - expected) > 0.005) {
+                    this.toast('The total has been updated since this page loaded — it is now ' + this.money(result.razorpay.amount / 100) + '.', 'info');
+                }
+
+                this.handle(result);
             } catch (e) {
                 this.toast(e.message, 'error');
                 this.loading = false;
@@ -552,8 +571,9 @@ document.addEventListener('alpine:init', () => {
                 this.addOpen = false;
                 return this.openCheckout(result.razorpay);
             }
-            // 'paid' or 'created' — nothing to pay right now.
-            this.toast(result.message, 'success');
+            // 'paid', 'created' or 'held' — nothing to pay right now. 'held' means a
+            // payment was found that needs a human check: it must not read as success.
+            this.toast(result.message, result.mode === 'held' ? 'warning' : 'success');
             setTimeout(() => { window.location.href = result.redirect || window.location.href; }, 1200);
         },
 

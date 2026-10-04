@@ -666,7 +666,9 @@ class OwnerSelfServeBillingTest extends TestCase
         [$owner] = $this->owner(2, ['status' => 'suspended']);
         Http::fake();
 
-        $this->startRenewal($owner)->assertStatus(422);
+        // 423 Locked: refused at the controller's door since the audit, before any
+        // service runs. CheckoutService refuses too, as the second line of defence.
+        $this->startRenewal($owner)->assertStatus(423);
 
         $this->assertSame(0, SubscriptionOrder::count());
         Http::assertNothingSent();
@@ -718,6 +720,209 @@ class OwnerSelfServeBillingTest extends TestCase
         $large = $count(10, '9700000062');
 
         $this->assertLessThanOrEqual($small + 2, $large, "Owner page went from {$small} to {$large} queries as branches grew 2 → 10.");
+    }
+
+    // =================================================================
+    // The S3 audit (16_S3_AUDIT.md)
+    // =================================================================
+
+    /**
+     * 🔴 Paying twice for one year. Two pending renewals could coexist (S2 blocks two
+     * LIVE links, not two pending orders), both quoted from the same anchor, both
+     * listed as Payment due. Pay one, and the other now buys nothing — so it must
+     * stop being offered, and refuse to open.
+     */
+    public function test_once_one_renewal_is_paid_a_second_one_is_never_offered(): void
+    {
+        [$owner, $account] = $this->owner(2);
+        $billing = app(AccountBillingService::class);
+        $first = $billing->renewAccount($account, 'yearly', ['payment_status' => 'pending', 'collection' => 'link']);
+        $second = $billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'pending', 'collection' => 'link']);
+
+        $billing->acceptOrder($first, ['payment_method' => 'rtgs']);
+
+        $due = collect($this->actingAs($owner)->get(route('admin.subscription.index'))->assertOk()->viewData('due'));
+        $this->assertFalse($due->firstWhere('id', $second->id)['payable'], 'An overtaken renewal must not be offered.');
+
+        Http::fake();
+        $this->actingAs($owner)->postJson(route('admin.subscription.checkout'), ['charge' => 'order', 'order_id' => $second->id])
+            ->assertStatus(422);
+        Http::assertNothingSent();
+    }
+
+    /** 🔴 The owner's open attempt, overtaken by an offline renewal, is never paid. */
+    public function test_an_attempt_overtaken_by_an_offline_renewal_is_refused_and_cleared(): void
+    {
+        [$owner, $account] = $this->owner(2);
+        $this->fakeOrders('order_OV1', 'order_OV2');
+        Http::fake(['api.razorpay.com/v1/orders/order_OV1/payments' => Http::response(['items' => []], 200)]);
+
+        $this->startRenewal($owner)->assertOk();
+        $own = SubscriptionOrder::sole();
+
+        // The operator records a renewal paid by bank transfer meanwhile.
+        app(AccountBillingService::class)->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid', 'payment_method' => 'rtgs']);
+
+        $this->actingAs($owner)->postJson(route('admin.subscription.checkout'), ['charge' => 'order', 'order_id' => $own->id])
+            ->assertStatus(422);
+
+        // And the next Renew clears it out rather than reusing it.
+        $this->startRenewal($owner)->assertOk();
+        $this->assertSame('voided', $own->fresh()->payment_status->value);
+    }
+
+    /** 🟠 Reuse compared branch COUNT; a swapped branch left the new one unpaid. */
+    public function test_a_swapped_branch_is_never_paid_for_with_the_old_order(): void
+    {
+        [$owner, $account, $ids] = $this->owner(2);
+        $this->fakeOrders('order_SW1', 'order_SW2');
+        Http::fake(['api.razorpay.com/v1/orders/order_SW1/payments' => Http::response(['items' => []], 200)]);
+
+        $this->startRenewal($owner)->assertOk();
+        $first = SubscriptionOrder::sole();
+
+        app(AccountBillingService::class)->cancelBranch(Hostel::find($ids[1]), 'swap');
+        $new = Hostel::factory()->create(['mobile' => '9700000001', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => now()->addMonths(2)]);
+        $owner->hostels()->syncWithoutDetaching([$new->id]);
+
+        $this->startRenewal($owner)->assertOk()->assertJsonPath('razorpay.order_id', 'order_SW2');
+
+        $this->assertSame('voided', $first->fresh()->payment_status->value);
+        $current = SubscriptionOrder::where('payment_status', 'pending')->sole();
+        $this->assertContains($new->id, $current->lines()->pluck('branch_id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    /** 🟠 A payment still in flight blocks a supersede — voiding it made a refund case. */
+    public function test_an_in_flight_payment_blocks_superseding_the_attempt(): void
+    {
+        [$owner, $account] = $this->owner(2);
+        $this->fakeOrders('order_FL1', 'order_FL2');
+        Http::fake(['api.razorpay.com/v1/orders/order_FL1/payments' => Http::response(['items' => [
+            ['id' => 'pay_FL', 'amount' => 2000000, 'status' => 'authorized'],
+        ]], 200)]);
+
+        $this->startRenewal($owner)->assertOk();
+        $old = SubscriptionOrder::sole();
+        $account->update(['unit_price_override_yearly' => 8500]);
+
+        $this->startRenewal($owner)->assertStatus(422);
+
+        $this->assertSame('pending', $old->fresh()->payment_status->value);
+        $this->assertSame(1, SubscriptionOrder::count(), 'No second charge while the first is still being paid.');
+    }
+
+    /** 🟡 A found-but-refused payment is reported as held, never as "paid". */
+    public function test_a_short_payment_found_on_retry_is_held_not_reported_paid(): void
+    {
+        [$owner, $account] = $this->owner(2);
+        $this->fakeOrders('order_SR1');
+        Http::fake(['api.razorpay.com/v1/orders/order_SR1/payments' => Http::response(['items' => [
+            ['id' => 'pay_SR', 'amount' => 500000, 'status' => 'captured'],
+        ]], 200)]);
+
+        $this->startRenewal($owner)->assertOk();
+        $account->update(['unit_price_override_yearly' => 8500]);
+
+        $this->startRenewal($owner)->assertOk()->assertJsonPath('mode', 'held');
+        $this->assertDatabaseHas('notifications', ['type' => 'payment_unapplied']);
+    }
+
+    /** 🟡 Suspended means nothing can be started — adding a branch included. */
+    public function test_a_suspended_owner_cannot_add_a_branch(): void
+    {
+        [$owner] = $this->owner(1, ['status' => 'suspended']);
+
+        $this->actingAs($owner)->postJson(route('admin.subscription.add-branch'), ['name' => 'Held Wing'])->assertStatus(423);
+
+        $this->assertNull(Hostel::where('name', 'Held Wing')->first());
+    }
+
+    /** 🔴 A payment that lands on an overtaken charge is recorded AND raised for refund. */
+    public function test_a_payment_that_buys_nothing_raises_a_refund_alert(): void
+    {
+        [$owner, $account] = $this->owner(2);
+        $billing = app(AccountBillingService::class);
+        $first = $billing->renewAccount($account, 'yearly', ['payment_status' => 'pending']);
+        $second = $billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'pending']);
+        $billing->acceptOrder($first, ['payment_method' => 'rtgs']);
+
+        // The customer pays the overtaken one anyway (an old link, a stale tab).
+        app(\App\Services\Billing\PaymentSettlement::class)->settle($second, 'pay_dup', 2000000, 'payment link', 'webhook');
+
+        $this->assertSame('paid', $second->fresh()->payment_status->value, 'Recorded — so it is not offered again.');
+        $this->assertDatabaseHas('notifications', ['type' => 'payment_no_coverage', 'hostel_id' => null]);
+    }
+
+    /**
+     * 🔴 A renewal paid by checkout overtakes the operator's live add-branch link for
+     * a branch it just covered. That link must die before the customer taps it from
+     * an old SMS and pays for nothing.
+     */
+    public function test_paying_a_renewal_cancels_a_live_link_it_just_made_pointless(): void
+    {
+        [$owner, $account, $ids] = $this->owner(2);
+        Hostel::find($ids[1])->update(['subscription_end' => now()->addMonth()]);   // behind the anchor
+
+        $addBranch = app(AccountBillingService::class)->addBranch($account->fresh(), Hostel::find($ids[1]), ['payment_status' => 'pending', 'collection' => 'link']);
+        $addBranch->update(['payment_link_id' => 'plink_AB', 'payment_link_url' => 'https://rzp.io/i/ab', 'payment_link_status' => 'created', 'payment_link_attempts' => 1]);
+
+        $this->fakeOrders('order_RN');
+        Http::fake(['api.razorpay.com/v1/payment_links/plink_AB/cancel' => Http::response(['id' => 'plink_AB', 'status' => 'cancelled'], 200)]);
+        $this->startRenewal($owner)->assertOk();
+
+        $this->fakePayment('pay_RN', 2000000, 'order_RN');
+        $this->actingAs($owner)->postJson(route('admin.subscription.confirm'), [
+            'razorpay_order_id' => 'order_RN', 'razorpay_payment_id' => 'pay_RN', 'razorpay_signature' => $this->sign('order_RN', 'pay_RN'),
+        ])->assertOk()->assertJsonPath('state', 'applied');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'plink_AB/cancel'));
+        $this->assertSame('cancelled', $addBranch->fresh()->payment_link_status->value);
+    }
+
+    /** 🟠 The operator is told the truth when the owner paid online moments before. */
+    public function test_accepting_an_order_just_paid_online_tells_the_operator_not_to_take_payment(): void
+    {
+        [, $account] = $this->owner(2);
+        $order = app(AccountBillingService::class)->renewAccount($account, 'yearly', ['payment_status' => 'pending']);
+
+        app(\App\Services\Billing\PaymentSettlement::class)->settle($order->fresh(), 'pay_race', 2000000, 'online checkout', 'webhook');
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->patch(route('superadmin.accounts.orders.accept', [$account, $order]), ['payment_method' => 'cash'])
+            ->assertSessionHas('info', fn ($m) => str_contains($m, 'pay_race') && str_contains($m, 'Do not take payment'));
+
+        $this->assertSame('pay_race', $order->fresh()->transaction_number, 'The online payment is never overwritten.');
+    }
+
+    /** The operator cannot send a link for a charge that would buy nothing. */
+    public function test_the_operator_cannot_send_a_link_for_an_overtaken_charge(): void
+    {
+        [, $account] = $this->owner(2);
+        $billing = app(AccountBillingService::class);
+        $first = $billing->renewAccount($account, 'yearly', ['payment_status' => 'pending']);
+        $second = $billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'pending']);
+        $billing->acceptOrder($first, ['payment_method' => 'rtgs']);
+        Http::fake();
+
+        $super = User::factory()->superAdmin()->create();
+        $this->actingAs($super)->post(route('superadmin.accounts.orders.link.issue', $account), ['order_id' => $second->id])
+            ->assertSessionHas('error');
+        $this->assertNull($second->fresh()->payment_link_id);
+
+        $this->actingAs($super)->get(route('superadmin.accounts.show', $account))->assertOk()->assertSee('collecting this buys nothing');
+    }
+
+    /** A note alone can never choose which charge a payment settles. */
+    public function test_a_note_cannot_settle_an_order_with_no_razorpay_order_on_record(): void
+    {
+        [, $account] = $this->owner(2);
+        $order = app(AccountBillingService::class)->renewAccount($account, 'yearly', ['payment_status' => 'pending']);
+        $this->assertNull($order->razorpay_order_id);
+
+        $this->deliverOrderPaid('order_FORGED_NOTE', 'pay_FN', 2000000, ['type' => 'checkout', 'he_order_id' => (string) $order->id]);
+
+        $this->assertSame('pending', $order->fresh()->payment_status->value);
+        $this->assertDatabaseHas('notifications', ['type' => 'payment_unapplied']);
     }
 
     public function test_the_subscription_page_renders_for_the_owner(): void

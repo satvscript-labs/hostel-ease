@@ -122,6 +122,38 @@ class SubscriptionOrder extends Model
     }
 
     /**
+     * Would paying this order still BUY anything?
+     *
+     * True when at least one of its lines reaches past the coverage its branch already
+     * holds. False means the charge has been OVERTAKEN — every date it would grant is
+     * already in place (another renewal was paid, a duplicate was raised, an offline
+     * payment covered it) — and taking money for it buys nothing.
+     *
+     * The S3 audit's lead finding: two pending renewals could coexist, both quoted
+     * from the same anchor, both shown to the owner as "Payment due". Paying both
+     * gave ONE year — addLine() never shortens and both lines end on the same date,
+     * so the second payment changed nothing. Every surface that invites a payment
+     * now asks this first.
+     *
+     * Reads `lines.branch`; callers that need today's coverage pass $fresh, which
+     * reloads them rather than trusting whatever was eager-loaded earlier.
+     */
+    public function wouldExtendCoverage(bool $fresh = false): bool
+    {
+        $fresh ? $this->load('lines.branch') : $this->loadMissing('lines.branch');
+
+        return $this->lines->contains(function (SubscriptionOrderLine $line) {
+            $branch = $line->branch;
+            if (! $branch || ! $line->end_date) {
+                return false;
+            }
+
+            return ! $branch->subscription_end
+                || $line->end_date->copy()->startOfDay()->greaterThan($branch->subscription_end->copy()->startOfDay());
+        });
+    }
+
+    /**
      * Whether the owner has opened this charge for online checkout (S3) — a Razorpay
      * order exists for it and it is still unpaid. Razorpay orders cannot be
      * cancelled, so this instrument stays payable for as long as the charge is open.

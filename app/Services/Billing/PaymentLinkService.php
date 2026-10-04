@@ -144,6 +144,12 @@ class PaymentLinkService
             throw new RuntimeException('This charge already has a live payment link. Cancel it before issuing another — two live links for one charge is how a customer pays twice.');
         }
 
+        // Overtaken (S3 audit): every date this charge would grant is already covered,
+        // so a link would ask the customer to pay for nothing.
+        if (! $order->wouldExtendCoverage(fresh: true)) {
+            throw new RuntimeException('Everything this charge covers is already paid up — it has been overtaken (a later renewal or another payment covered it). Void it rather than collecting for it.');
+        }
+
         // The owner has this charge open in online checkout (S3). Razorpay orders
         // cannot be cancelled, so that checkout stays payable — a link beside it
         // would give the customer two ways to pay one bill.
@@ -288,6 +294,45 @@ class PaymentLinkService
         }
 
         $this->cancel($order, $reason);
+    }
+
+    /**
+     * Cancel every live link on the account that something else has just made
+     * pointless (S3 audit).
+     *
+     * The case: the operator sends an add-branch link for a branch; the owner then
+     * renews everything through checkout, which covers that branch too. The add-branch
+     * link is now worthless — but it is still live, and still sitting in the
+     * customer's SMS. Tapped a week later, it takes money for nothing. Call this after
+     * ANY coverage grant; it cancels only links whose charge would no longer extend
+     * anything, and never throws (cancel() reconciles instead).
+     *
+     * @return int how many links it cancelled
+     */
+    public function cancelOvertakenLinks(SubscriptionAccount $account, ?int $exceptOrderId = null): int
+    {
+        if (! $this->razorpay->isConfigured()) {
+            return 0;
+        }
+
+        $cancelled = 0;
+
+        $live = $account->orders()
+            ->withLiveLink()
+            ->where('payment_status', PaymentStatus::Pending->value)
+            ->get();
+
+        foreach ($live as $order) {
+            if ($order->id === $exceptOrderId || $order->wouldExtendCoverage(fresh: true)) {
+                continue;
+            }
+
+            if ($this->cancel($order, 'overtaken — its coverage is already in place')) {
+                $cancelled++;
+            }
+        }
+
+        return $cancelled;
     }
 
     /**
@@ -442,6 +487,10 @@ class PaymentLinkService
                 $order->fresh(),
                 ['payment' => $paymentId, 'payment_link_id' => $order->payment_link_id],
             );
+
+            if ($order->account) {
+                $this->cancelOvertakenLinks($order->account, $order->id);
+            }
         }
 
         return true;

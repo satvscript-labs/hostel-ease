@@ -47,6 +47,7 @@ class CheckoutService
         protected AccountBillingService $billing,
         protected PaymentSettlement $settlement,
         protected ActivityLogger $logger,
+        protected PaymentLinkService $paymentLinks,
     ) {}
 
     public function isEnabled(): bool
@@ -61,7 +62,7 @@ class CheckoutService
     /**
      * Renew every billable branch, on one date, in one payment.
      *
-     * @return array{mode:'link'|'checkout'|'paid', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
+     * @return array{mode:'link'|'checkout'|'paid'|'held', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
      *
      * @throws RuntimeException with an owner-readable message
      */
@@ -78,11 +79,30 @@ class CheckoutService
                 throw new RuntimeException('There are no branches on your plan to renew. Contact us if that is not right.');
             }
 
-            $open = $account->orders()
+            // Every pending renewal, newest first. Only one that would still BUY
+            // something counts as "the open demand" (S3 audit): an overtaken renewal
+            // - its dates already covered by a later payment - is not a bill, and
+            // offering it was how a customer paid twice for one year.
+            $pending = $account->orders()
                 ->where('payment_status', PaymentStatus::Pending->value)
                 ->where('kind', OrderKind::Renewal->value)
-                ->latest('id')
-                ->first();
+                ->orderByDesc('id')
+                ->get();
+
+            $open = $pending->first(fn (SubscriptionOrder $o) => $o->wouldExtendCoverage(fresh: true));
+
+            // The owner's OWN overtaken attempts are cleared out, so they stop
+            // sitting in receivables as money nobody owes. supersede() asks Razorpay
+            // first, so one that was actually paid is applied, not voided. Operator
+            // charges are left for the operator to void - they are theirs.
+            foreach ($pending as $stale) {
+                if (($open && $stale->is($open)) || ! $this->isOwnersOwn($stale)) {
+                    continue;
+                }
+                if ($result = $this->supersede($stale)) {
+                    return $result;
+                }
+            }
 
             if ($open && ! $this->isOwnersOwn($open)) {
                 // The OPERATOR has already billed this renewal. Pay that — never a
@@ -103,9 +123,16 @@ class CheckoutService
             if ($open) {
                 // The owner's own earlier attempt. Same term and same price → the
                 // same order and the same Razorpay order: a retry, not a new charge.
+                // Compared on WHICH branches, not how many (S3 audit): one branch
+                // removed and another added leaves the count and the price unchanged,
+                // and reusing that order would charge for the old set - the new branch
+                // left out of the renewal the owner thinks they paid for.
                 $fresh = $this->billing->quoteRenewal($account, $period);
+                $orderBranches = $open->lines()->pluck('branch_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+                $quoteBranches = collect($fresh['branch_ids'])->map(fn ($id) => (int) $id)->sort()->values()->all();
+
                 $unchanged = $open->period?->value === $period
-                    && $open->quantity === $fresh['quantity']
+                    && $orderBranches === $quoteBranches
                     && $open->amountPaise() === (int) round($fresh['breakdown']['final'] * 100);
 
                 if ($unchanged) {
@@ -135,7 +162,7 @@ class CheckoutService
      * and without a live anchor the right action is Renew-all, which brings every
      * branch along.
      *
-     * @return array{mode:'link'|'checkout'|'paid', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
+     * @return array{mode:'link'|'checkout'|'paid'|'held', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
      *
      * @throws RuntimeException with an owner-readable message
      */
@@ -159,6 +186,15 @@ class CheckoutService
             }
 
             $open = $this->openAddBranchOrder($account, $branch);
+
+            // Overtaken - the branch is already covered past what this would buy.
+            // Not a demand: clear it if it is ours, ignore it if it is the operator's.
+            if ($open && ! $open->wouldExtendCoverage(fresh: true)) {
+                if ($this->isOwnersOwn($open) && ($result = $this->supersede($open))) {
+                    return $result;
+                }
+                $open = null;
+            }
 
             if ($open && ! $this->isOwnersOwn($open)) {
                 return $this->payExisting($open);
@@ -193,7 +229,7 @@ class CheckoutService
      * Pay a charge that is already open — an operator's proforma or link, or the
      * owner's own earlier attempt. What the "Payment due" panel calls.
      *
-     * @return array{mode:'link'|'checkout'|'paid', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
+     * @return array{mode:'link'|'checkout'|'paid'|'held', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
      *
      * @throws RuntimeException with an owner-readable message
      */
@@ -342,6 +378,13 @@ class CheckoutService
                 $order->fresh(),
                 ['payment' => $paymentId, 'razorpay_order_id' => $order->razorpay_order_id],
             );
+
+            // This payment may have made an operator's live link pointless - an
+            // add-branch link for a branch this renewal just covered. Kill it before
+            // the customer taps it from an old SMS and pays for nothing.
+            if ($order->account) {
+                $this->paymentLinks->cancelOvertakenLinks($order->account, $order->id);
+            }
         }
 
         return $result;
@@ -353,6 +396,13 @@ class CheckoutService
      */
     protected function payExisting(SubscriptionOrder $order): array
     {
+        // The last gate before money (S3 audit). Whatever route led here - the
+        // Payment due list, a reused attempt, an operator's proforma or link - never
+        // open a payment for a charge whose every date is already covered.
+        if (! $order->wouldExtendCoverage(fresh: true)) {
+            throw new RuntimeException('Everything this charge covers is already paid up, so there is nothing to pay on it. If you think that is wrong, please contact us.');
+        }
+
         // One live instrument per order. A live link means the operator's link IS
         // how this charge gets paid; opening a checkout beside it would give the
         // customer two ways to pay one bill.
@@ -428,18 +478,34 @@ class CheckoutService
                 throw new RuntimeException('We could not check your earlier payment attempt just now. Please try again in a moment — you will not be charged twice.');
             }
 
+            // A payment still IN FLIGHT - started or authorised, not yet captured -
+            // means "wait", not "abandoned" (S3 audit). Voiding now would land its
+            // capture, seconds later, on a voided order: a refund case made by us.
+            if (collect($payments)->contains(fn (array $p) => in_array($p['status'], ['created', 'authorized'], true))) {
+                throw new RuntimeException('Your earlier payment attempt is still being processed. Give it a minute, then refresh this page - you will not be charged twice.');
+            }
+
             $captured = collect($payments)->firstWhere('status', 'captured');
             if ($captured) {
                 // RETURN, never throw: this runs inside the caller's transaction, so
                 // a throw here would roll back the very settlement it just made — the
                 // payment would be found, applied, and silently un-applied.
-                $this->settleOrder($open, $captured['id'], $captured['amount'], 'found on retry');
+                $result = $this->settleOrder($open, $captured['id'], $captured['amount'], 'found on retry');
 
-                return [
-                    'mode' => 'paid',
-                    'order' => $open->fresh(),
-                    'message' => 'Good news — your earlier payment had already gone through, so there is nothing more to pay. Your plan is updated.',
-                ];
+                // Only say "paid" when it was. A refused settlement (a short capture,
+                // say) has raised an alert, and the owner must hear that we are
+                // checking - not that everything is fine.
+                return $result === PaymentSettlement::REFUSED
+                    ? [
+                        'mode' => 'held',
+                        'order' => $open->fresh(),
+                        'message' => 'We found a payment from your earlier attempt that needs a check before it is applied. Our team has been alerted and will be in touch - please do not pay again.',
+                    ]
+                    : [
+                        'mode' => 'paid',
+                        'order' => $open->fresh(),
+                        'message' => 'Good news - your earlier payment had already gone through, so there is nothing more to pay. Your plan is updated.',
+                    ];
             }
         }
 
@@ -490,7 +556,9 @@ class CheckoutService
 
         if ($noteId && ctype_digit((string) $noteId)) {
             $order = SubscriptionOrder::with('account.owner')->find((int) $noteId);
-            if ($order && (! $order->razorpay_order_id || $order->razorpay_order_id === $razorpayOrderId)) {
+            // EXACT match only (S3 audit). Accepting a note on an order with no
+            // Razorpay id stored let a note alone choose which charge got paid.
+            if ($order && $order->razorpay_order_id !== null && $order->razorpay_order_id === $razorpayOrderId) {
                 return $order;
             }
         }

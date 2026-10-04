@@ -426,6 +426,15 @@
                                                     {{-- S3: the owner has this charge open in online checkout.
                                                          Razorpay orders cannot be cancelled, so it stays payable —
                                                          worth knowing before taking cash for it, or voiding it. --}}
+                                                    {{-- S3 audit: an OVERTAKEN charge - every date it would grant is
+                                                         already covered. Collecting for it buys the customer nothing,
+                                                         so it is flagged here and refused everywhere else. Void it. --}}
+                                                    @if($order->payment_status->value === 'pending' && ! $order->wouldExtendCoverage())
+                                                        <div>
+                                                            <span class="od-k">Overtaken</span>
+                                                            <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Already covered by a later payment — collecting this buys nothing. Void it.</span>
+                                                        </div>
+                                                    @endif
                                                     @if($order->hasOpenCheckout())
                                                         <div>
                                                             <span class="od-k">Online</span>
@@ -487,7 +496,7 @@
 
                                                 @if($order->payment_status->value === 'pending')
                                                     <form method="POST" action="{{ route('superadmin.accounts.orders.accept', [$account, $order]) }}"
-                                                          data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.{{ $order->hasOpenCheckout() ? ' The owner also has this open in online checkout — if they pay there as well, that payment will be flagged for a refund.' : '' }}">
+                                                          data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.{{ $order->hasOpenCheckout() ? ' The owner also has this open in online checkout — if they pay there as well, that payment will be flagged for a refund.' : '' }}{{ ! $order->wouldExtendCoverage() ? ' WARNING: everything this charge covers is already paid up — accepting money for it buys the customer nothing.' : '' }}">
                                                         @csrf @method('PATCH')
                                                         <input type="hidden" name="payment_method" value="cash">
                                                         <button class="btn btn-sm btn-success rounded-pill px-3 fw-semibold shadow-sm">

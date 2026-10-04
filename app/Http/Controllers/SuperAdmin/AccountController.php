@@ -55,7 +55,16 @@ class AccountController extends Controller
     protected function collectOrRecord(string $collect, array $payment, \Closure $charge): array
     {
         if ($collect !== 'link') {
-            return [$charge($payment + ['payment_status' => 'paid']), false];
+            $order = $charge($payment + ['payment_status' => 'paid']);
+
+            // A paid charge can make another live link pointless - an add-branch link
+            // for a branch this renewal just covered. Cancel those before the customer
+            // pays one from an old SMS for nothing (S3 audit).
+            if ($order?->account) {
+                $this->paymentLinks->cancelOvertakenLinks($order->account, $order->id);
+            }
+
+            return [$order, false];
         }
 
         // A link has no payment instrument yet, so carrying the modal's method and
@@ -83,6 +92,19 @@ class AccountController extends Controller
         });
 
         return [$order, true];
+    }
+
+    /**
+     * Say how a charge was already paid, so an operator about to take money for it
+     * knows not to - in particular when the owner paid it online moments ago.
+     */
+    protected function alreadyPaidMessage(SubscriptionOrder $order): string
+    {
+        $how = $order->payment_method?->value === 'online'
+            ? 'online by the customer ('.($order->transaction_number ?: 'Razorpay').')'
+            : 'already';
+
+        return "That charge was paid {$how}. Do not take payment for it again - if you have, it needs refunding.";
     }
 
     /** The flash message for a freshly issued link — the URL is the deliverable. */
@@ -563,6 +585,7 @@ class AccountController extends Controller
         abort_unless(count($branchIds) > 0, 422);
 
         $order = $this->billing->comp($account, $data['period'], (int) $data['multiplier'], $branchIds, $data['reason']);
+        $this->paymentLinks->cancelOvertakenLinks($account, $order->id);
         $this->logger->log('subscription.paid', "Comp granted ({$data['multiplier']}× {$data['period']}, {$order->quantity} branch(es)) — {$data['reason']}", $order);
 
         return back()->with('success', 'Complimentary coverage granted.');
@@ -633,7 +656,7 @@ class AccountController extends Controller
         ]);
 
         if ($order->payment_status->value === 'paid') {
-            return back()->with('info', 'That payment was already accepted.');
+            return back()->with('info', $this->alreadyPaidMessage($order));
         }
 
         // ── KILL THE LINK FIRST (S2 · design §6 BP2) ──
@@ -645,10 +668,24 @@ class AccountController extends Controller
         $hadLink = $order->hasLiveLink();
         $this->paymentLinks->cancelIfLive($order, 'charge accepted offline');
 
-        $this->billing->acceptOrder($order, [
+        $result = $this->billing->acceptOrder($order, [
             'payment_method' => $data['payment_method'] ?? 'cash',
             'transaction_number' => $data['transaction_number'] ?? null,
         ]);
+
+        // THE RACE (S3 audit): the screen said pending, but the owner paid online in
+        // the seconds before this click. acceptOrder() locks and re-reads, so it did
+        // not overwrite that payment - but the operator must be told, or they keep
+        // cash for a charge that is already paid.
+        // Expected = what acceptOrder() writes on a normal accept: the posted reference,
+        // else whatever the order already carried. Anything else means another payment
+        // got there first.
+        $expectedTxn = $data['transaction_number'] ?? $order->transaction_number;
+        if ($result->transaction_number && $result->transaction_number !== $expectedTxn) {
+            return back()->with('error', $this->alreadyPaidMessage($result));
+        }
+
+        $this->paymentLinks->cancelOvertakenLinks($account, $order->id);
 
         $this->logger->log('subscription.paid', "Accepted payment {$order->invoiceNumber()} — ".hostelease_money($order->amount), $order);
 

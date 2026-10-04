@@ -73,8 +73,13 @@ class SubscriptionController extends Controller
         // Charges already open on the account — whoever opened them. The operator's
         // payment links are payable here even with the kill switch off: a link is
         // the operator's instrument, not self-serve (design §4).
-        $due = $account->orders()->outstanding()->latest('id')->get();
-        $openRenewal = $due->first(fn (SubscriptionOrder $o) => $o->kind?->value === 'renewal');
+        // lines.branch eager-loaded: each row asks wouldExtendCoverage(), and that
+        // must not become a query per row.
+        $due = $account->orders()->outstanding()->with('lines.branch')->latest('id')->get();
+
+        // The hero's "Pay" points at a renewal that would still BUY something. An
+        // overtaken one is listed below as already covered, never offered (S3 audit).
+        $openRenewal = $due->first(fn (SubscriptionOrder $o) => $o->kind?->value === 'renewal' && $o->wouldExtendCoverage());
 
         $selfServe = (bool) config('hostelease.owner_self_serve');
         $canManage = $viewerOwnsAccount && $selfServe && $this->checkout->isEnabled();
@@ -271,6 +276,16 @@ class SubscriptionController extends Controller
             ], 403)];
         }
 
+        // An operator hold covers EVERYTHING this page can start - adding a branch
+        // included, which used to slip through because only the payment path checked
+        // (S3 audit). CheckoutService refuses too; this stops it before a branch is
+        // created on an account the operator has frozen.
+        if ($account->status === \App\Enums\AccountStatus::Suspended) {
+            return [$account, response()->json([
+                'message' => 'Your account is on hold, so changes and online payments are paused. Please contact us and we will sort it out with you.',
+            ], 423)];
+        }
+
         return [$account, null];
     }
 
@@ -296,8 +311,8 @@ class SubscriptionController extends Controller
                 'url' => $result['url'],
                 'message' => 'We have already sent you a secure payment link for this — opening it now.',
             ],
-            'paid' => [
-                'mode' => 'paid',
+            'paid', 'held' => [
+                'mode' => $result['mode'],
                 'message' => $result['message'],
                 'redirect' => route('admin.subscription.index'),
             ],
@@ -353,11 +368,16 @@ class SubscriptionController extends Controller
         // on a customer's page. Only an https URL is ever rendered — a hostile or
         // malformed value (`javascript:` …) is dropped, and the row falls back to
         // checkout or "contact us" rather than to a dangerous link.
-        $linkUrl = $o->hasLiveLink() && str_starts_with((string) $o->payment_link_url, 'https://')
+        // Would paying it still buy anything? An overtaken charge is shown as
+        // already covered, with no way to pay it - not its link, not checkout.
+        $payable = $o->wouldExtendCoverage();
+
+        $linkUrl = $payable && $o->hasLiveLink() && str_starts_with((string) $o->payment_link_url, 'https://')
             ? $o->payment_link_url
             : null;
 
         return [
+            'payable' => $payable,
             'id' => $o->id,
             'label' => $o->kind?->label() ?? 'Charge',
             'invoice' => $o->invoiceNumber(),

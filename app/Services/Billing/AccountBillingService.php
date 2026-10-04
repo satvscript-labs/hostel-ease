@@ -273,8 +273,15 @@ class AccountBillingService
     public function acceptOrder(SubscriptionOrder $order, array $payment = []): SubscriptionOrder
     {
         return DB::transaction(function () use ($order, $payment) {
+            // Lock and re-read (S3 audit): the operator's Accept, an owner checkout
+            // and a payment link can all target the same order. Deciding "already
+            // paid?" on the instance the caller loaded — possibly seconds stale —
+            // let a second writer overwrite the first's transaction number.
+            SubscriptionOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
+            $order->refresh();
+
             if ($order->payment_status === PaymentStatus::Paid) {
-                return $order;   // idempotent
+                return $order;   // idempotent — the caller compares what it got back
             }
 
             $order->update([
