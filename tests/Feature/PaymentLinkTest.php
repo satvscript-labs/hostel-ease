@@ -591,6 +591,75 @@ class PaymentLinkTest extends TestCase
         $this->assertSame(DiscountStatus::Consumed, $discount->fresh()->status);
     }
 
+    /**
+     * V8, found in the S2 check pass. `refreshAccountAnchor()` derives the ANCHOR
+     * from paid lines — so an unpaid charge cannot move it — but it writes `period`
+     * and `status` from whatever period it is handed, and those are NOT
+     * ledger-derived. addBranch()/align()/recordBranchRenewal() each handed it a
+     * PAID cadence unconditionally, so an unpaid payment link rewrote a TRIAL
+     * account to period=yearly / status=active with no money received: it then read
+     * as a paying customer in the Customers list, in the renewals worklist and in
+     * S5's trial-conversion figures, and its trial-expiry messaging stopped.
+     */
+    public function test_an_unpaid_link_does_not_promote_a_trial_account_to_paying(): void
+    {
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9000000033', 'email' => 'trial@example.test']);
+        $live = Hostel::factory()->create(['mobile' => '9000000033', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => now()->addDays(10)]);
+        $fresh = Hostel::factory()->create(['mobile' => '9000000033', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => null]);
+        $owner->hostels()->sync([$live->id, $fresh->id]);
+
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'trial', 'status' => 'trial',
+            'current_period_end' => now()->addDays(10),
+        ]);
+
+        $this->fakeLinkCreated('plink_TRIAL');
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.add-branch', $account), [
+                'branch_id' => $fresh->id, 'collect' => 'link',
+            ])
+            ->assertSessionHas('payment_link');
+
+        $account->refresh();
+        $this->assertSame('trial', $account->period->value, 'An unpaid link must not change the cadence.');
+        $this->assertSame('trial', $account->status->value, 'An unpaid link must not make a trial look like a paying account.');
+        $this->assertNull($fresh->fresh()->subscription_end, 'And it must grant no coverage.');
+    }
+
+    /** The other half: paying it IS the moment a trial becomes a paying account. */
+    public function test_paying_the_link_is_what_promotes_the_trial(): void
+    {
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9000000034']);
+        $live = Hostel::factory()->create(['mobile' => '9000000034', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => now()->addDays(10)]);
+        $fresh = Hostel::factory()->create(['mobile' => '9000000034', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => null]);
+        $owner->hostels()->sync([$live->id, $fresh->id]);
+
+        $account = SubscriptionAccount::create([
+            'owner_id' => $owner->id, 'period' => 'trial', 'status' => 'trial',
+            'current_period_end' => now()->addDays(10),
+        ]);
+
+        $this->fakeLinkCreated('plink_PROMOTE');
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $fresh->id, 'collect' => 'link']);
+
+        $order = SubscriptionOrder::latest('id')->first();
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links/plink_PROMOTE/cancel' => Http::response(['id' => 'plink_PROMOTE', 'status' => 'cancelled'], 200),
+        ]);
+
+        $this->actingAs($this->superAdmin())
+            ->patch(route('superadmin.accounts.orders.accept', [$account, $order]), ['payment_method' => 'upi']);
+
+        $account->refresh();
+        $this->assertSame('yearly', $account->period->value);
+        $this->assertSame('active', $account->status->value);
+        $this->assertNotNull($fresh->fresh()->subscription_end, 'And the branch is now co-terminated.');
+    }
+
     // =================================================================
     // Form reality + authorization (design §6 BP10)
     // =================================================================

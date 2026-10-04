@@ -235,9 +235,19 @@ class AccountBillingService
             $this->addLine($order, $branch, (float) $amount, $quote['end'], $quote['start']);
 
             // Coverage follows the ledger, so a pending order grants nothing until
-            // it is accepted — no branch of logic needed here.
+            // it is accepted — no branch of logic needed for the anchor.
             $this->mirror->sync($account);
-            $this->refreshAccountAnchor($account, $bp);
+
+            // The CADENCE is a different matter, and does need the branch (S2).
+            // `period`/`status` are not ledger-derived, so handing this a paid period
+            // for a pending charge would relabel the account as a paying one before
+            // any money arrived — the same defect as addBranch()/align(). A paid or
+            // trial grant passes its own period; a pending charge passes nothing and
+            // leaves the account as it was until acceptOrder() settles it.
+            $this->refreshAccountAnchor(
+                $account,
+                $order->payment_status->grantsCoverage() ? $bp : null,
+            );
 
             return $order;
         });
@@ -272,9 +282,16 @@ class AccountBillingService
                 // Accepting a monthly link on a yearly account has to switch the
                 // account to monthly; passing nothing would have kept the old cadence
                 // and then priced the next renewal off it.
-                $period = ($order->kind === OrderKind::Renewal && $order->period?->isPaid())
-                    ? $order->period
-                    : null;
+                //
+                // An add-branch or align is NOT a cadence change — it tops up the
+                // existing cycle — but it IS the moment a trial account becomes a
+                // paying one, which is the half addBranch()/align() now defer to here
+                // rather than doing on an unpaid link.
+                $period = match (true) {
+                    $order->kind === OrderKind::Renewal && (bool) $order->period?->isPaid() => $order->period,
+                    in_array($order->kind, [OrderKind::AddBranch, OrderKind::Align, OrderKind::Purchase], true) => $this->paidPeriod($account->period?->value),
+                    default => null,
+                };
 
                 // A renewal bought in advance carries its real cycle start on its
                 // lines (see renewAccount), so the cycle window stays a matched pair
@@ -752,9 +769,20 @@ class AccountBillingService
             // own provisioning). Otherwise the account keeps reading Trial even
             // though the branch is now fully paid through the anchor (BR-18-adjacent).
             //
-            // Safe for a PENDING order too, unlike renewAccount's direct write: this
-            // derives the anchor from PAID lines, so an unpaid top-up moves nothing.
-            $this->refreshAccountAnchor($account, $this->paidPeriod($account->period?->value));
+            // ONLY WHEN IT IS PAID. refreshAccountAnchor() derives the anchor from
+            // PAID lines, so an unpaid top-up cannot move that — but it writes
+            // `period` and `status` from whatever period it is handed, and those are
+            // NOT ledger-derived. Handing it a paid cadence for a pending link
+            // rewrote a TRIAL account to period=yearly / status=active with no money
+            // received: it then read as a paying customer in the Customers list, in
+            // the renewals worklist and in S5's trial-conversion figures, and its
+            // trial-expiry messaging stopped. Passing null leaves the account's own
+            // period alone; acceptOrder() resolves the paid cadence when the money
+            // actually lands. (Same family as the renewAccount fix — design §5.1.)
+            $this->refreshAccountAnchor(
+                $account,
+                $order->payment_status->grantsCoverage() ? $this->paidPeriod($account->period?->value) : null,
+            );
 
             // Consume the one-shot discount only once the money is in (S2 · design
             // §5.2). On a pending payment link this used to mark a single-use
@@ -837,9 +865,14 @@ class AccountBillingService
             }
             $this->mirror->sync($account);
 
-            // Same reasoning as addBranch(): a paid top-up just happened, so
-            // resolve off the paid cadence ($bp), not a possibly-'trial' $account->period.
-            $this->refreshAccountAnchor($account, $bp);
+            // Same reasoning as addBranch(), including the pending guard: resolve off
+            // the paid cadence ($bp) only once the money is in, because `period` and
+            // `status` are NOT ledger-derived and an unpaid link must not promote a
+            // trial to a paying account. acceptOrder() resolves it on payment.
+            $this->refreshAccountAnchor(
+                $account,
+                $order->payment_status->grantsCoverage() ? $bp : null,
+            );
 
             return $order;
         });

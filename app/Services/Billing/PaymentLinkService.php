@@ -162,6 +162,15 @@ class PaymentLinkService
             remindersEnabled: (bool) config('hostelease.payment_links.reminders', true),
         );
 
+        // A 200 with no id or no URL is not a usable link, and storing it would be
+        // worse than failing: `payment_link_id = ''` is not null, so hasLiveLink()
+        // would report a live link that does not exist — blocking every re-issue and
+        // offering the operator a Send button with nothing behind it. Throwing here
+        // rolls the whole charge back, which is the honest outcome.
+        if (! filled($link['id']) || ! filled($link['short_url'])) {
+            throw new RuntimeException('Razorpay accepted the request but returned no usable payment link. Nothing has been charged or recorded — try again, or record this payment offline.');
+        }
+
         $order->update([
             'payment_link_id' => $link['id'],
             'payment_link_url' => $link['short_url'],
