@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Billing\AccountBillingService;
 use App\Support\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -658,6 +659,280 @@ class PaymentLinkTest extends TestCase
         $this->assertSame('yearly', $account->period->value);
         $this->assertSame('active', $account->status->value);
         $this->assertNotNull($fresh->fresh()->subscription_end, 'And the branch is now co-terminated.');
+    }
+
+    // =================================================================
+    // The S2 audit — the one money value that comes from the client
+    //
+    // Everything a link charges is server-computed from the quote EXCEPT the
+    // operator's amount override, which is posted by the browser. These pin down
+    // that it can only ever reduce a charge, and that it cannot reach the database
+    // unbounded. 13_S2_AUDIT.md §2.
+    // =================================================================
+
+    /**
+     * 🔴 A1. An override above the quote used to become the charged amount AND the
+     * link amount: server quoted ₹20,000, the request said ₹25,000, and the customer
+     * was asked for ₹25,000. It also broke the order row's own invariant —
+     * subtotal 20000 · discount 0 · amount 25000 — which the invoice PDF renders.
+     */
+    public function test_an_override_above_the_quote_is_refused_and_charges_nothing(): void
+    {
+        [, $account] = $this->seedAccount();
+        $this->fakeLinkCreated();
+        $before = SubscriptionOrder::count();
+
+        // Two branches × ₹10,000 = ₹20,000 quoted. Post more.
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), [
+                'period' => 'yearly', 'collect' => 'link', 'amount' => 25000,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame($before, SubscriptionOrder::count(), 'No order may be written for an over-quote charge.');
+        Http::assertNothingSent();
+    }
+
+    /** The same guard on the offline path — it is the service, not the controller. */
+    public function test_an_override_above_the_quote_is_refused_offline_too(): void
+    {
+        [, $account] = $this->seedAccount();
+        $before = SubscriptionOrder::count();
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), ['period' => 'yearly', 'amount' => 25000])
+            ->assertSessionHas('error');
+
+        $this->assertSame($before, SubscriptionOrder::count());
+    }
+
+    /** An override EQUAL to the quote is fine, and records no discount. */
+    public function test_an_override_equal_to_the_quote_is_accepted(): void
+    {
+        [, $account] = $this->seedAccount();
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), ['period' => 'yearly', 'amount' => 20000])
+            ->assertSessionHas('success');
+
+        $order = SubscriptionOrder::latest('id')->first();
+        $this->assertSame('20000.00', (string) $order->amount);
+        $this->assertSame('0.00', (string) $order->discount_total);
+    }
+
+    /** A lower override still works, and the difference is the recorded discount. */
+    public function test_a_lower_override_still_records_the_difference_as_a_discount(): void
+    {
+        [, $account] = $this->seedAccount();
+        $this->fakeLinkCreated();
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), [
+                'period' => 'yearly', 'collect' => 'link', 'amount' => 17500,
+            ])
+            ->assertSessionHas('payment_link');
+
+        $order = SubscriptionOrder::latest('id')->first();
+        $this->assertSame('20000.00', (string) $order->subtotal);
+        $this->assertSame('2500.00', (string) $order->discount_total);
+        $this->assertSame('17500.00', (string) $order->amount);
+
+        // The row's invariant: subtotal − discount == amount.
+        $this->assertSame(
+            round((float) $order->subtotal - (float) $order->discount_total, 2),
+            round((float) $order->amount, 2),
+        );
+    }
+
+    /**
+     * 🔴 A2. There was no upper bound at all. 1e14 into a decimal(12,2) column is
+     * silently stored by SQLite and a hard write error under MySQL's strict mode —
+     * i.e. a 500 on a money action in production. Every other money input in this
+     * codebase already carried max:9999999; these four did not.
+     */
+    public function test_an_absurd_override_is_rejected_before_it_reaches_the_database(): void
+    {
+        [, $account] = $this->seedAccount();
+        $before = SubscriptionOrder::count();
+
+        foreach (['renew' => ['period' => 'yearly'], 'align' => []] as $action => $extra) {
+            $this->actingAs($this->superAdmin())
+                ->post(route('superadmin.accounts.'.$action, $account), $extra + ['amount' => 99999999999999.99])
+                ->assertSessionHasErrors('amount');
+        }
+
+        $this->assertSame($before, SubscriptionOrder::count());
+    }
+
+    /**
+     * 🟠 C2. "One live link per order" was not enough: nothing stopped the same WORK
+     * being quoted twice as two orders, each with its own link. Two add-branch links
+     * for the same branch both sat live, and a customer who tapped both paid twice
+     * for identical coverage — and the ledger absorbs it without double-granting,
+     * so the money is simply gone.
+     */
+    public function test_a_second_live_link_for_the_same_branch_add_is_refused(): void
+    {
+        [, $account, , $b2] = $this->seedAccount();
+        $b2->update(['subscription_end' => now()->addMonth()]);   // behind the anchor
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links' => Http::sequence()
+                ->push(['id' => 'plink_D1', 'short_url' => 'https://rzp.io/i/d1', 'status' => 'created', 'amount' => 1])
+                ->push(['id' => 'plink_D2', 'short_url' => 'https://rzp.io/i/d2', 'status' => 'created', 'amount' => 1]),
+        ]);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $b2->id, 'collect' => 'link'])
+            ->assertSessionHas('payment_link');
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $b2->id, 'collect' => 'link'])
+            ->assertSessionHas('error');
+
+        $this->assertSame(1, SubscriptionOrder::withLiveLink()->count());
+    }
+
+    /** But two DIFFERENT branches being added at once stays legitimate. */
+    public function test_two_live_links_for_two_different_branches_are_allowed(): void
+    {
+        [$owner, $account, , $b2] = $this->seedAccount();
+        $b3 = Hostel::factory()->create([
+            'mobile' => '9000000011', 'owner_id' => $owner->id, 'status' => 'active',
+            'subscription_end' => now()->addMonth(),
+        ]);
+        $owner->hostels()->attach($b3->id);
+        $b2->update(['subscription_end' => now()->addMonth()]);
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links' => Http::sequence()
+                ->push(['id' => 'plink_E1', 'short_url' => 'https://rzp.io/i/e1', 'status' => 'created', 'amount' => 1])
+                ->push(['id' => 'plink_E2', 'short_url' => 'https://rzp.io/i/e2', 'status' => 'created', 'amount' => 1]),
+        ]);
+
+        foreach ([$b2->id, $b3->id] as $id) {
+            $this->actingAs($this->superAdmin())
+                ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $id, 'collect' => 'link'])
+                ->assertSessionHas('payment_link');
+        }
+
+        $this->assertSame(2, SubscriptionOrder::withLiveLink()->count());
+    }
+
+    /** 🟠 C3. Two align links are always the same demand twice. */
+    public function test_a_second_live_align_link_is_refused(): void
+    {
+        [, $account, , $b2] = $this->seedAccount();
+        $b2->update(['subscription_end' => now()->addMonth()]);
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links' => Http::sequence()
+                ->push(['id' => 'plink_F1', 'short_url' => 'https://rzp.io/i/f1', 'status' => 'created', 'amount' => 1])
+                ->push(['id' => 'plink_F2', 'short_url' => 'https://rzp.io/i/f2', 'status' => 'created', 'amount' => 1]),
+        ]);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.align', $account), ['collect' => 'link'])
+            ->assertSessionHas('payment_link');
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.align', $account), ['collect' => 'link'])
+            ->assertSessionHas('error');
+
+        $this->assertSame(1, SubscriptionOrder::withLiveLink()->count());
+    }
+
+    /**
+     * 🟠 Razorpay being unreachable threw ConnectionException, which extends
+     * \Exception and NOT RuntimeException — so it sailed past every controller catch
+     * and turned a gateway blip into a 500 white screen on a money action.
+     */
+    public function test_an_unreachable_razorpay_is_an_error_message_not_a_500(): void
+    {
+        [, $account] = $this->seedAccount();
+        $before = SubscriptionOrder::count();
+
+        Http::fake(function () {
+            throw new ConnectionException('cURL error 28: Operation timed out');
+        });
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), ['period' => 'yearly', 'collect' => 'link'])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame($before, SubscriptionOrder::count(), 'And nothing half-written.');
+    }
+
+    /**
+     * An override of exactly 0 would otherwise mint a ₹0 "charge" with a link
+     * Razorpay cannot create (its floor is ₹1), leaving a pending order for nothing.
+     */
+    public function test_a_zero_amount_link_is_refused_and_leaves_no_order(): void
+    {
+        [, $account] = $this->seedAccount();
+        $this->fakeLinkCreated();
+        $before = SubscriptionOrder::count();
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), [
+                'period' => 'yearly', 'collect' => 'link', 'amount' => 0,
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertSame($before, SubscriptionOrder::count());
+        Http::assertNothingSent();
+    }
+
+    /**
+     * A double-clicked "Create link" must not issue two links for one charge. The
+     * second request holds a model instance loaded before it waited on the lock, on
+     * which hasLiveLink() is stale-false — so without a re-read it would stamp a
+     * second link id over the first, leaving the first live and payable at Razorpay
+     * with nothing here pointing at it.
+     */
+    public function test_issuing_a_link_twice_on_the_same_order_is_refused(): void
+    {
+        [, $account, $b1] = $this->seedAccount();
+
+        $order = app(AccountBillingService::class)
+            ->recordBranchRenewal($b1, 'yearly', ['payment_status' => 'pending']);
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links' => Http::sequence()
+                ->push(['id' => 'plink_G1', 'short_url' => 'https://rzp.io/i/g1', 'status' => 'created', 'amount' => 1])
+                ->push(['id' => 'plink_G2', 'short_url' => 'https://rzp.io/i/g2', 'status' => 'created', 'amount' => 1]),
+        ]);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.orders.link.issue', $account), ['order_id' => $order->id])
+            ->assertSessionHas('payment_link');
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.orders.link.issue', $account), ['order_id' => $order->id])
+            ->assertSessionHas('error');
+
+        $order->refresh();
+        $this->assertSame('plink_G1', $order->payment_link_id, 'The first link must survive.');
+        $this->assertSame(1, $order->payment_link_attempts);
+    }
+
+    /** A 200 with no usable link must not be stored as a live link. */
+    public function test_a_response_with_no_link_url_is_refused(): void
+    {
+        [, $account] = $this->seedAccount();
+        $before = SubscriptionOrder::count();
+
+        Http::fake([
+            'api.razorpay.com/v1/payment_links' => Http::response(['id' => 'plink_X', 'status' => 'created'], 200),
+        ]);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.renew', $account), ['period' => 'yearly', 'collect' => 'link'])
+            ->assertSessionHas('error');
+
+        $this->assertSame($before, SubscriptionOrder::count());
     }
 
     // =================================================================

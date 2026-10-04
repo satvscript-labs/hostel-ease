@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -301,7 +303,20 @@ class RazorpayService
             throw new RuntimeException('Razorpay is not configured.');
         }
 
-        $response = $this->client()->{$method}(self::BASE_URL.$path, $payload);
+        try {
+            $response = $this->client()->{$method}(self::BASE_URL.$path, $payload);
+        } catch (ConnectionException $e) {
+            // A timeout, a DNS failure or a dropped connection. This class promises
+            // ONE error contract — RuntimeException — and ConnectionException is not
+            // one: it extends \Exception, so it sailed past every
+            // `catch (\RuntimeException)` in the controllers and turned a Razorpay
+            // blip into a 500 white screen on a money action. The DB transaction did
+            // roll back, so nothing was half-written; the operator just had no idea
+            // what had happened or whether they had charged someone.
+            Log::warning('Razorpay could not be reached', ['path' => $path, 'error' => $e->getMessage()]);
+
+            throw new RuntimeException('Razorpay could not be reached just now, so nothing was charged or recorded. Try again in a moment, or record this payment offline.', 503, $e);
+        }
 
         if ($response->status() === 401) {
             throw new RuntimeException('Razorpay authentication failed.', 401);

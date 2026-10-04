@@ -741,9 +741,24 @@ class AccountBillingService
                 // No live cycle to co-terminate with — treat as a normal renewal
                 // at a paid rate (never trial, which would add the branch free).
                 // recordBranchRenewal returns the order directly since S1.
+                $period = $this->paidPeriod($account->period?->value)->value;
+
+                // This branch of addBranch() does NOT go through resolveCharge(), so
+                // the posted-override guard has to be applied here or this is the one
+                // operator path where a client could still charge above the quote.
+                // recordBranchRenewal() itself must stay unguarded: the webhook and
+                // the checkout callback record what Razorpay actually captured, which
+                // may legitimately differ from any quote and must never be clamped.
+                if (($payment['amount'] ?? null) !== null && ! ($payment['amount_authoritative'] ?? false)) {
+                    $this->assertOverrideReducesOnly(
+                        (float) $this->branchBilling->quote($branch, $period)['amount'],
+                        round((float) $payment['amount'], 2),
+                    );
+                }
+
                 return $this->recordBranchRenewal(
                     $branch,
-                    $this->paidPeriod($account->period?->value)->value,
+                    $period,
                     $payment + ['kind' => OrderKind::AddBranch],
                 );
             }
@@ -855,6 +870,15 @@ class AccountBillingService
             $subtotal = $quote['subtotal'];
             $override = $payment['amount'] ?? null;
             $amount = $override !== null ? round((float) $override, 2) : $subtotal;
+
+            // Align prices itself rather than going through resolveCharge(), so it
+            // needs the same guard explicitly: an override may only reduce. Without
+            // it, an over-quote figure would also make $scale > 1 and inflate every
+            // per-branch line past the total they are supposed to add up to.
+            if ($override !== null && ! ($payment['amount_authoritative'] ?? false)) {
+                $this->assertOverrideReducesOnly($subtotal, $amount);
+            }
+
             $discountTotal = $override !== null ? max(0, round($subtotal - $amount, 2)) : 0.0;
             $scale = ($override !== null && $subtotal > 0) ? $amount / $subtotal : 1.0;
 
@@ -906,7 +930,52 @@ class AccountBillingService
 
         $amount = round((float) $override, 2);
 
+        // AN OPERATOR OVERRIDE MAY ONLY REDUCE A CHARGE. It is posted by the browser,
+        // so it is the one money value in the system that comes from outside the
+        // engine — and it was unbounded above. Posting 25,000 against a 20,000 quote
+        // wrote `subtotal 20000 · discount 0 · amount 25000`: the row's own invariant
+        // (subtotal − discount == amount) broken, the invoice PDF nonsense, and in
+        // S2 the payment LINK asked the customer for the posted figure rather than
+        // the quoted one. Refusing is the only safe reading: an override's whole
+        // meaning here is "charge less, and log the difference as a discount".
+        if (! ($payment['amount_authoritative'] ?? false)) {
+            $this->assertOverrideReducesOnly($subtotal, $amount);
+        }
+
         return [$amount, max(0, round($subtotal - $amount, 2))];
+    }
+
+    /**
+     * Guard the one money value that arrives from the client.
+     *
+     * Deliberately in the SERVICE, not just in request validation: every operator
+     * charge path funnels through here, so no future controller, console command or
+     * job can reintroduce an over-quote charge.
+     *
+     * ⚠️ GATEWAY AMOUNTS ARE EXEMPT, via `amount_authoritative` in the payment array.
+     * The webhook and the checkout callback record what Razorpay *actually captured*,
+     * fetched server-side from Razorpay itself — and that legitimately exceeds the
+     * current quote whenever the quote has moved since checkout opened (proration
+     * shrinks by the day). Clamping it would be wrong twice over: it would understate
+     * money we have genuinely received, and because it throws, it would 500 the
+     * WEBHOOK — which makes Razorpay retry the delivery forever and still never
+     * succeed. The suite caught exactly that when this guard first went in.
+     *
+     * @throws RuntimeException
+     */
+    protected function assertOverrideReducesOnly(float $subtotal, float $amount): void
+    {
+        if (round($amount, 2) <= round($subtotal, 2)) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'The amount override (%s) is more than this charge comes to (%s). An override can only '
+                .'bring a charge DOWN — the difference is recorded as a discount. To bill more, change '
+                .'the branch count or set a custom unit price for this customer.',
+            hostelease_money($amount),
+            hostelease_money($subtotal),
+        ));
     }
 
     /**

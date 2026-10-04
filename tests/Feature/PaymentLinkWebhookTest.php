@@ -387,6 +387,28 @@ class PaymentLinkWebhookTest extends TestCase
         $this->assertSame('pay_by_ref', $order->fresh()->transaction_number);
     }
 
+    /**
+     * A gateway-captured amount ABOVE the current quote must be recorded as-is.
+     *
+     * The S2 audit added a guard stopping a posted override from charging more than
+     * the engine quoted. Applied to the webhook it broke this: Razorpay had captured
+     * ₹5,000 for an add-branch now quoting ₹4,602.74 (proration shrinks by the day,
+     * so a quote legitimately moves between checkout and payment) and the delivery
+     * 500'd — which makes Razorpay retry forever and still never succeed. The
+     * captured figure is the truth; only CLIENT input is clamped.
+     */
+    public function test_a_captured_amount_above_the_current_quote_is_still_applied(): void
+    {
+        $order = $this->pendingLinkOrder(10000);
+
+        // Razorpay captured MORE than the charge — accepted, logged, applied.
+        $this->deliver($this->paidPayload($order, 1200000, 'pay_over'))->assertOk();
+
+        $order->refresh();
+        $this->assertSame('paid', $order->payment_status->value);
+        $this->assertSame('pay_over', $order->transaction_number);
+    }
+
     public function test_an_unknown_event_is_acknowledged_and_ignored(): void
     {
         $this->deliver(['event' => 'payment_link.something_new', 'payload' => []])->assertOk();

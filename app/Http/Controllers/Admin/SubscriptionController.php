@@ -292,6 +292,11 @@ class SubscriptionController extends Controller
 
         $payload = [
             'amount' => $amount,
+            // Fetched from Razorpay above, not taken from the client — so it is the
+            // captured truth and is recorded as-is, exempt from the operator-override
+            // guard that may only reduce a charge. It legitimately exceeds the
+            // current quote when the quote moved while checkout was open.
+            'amount_authoritative' => true,
             'payment_status' => 'paid',
             'payment_method' => 'online',
             'transaction_number' => $data['razorpay_payment_id'],

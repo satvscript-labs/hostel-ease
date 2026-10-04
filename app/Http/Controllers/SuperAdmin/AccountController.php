@@ -376,7 +376,7 @@ class AccountController extends Controller
     {
         $data = $request->validate([
             'branch_id' => ['required', 'integer'],
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'remarks' => ['nullable', 'string', 'max:500'],
@@ -423,7 +423,7 @@ class AccountController extends Controller
             'state' => ['nullable', 'string', 'max:100'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'plan' => ['required', Rule::in(['yearly', 'monthly', 'trial'])],
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
         ]);
 
@@ -462,7 +462,7 @@ class AccountController extends Controller
     {
         $data = $request->validate([
             'period' => ['required', Rule::in(['yearly', 'monthly'])],
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
@@ -503,7 +503,7 @@ class AccountController extends Controller
     public function align(Request $request, SubscriptionAccount $account): RedirectResponse
     {
         $data = $request->validate([
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'remarks' => ['nullable', 'string', 'max:500'],

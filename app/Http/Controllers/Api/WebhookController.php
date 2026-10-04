@@ -132,15 +132,33 @@ class WebhookController extends Controller
         // the payment entity is the fallback when a payload omits it.
         $paidPaise = max((int) ($link['amount_paid'] ?? 0), (int) ($payment['amount'] ?? 0));
 
+        $order = $this->paymentLinks->resolveOrder($link);
+
         if (! $paymentId) {
-            Log::warning('Razorpay webhook: payment_link.paid with no payment id', [
+            // Razorpay says this link is PAID but sent us no payment entity. Money
+            // has moved and we cannot key an idempotent apply on anything, so this
+            // must not be applied — but it also must not be a log line nobody reads,
+            // which is what it was. Raise it, with the link id a human can look up,
+            // and point them at the one-click recovery.
+            Log::error('Razorpay webhook: payment_link.paid carried no payment id', [
                 'payment_link_id' => $link['id'] ?? null,
+                'order_id' => $order?->id,
             ]);
+
+            $this->notifications->push(
+                null,
+                'payment_unapplied',
+                'payment_link_no_payment_id:'.($link['id'] ?? uniqid()),
+                'A payment link was paid but could not be applied — manual review',
+                'Razorpay reports payment link '.($link['id'] ?? 'unknown').' as paid'
+                    .($order ? ' for '.($order->account?->owner?->name ?? 'account #'.$order->account_id)." ({$order->invoiceNumber()})" : '')
+                    .', but sent no payment reference, so it was not applied. Open that charge on'
+                    .' Account 360 and use "Check with Razorpay" to pull the payment through.',
+                'danger',
+            );
 
             return;
         }
-
-        $order = $this->paymentLinks->resolveOrder($link);
 
         if (! $order) {
             // Money captured with nothing here to apply it to. This must NOT throw:
@@ -344,6 +362,14 @@ class WebhookController extends Controller
         try {
             $payment = [
                 'amount' => $capturedPaise > 0 ? $capturedPaise / 100 : null,
+                // This figure is what Razorpay says it CAPTURED, so it is the truth
+                // and must be recorded as-is — exempt from the operator-override
+                // guard, which may only ever reduce a charge. It legitimately exceeds
+                // the current quote when the quote has moved since checkout opened
+                // (proration shrinks by the day), and clamping it here would both
+                // understate real money and 500 this webhook into an infinite
+                // Razorpay retry loop.
+                'amount_authoritative' => true,
                 'payment_status' => 'paid',
                 'payment_method' => 'online',
                 'transaction_number' => $paymentId,

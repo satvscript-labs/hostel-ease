@@ -7,7 +7,9 @@ use App\Enums\OrderKind;
 use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
+use App\Models\SubscriptionOrderLine;
 use App\Services\ActivityLogger;
 use App\Services\NotificationService;
 use App\Services\RazorpayService;
@@ -112,6 +114,22 @@ class PaymentLinkService
             throw new RuntimeException('That charge is not attached to a customer account, so there is nobody to send a link to.');
         }
 
+        // SERIALISE ON THE ACCOUNT ROW before reading what links it already has.
+        // Every guard below is a read-then-write, so without a lock two operators
+        // clicking "Create link" at the same moment — or one operator double-clicking
+        // — both see "no live link", both pass, and the customer receives two demands
+        // for one charge. A no-op on SQLite (single writer); real on MySQL, which is
+        // production.
+        SubscriptionAccount::query()->whereKey($account->getKey())->lockForUpdate()->first();
+
+        // ...and then RE-READ the order. The lock serialises the two requests, but
+        // the loser is still holding the model instance it loaded BEFORE waiting —
+        // on which hasLiveLink() is false, because the winner's link was stamped
+        // after that read. Without this, a double-clicked button issues two links
+        // and the second overwrites the first's id: the first link stays live and
+        // payable at Razorpay with nothing here pointing at it.
+        $order->refresh();
+
         // ── Guards (design §6 BP11). Each says what to do about it, because an
         // operator reading "refused" with no reason will just click again. ──
         if ($order->payment_status === PaymentStatus::Paid) {
@@ -127,22 +145,17 @@ class PaymentLinkService
             throw new RuntimeException('This charge already has a live payment link. Cancel it before issuing another — two live links for one charge is how a customer pays twice.');
         }
 
-        // Only one live RENEWAL link per account. A renewal always covers the whole
-        // estate, so two of them are necessarily duplicates of each other. Add-branch
-        // links for different branches are legitimate and stay allowed (design BP3).
-        if ($order->kind === OrderKind::Renewal) {
-            $existing = $account->orders()
-                ->withLiveLink()
-                ->where('kind', OrderKind::Renewal->value)
-                ->whereKeyNot($order->getKey())
-                ->first();
-
-            if ($existing) {
-                throw new RuntimeException("This customer already has a live renewal link ({$existing->invoiceNumber()}). Cancel that one first, or collect against it.");
-            }
-        }
+        $this->assertNoDuplicateLiveLink($account, $order);
 
         $attempt = ((int) $order->payment_link_attempts) + 1;
+
+        // `payment_link_attempts` is an unsigned TINYINT, so 256 would be a hard
+        // write error under MySQL's strict mode — a 500 on a money action. Nobody
+        // will re-issue one charge 255 times, which is exactly why this should say
+        // something human rather than fall over.
+        if ($attempt > 255) {
+            throw new RuntimeException('This charge has had 255 payment links issued against it. Something is wrong — void it and raise a fresh charge rather than issuing another link.');
+        }
         $reference = $this->reference($order, $attempt);
         $expireBy = $this->expiryTimestamp();
 
@@ -519,11 +532,17 @@ class PaymentLinkService
     {
         $order->update(['payment_link_status' => PaymentLinkStatus::PartiallyPaid->value]);
 
+        // The de-dupe token must be unique PER ORDER, not the literal '(partial)' it
+        // used to be: the alert signature is built from this, so two partially-paid
+        // links on different customers collided and the second alert overwrote the
+        // first — losing one of them silently. There is no payment id to key on here,
+        // so the order is the key.
         $this->alertUnapplied(
             $order,
-            '(partial)',
+            'partial-on-order-'.$order->id,
             $paidPaise,
             'the link was partly paid, and partial payments are not enabled on our links',
+            'A partial payment of ',
         );
     }
 
@@ -570,6 +589,71 @@ class PaymentLinkService
     // -----------------------------------------------------------------
     // Internals
     // -----------------------------------------------------------------
+
+    /**
+     * Refuse a link that duplicates a demand already out with the customer.
+     *
+     * The rule is per CHARGE SHAPE, because "one live link per order" is not enough
+     * on its own — nothing stopped the operator quoting the *same work* twice as two
+     * separate orders, each with its own link. Measured in the S2 audit: two
+     * add-branch links for the same branch, and two align links, both sat live at
+     * once, and a customer who tapped both paid twice for identical coverage. (The
+     * ledger absorbs it without double-granting — addLine() never shortens, so the
+     * second payment buys a date the branch already has — which makes it WORSE, not
+     * better: the money is gone and there is nothing to show for it.)
+     *
+     *  · renewal    — one per account. A renewal always covers the whole billable
+     *                 estate, so two are necessarily the same demand.
+     *  · align      — one per account, for the same reason.
+     *  · add_branch — one per account PER BRANCH. Two different branches being added
+     *                 at once is legitimate and stays allowed.
+     *
+     * @throws RuntimeException
+     */
+    protected function assertNoDuplicateLiveLink(SubscriptionAccount $account, SubscriptionOrder $order): void
+    {
+        if (! in_array($order->kind, [OrderKind::Renewal, OrderKind::Align, OrderKind::AddBranch], true)) {
+            return;
+        }
+
+        $rivals = $account->orders()
+            ->withLiveLink()
+            ->where('kind', $order->kind->value)
+            ->whereKeyNot($order->getKey())
+            ->get();
+
+        if ($rivals->isEmpty()) {
+            return;
+        }
+
+        if ($order->kind === OrderKind::AddBranch) {
+            // Narrow it to the same branch. One grouped query, not one per rival.
+            $mine = $order->lines()->pluck('branch_id')->all();
+            $theirs = SubscriptionOrderLine::whereIn('order_id', $rivals->modelKeys())
+                ->whereIn('branch_id', $mine)
+                ->pluck('order_id')
+                ->unique();
+
+            $rivals = $rivals->whereIn('id', $theirs->all());
+
+            if ($rivals->isEmpty()) {
+                return;
+            }
+        }
+
+        $rival = $rivals->first();
+        $what = match ($order->kind) {
+            OrderKind::Renewal => 'renewal link',
+            OrderKind::Align => 'alignment link',
+            default => 'payment link for that branch',
+        };
+
+        throw new RuntimeException(
+            "This customer already has a live {$what} ({$rival->invoiceNumber()} · "
+                .hostelease_money($rival->amount).'). Cancel that one first, or collect against it — '
+                .'two live links for the same charge is how a customer pays twice.'
+        );
+    }
 
     /** @throws RuntimeException */
     protected function assertConfigured(): void
@@ -654,7 +738,7 @@ class PaymentLinkService
      * webhook must return 200 or Razorpay retries forever and still never
      * succeeds, so the only correct response is to shout at a human.
      */
-    protected function alertUnapplied(?SubscriptionOrder $order, string $paymentId, int $paidPaise, string $why): void
+    protected function alertUnapplied(?SubscriptionOrder $order, string $paymentId, int $paidPaise, string $why, string $lead = ''): void
     {
         $who = $order?->account?->owner?->name ?? ($order ? 'account #'.$order->account_id : 'an unknown customer');
 
@@ -670,7 +754,7 @@ class PaymentLinkService
             'payment_unapplied',
             'payment_unapplied:'.$paymentId,
             'Payment received but not applied — manual review',
-            hostelease_money($paidPaise / 100).' was captured for '.$who
+            $lead.hostelease_money($paidPaise / 100).' was captured for '.$who
                 .($order ? " ({$order->invoiceNumber()})" : '')
                 ." but was not applied because {$why}. Review it and either refund the payment or record the charge from Account 360.",
             'danger',
