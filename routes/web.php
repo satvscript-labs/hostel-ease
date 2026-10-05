@@ -63,8 +63,18 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'show'])->name('login');
     Route::post('login', [LoginController::class, 'login'])->middleware('throttle:6,1')->name('login.attempt');
     
+    // Self-signup in two steps: details, then a 6-digit code emailed to the owner.
+    // Nothing is created until the code is right (App\Services\Auth\SignupVerification).
+    // Throttled per IP on top of the per-sign-up limits the service enforces.
+    // Step 2 lives under signup/, NOT register/: `register/{token}` above is the
+    // student self-registration link printed on hostels' QR codes, and it would
+    // swallow register/verify as a token called "verify".
     Route::get('register', [RegisterController::class, 'show'])->name('register');
     Route::post('register', [RegisterController::class, 'register'])->middleware('throttle:6,1')->name('register.attempt');
+    Route::get('signup/verify', [RegisterController::class, 'showVerify'])->name('register.verify');
+    Route::post('signup/verify', [RegisterController::class, 'verify'])->middleware('throttle:10,1')->name('register.verify.attempt');
+    Route::post('signup/resend', [RegisterController::class, 'resend'])->middleware('throttle:3,1')->name('register.resend');
+    Route::post('signup/email', [RegisterController::class, 'changeEmail'])->middleware('throttle:3,1')->name('register.email');
 
     // Account recovery (W10). No self-serve reset exists yet — this is an
     // honest "how to get back in" page, not a dead link. It becomes the OTP

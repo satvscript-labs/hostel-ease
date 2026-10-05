@@ -13,10 +13,20 @@ class AuthTest extends TestCase
     /** H3 — self-service signup must provision the tenant fully. */
     public function test_self_signup_provisions_owner_payment_modes_and_account(): void
     {
+        // Two steps since the email-verification redesign: details, then the code.
+        \Illuminate\Support\Facades\Mail::fake();
         $this->post('/register', [
             'name' => 'New Owner', 'hostel_name' => 'Fresh PG',
-            'mobile' => '9812345678', 'password' => 'secret123',
-        ])->assertRedirect();
+            'mobile' => '9812345678', 'email' => 'owner@freshpg.test', 'password' => 'secret123',
+        ])->assertRedirect(route('register.verify'));
+
+        $code = null;
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\SignupCodeMail::class, function ($m) use (&$code) {
+            $code = $m->code;
+
+            return true;
+        });
+        $this->post(route('register.verify.attempt'), ['code' => $code])->assertRedirect();
 
         $owner = User::where('mobile', '+919812345678')->firstOrFail();
         $hostel = \App\Models\Hostel::where('name', 'Fresh PG')->firstOrFail();
@@ -83,7 +93,7 @@ class AuthTest extends TestCase
         $this->post('/login', [
             'mobile' => '8888888888',
             'password' => 'password',
-        ])->assertSessionHasErrors('mobile');
+        ])->assertSessionHasErrors('credentials');
 
         $this->assertGuest();
     }

@@ -45,9 +45,13 @@ class LoginController extends Controller
             return redirect()->intended(route('dashboard'));
         }
 
+        // Keyed `credentials`, not `mobile`: a failed sign-in is about the pair, so
+        // the page shows it above the form instead of blaming the mobile field. The
+        // message deliberately does not say WHICH part was wrong — that would tell a
+        // stranger whether a mobile number has an account.
         return back()->withErrors([
-            'mobile' => __('These credentials do not match our records, or your account is inactive.'),
-        ])->onlyInput('mobile');
+            'credentials' => __('That mobile number and password do not match an active account. Check both and try again.'),
+        ])->onlyInput('mobile', 'remember');
     }
 
     public function logout(Request $request): RedirectResponse

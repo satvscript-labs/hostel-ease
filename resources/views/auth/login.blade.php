@@ -1,56 +1,47 @@
-{{-- W10: the shell (head, split visual, locale footer, PWA) is <x-guest-shell>;
-     this page is now only the login form. Was a 300-line near-duplicate of
-     register. --}}
-<x-guest-shell :title="__('Login')" :heading="__('Welcome back')" :sub="__('Enter your credentials to access your dashboard.')">
+{{-- Login, on the redesigned <x-guest-shell>. Mobile number is the login across the
+     whole product (staff included, many without an email), so it stays the one
+     identifier here. --}}
+<x-guest-shell :title="__('Sign in')" :heading="__('Welcome back')" :sub="__('Sign in with the mobile number you registered with.')">
 
+    @if(session('status'))
+        <div class="g-note g-note--ok" role="status"><i class="fa-solid fa-circle-check"></i><div>{{ session('status') }}</div></div>
+    @endif
     @if(session('error'))
-        <div class="guest-alert"><i class="fa-solid fa-circle-exclamation mt-1"></i><div>{{ session('error') }}</div></div>
+        <div class="g-note g-note--bad" role="alert"><i class="fa-solid fa-circle-exclamation"></i><div>{{ session('error') }}</div></div>
     @endif
-    @if($errors->any())
-        <div class="guest-alert"><i class="fa-solid fa-circle-exclamation mt-1"></i><div>{{ $errors->first() }}</div></div>
-    @endif
+    {{-- A failed sign-in is about the PAIR, not the mobile field — so it sits above
+         the form instead of under one input. --}}
+    @error('credentials')
+        <div class="g-note g-note--bad" role="alert"><i class="fa-solid fa-circle-exclamation"></i><div>{{ $message }}</div></div>
+    @enderror
 
-    <form method="POST" action="{{ route('login.attempt') }}">
+    <form method="POST" action="{{ route('login.attempt') }}" x-data="{ busy: false }" @submit="busy = true" novalidate>
         @csrf
 
-        <div class="guest-field">
-            <label class="guest-label">{{ __('Mobile Number') }}</label>
-            <div class="d-flex gap-2">
-                <div class="guest-prefix">+91</div>
-                <div class="guest-input-wrap flex-grow-1">
-                    <input type="tel" name="mobile" value="{{ old('mobile') }}" class="guest-input"
-                           inputmode="numeric" maxlength="10" placeholder="{{ __('10-digit mobile number') }}" required autofocus>
-                    <i class="fa-solid fa-mobile-screen guest-input-ic"></i>
-                </div>
-            </div>
-        </div>
+        <x-guest.field name="mobile" :label="__('Mobile number')" type="tel" prefix="+91"
+                       :value="old('mobile')" inputmode="numeric" maxlength="14" autocomplete="tel-national"
+                       :placeholder="__('98765 43210')" autofocus />
 
-        <div class="guest-field">
-            <label class="guest-label">{{ __('Password') }}</label>
-            <div class="guest-input-wrap" x-data="{ show: false }">
-                <input :type="show ? 'text' : 'password'" name="password" class="guest-input" placeholder="••••••••" required autocomplete="current-password">
-                <button type="button" class="guest-input-ic border-0 bg-transparent" style="pointer-events:auto; cursor:pointer;" @click="show = !show" tabindex="-1" aria-label="{{ __('Show password') }}">
-                    <i class="fa-solid" :class="show ? 'fa-eye-slash' : 'fa-eye'"></i>
-                </button>
-            </div>
-        </div>
+        <x-guest.field name="password" :label="__('Password')" type="password" autocomplete="current-password" />
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <label class="d-flex align-items-center gap-2 m-0" style="cursor:pointer;">
-                <input class="form-check-input m-0" type="checkbox" name="remember" id="remember">
-                <span class="small fw-semibold text-muted">{{ __('Remember me') }}</span>
+        <div class="d-flex justify-content-between align-items-center mb-4 mt-n1">
+            <label class="d-flex align-items-center gap-2 m-0 g-quiet" style="cursor:pointer;">
+                <input class="form-check-input m-0" type="checkbox" name="remember" value="1" @checked(old('remember'))>
+                {{ __('Keep me signed in') }}
             </label>
-            <a href="{{ route('recover') }}" class="small guest-link">{{ __('Forgot password?') }}</a>
+            <a href="{{ route('recover') }}" class="g-link small">{{ __('Forgot password?') }}</a>
         </div>
 
-        <button type="submit" class="guest-btn mb-4">
-            {{ __('Sign in to dashboard') }} <i class="fa-solid fa-arrow-right"></i>
+        <button type="submit" class="g-btn" :disabled="busy">
+            <span x-show="!busy">{{ __('Sign in') }}</span>
+            <span x-show="busy" x-cloak class="g-spinner" aria-hidden="true"></span>
+            <span x-show="busy" x-cloak>{{ __('Signing in…') }}</span>
         </button>
-
-        <div class="text-center">
-            <span class="text-muted small">{{ __("Don't have an account?") }}</span>
-            <a href="{{ route('register') }}" class="small guest-link ms-1">{{ __('Sign up for free') }}</a>
-        </div>
     </form>
+
+    <p class="g-quiet text-center mt-4 mb-0">
+        {{ __('New to :app?', ['app' => config('app.name', 'HostelEase')]) }}
+        <a href="{{ route('register') }}" class="g-link">{{ __('Create an account') }}</a>
+    </p>
 
 </x-guest-shell>

@@ -1,39 +1,41 @@
-{{-- W10: the honest target of "Forgot password?" — no self-serve reset exists
-     yet (OTP deferred, pending_requirements #1), so this explains the two real
-     recovery paths instead of pretending. Upgrades into an OTP form when an
-     SMS provider is chosen. --}}
+{{-- The honest target of "Forgot password?" (W10): no self-serve reset exists yet, so
+     this explains the two real ways back in instead of pretending. Restyled for the
+     redesigned <x-guest-shell>; behaviour unchanged. --}}
 <x-guest-shell :title="__('Recover access')" :heading="__('Locked out?')" :sub="__('Here is how to get back into your account.')">
 
-    <div class="d-flex flex-column gap-3 mb-4">
-        {{-- Staff path --}}
-        <div class="d-flex align-items-start gap-3 p-3 rounded-3" style="border:1px solid rgba(0,0,0,.07); background:var(--he-bg-canvas,#f8fafc);">
-            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px; height:44px; background:var(--he-primary-soft, rgba(79,70,229,.1)); color:var(--he-primary,#4f46e5);">
-                <i class="fa-solid fa-user-group"></i>
-            </div>
+    @push('head')
+    <style>
+        .g-path { display: flex; gap: 1rem; align-items: flex-start; padding: 1.1rem 0; border-bottom: 1px solid var(--g-line); }
+        .g-path:first-child { padding-top: 0; }
+        .g-path-ic { width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .g-path-title { font-weight: 700; margin-bottom: 0.2rem; }
+        .g-path-text { color: var(--g-muted); font-size: 0.92rem; line-height: 1.55; }
+    </style>
+    @endpush
+
+    <div class="mb-4">
+        <div class="g-path">
+            <div class="g-path-ic" style="background: color-mix(in srgb, var(--g-brand) 10%, #fff); color: var(--g-brand);"><i class="fa-solid fa-user-group"></i></div>
             <div>
-                <div class="fw-bold" style="color:var(--he-text-main,#0f172a);">{{ __('Staff member?') }}</div>
-                <div class="small text-muted">{{ __('Your hostel owner can reset your password from their Settings → Users & Roles in seconds. Ask them for a new one.') }}</div>
+                <div class="g-path-title">{{ __('Staff member?') }}</div>
+                <div class="g-path-text">{{ __('Your hostel owner can reset your password in seconds from Settings → Users & Roles. Ask them for a new one.') }}</div>
             </div>
         </div>
-
-        {{-- Owner path --}}
-        <div class="d-flex align-items-start gap-3 p-3 rounded-3" style="border:1px solid rgba(0,0,0,.07); background:var(--he-bg-canvas,#f8fafc);">
-            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px; height:44px; background:var(--he-accent-soft, rgba(147,51,234,.1)); color:var(--he-accent,#9333ea);">
-                <i class="fa-solid fa-shield-halved"></i>
-            </div>
+        <div class="g-path">
+            <div class="g-path-ic" style="background: color-mix(in srgb, var(--g-brand-2) 10%, #fff); color: var(--g-brand-2);"><i class="fa-solid fa-shield-halved"></i></div>
             <div>
-                <div class="fw-bold" style="color:var(--he-text-main,#0f172a);">{{ __('Hostel owner?') }}</div>
-                <div class="small text-muted">{{ __('Contact HostelEase support with your registered mobile number — we will verify it is you and reset your access.') }}</div>
+                <div class="g-path-title">{{ __('Hostel owner?') }}</div>
+                <div class="g-path-text">{{ __('Contact HostelEase support from your registered mobile number or email. We will confirm it is you and reset your access.') }}</div>
             </div>
         </div>
     </div>
 
-    <a href="mailto:{{ config('mail.from.address', 'support@hostelease.app') }}?subject={{ rawurlencode(__('Account recovery request')) }}" class="guest-btn mb-4 text-decoration-none">
+    <a href="mailto:{{ config('hostelease.company.email', config('mail.from.address')) }}?subject={{ rawurlencode(__('Account recovery request')) }}" class="g-btn">
         <i class="fa-solid fa-headset"></i> {{ __('Contact support') }}
     </a>
 
-    <div class="text-center">
-        <a href="{{ route('login') }}" class="small guest-link"><i class="fa-solid fa-arrow-left me-1"></i>{{ __('Back to login') }}</a>
-    </div>
+    <p class="g-quiet text-center mt-4 mb-0">
+        <a href="{{ route('login') }}" class="g-link">{{ __('Back to sign in') }}</a>
+    </p>
 
 </x-guest-shell>

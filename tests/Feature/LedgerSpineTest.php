@@ -306,12 +306,20 @@ class LedgerSpineTest extends TestCase
         // S1 item 17: signup was the last path writing coverage directly, so its
         // trial existed nowhere the ledger could see (and the audit flagged it
         // forever as "entitled with no paid record").
+        // Two steps since the email-verification redesign: details, then the code.
+        \Illuminate\Support\Facades\Mail::fake();
         $this->post('/register', [
-            'name' => 'Signup Owner',
-            'hostel_name' => 'Signup Hostel',
-            'mobile' => '9995550001',
-            'password' => 'secret123',
-        ])->assertRedirect(route('dashboard'));
+            'name' => 'Signup Owner', 'hostel_name' => 'Signup Hostel',
+            'mobile' => '9995550001', 'email' => 'signup@hostel.test', 'password' => 'secret123',
+        ])->assertRedirect(route('register.verify'));
+
+        $code = null;
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\SignupCodeMail::class, function ($m) use (&$code) {
+            $code = $m->code;
+
+            return true;
+        });
+        $this->post(route('register.verify.attempt'), ['code' => $code])->assertRedirect(route('dashboard'));
 
         $hostel = Hostel::where('name', 'Signup Hostel')->firstOrFail();
 
