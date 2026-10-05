@@ -606,17 +606,20 @@ class OwnerSelfServeBillingTest extends TestCase
         $this->assertSame('active', $account->status->value);
     }
 
-    /** Provisioning onto an EXISTING owner (same mobile) cannot carry a trial. */
-    public function test_provisioning_a_trial_hostel_for_an_existing_owner_is_refused(): void
+    /**
+     * The Provision form is for NEW customers. An existing owner's number is sent to
+     * their Account 360, where a new hostel joins their plan (2026-10-05).
+     */
+    public function test_provisioning_for_an_existing_owner_is_sent_to_their_account(): void
     {
         [$owner] = $this->owner(1, [], '9700000041');
 
         $this->actingAs(User::factory()->superAdmin()->create())
             ->post(route('superadmin.hostels.store'), [
                 'name' => 'Second Site', 'owner_name' => $owner->name, 'mobile' => '+919700000041',
-                'status' => 'active', 'plan' => 'trial', 'payment_status' => 'paid',
+                'status' => 'active', 'plan' => 'trial',
             ])
-            ->assertSessionHasErrors('plan');
+            ->assertSessionHasErrors(['mobile' => 'This number already belongs to '.$owner->name.', an existing customer. Add the hostel from their account so it joins their plan.']);
 
         $this->assertNull(Hostel::where('name', 'Second Site')->first());
     }

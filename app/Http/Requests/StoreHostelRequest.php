@@ -44,16 +44,13 @@ class StoreHostelRequest extends FormRequest
             'subscription_end' => [$this->isMethod('put') ? 'required' : 'nullable', 'date', 'after:subscription_start'],
             // Creation only
             'plan' => [$this->isMethod('post') ? 'required' : 'nullable', Rule::in(['yearly', 'monthly', 'trial'])],
-            'amount' => ['nullable', 'numeric', 'min:0'],
-            'payment_status' => ['nullable', Rule::in(['paid', 'pending', 'failed'])],
-            // NO 'comp' here (S0 · finding F6). This path writes a legacy
-            // `subscriptions` row whose payment_method is a MySQL
-            // enum('cash','upi','cheque','rtgs','online') — 'comp' is not in it, so
-            // on a strict connection the insert throws and the request 500s. The UI
-            // never offered it, so this only ever armed a crafted POST. Complimentary
-            // coverage has its own audited path: Account 360 → Comp, which writes
-            // `comp` to subscription_orders (a plain string column). The constraint
-            // disappears in S1 when the legacy table stops being written.
+            // May only LOWER the server's quote (enforced in the billing service too);
+            // bounded like every other money input.
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
+            // How the first charge is collected: recorded as received, or a payment link.
+            // (Replaced a paid / pending / failed status — "failed" meant nothing here.)
+            'collect' => ['nullable', Rule::in(['offline', 'link'])],
+            // No 'comp': complimentary coverage has its own audited path (Account 360 → Comp).
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online'])],
             'transaction_number' => ['nullable', 'string', 'max:100'],
         ];

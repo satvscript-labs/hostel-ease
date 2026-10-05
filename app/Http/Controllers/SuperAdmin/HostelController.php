@@ -9,6 +9,8 @@ use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
 use App\Services\HostelService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class HostelController extends Controller
@@ -68,11 +70,11 @@ class HostelController extends Controller
             ],
         ]);
         
-        $pricingJson = [
-            'yearly' => config('hostelease.subscription_pricing.yearly', 10000),
-            'monthly' => config('hostelease.subscription_pricing.monthly', 1000),
-            'trial' => 0,
-        ];
+        // A NEW customer's first term, priced by the same engine every charge uses —
+        // the list unit and any automatic tier for one branch. It replaced a browser-
+        // side "Auto-calc" that copied the list price into an editable box.
+        $newCustomerQuotes = $this->newCustomerQuotes();
+        $linksEnabled = app(\App\Services\Billing\PaymentLinkService::class)->isEnabled();
 
         // Owner-account deep-link per row (P4 item 3.2), resolved in two batched
         // queries rather than per-row.
@@ -89,7 +91,7 @@ class HostelController extends Controller
             $h->id => optional($owners->get($h->mobile), fn ($o) => $accounts->get($o->id)),
         ])->all();
 
-        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'pricingJson', 'accountByHostel', 'stats'));
+        return view('superadmin.hostels.index', compact('hostels', 'hostelsJson', 'newCustomerQuotes', 'linksEnabled', 'accountByHostel', 'stats'));
     }
 
     /**
@@ -102,45 +104,121 @@ class HostelController extends Controller
         return redirect()->route('superadmin.hostels.show', [$hostel, 'edit' => 1]);
     }
 
+    /**
+     * Provision a NEW customer: their first hostel, their login, and their first charge.
+     *
+     * New customers only. A hostel for someone who is already a customer is added from
+     * their Account 360 (Add hostel), where it joins their plan — prorated onto their
+     * renewal date, at their price, with their discounts. This form used to accept an
+     * existing owner's number and give the branch its own full term at the list price,
+     * which could push their whole account's renewal date out by a year.
+     *
+     * The charge is the shared one: recorded as received, or a payment link (the
+     * hostel is created either way and goes live when the money lands). A posted
+     * amount may only lower it. Everything — hostel, login, charge, link — is one
+     * transaction, so a refused charge or a Razorpay failure leaves nothing behind.
+     */
     public function store(StoreHostelRequest $request): RedirectResponse
     {
-        // provision() links the hostel to an EXISTING owner when the mobile matches —
-        // and that owner has had their account's one free trial (owner decision,
-        // 2026-10-04), so a "trial" plan is refused by the biller. provision() is one
-        // transaction, so the refusal rolls the new hostel back; answer it as a form
-        // error, never a 500.
+        $data = $request->validated();
+
+        if ($existing = $this->existingOwner($data['mobile'])) {
+            $account = \App\Models\SubscriptionAccount::where('owner_id', $existing->id)->first();
+
+            return back()->withInput()->withErrors(['mobile' => "This number already belongs to {$existing->name}"
+                .($account ? ', an existing customer. Add the hostel from their account so it joins their plan.' : '.')]);
+        }
+
+        $viaLink = ($data['collect'] ?? 'offline') === 'link' && ($data['plan'] ?? 'yearly') !== 'trial';
+        $data['payment_status'] = $viaLink ? 'pending' : 'paid';
+        $data['collection'] = $viaLink ? \App\Enums\CollectionMethod::Link->value : null;
+        if ($viaLink) {
+            // No instrument yet — the webhook records how it was actually paid.
+            unset($data['payment_method'], $data['transaction_number']);
+        }
+
         try {
-            $result = $this->hostels->provision($request->validated());
+            $result = null;
+            if ($viaLink) {
+                app(\App\Services\Billing\PaymentLinkService::class)->collect(function () use (&$result, $data) {
+                    $result = $this->hostels->provision($data);
+
+                    return $result['order'];
+                });
+            } else {
+                $result = $this->hostels->provision($data);
+            }
         } catch (\RuntimeException $e) {
             return back()->withInput()->withErrors(['plan' => \App\Support\Refusal::message($e)]);
         }
 
-        $this->logger->log('hostel.provision', "Provisioned hostel {$result['hostel']->name}", $result['hostel']);
+        $this->logger->log('hostel.provision', "Provisioned hostel {$result['hostel']->name} for new customer {$result['admin']->name}", $result['hostel']);
 
-        $redirect = redirect()->route('superadmin.hostels.show', $result['hostel']);
+        $account = \App\Models\SubscriptionAccount::where('owner_id', $result['admin']->id)->firstOrFail();
+        $order = $result['order']?->fresh();
 
-        // Make the S0 behaviour change visible instead of surprising (finding F1):
-        // an unpaid initial setup grants NO coverage now, where it used to silently
-        // hand out a full year. The branch is created and recorded as money owed —
-        // accept the payment, or grant a trial/comp, to let them start working.
-        $unpaid = ($request->validated()['payment_status'] ?? 'pending') !== 'paid';
-        $note = $unpaid
-            ? ' Payment is not marked paid, so no coverage has been granted yet — accept the payment (or grant a trial/comp) to activate the branch.'
-            : '';
+        $redirect = redirect()->route('superadmin.accounts.show', $account)
+            ->with('credentials', ['mobile' => $result['admin']->mobile, 'password' => $result['password']]);
 
-        if ($result['password'] === null) {
-            // Linked to an existing owner login (same mobile = another branch).
-            return $redirect->with('success',
-                "Hostel created and linked to existing owner {$result['admin']->mobile} as a new branch. They use their current password.".$note);
+        if ($viaLink) {
+            // Account 360 opens its Share panel by itself when this is present.
+            return $redirect
+                ->with('success', "{$result['hostel']->name} is set up. It goes live once the ".hostelease_money($order->amount).' payment link is paid.')
+                ->with('payment_link', [
+                    'url' => $order->payment_link_url, 'amount' => (float) $order->amount, 'invoice' => $order->invoiceNumber(),
+                    'order_id' => $order->id, 'expires' => $order->payment_link_expires_at?->format('d M Y'),
+                ]);
         }
 
-        // Surface the generated login once so the Super Admin can share it.
-        return $redirect
-            ->with('credentials', [
-                'mobile' => $result['admin']->mobile,
-                'password' => $result['password'],
-            ])
-            ->with('success', 'Hostel created and admin login generated.'.$note);
+        return $redirect->with('success', ($data['plan'] ?? 'yearly') === 'trial'
+            ? "{$result['hostel']->name} is set up on a 14-day free trial."
+            : "{$result['hostel']->name} is set up and paid — live until ".$account->fresh()->current_period_end?->format('d M Y').'.');
+    }
+
+    /**
+     * Does this mobile already belong to a customer? Lets the Provision form send the
+     * operator to that customer's Account 360 before they fill anything else in.
+     */
+    public function ownerLookup(Request $request): JsonResponse
+    {
+        $digits = substr(preg_replace('/\D+/', '', (string) $request->query('mobile')), -10);
+        if (strlen($digits) !== 10) {
+            return response()->json(['exists' => false]);
+        }
+
+        $owner = $this->existingOwner('+91'.$digits);
+        if (! $owner) {
+            return response()->json(['exists' => false]);
+        }
+
+        $account = \App\Models\SubscriptionAccount::where('owner_id', $owner->id)->first();
+
+        return response()->json([
+            'exists' => true,
+            'name' => $owner->name,
+            'branches' => count($owner->accessibleHostelIds()),
+            'account_url' => $account ? route('superadmin.accounts.show', [$account, 'add_hostel' => 1]) : null,
+        ]);
+    }
+
+    /** A hostel-admin login holding this mobile — an existing customer. */
+    protected function existingOwner(string $mobile): ?\App\Models\User
+    {
+        return \App\Models\User::where('mobile', $mobile)->where('role', 'hostel_admin')->first();
+    }
+
+    /** @return array<string, array{unit: float, volume: float, auto: float}> */
+    protected function newCustomerQuotes(): array
+    {
+        $discounts = app(\App\Services\Billing\DiscountService::class);
+        $blank = new \App\Models\SubscriptionAccount;   // no negotiated price or discounts yet
+
+        return collect(['yearly', 'monthly'])->mapWithKeys(function (string $period) use ($discounts, $blank) {
+            $unit = (float) config("hostelease.subscription_pricing.{$period}");
+            $p = $discounts->preview($blank, $unit, 1, 'renewal');
+
+            return [$period => ['unit' => $unit, 'volume' => (float) $p['volume_amount'], 'auto' => (float) $p['final']]];
+        })->all();
     }
 
     public function show(Hostel $hostel): View

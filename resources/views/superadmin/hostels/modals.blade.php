@@ -5,7 +5,10 @@
             <form method="POST" action="{{ route('superadmin.hostels.store') }}" data-ring-required class="custom-overlay-modal" style="max-width: 800px;" :class="{ 'is-open': createModalOpen }" @click.stop>
                 @csrf
                 <div class="custom-overlay-header">
-                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-building-circle-arrow-right text-primary me-2"></i>Add New Hostel / Branch</h5>
+                    <div>
+                        <h5 class="fw-bold mb-0"><i class="fa-solid fa-building-circle-arrow-right text-primary me-2"></i>New customer</h5>
+                        <div class="small text-muted">Their first hostel, login and plan. For an existing customer, add the hostel from their account.</div>
+                    </div>
                     <button type="button" class="btn-close" @click="createModalOpen = false"></button>
                 </div>
                 <div class="custom-overlay-body">
@@ -22,8 +25,10 @@
                             <label class="form-label fw-bold small text-muted">MOBILE <span class="text-danger">*</span></label>
                             <div class="input-group shadow-sm">
                                 <span class="input-group-text bg-white border-end-0 fw-bold text-muted">+91</span>
-                                <input type="tel" name="mobile" value="{{ old('mobile') }}" class="form-control bg-white border-start-0" maxlength="10" inputmode="numeric" required>
+                                <input type="tel" name="mobile" value="{{ old('mobile') }}" class="form-control bg-white border-start-0" maxlength="10" inputmode="numeric" required
+                                       @input.debounce.400ms="lookupOwner($event.target.value)">
                             </div>
+                            @error('mobile')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small text-muted">EMAIL</label>
@@ -55,36 +60,47 @@
                             </div>
                         </div>
 
-                        <div class="col-12"><hr class="my-1 text-muted"></div>
-                        <div class="col-12"><h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-receipt text-primary me-2"></i>Initial Subscription Setup</h6></div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted">PLAN PERIOD <span class="text-danger">*</span></label>
-                            <x-he-select name="plan" :submit="false" compact x-model="c_plan" :options="[
-                                'yearly' => 'Yearly',
-                                'monthly' => 'Monthly',
-                                'trial' => 'Trial (14 Days)',
-                            ]" />
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="d-flex justify-content-between align-items-end mb-2">
-                                <label class="form-label fw-bold small text-muted mb-0">AMOUNT (₹)</label>
-                                <button type="button" @click="recalcCreate()" class="btn btn-link p-0 text-decoration-none small fw-bold" style="font-size: 0.72rem;"><i class="fa-solid fa-rotate-right"></i> Auto-calc</button>
-                            </div>
-                            <div class="input-group shadow-sm">
-                                <span class="input-group-text bg-white fw-bold text-muted">₹</span>
-                                <input type="number" step="0.01" name="amount" x-model="c_amount" class="form-control fw-bold text-dark border">
+                        {{-- ALREADY A CUSTOMER: this form is for new customers only. Their
+                             hostel is added from their account, where it joins their plan. --}}
+                        <div class="col-12" x-show="owner.exists" x-transition.opacity x-cloak>
+                            <div class="d-flex flex-wrap align-items-center gap-3 p-3 rounded-4" style="background: var(--he-warning-soft, #fef3c7); color:#92400e;">
+                                <i class="fa-solid fa-user-check fs-5"></i>
+                                <div class="flex-grow-1 small">
+                                    <div class="fw-bold text-dark" x-text="owner.name + ' is already a customer'"></div>
+                                    <span x-text="owner.branches + ' branch(es) on their plan.'"></span> Add this hostel from their account so it joins their plan — prorated to their renewal date, at their price.
+                                </div>
+                                <a :href="owner.account_url" x-show="owner.account_url" class="btn btn-sm btn-dark rounded-pill px-3 fw-semibold">Open their account <i class="fa-solid fa-arrow-right ms-1"></i></a>
                             </div>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted">PAYMENT STATUS</label>
-                            <x-he-select name="payment_status" :submit="false" compact x-model="c_status" :options="[
-                                'paid' => 'Paid',
-                                'pending' => 'Pending',
-                                'failed' => 'Failed',
-                            ]" />
+                        <div class="col-12" x-show="!owner.exists"><hr class="my-1 text-muted"></div>
+                        <div class="col-12" x-show="!owner.exists">
+                            <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-receipt text-primary me-2"></i>Plan</h6>
+                            <input type="hidden" name="plan" :value="c_plan">
+                            <div class="d-flex gap-2 mb-3">
+                                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="c_plan==='yearly'?'btn-primary':'btn-light border'" @click="c_plan='yearly'">Yearly</button>
+                                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="c_plan==='monthly'?'btn-primary':'btn-light border'" @click="c_plan='monthly'">Monthly</button>
+                                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="c_plan==='trial'?'btn-primary':'btn-light border'" @click="c_plan='trial'">Free trial (14 days)</button>
+                            </div>
+
+                            <x-he-billing-summary data="createSummary" />
+
+                            <div class="row g-3 mt-1" x-show="c_plan !== 'trial'" x-cloak>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-muted">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
+                                    <input type="number" step="0.01" min="0" name="amount" x-model="c_override" :disabled="c_plan === 'trial'"
+                                           class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(createSummary.final) + ')'">
+                                    <div class="form-text">Lower only — the difference is logged as a discount.</div>
+                                </div>
+                                <div class="col-md-6">
+                                    @include('superadmin.accounts._collect_toggle', ['model' => 'c_collect'])
+                                    <div x-show="c_collect === 'offline'" x-collapse>
+                                        <label class="form-label fw-bold small text-muted">METHOD</label>
+                                        <x-he-select name="payment_method" :submit="false" compact selected="cash" :options="['cash' => 'Cash', 'upi' => 'UPI', 'cheque' => 'Cheque', 'rtgs' => 'RTGS / NEFT', 'online' => 'Online']" />
+                                        <input type="text" name="transaction_number" class="form-control bg-white border shadow-sm mt-2" placeholder="Reference (optional)" maxlength="100">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <input type="hidden" name="status" value="active">
@@ -92,7 +108,10 @@
                 </div>
                 <div class="custom-overlay-footer">
                     <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="createModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-check me-2"></i>Provision Hostel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" :disabled="owner.exists">
+                        <i class="fa-solid me-2" :class="c_plan !== 'trial' && c_collect === 'link' ? 'fa-link' : 'fa-check'"></i>
+                        <span x-text="c_plan === 'trial' ? 'Start free trial' : (c_collect === 'link' ? 'Set up & create link' : 'Set up & record payment')"></span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -205,20 +224,40 @@ document.addEventListener('alpine:init', () => {
         },
 
         hostels: <?php echo json_encode($hostelsJson); ?>,
-        pricing: <?php echo json_encode($pricingJson); ?>,
 
-        // Create form
-        c_plan: {!! json_encode(old('plan', 'yearly')) !!},
-        c_amount: {!! json_encode(old('amount', config('hostelease.subscription_pricing.yearly', 10000))) !!},
-        c_status: {!! json_encode(old('payment_status', 'pending')) !!},
+        // ── New customer (Provision) ──
+        // Prices come from the server's engine (newCustomerQuotes); the browser only
+        // chooses the term and how it is collected, and may LOWER the total.
+        quotes: @json($newCustomerQuotes),
+        c_plan: @json(old('plan', 'yearly')),
+        c_override: @json(old('amount', '')),
+        c_collect: @json(old('collect', 'offline')),
+        owner: { exists: false, name: '', branches: 0, account_url: null },
 
-        init() {
-            // Picking a plan re-prices the amount (mirrors the Auto-calc button).
-            this.$watch('c_plan', () => this.recalcCreate());
+        get createSummary() {
+            if (this.c_plan === 'trial') {
+                return { rows: [{ label: '14-day free trial', amount: 0, kind: 'line' }], finalLabel: 'Payable now', final: 0, note: 'Branches they add during the trial join it; everything is billed when they subscribe.' };
+            }
+            const q = this.quotes[this.c_plan] || { unit: 0, volume: 0, auto: 0 };
+            const rows = [{ label: '1 branch × ' + heMoney(q.unit) + (this.c_plan === 'monthly' ? '/mo' : '/yr'), amount: q.unit, kind: 'line' }];
+            if (q.volume > 0) rows.push({ label: 'Volume tier', amount: q.volume, kind: 'discount' });
+            let final = q.auto;
+            const ov = parseFloat(this.c_override);
+            if (this.c_override !== '' && !isNaN(ov) && ov < q.auto) {
+                rows.push({ label: 'Manual adjustment', amount: Math.round((q.auto - ov) * 100) / 100, kind: 'discount' });
+                final = ov;
+            }
+            return { rows, finalLabel: this.c_collect === 'link' ? 'Link amount' : 'Payable now', final,
+                note: this.c_collect === 'link' ? 'The hostel goes live once the link is paid.' : 'Live from today for one ' + (this.c_plan === 'monthly' ? 'month' : 'year') + '.' };
         },
 
-        recalcCreate() {
-            this.c_amount = this.pricing[this.c_plan] ?? 0;
+        async lookupOwner(value) {
+            const digits = (value || '').replace(/\D/g, '');
+            if (digits.length !== 10) { this.owner = { exists: false, name: '', branches: 0, account_url: null }; return; }
+            try {
+                const res = await fetch(@json(route('superadmin.hostels.owner-lookup')) + '?mobile=' + digits, { headers: { 'Accept': 'application/json' } });
+                this.owner = await res.json();
+            } catch (e) { /* the server refuses an existing owner anyway */ }
         },
 
         // Edit form

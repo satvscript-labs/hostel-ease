@@ -58,12 +58,12 @@
             <p class="he-page-sub">{{ __('Every tenant branch across the platform — coverage, owners and admins.') }}</p>
         </div>
         <button type="button" @click="createModalOpen = true" class="btn btn-premium shadow-sm rounded-pill px-4 fw-semibold tactile-btn d-none d-md-inline-flex align-items-center">
-            <i class="fa-solid fa-plus me-2"></i>{{ __('Add Hostel') }}
+            <i class="fa-solid fa-user-plus me-2"></i>{{ __('New customer') }}
         </button>
     </div>
 
     <template x-teleport="body">
-        <button type="button" class="fab" @click="createModalOpen = true" title="{{ __('Add Hostel') }}"><i class="fa-solid fa-plus"></i></button>
+        <button type="button" class="fab" @click="createModalOpen = true" title="{{ __('New customer') }}"><i class="fa-solid fa-user-plus"></i></button>
     </template>
 
     {{-- ── Fleet health ── --}}

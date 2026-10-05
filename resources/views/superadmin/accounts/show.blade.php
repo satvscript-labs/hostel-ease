@@ -173,6 +173,9 @@
 <div class="page-enter" x-data="account360()">
     <a href="{{ route('superadmin.accounts.index') }}" class="btn btn-sm btn-light rounded-pill px-3 mb-3 shadow-sm"><i class="fa-solid fa-arrow-left me-1"></i> Customers</a>
 
+    {{-- A customer just provisioned lands here: their generated login, shown once. --}}
+    @include('superadmin.partials.credentials')
+
     {{-- ── Header band ── --}}
     <div class="a360-hero p-4 p-md-4 mb-4 shadow">
         <div class="a360-hero-bg"></div>
@@ -728,7 +731,9 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
-        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false, addHostelOpen: false,
+        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
+        // Sent here from the Provision form for an existing customer's number.
+        addHostelOpen: @js(request()->boolean('add_hostel')),
         billingModeOpen: false, billingModeChoice: @js($account->billing_mode->value),
         dType: 'percentage',
 

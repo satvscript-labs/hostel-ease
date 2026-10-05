@@ -156,6 +156,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('dashboard', [SuperAdminDashboard::class, 'index'])->name('dashboard');
 
         // --- Module 12: Hostels, Subscriptions, Admins ---
+        Route::get('hostels/owner-lookup', [HostelController::class, 'ownerLookup'])->name('hostels.owner-lookup');
         Route::resource('hostels', HostelController::class);
 
         // Customers / Accounts (account-level billing control terminal)

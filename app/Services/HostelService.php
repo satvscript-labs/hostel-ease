@@ -82,16 +82,57 @@ class HostelService
 
             $this->seedPaymentModes($hostel);
 
-            app(\App\Services\Billing\AccountBillingService::class)->recordBranchRenewal($hostel, $data['plan'] ?? 'yearly', [
-                'amount' => $data['amount'] ?? null,
-                'payment_status' => $data['payment_status'] ?? 'pending',
-                'payment_method' => $data['payment_method'] ?? null,
-                'transaction_number' => $data['transaction_number'] ?? null,
-                'remarks' => 'Initial Branch Setup',
-            ]);
+            $order = $this->chargeFirstTerm($hostel, $admin, $existing !== null, $data);
 
-            return ['hostel' => $hostel, 'admin' => $admin, 'password' => $password];
+            return ['hostel' => $hostel, 'admin' => $admin, 'password' => $password, 'order' => $order, 'existing' => $existing !== null];
         });
+    }
+
+    /**
+     * The new branch's first charge — through the SAME account functions Account 360
+     * uses, so a provisioned branch is priced and dated exactly like any other.
+     *
+     * This replaced (2026-10-05) a per-branch `recordBranchRenewal()` that gave every
+     * provisioned branch its OWN full term from today at the LIST price. For a new
+     * customer that skipped the discount engine; for an EXISTING owner it ignored
+     * their negotiated price and discounts, never co-terminated, and — because the
+     * account's renewal date is the furthest coverage of any branch — could push the
+     * whole account's renewal date out by up to a year.
+     *
+     *   trial              → the account's free trial, or JOINS it while it runs
+     *                        (recordBranchRenewal is the one place that rule lives)
+     *   existing owner     → addBranch(): prorated onto their renewal date at their
+     *                        price; a full term at their price if they have no live cycle
+     *   new customer       → renewAccount(): the first term, discount-aware
+     *
+     * `payment_status` paid = money in hand; pending = owed (the caller may attach a
+     * payment link). A posted `amount` may only lower the charge — both account paths
+     * enforce it.
+     */
+    protected function chargeFirstTerm(Hostel $hostel, User $owner, bool $existingOwner, array $data): ?\App\Models\SubscriptionOrder
+    {
+        $billing = app(\App\Services\Billing\AccountBillingService::class);
+        $plan = $data['plan'] ?? 'yearly';
+
+        $payment = array_filter([
+            'amount' => $data['amount'] ?? null,
+            'payment_status' => $data['payment_status'] ?? 'pending',
+            'payment_method' => $data['payment_method'] ?? null,
+            'transaction_number' => $data['transaction_number'] ?? null,
+            'collection' => $data['collection'] ?? null,
+            'remarks' => 'Initial Branch Setup',
+        ], fn ($v) => $v !== null && $v !== '');
+
+        if ($plan === 'trial') {
+            // A trial costs nothing and is never "owed": paid, ₹0.
+            return $billing->recordBranchRenewal($hostel, 'trial', ['payment_status' => 'paid', 'remarks' => 'Initial Branch Setup (trial)']);
+        }
+
+        $account = $billing->accountFor($owner);
+
+        return $existingOwner
+            ? $billing->addBranch($account, $hostel, $payment)
+            : $billing->renewAccount($account, $plan, $payment);
     }
 
 

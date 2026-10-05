@@ -73,8 +73,10 @@ class HostelProvisioningTest extends TestCase
             'plan' => 'yearly', 'status' => 'active',
         ]);
 
+        // A new customer lands on their Account 360, with the generated login.
         $hostel = Hostel::where('name', 'HTTP Hostel')->firstOrFail();
-        $response->assertRedirect(route('superadmin.hostels.show', $hostel));
+        $account = \App\Models\SubscriptionAccount::where('owner_id', $hostel->owner_id)->sole();
+        $response->assertRedirect(route('superadmin.accounts.show', $account));
         $response->assertSessionHas('credentials');
     }
 
