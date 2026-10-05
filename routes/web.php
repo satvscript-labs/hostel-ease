@@ -129,6 +129,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         // create a branch. Confirm is throttled more loosely — it only settles money
         // already taken, and must never be the thing a paying customer is refused by.
         Route::get('subscription', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('subscription.index');
+        Route::get('subscription/receipts/{order}', [\App\Http\Controllers\Admin\SubscriptionController::class, 'receipt'])->name('subscription.receipt');
         Route::post('subscription/checkout', [\App\Http\Controllers\Admin\SubscriptionController::class, 'checkout'])
             ->middleware('throttle:12,1')->name('subscription.checkout');
         Route::post('subscription/branches', [\App\Http\Controllers\Admin\SubscriptionController::class, 'addBranch'])

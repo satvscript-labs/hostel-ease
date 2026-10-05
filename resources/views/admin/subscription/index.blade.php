@@ -2,23 +2,27 @@
 @section('title', 'My Subscription')
 
 {{-- ─────────────────────────────────────────────────────────────────────────
-     The owner's billing page — rebuilt in S3 on the same core as the operator's
-     Account 360 (_artifact/saas_billing_autopay/14_S3_DESIGN.md).
+     The owner's billing page — redesigned 2026-10-06 (doc 23) on the same core as
+     the operator's Account 360.
 
-     · Every figure comes from the same quote functions Account 360 uses, so the
-       owner sees their own negotiated price and the two surfaces cannot disagree.
-     · Paying anything goes through a PENDING ORDER written when the price is shown,
-       never a quote re-priced when the money arrives.
-     · The browser sends a charge shape, never an amount; confirming sends only
-       Razorpay's three ids.
-     · A charge already open — a link we sent, a proforma, the owner's own earlier
-       attempt — is what gets paid. Never a second demand beside it.
+     Layout, top to bottom, in the order an owner thinks:
+       1. Hero        — where the plan stands, and the one thing to do next.
+       2. Next step   — every charge waiting, every branch not yet covered, each
+                        with ONE button. Nothing to do → the card is not shown.
+       3. Branches · Payments & receipts.
+     Every charge opens the SAME review sheet first (the shared billing summary —
+     identical rows to Account 360), and only then Razorpay. Nothing is paid
+     without being seen.
+
+     Money rules, unchanged: the browser sends a charge SHAPE, never an amount;
+     confirming sends only Razorpay's three ids; a charge already open is what
+     gets paid, never a second one beside it. Every figure here comes from the
+     server's quotes — the sheet only shows them.
 
      BLADE ORDER MATTERS: the one multi-line PHP block below must stay ABOVE every
-     inline single-expression use further down (the branch-state chips). Blade pairs
-     the first opener it finds with the first closer, before comments are stripped —
-     a second block added lower down swallows the page (see show.blade.php for
-     Account 360, where that bit).
+     inline single-expression use further down. Blade pairs the first opener with
+     the first closer before comments are stripped — a second block lower down
+     swallows the page.
    ───────────────────────────────────────────────────────────────────────── --}}
 
 @php
@@ -35,49 +39,107 @@
         AccountStatus::Suspended => ['tone' => 'muted', 'icon' => 'lock', 'label' => __('Account on hold'), 'cta' => null],
         default => ['tone' => ($days !== null && $days <= 30) ? 'due' : 'active', 'icon' => 'circle-check', 'label' => __('Active'), 'cta' => __('Renew all now')],
     };
+
+    // ── Next step: everything waiting on the owner, in one list ──
+    $dueRows = collect($due);
+    $billedAddNames = $dueRows->where('kind', 'add_branch')->where('payable', true)->flatMap(fn ($r) => array_column($r['lines'], 'name'))->all();
+    $singleBehind = null;
+    if (! $alignOffer && count($addable) === 1) {
+        $firstId = array_key_first($addable);
+        $singleBehind = $addable[$firstId] + ['id' => $firstId];
+        if (in_array($singleBehind['name'], $billedAddNames, true)) {
+            $singleBehind = null;   // already billed — it is in the list as a charge
+        }
+    }
+    $hasSteps = $dueRows->isNotEmpty() || $alignOffer || $singleBehind;
 @endphp
 
 @push('styles')
 <style>
-    /* The hero measures ITSELF (container units), so its metrics shrink as a
-       whole instead of wrapping mid-figure on phones (§4.10 rule 2). Safe to
-       contain: nothing inside floats a dropdown (§4.9 warning). */
-    .sub-hero { border-radius: 1.4rem; position: relative; overflow: hidden; color:#fff; container-type: inline-size; }
-    .sub-metric, .sub-hero .h4 { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: clamp(0.95rem, 3.6cqi + 0.3rem, 1.5rem); }
-    /* Asymmetric metric grid: short values (Branches, Term) take the space
-       they need; long ones (date, money) get the remainder. Two paired rows
-       on phones, one four-across row when the hero is wide. */
-    .sub-metrics { display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: 0.85rem 1.25rem; }
-    .sub-metric-lbl { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255, 255, 255, 0.55); white-space: nowrap; }
-    @container (min-width: 560px) {
-        .sub-metrics { grid-template-columns: auto minmax(0, 1.2fr) auto minmax(0, 1.2fr); column-gap: 2rem; }
+    /* ══ My Subscription — doc 23 ══
+       One motion idea: things RISE into place, in reading order, once. Interaction
+       motion answers an action: the total pulses when the term changes; the sheet
+       eases in. All of it switched off for reduced motion. */
+    .os-rise { opacity: 0; animation: os-rise .55s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)) forwards; animation-delay: calc(var(--i, 0) * 60ms + 80ms); }
+    @keyframes os-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    /* Hero — container-measured so metrics shrink as a group on phones. */
+    .sub-hero { border-radius: 1.4rem; position: relative; overflow: hidden; color: #fff; container-type: inline-size; }
+    .sub-hero-bg { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; z-index: 0; pointer-events: none; }
+    .sub-hero-bg::after { content: ''; position: absolute; top: -40%; right: -8%; width: 420px; height: 420px; background: radial-gradient(circle, rgba(147,51,234,.4), transparent 70%); }
+    .hero-active { background: var(--he-gradient-mesh, linear-gradient(135deg,#0f172a,#1e1b4b)); }
+    .hero-trial  { background: linear-gradient(135deg,#4f46e5,#7c3aed); }
+    .hero-due    { background: linear-gradient(135deg,#7c3aed,#b45309); }
+    .hero-warn   { background: linear-gradient(135deg,#b45309,#7c2d12); }
+    .hero-danger { background: linear-gradient(135deg,#7f1d1d,#450a0a); }
+    .hero-muted  { background: linear-gradient(135deg,#334155,#0f172a); }
+    .sub-metrics { display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: .85rem 1.25rem; }
+    @container (min-width: 560px) { .sub-metrics { grid-template-columns: auto minmax(0,1.2fr) auto minmax(0,1.2fr); column-gap: 2rem; } }
+    .sub-metric-lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: rgba(255,255,255,.55); white-space: nowrap; }
+    .sub-metric { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: clamp(.95rem, 3.6cqi + .3rem, 1.5rem); }
+    .sub-lock { display: flex; align-items: flex-start; gap: .7rem; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: .75rem .95rem; backdrop-filter: blur(10px); max-width: 340px; }
+    .sub-lock-ic { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.18); font-size: .85rem; }
+    .sub-lock-title { font-weight: 800; font-size: .8rem; line-height: 1.25; }
+    .sub-lock-sub { font-size: .7rem; opacity: .75; line-height: 1.35; }
+
+    /* Next step — a list of ONE-button items. */
+    .os-steps { border: 1px solid rgba(79,70,229,.22); }
+    .os-step { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; }
+    .os-step + .os-step { border-top: 1px solid rgba(15,23,42,.06); }
+    .os-step-ic { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--he-primary-soft, rgba(79,70,229,.08)); color: var(--he-primary, #4f46e5); }
+    .os-step-ic.is-warn { background: var(--he-warning-soft, #fef3c7); color: #b45309; }
+    .os-step-body { flex: 1 1 auto; min-width: 0; }
+    .os-step-title { font-weight: 700; color: var(--he-text-main, #0f172a); }
+    .os-step-sub { font-size: .8rem; color: var(--he-text-muted, #64748b); }
+    .os-step-amt { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--he-text-main, #0f172a); white-space: nowrap; }
+    @media (max-width: 575.98px) { .os-step { flex-wrap: wrap; padding: 1rem 1.1rem; } .os-step-act { width: 100%; } .os-step-act > .btn { width: 100%; } }
+
+    /* Branches */
+    .os-branch { display: flex; align-items: flex-start; gap: .85rem; padding: .95rem 1.5rem; }
+    .os-branch + .os-branch { border-top: 1px solid rgba(15,23,42,.06); }
+    .os-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: .45rem; flex-shrink: 0; }
+    .os-dot.ok { background: var(--he-success, #10b981); box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+    .os-dot.warn { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,.14); }
+    .os-dot.off { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.12); }
+    .os-dot.muted { background: #94a3b8; }
+    .os-branch-name { font-weight: 700; color: var(--he-text-main, #0f172a); }
+    .os-branch-meta { font-size: .82rem; color: var(--he-text-muted, #64748b); }
+    .os-chip { font-size: .7rem; font-weight: 700; border-radius: 9999px; padding: .2rem .6rem; white-space: nowrap; }
+    .os-kebab { width: 32px; height: 32px; border-radius: 10px; border: 0; background: transparent; color: var(--he-text-muted, #64748b); }
+    .os-kebab:hover, .os-kebab[aria-expanded="true"] { background: var(--he-bg-surface-raised, #f1f5f9); color: var(--he-text-main, #0f172a); }
+    .os-kebab:focus-visible { outline: 2px solid var(--he-primary, #4f46e5); outline-offset: 2px; }
+
+    /* Payments & receipts */
+    .os-pay { display: flex; align-items: center; gap: .85rem; padding: .85rem 1.5rem; }
+    .os-pay + .os-pay { border-top: 1px solid rgba(15,23,42,.06); }
+    .os-pay-ic { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--he-success-soft, #d1fae5); color: #047857; font-size: .85rem; }
+    .os-pay-ic.is-free { background: var(--he-primary-soft, rgba(79,70,229,.08)); color: var(--he-primary, #4f46e5); }
+
+    /* Review sheet */
+    .custom-overlay-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.6); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .custom-overlay-modal { width: 100%; background: #fff; border-radius: 1.25rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25); display: flex; flex-direction: column; max-height: 92vh; transform: scale(.96) translateY(6px); opacity: 0; transition: all .32s cubic-bezier(.16,1,.3,1); overflow: hidden; }
+    .custom-overlay-modal.is-open { transform: none; opacity: 1; }
+    .custom-overlay-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(0,0,0,.05); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .custom-overlay-body { padding: 1.5rem; overflow-y: auto; background: #fafafa; }
+    .custom-overlay-footer { padding: 1.1rem 1.5rem; border-top: 1px solid rgba(0,0,0,.05); display: flex; gap: .75rem; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+    @media (max-width: 575px) { .custom-overlay-modal { max-height: 100vh; border-radius: 1.25rem 1.25rem 0 0; align-self: flex-end; transform: translateY(24px); } .custom-overlay-backdrop { padding: 0; align-items: flex-end; } }
+    .plan-pick { border: 1.5px solid rgba(0,0,0,.08); border-radius: 1rem; padding: .9rem 1rem; cursor: pointer; background: #fff; transition: all .2s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)); text-align: left; width: 100%; }
+    .plan-pick.on { border-color: var(--bs-primary); background: rgba(79,70,229,.05); box-shadow: 0 6px 18px rgba(79,70,229,.12); }
+    .os-pulse { animation: os-pulse .35s ease; }
+    @keyframes os-pulse { 50% { transform: scale(1.035); } }
+    .os-incl { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .os-incl span { font-size: .74rem; font-weight: 600; background: #fff; border: 1px solid rgba(15,23,42,.1); border-radius: 9999px; padding: .2rem .6rem; color: var(--he-text-main, #0f172a); }
+    .os-trust { font-size: .72rem; color: var(--he-text-muted, #64748b); margin-right: auto; }
+    .os-steps-dots { display: flex; gap: .35rem; }
+    .os-steps-dots i { width: 22px; height: 4px; border-radius: 4px; background: rgba(15,23,42,.12); transition: background .3s ease; }
+    .os-steps-dots i.on { background: var(--he-primary, #4f46e5); }
+    .sub-sticky { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; background: #fff; border-top: 1px solid rgba(0,0,0,.08); padding: .7rem 1rem; box-shadow: 0 -6px 20px rgba(0,0,0,.06); }
+
+    @media (prefers-reduced-motion: reduce) {
+        .os-rise { animation: none; opacity: 1; }
+        .os-pulse { animation: none; }
+        .custom-overlay-modal { transition: none; }
     }
-    /* Lock notice (W9): a glass CARD, not a cramped pill — it holds a sentence,
-       and a sentence needs a surface, an icon anchor, and room to wrap. */
-    .sub-lock { display:flex; align-items:flex-start; gap:.7rem; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:.75rem .95rem; backdrop-filter:blur(10px); max-width:340px; }
-    .sub-lock-ic { width:34px; height:34px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.18); font-size:.85rem; }
-    .sub-lock-title { font-weight:800; font-size:.8rem; line-height:1.25; }
-    .sub-lock-sub { font-size:.7rem; opacity:.75; line-height:1.35; }
-    .sub-hero-bg { position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:0; pointer-events:none; }
-    .sub-hero-bg::after { content:''; position:absolute; top:-40%; right:-8%; width:420px; height:420px; background:radial-gradient(circle, rgba(147,51,234,0.4), transparent 70%); }
-    .hero-active  { background: var(--he-gradient-mesh, linear-gradient(135deg,#0f172a,#1e1b4b)); }
-    .hero-trial   { background: linear-gradient(135deg,#4f46e5,#7c3aed); }
-    .hero-due     { background: linear-gradient(135deg,#7c3aed,#b45309); }
-    .hero-warn    { background: linear-gradient(135deg,#b45309,#7c2d12); }
-    .hero-danger  { background: linear-gradient(135deg,#7f1d1d,#450a0a); }
-    .hero-muted   { background: linear-gradient(135deg,#334155,#0f172a); }
-    .sub-metric { font-variant-numeric: tabular-nums; }
-    /* .panel-card / .panel-head / .panel-body are canonical in _premium.scss — do not redeclare. */
-    .plan-pick { border:1.5px solid rgba(0,0,0,0.08); border-radius:1rem; padding:1rem 1.1rem; cursor:pointer; transition:all .2s var(--ease-out-expo,cubic-bezier(.16,1,.3,1)); }
-    .plan-pick.on { border-color:var(--bs-primary); background:rgba(79,70,229,.05); box-shadow:0 6px 18px rgba(79,70,229,.12); }
-    .custom-overlay-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:1rem; }
-    .custom-overlay-modal { width:100%; background:#fff; border-radius:1.25rem; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); display:flex; flex-direction:column; max-height:92vh; transform:scale(.95); opacity:0; transition:all .3s cubic-bezier(.16,1,.3,1); overflow:hidden; }
-    .custom-overlay-modal.is-open { transform:scale(1); opacity:1; }
-    .custom-overlay-header { padding:1.25rem 1.5rem; border-bottom:1px solid rgba(0,0,0,.05); display:flex; justify-content:space-between; align-items:center; }
-    .custom-overlay-body { padding:1.5rem; overflow-y:auto; background:#fafafa; }
-    .custom-overlay-footer { padding:1.1rem 1.5rem; border-top:1px solid rgba(0,0,0,.05); display:flex; gap:.75rem; justify-content:flex-end; }
-    @media (max-width: 575px) { .custom-overlay-modal { max-height:100vh; border-radius:1.25rem 1.25rem 0 0; align-self:flex-end; } .custom-overlay-backdrop { padding:0; align-items:flex-end; } }
-    .sub-sticky { position:fixed; left:0; right:0; bottom:0; z-index:1030; background:#fff; border-top:1px solid rgba(0,0,0,.08); padding:.7rem 1rem; box-shadow:0 -6px 20px rgba(0,0,0,.06); }
 </style>
 @endpush
 
@@ -90,8 +152,8 @@
         </div>
     </div>
 
-    {{-- ── Status hero ── --}}
-    <div class="sub-hero hero-{{ $hero['tone'] }} p-4 p-md-4 mb-4 shadow">
+    {{-- ══ 1. Hero ══ --}}
+    <div class="sub-hero hero-{{ $hero['tone'] }} p-4 mb-4 shadow">
         <div class="sub-hero-bg"></div>
         <div class="position-relative" style="z-index:1;">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -112,9 +174,8 @@
                     </div>
                 </div>
 
-                {{-- The one primary action. If a renewal is ALREADY billed — by us, or
-                     by the owner's own earlier attempt — the button pays THAT, never
-                     raises a second one beside it (design 14 §3). --}}
+                {{-- The one primary action. A renewal already billed — by us or by the
+                     owner's earlier attempt — is what gets paid, never a second one. --}}
                 @if($status === AccountStatus::Suspended)
                     <a href="mailto:{{ config('hostelease.company.email') }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>{{ __('Contact support') }}</a>
                 @elseif($openRenewal && ($openRenewal['link_url'] || $canManage))
@@ -124,7 +185,7 @@
                                 <i class="fa-solid fa-lock me-2"></i>{{ __('Pay') }} {{ hostelease_money($openRenewal['amount']) }}
                             </a>
                         @else
-                            <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="payOrder({{ $openRenewal['id'] }})" :disabled="loading">
+                            <button class="btn btn-light rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openOrder({{ $openRenewal['id'] }})">
                                 <i class="fa-solid fa-lock me-2"></i>{{ __('Pay') }} {{ hostelease_money($openRenewal['amount']) }}
                             </button>
                         @endif
@@ -160,10 +221,10 @@
             </div>
 
             <div class="sub-metrics mt-3">
-                <div><div class="sub-metric-lbl">{{ __('Branches') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
-                <div><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? __('Trial ends') : __('Renews on') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
-                <div><div class="sub-metric-lbl">{{ __('Term') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->isPaid() ? $account->period->label() : __('Trial') }}</div></div>
-                <div>
+                <div class="os-rise" style="--i:0"><div class="sub-metric-lbl">{{ __('Branches') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $branches->count() }}</div></div>
+                <div class="os-rise" style="--i:1"><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? __('Trial ends') : __('Renews on') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
+                <div class="os-rise" style="--i:2"><div class="sub-metric-lbl">{{ __('Term') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->isPaid() ? $account->period->label() : __('Trial') }}</div></div>
+                <div class="os-rise" style="--i:3">
                     @if($openRenewal)
                         {{-- Something is already billed: that is the number, in its own term. --}}
                         <div class="sub-metric-lbl">{{ __('Due now') }}</div>
@@ -184,61 +245,91 @@
         </div>
     </div>
 
-    {{-- ── Payment due ──
-         Every charge already open on the account, whoever opened it. A payment link
-         the HostelEase team sent is payable here even with self-serve switched off:
-         it is OUR instrument, not self-serve (design 14 §4, roadmap item 23). --}}
-    @if(count($due))
-        <div class="panel-card shadow-sm mb-4" style="border-color: rgba(79,70,229,.25);">
+    {{-- ══ 2. Next step ══ Everything waiting on the owner, each with one button. --}}
+    @if($hasSteps)
+        <div class="panel-card shadow-sm mb-4 os-steps os-rise" style="--i:4">
             <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-file-invoice text-primary me-2"></i>{{ __('Payment due') }}</h6>
-                <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">{{ count($due) }}</span>
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="fa-solid {{ $dueRows->isNotEmpty() ? 'fa-file-invoice' : 'fa-list-check' }} text-primary me-2"></i>{{ $dueRows->isNotEmpty() ? __('Payment due') : __('Next step') }}
+                </h6>
+                <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">{{ $dueRows->count() + ($alignOffer ? 1 : 0) + ($singleBehind ? 1 : 0) }}</span>
             </div>
+
             @foreach($due as $row)
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-4 py-3 {{ ! $loop->last ? 'border-bottom' : '' }}">
-                    <div class="min-w-0">
-                        <div class="fw-bold text-dark">{{ hostelease_money($row['amount']) }} <span class="fw-normal text-muted small">· {{ $row['label'] }}@if($row['period']) · {{ $row['period'] }}@endif</span></div>
-                        <div class="small text-muted">
+                <div class="os-step">
+                    <div class="os-step-ic {{ $row['payable'] ? '' : 'is-warn' }}"><i class="fa-solid {{ $row['kind'] === 'renewal' ? 'fa-arrows-rotate' : (in_array($row['kind'], ['add_branch', 'align'], true) ? 'fa-diagram-project' : 'fa-file-invoice') }}"></i></div>
+                    <div class="os-step-body">
+                        <div class="os-step-title">{{ $row['label'] }}@if($row['period']) · {{ $row['period'] }}@endif <span class="fw-normal text-muted small">· {{ $row['quantity'] }} {{ __('branch(es)') }}</span></div>
+                        <div class="os-step-sub">
                             {{ $row['invoice'] }} · {{ __('raised') }} {{ $row['raised'] }}
                             @if($row['link_expires']) · {{ __('link valid until') }} {{ $row['link_expires'] }} @endif
                         </div>
                     </div>
-                    {{-- An OVERTAKEN charge — every date it would grant is already
-                         covered — is shown, but never offered: paying it would buy
-                         nothing (S3 audit). We clear it up on our side. --}}
-                    @if($row['stale'])
-                        <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Your branches changed since this was raised, so the amount has changed.') }}">
-                            <i class="fa-solid fa-rotate me-1"></i>{{ __('Amount changed — renew again for the new total') }}
-                        </span>
-                    @elseif(! $row['payable'])
-                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
-                            <i class="fa-solid fa-circle-check me-1"></i>{{ __('Already covered — nothing to pay') }}
-                        </span>
-                    @elseif($row['link_url'])
-                        <a href="{{ $row['link_url'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
-                            <i class="fa-solid fa-lock me-1"></i>{{ __('Pay securely') }}
-                        </a>
-                    @elseif($canManage)
-                        <div class="d-flex align-items-center gap-3">
-                            @if($row['own'])
-                                <button type="button" class="btn btn-link btn-sm text-muted p-0" @click="openRenew()">{{ __('Change term') }}</button>
-                            @endif
-                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="payOrder({{ $row['id'] }})" :disabled="loading">
-                                <i class="fa-solid fa-lock me-1"></i>{{ __('Pay now') }}
-                            </button>
-                        </div>
-                    @else
-                        <span class="small text-muted">{{ __('Contact us to pay') }}</span>
-                    @endif
+                    <div class="os-step-amt">{{ hostelease_money($row['amount']) }}</div>
+                    <div class="os-step-act">
+                        @if($row['stale'])
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Your branches changed since this was raised, so the amount has changed.') }}">
+                                    <i class="fa-solid fa-rotate me-1"></i>{{ __('Amount changed — renew again for the new total') }}
+                                </span>
+                                @if($canManage && $row['own'])
+                                    <button type="button" class="btn btn-link btn-sm p-0 fw-semibold" @click="openRenew()">{{ __('Renew again') }}</button>
+                                @endif
+                            </div>
+                        @elseif(! $row['payable'])
+                            <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
+                                <i class="fa-solid fa-circle-check me-1"></i>{{ __('Already covered — nothing to pay') }}
+                            </span>
+                        @elseif($row['link_url'])
+                            <a href="{{ $row['link_url'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
+                                <i class="fa-solid fa-lock me-1"></i>{{ __('Pay securely') }}
+                            </a>
+                        @elseif($canManage)
+                            <div class="d-flex align-items-center gap-3 justify-content-end">
+                                @if($row['own'])
+                                    <button type="button" class="btn btn-link btn-sm text-muted p-0" @click="openRenew()">{{ __('Change term') }}</button>
+                                @endif
+                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openOrder({{ $row['id'] }})">
+                                    {{ __('Review & pay') }}
+                                </button>
+                            </div>
+                        @else
+                            <span class="small text-muted">{{ __('Contact us to pay') }}</span>
+                        @endif
+                    </div>
                 </div>
             @endforeach
+
+            @if($alignOffer)
+                <div class="os-step">
+                    <div class="os-step-ic"><i class="fa-solid fa-diagram-project"></i></div>
+                    <div class="os-step-body">
+                        <div class="os-step-title">{{ __(':n branches end before :date', ['n' => $alignOffer['count'], 'date' => $alignOffer['anchor']]) }}</div>
+                        <div class="os-step-sub">{{ __('Bring them onto your renewal date in one payment, so every branch renews together.') }}</div>
+                    </div>
+                    <div class="os-step-amt">{{ hostelease_money($alignOffer['total']) }}</div>
+                    <div class="os-step-act"><button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openAlign()">{{ __('Bring all up to date') }}</button></div>
+                </div>
+            @endif
+
+            @if($singleBehind)
+                <div class="os-step">
+                    <div class="os-step-ic"><i class="fa-solid fa-diagram-project"></i></div>
+                    <div class="os-step-body">
+                        <div class="os-step-title">{{ __(':name is not covered to :date', ['name' => $singleBehind['name'], 'date' => $singleBehind['anchor']]) }}</div>
+                        <div class="os-step-sub">{{ __('Add it to your plan so it renews with every other branch.') }}</div>
+                    </div>
+                    <div class="os-step-amt">{{ hostelease_money($singleBehind['amount']) }}</div>
+                    <div class="os-step-act"><button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openPlan({{ $singleBehind['id'] }})">{{ __('Add to plan') }}</button></div>
+                </div>
+            @endif
         </div>
     @endif
 
     <div class="row g-4">
-        {{-- ── Branches ── --}}
+        {{-- ══ 3a. Branches ══ --}}
         <div class="col-lg-7">
-            <div class="panel-card shadow-sm h-100">
+            <div class="panel-card shadow-sm h-100 os-rise" style="--i:5">
                 <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-hotel text-primary me-2"></i>{{ __('Your branches') }}</h6>
                     <span class="text-muted small">
@@ -246,99 +337,122 @@
                         @if($branches->count() > $billableCount) · {{ $branches->count() - $billableCount }} {{ __('closing') }} @endif
                     </span>
                 </div>
-                <div class="stagger">
-                    @forelse($branches as $branch)
-                        @php($state = $branch->cancellationState())
-                        @php($behind = ! $branch->isCancelled() && $account->current_period_end && $account->current_period_end->isFuture() && (! $branch->subscription_end || $branch->subscription_end->lt($account->current_period_end)))
-                        <div class="px-4 py-3 border-bottom">
-                            <div class="d-flex justify-content-between align-items-start gap-2">
-                                <div class="min-w-0">
-                                    <div class="fw-bold text-dark">{{ $branch->name }}</div>
-                                    <div class="small text-muted">
-                                        @if($state === 'cancelled')
-                                            {{ __('Closing') }} {{ $branch->subscription_end?->format('d M Y') }} · {{ __('not billed at your next renewal') }}
-                                        @elseif($state === 'closed')
-                                            {{ __('Closed') }} {{ $branch->subscription_end?->format('d M Y') }}
-                                        @else
-                                            {{ __('Ends') }} {{ $branch->subscription_end ? $branch->subscription_end->format('d M Y') : '—' }}
-                                        @endif
-                                    </div>
-                                    @if($state === 'removal_requested')
-                                        <div class="small mt-1" style="color:#ea580c;">
-                                            <i class="fa-solid fa-clock me-1"></i>{{ __('Removal requested — our team will be in touch. Nothing has changed yet.') }}
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="d-flex flex-column align-items-end gap-2">
-                                    @php($chip = match($state) {
-                                        'removal_requested' => ['warning', __('Removal asked')],
-                                        'cancelled' => ['secondary', __('Closing')],
-                                        'closed' => ['secondary', __('Closed')],
-                                        default => $branch->isActive() ? ($behind ? ['warning', __('Behind')] : ['success', __('Active')]) : ['danger', __('Expired')],
-                                    })
-                                    <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
-                                    @if($branch->free_renewals > 0 && ! $branch->isCancelled())
-                                        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1"><i class="fa-solid fa-gift me-1"></i>{{ $branch->free_renewals === 1 ? __('Next renewal free') : __(':n renewals free', ['n' => $branch->free_renewals]) }}</span>
-                                    @endif
 
-                                    {{-- Bring a behind branch onto the renewal date, at the price
-                                         the operator would quote — the same function prices both. --}}
-                                    @if(isset($addable[$branch->id]))
-                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold"
-                                                @click="payAddBranch({{ $branch->id }})" :disabled="loading">
-                                            {{ __('Add to plan') }} · {{ hostelease_money($addable[$branch->id]['amount']) }}
-                                        </button>
-                                    @endif
-
-                                    {{-- Removal is a REQUEST, never a self-service cancel (D11). Owner
-                                         only — a co-admin shares the role, so the gate is the FK. --}}
-                                    @if($viewerOwnsAccount && ! $branch->isCancelled())
-                                        @if($state === 'removal_requested')
-                                            <form method="POST" action="{{ route('admin.branches.withdraw-removal', $branch) }}"
-                                                  data-confirm="{{ __('Withdraw your request to remove') }} {{ $branch->name }}?">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm">{{ __('Withdraw') }}</button>
-                                            </form>
-                                        @else
-                                            <button type="button" class="btn btn-sm btn-link text-muted p-0 small"
-                                                    @click="removeBranchId = {{ $branch->id }}; removeBranchName = @js($branch->name); removeOpen = true">
-                                                {{ __('Request removal') }}
-                                            </button>
-                                        @endif
-                                    @endif
-                                </div>
+                @forelse($branches as $branch)
+                    @php($state = $branch->cancellationState())
+                    @php($behind = isset($addable[$branch->id]))
+                    <div class="os-branch os-rise" style="--i:{{ 6 + $loop->index }}">
+                        <span class="os-dot {{ in_array($state, ['cancelled', 'closed'], true) ? 'muted' : (! $branch->isActive() ? 'off' : ($behind ? 'warn' : 'ok')) }}"></span>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="os-branch-name">{{ $branch->name }}</span>
+                                @php($chip = match($state) {
+                                    'removal_requested' => ['warning', __('Removal asked')],
+                                    'cancelled' => ['secondary', __('Closing')],
+                                    'closed' => ['secondary', __('Closed')],
+                                    default => $branch->isActive() ? ($behind ? ['warning', __('Behind')] : ['success', __('Active')]) : ['danger', __('Not active')],
+                                })
+                                <span class="os-chip bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }}">{{ $chip[1] }}</span>
+                                @if($branch->free_renewals > 0 && ! $branch->isCancelled())
+                                    <span class="os-chip bg-primary-subtle text-primary"><i class="fa-solid fa-gift me-1"></i>{{ $branch->free_renewals === 1 ? __('Next renewal free') : __(':n renewals free', ['n' => $branch->free_renewals]) }}</span>
+                                @endif
                             </div>
+                            <div class="os-branch-meta mt-1">
+                                @if($state === 'cancelled')
+                                    {{ __('Closing') }} {{ $branch->subscription_end?->format('d M Y') }} · {{ __('not billed at your next renewal') }}
+                                @elseif($state === 'closed')
+                                    {{ __('Closed') }} {{ $branch->subscription_end?->format('d M Y') }}
+                                @elseif(! $branch->subscription_end)
+                                    {{ $behind ? __('Not on your plan yet — add it to switch it on') : __('Starts when you subscribe — included in your next payment') }}
+                                @elseif($behind)
+                                    {{ __('Covered to') }} {{ $branch->subscription_end->format('d M Y') }} · {{ __('your plan renews') }} {{ $anchorFmt }}
+                                @else
+                                    {{ __('Covered to') }} {{ $branch->subscription_end->format('d M Y') }}
+                                @endif
+                            </div>
+                            @if($state === 'removal_requested')
+                                <div class="small mt-1" style="color:#ea580c;"><i class="fa-solid fa-clock me-1"></i>{{ __('Removal requested — our team will be in touch. Nothing has changed yet.') }}</div>
+                            @endif
                         </div>
-                    @empty
-                        <div class="p-4"><x-he-empty-state icon="hotel" title="{{ __('No branches yet') }}" subtitle="{{ __('Add a branch to get started.') }}" /></div>
-                    @endforelse
-                </div>
-                @if($branches->contains(fn ($b) => ! $b->isCancelled() && $account->current_period_end && $account->current_period_end->isFuture() && (! $b->subscription_end || $b->subscription_end->lt($account->current_period_end))))
-                    <div class="px-4 py-3 small text-muted bg-light bg-opacity-50"><i class="fa-solid fa-circle-info text-warning me-1"></i>{{ __('Renewing all brings every branch onto the same date.') }}</div>
-                @endif
+
+                        <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                            {{-- One clear action on the page lives in Next step. A branch's own
+                                 options — paying for it alone, asking to remove it — sit in its
+                                 menu, so a list of behind branches is not a wall of buttons.
+                                 Removal is a REQUEST (D11), owner only — the gate is the FK. --}}
+                            @if($behind || ($viewerOwnsAccount && ! $branch->isCancelled()))
+                                <div class="dropdown">
+                                    <button class="os-kebab" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ __('More for :name', ['name' => $branch->name]) }}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2">
+                                        @if($behind)
+                                            <li>
+                                                <button type="button" class="dropdown-item rounded-3 py-2" @click="openPlan({{ $branch->id }})">
+                                                    <i class="fa-solid fa-plus me-2 text-primary"></i>{{ __('Add to plan') }} · {{ hostelease_money($addable[$branch->id]['amount']) }}
+                                                </button>
+                                            </li>
+                                            @if($viewerOwnsAccount && ! $branch->isCancelled())<li><hr class="dropdown-divider"></li>@endif
+                                        @endif
+                                        @if(! $viewerOwnsAccount || $branch->isCancelled())
+                                            {{-- nothing more for this viewer --}}
+                                        @elseif($state === 'removal_requested')
+                                            <li>
+                                                <form method="POST" action="{{ route('admin.branches.withdraw-removal', $branch) }}" data-confirm="{{ __('Withdraw your request to remove') }} {{ $branch->name }}?">
+                                                    @csrf @method('DELETE')
+                                                    <button class="dropdown-item rounded-3 py-2"><i class="fa-solid fa-rotate-left me-2 text-muted"></i>{{ __('Withdraw') }}</button>
+                                                </form>
+                                            </li>
+                                        @else
+                                            <li>
+                                                <button type="button" class="dropdown-item rounded-3 py-2 text-danger"
+                                                        @click="removeBranchId = {{ $branch->id }}; removeBranchName = @js($branch->name); removeOpen = true">
+                                                    <i class="fa-solid fa-circle-minus me-2"></i>{{ __('Request removal') }}
+                                                </button>
+                                            </li>
+                                        @endif
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="p-4"><x-he-empty-state icon="hotel" title="{{ __('No branches yet') }}" subtitle="{{ __('Add a branch to get started.') }}" /></div>
+                @endforelse
             </div>
         </div>
 
-        {{-- ── Payment history ── --}}
+        {{-- ══ 3b. Payments & receipts ══ Money paid, and free grants as "Free". --}}
         <div class="col-lg-5">
-            <div class="panel-card shadow-sm h-100">
-                <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>{{ __('Recent payments') }}</h6></div>
-                @forelse($orders as $order)
-                    <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
-                        <div>
-                            <div class="fw-bold text-dark">{{ hostelease_money($order->amount) }}</div>
-                            <div class="small text-muted">{{ $order->kind?->label() ?? '' }} · {{ $order->quantity }} {{ __('branch(es)') }} · {{ $order->created_at?->format('d M Y') }}</div>
+            <div class="panel-card shadow-sm h-100 os-rise" style="--i:6">
+                <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-receipt text-primary me-2"></i>{{ __('Payments & receipts') }}</h6></div>
+                @forelse($history as $h)
+                    <div class="os-pay">
+                        <span class="os-pay-ic {{ $h['free'] ? 'is-free' : '' }}"><i class="fa-solid {{ $h['free'] ? 'fa-gift' : 'fa-check' }}"></i></span>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="fw-bold text-dark">{{ $h['free'] ? __('Free') : hostelease_money($h['amount']) }}</div>
+                            <div class="small text-muted text-truncate">{{ $h['label'] }}@if($h['period']) · {{ $h['period'] }}@endif · {{ $h['branches'] }} {{ __('branch(es)') }} · {{ $h['date'] }}</div>
                         </div>
-                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1">{{ __('Paid') }}</span>
+                        @if($h['receipt'])
+                            <a href="{{ $h['receipt'] }}" class="he-icon-btn" title="{{ __('Download receipt') }}" aria-label="{{ __('Download receipt :no', ['no' => $h['invoice']]) }}"><i class="fa-solid fa-download"></i></a>
+                        @endif
                     </div>
                 @empty
-                    <div class="p-4"><x-he-empty-state icon="receipt" title="{{ __('No payments yet') }}" subtitle="{{ __('Your renewals will appear here.') }}" /></div>
+                    <div class="p-4"><x-he-empty-state icon="receipt" title="{{ __('No payments yet') }}" subtitle="{{ __('Your renewals and receipts will appear here.') }}" /></div>
                 @endforelse
             </div>
         </div>
     </div>
 
-    {{-- ── Mobile sticky action bar ── --}}
+    @unless($selfServe)
+        <div class="d-flex align-items-start gap-3 mt-4 p-3 px-4 rounded-4 shadow-sm" style="background:var(--he-warning-soft,#fef3c7); border:1px solid rgba(245,158,11,.25);">
+            <i class="fa-solid fa-shield-halved fs-5 mt-1" style="color:var(--he-warning,#f59e0b);"></i>
+            <div>
+                <div class="fw-bold text-dark" style="font-size:.92rem;">{{ __('Billing is managed by HostelEase support') }}</div>
+                <div class="small text-muted">{{ __('Your plans and coverage above are always up to date. To renew, add a branch, or change your plan, contact support and our team will set it up on your account. Any payment link we send you can be paid right here.') }}</div>
+            </div>
+        </div>
+    @endunless
+
+    {{-- ── Mobile action bar ── --}}
     @if($status !== AccountStatus::Suspended && (($openRenewal && ($openRenewal['link_url'] || $canManage)) || ($canManage && $hero['cta'])))
         <div class="d-lg-none" style="height:76px;"></div>
         <div class="sub-sticky d-lg-none">
@@ -351,12 +465,12 @@
                     @if($openRenewal['link_url'])
                         <a href="{{ $openRenewal['link_url'] }}" target="_blank" rel="noopener" class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1"><i class="fa-solid fa-lock me-2"></i>{{ __('Pay now') }}</a>
                     @else
-                        <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="payOrder({{ $openRenewal['id'] }})" :disabled="loading"><i class="fa-solid fa-lock me-2"></i>{{ __('Pay now') }}</button>
+                        <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="openOrder({{ $openRenewal['id'] }})"><i class="fa-solid fa-lock me-2"></i>{{ __('Pay now') }}</button>
                     @endif
                 @else
                     <div class="flex-shrink-0">
                         <div class="small text-muted lh-1" x-text="period === 'monthly' ? @js(__('Monthly total')) : @js(__('Yearly total'))"></div>
-                        <div class="fw-bold text-dark" x-text="money(q().final)"></div>
+                        <div class="fw-bold text-dark" x-text="money(quotes[period].final)"></div>
                     </div>
                     <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>
                 @endif
@@ -364,126 +478,115 @@
         </div>
     @endif
 
-    @unless($selfServe)
-        <div class="d-flex align-items-start gap-3 mt-4 p-3 px-4 rounded-4 shadow-sm" style="background:var(--he-warning-soft,#fef3c7); border:1px solid rgba(245,158,11,.25);">
-            <i class="fa-solid fa-shield-halved fs-5 mt-1" style="color:var(--he-warning,#f59e0b);"></i>
-            <div>
-                <div class="fw-bold text-dark" style="font-size:.92rem;">{{ __('Billing is managed by HostelEase support') }}</div>
-                <div class="small text-muted">{{ __('Your plans and coverage above are always up to date. To renew, add a branch, or change your plan, contact support and our team will set it up on your account. Any payment link we send you can be paid right here.') }}</div>
-            </div>
-        </div>
-    @endunless
-
     @if($canManage)
-    {{-- ══ Renew-all ══ Itemised from the SAME quote the operator sees. The term is
-         the only thing the owner chooses; every figure is the server's. --}}
+    {{-- ══ The review sheet ══ One sheet for every charge. It only SHOWS the
+         server's figures; what is charged is decided again on the server. --}}
     <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="renewOpen" x-transition.opacity @click.self="renewOpen = false" x-cloak style="display:none;">
-            <div class="custom-overlay-modal" style="max-width:520px;" :class="{ 'is-open': renewOpen }">
-                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">{{ __('Renew all branches') }}</h5><button type="button" class="btn-close" @click="renewOpen = false" :disabled="loading"></button></div>
+        <div class="custom-overlay-backdrop" x-show="sheet.open" x-transition.opacity @click.self="closeSheet()" @keydown.escape.window="closeSheet()" x-cloak style="display:none;">
+            <div class="custom-overlay-modal" style="max-width:540px;" :class="{ 'is-open': sheet.open }" role="dialog" aria-modal="true" :aria-label="sheetTitle">
+                <div class="custom-overlay-header">
+                    <div>
+                        <h5 class="fw-bold mb-0" x-text="sheetTitle"></h5>
+                        <div class="small text-muted mt-1" x-text="sheetSubtitle"></div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="os-steps-dots" x-show="sheet.kind === 'add'" aria-hidden="true"><i class="on"></i><i :class="{ on: addStep === 2 }"></i></div>
+                        <button type="button" class="btn-close" @click="closeSheet()" :disabled="loading" aria-label="{{ __('Close') }}"></button>
+                    </div>
+                </div>
+
                 <div class="custom-overlay-body">
-                    <div class="text-muted small text-uppercase mb-2" style="letter-spacing:.5px;">{{ __('Choose term') }}</div>
-                    <div class="row g-2 mb-3">
+                    {{-- Renew: the term first --}}
+                    <div x-show="sheet.kind === 'renew'" class="row g-2 mb-3">
                         <div class="col-6">
-                            <div class="plan-pick h-100" :class="{ 'on': period === 'yearly' }" @click="period = 'yearly'">
+                            <button type="button" class="plan-pick h-100" :class="{ 'on': period === 'yearly' }" @click="setPeriod('yearly')">
                                 <div class="fw-bold text-uppercase small" :class="period === 'yearly' ? 'text-primary' : 'text-muted'">{{ __('Yearly') }}</div>
                                 <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.yearly.unit)"></div>
                                 <div class="small text-muted">{{ __('per branch') }}</div>
                                 @if($yearlySaving)<div class="small text-success fw-bold">{{ __('Save') }} {{ $yearlySaving }}%</div>@endif
-                            </div>
+                            </button>
                         </div>
                         <div class="col-6">
-                            <div class="plan-pick h-100" :class="{ 'on': period === 'monthly' }" @click="period = 'monthly'">
+                            <button type="button" class="plan-pick h-100" :class="{ 'on': period === 'monthly' }" @click="setPeriod('monthly')">
                                 <div class="fw-bold text-uppercase small" :class="period === 'monthly' ? 'text-primary' : 'text-muted'">{{ __('Monthly') }}</div>
                                 <div class="h5 fw-bold text-dark mb-0" x-text="money(quotes.monthly.unit)"></div>
                                 <div class="small text-muted">{{ __('per branch') }}</div>
-                            </div>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-white border rounded-4 p-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted"><span x-text="q().quantity"></span> {{ __('branch(es)') }} × <span x-text="money(q().unit)"></span></span>
-                            <span class="fw-semibold" x-text="money(q().subtotal)"></span>
-                        </div>
-                        <template x-for="c in (q().complimentary || [])" :key="c.name">
-                            <div class="d-flex justify-content-between mb-1 text-success"><span><i class="fa-solid fa-gift me-1"></i>{{ __('Free renewal') }} · <span x-text="c.name"></span></span><span x-text="'−' + money(c.amount)"></span></div>
-                        </template>
-                        <template x-if="q().volume > 0">
-                            <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Multi-branch discount') }}</span><span x-text="'−' + money(q().volume)"></span></div>
-                        </template>
-                        <template x-if="q().manual > 0">
-                            <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Your discount') }}</span><span x-text="'−' + money(q().manual)"></span></div>
-                        </template>
-                        {{-- Branches behind the current renewal date are brought up to it
-                             first — otherwise they would run free until then. --}}
-                        <template x-if="(q().topups || []).length">
-                            <div class="mt-2 pt-2 border-top">
-                                <div class="small text-muted mb-1">{{ __('Brings these branches up to') }} <span class="fw-semibold text-dark" x-text="q().current_anchor"></span> {{ __('first') }}:</div>
-                                <template x-for="t in q().topups" :key="t.name">
-                                    <div class="d-flex justify-content-between mb-1"><span class="text-muted"><span x-text="t.name"></span> · <span x-text="t.days"></span> {{ __('days') }}</span><span class="fw-semibold" x-text="money(t.amount)"></span></div>
+                    {{-- Add a branch, step 1: its details --}}
+                    <div x-show="sheet.kind === 'add' && addStep === 1" x-transition:enter.duration.250ms>
+                        <label class="form-label fw-bold small text-muted" for="os-add-name">{{ __('BRANCH NAME') }}</label>
+                        <input id="os-add-name" type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Sunrise Riverside" maxlength="255" @keydown.enter.prevent="add.name && (addStep = 2)">
+                        <label class="form-label fw-bold small text-muted" for="os-add-city">{{ __('CITY') }} <span class="fw-normal">— {{ __('optional') }}</span></label>
+                        <input id="os-add-city" type="text" x-model="add.city" class="form-control bg-white border shadow-sm" placeholder="e.g. Surat" maxlength="100">
+                    </div>
+
+                    {{-- Every money view: the shared summary (the same rows Account 360 shows) --}}
+                    <div x-show="sheet.kind !== 'add' || addStep === 2" x-transition:enter.duration.250ms :class="{ 'os-pulse': bump }">
+                        <x-he-billing-summary data="sheetSummary" />
+                    </div>
+
+                    {{-- Renew: the grouped top-ups, itemised on demand --}}
+                    <div x-show="sheet.kind === 'renew' && (quotes[period].topups || []).length > 2" x-data="{ more: false }" class="mt-2">
+                        <button type="button" class="btn btn-link btn-sm p-0 fw-semibold text-decoration-none" @click="more = !more">
+                            <i class="fa-solid fa-chevron-right me-1 small" :style="more ? 'transform:rotate(90deg)' : ''" style="transition:transform .2s ease"></i>
+                            <span x-text="more ? @js(__('Hide the top-ups')) : @js(__('See each branch\'s top-up'))"></span>
+                        </button>
+                        <div x-show="more" x-collapse>
+                            <div class="he-summary shadow-sm mt-2">
+                                <template x-for="t in (quotes[period].topups || [])" :key="t.name">
+                                    <div class="he-summary-row he-summary-row--line"><span x-text="t.name + ' · ' + t.days + ' ' + @js(__('days'))"></span><span class="he-summary-amt" x-text="money(t.amount)"></span></div>
                                 </template>
                             </div>
-                        </template>
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <span class="fw-bold">{{ __('Total payable') }}</span>
-                            <span class="h4 fw-bold mb-0 text-primary" x-text="money(q().final)"></span>
                         </div>
-                        <div class="small text-muted mt-2"><i class="fa-solid fa-calendar-check me-1"></i>{{ __('New renewal date') }}: <span class="fw-semibold text-dark" x-text="q().new_anchor"></span> — {{ __('all branches together.') }}</div>
+                    </div>
+
+                    {{-- Renew: exactly which branches this renews, and which are left out --}}
+                    <div x-show="sheet.kind === 'renew'" class="mt-3">
+                        <div class="small fw-semibold text-muted mb-2">{{ __('This renews') }}</div>
+                        <div class="os-incl"><template x-for="n in (quotes[period].included || [])" :key="n"><span x-text="n"></span></template></div>
+                        <div class="small text-muted mt-2" x-show="(quotes[period].closing || []).length">
+                            <i class="fa-solid fa-circle-info me-1"></i>{{ __('Not included (closing):') }} <span x-text="(quotes[period].closing || []).join(', ')"></span>
+                        </div>
                     </div>
                 </div>
+
                 <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="renewOpen = false" :disabled="loading">{{ __('Cancel') }}</button>
-                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2" @click="payRenewal()" :disabled="loading">
-                        <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Pay') }} <span x-text="money(q().final)"></span></span>
-                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
+                    <span class="os-trust" x-show="sheetPays"><i class="fa-solid fa-shield-halved me-1"></i>{{ __('Secure payment by Razorpay') }}</span>
 
-    {{-- ══ Add a branch ══ No trial — the account's one free trial went to its first
-         branch. The branch is created either way; it becomes active once paid for, so
-         an abandoned payment leaves it waiting with an "Add to plan" button, not lost. --}}
-    <template x-teleport="body">
-        <div class="custom-overlay-backdrop" x-show="addOpen" x-transition.opacity @click.self="addOpen = false" x-cloak style="display:none;">
-            <div class="custom-overlay-modal" style="max-width:500px;" :class="{ 'is-open': addOpen }">
-                <div class="custom-overlay-header"><h5 class="fw-bold mb-0">{{ __('Add a branch') }}</h5><button type="button" class="btn-close" @click="addOpen = false" :disabled="loading"></button></div>
-                <div class="custom-overlay-body">
-                    <label class="form-label fw-bold small text-muted">{{ __('BRANCH NAME') }}</label>
-                    <input type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Sunrise Riverside" maxlength="255">
-                    <label class="form-label fw-bold small text-muted">{{ __('CITY') }} <span class="fw-normal">— {{ __('optional') }}</span></label>
-                    <input type="text" x-model="add.city" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Surat" maxlength="100">
-
-                    <div class="alert bg-info-subtle text-info border-0 rounded-3 small mb-0">
-                        <i class="fa-solid fa-circle-info me-1"></i>
-                        {{-- The free trial belongs to the ACCOUNT, once (owner decision,
-                             2026-10-04) — a branch added later is never a trial branch. --}}
-                        @if($trialJoinable)
-                            {{ __('It joins your free trial and works straight away, until') }} {{ $anchorFmt }}. {{ __('Every branch is billed together when you subscribe.') }}
-                        @elseif($canAddPaid)
-                            {{ __('A new branch becomes active once it is paid for — prorated to') }} {{ $anchorFmt }} {{ __('so everything renews together. You will see the exact amount before you pay.') }}
-                        @else
-                            {{ __('A new branch becomes active when you subscribe — it is included in your plan from your first payment.') }}
-                        @endif
+                    {{-- x-show sits on a plain wrapper: Bootstrap's .d-flex is !important
+                         and would override the display:none x-show writes. --}}
+                    <div class="ms-auto" x-show="sheet.kind === 'add' && addStep === 1">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="closeSheet()">{{ __('Cancel') }}</button>
+                            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" @click="addStep = 2" :disabled="!add.name">{{ __('Continue') }} <i class="fa-solid fa-arrow-right ms-1"></i></button>
+                        </div>
                     </div>
-                </div>
-                <div class="custom-overlay-footer d-flex flex-column flex-sm-row gap-2">
-                    @if($canAddPaid)
-                        <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none px-0 order-2 order-sm-1 me-sm-auto"
-                                @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Add now, pay later') }}</button>
-                    @else
-                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm"
-                                @click="addBranch(false)" :disabled="!add.name || loading">{{ __('Add branch') }}</button>
-                    @endif
-                    @if($canAddPaid)
-                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm order-1 order-sm-2 d-flex align-items-center justify-content-center gap-2"
-                                @click="addBranch(true)" :disabled="!add.name || loading">
-                            <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Add & pay') }}</span>
-                            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                        </button>
-                    @endif
+                    <div class="ms-auto" x-show="sheet.kind === 'add' && addStep === 2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-light rounded-pill px-3 fw-bold" @click="addStep = 1" :disabled="loading"><i class="fa-solid fa-arrow-left me-1"></i>{{ __('Back') }}</button>
+                            <template x-if="newBranch && newBranch.mode === 'prorate'">
+                                <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none" @click="addBranch(false)" :disabled="loading">{{ __('Add now, pay later') }}</button>
+                            </template>
+                            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" @click="addBranch(newBranch && newBranch.mode === 'prorate')" :disabled="loading">
+                                <span x-show="!loading" x-text="addCta"></span>
+                                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Every charge --}}
+                    <div class="ms-auto" x-show="sheet.kind && sheet.kind !== 'add'">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="closeSheet()" :disabled="loading">{{ __('Cancel') }}</button>
+                            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" @click="pay()" :disabled="loading">
+                                <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Pay') }} <span x-text="money(sheetSummary.final)"></span></span>
+                                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -530,23 +633,135 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('ownerSubscription', () => ({
-        renewOpen: false,
-        addOpen: false,
         loading: false,
         removeOpen: false,
         removeBranchId: null,
         removeBranchName: '',
+
+        // Server figures — displayed, never sent back.
         period: @json($displayPeriod),
         quotes: @json($quotes),
+        addable: @json((object) $addable),
+        alignOffer: @json($alignOffer),
+        newBranch: @json($newBranch),
+        dueRows: @json((object) collect($due)->keyBy('id')->all()),
+
+        sheet: { open: false, kind: null, id: null },
+        addStep: 1,
         add: { name: '', city: '' },
+        bump: false,
 
         money(v) { const n = Number(v || 0); return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2, maximumFractionDigits: 2 }); },
-        q() { return this.quotes[this.period]; },
-        openRenew() { this.renewOpen = true; },
-        openAdd() { this.add = { name: '', city: '' }; this.addOpen = true; },
 
-        // Never alert(): it blocks the page. The app's toast if present, else a
-        // SweetAlert toast, else the console — never a dialog.
+        // ── Opening the sheet ──
+        openSheet(kind, id = null) { this.sheet = { open: true, kind, id }; },
+        closeSheet() { if (!this.loading) this.sheet.open = false; },
+        openRenew() { this.openSheet('renew'); },
+        openOrder(id) { this.openSheet('order', id); },
+        openPlan(id) { this.openSheet('plan', id); },
+        openAlign() { this.openSheet('align'); },
+        openAdd() { this.add = { name: '', city: '' }; this.addStep = 1; this.openSheet('add'); },
+        setPeriod(p) {
+            if (this.period === p) return;
+            this.period = p;
+            // The total changed: say so, briefly.
+            this.bump = false; this.$nextTick(() => { this.bump = true; setTimeout(() => this.bump = false, 360); });
+        },
+
+        get sheetPays() { return this.sheet.kind && (this.sheet.kind !== 'add' || (this.addStep === 2 && this.newBranch?.mode === 'prorate')); },
+        get addCta() {
+            const n = this.newBranch || {};
+            if (n.mode === 'prorate') return @js(__('Add & pay')) + ' ' + this.money(n.final);
+            return n.mode === 'trial' ? @js(__('Add to my trial')) : @js(__('Add branch'));
+        },
+
+        get sheetTitle() {
+            const r = this.dueRows[this.sheet.id];
+            switch (this.sheet.kind) {
+                case 'renew': return @js(__('Renew all branches'));
+                case 'order': return r ? r.label + (r.period ? ' · ' + r.period : '') : @js(__('Charge'));
+                case 'plan': return @js(__('Add to your plan'));
+                case 'align': return @js(__('Bring all up to date'));
+                case 'add': return @js(__('Add a new branch'));
+            }
+            return '';
+        },
+        get sheetSubtitle() {
+            switch (this.sheet.kind) {
+                case 'renew': return @js(__('Every branch renews together, on one date.'));
+                case 'order': { const r = this.dueRows[this.sheet.id]; return r ? (r.invoice + ' · ' + @js(__('raised')) + ' ' + r.raised) : ''; }
+                case 'plan': { const a = this.addable[this.sheet.id]; return a ? a.name : ''; }
+                case 'align': return this.alignOffer ? @js(__('Onto your renewal date')) + ' — ' + this.alignOffer.anchor : '';
+                case 'add': return this.addStep === 1 ? @js(__('Step 1 of 2 · details')) : @js(__('Step 2 of 2 · what it costs'));
+            }
+            return '';
+        },
+
+        // ── The rows. Every one comes from a server quote. ──
+        get sheetSummary() {
+            const k = this.sheet.kind;
+            if (k === 'renew') {
+                const q = this.quotes[this.period];
+                const rows = [{ label: q.quantity + ' ' + @js(__('branch(es)')) + ' × ' + this.money(q.unit) + (this.period === 'monthly' ? '/mo' : '/yr'), amount: q.subtotal, kind: 'line' }];
+                const tops = q.topups || [];
+                if (tops.length > 2) {
+                    // Several branches behind: one line, the detail one tap away below.
+                    rows.push({ label: @js(__('Bring')) + ' ' + tops.length + ' ' + @js(__('branches up to')) + ' ' + q.current_anchor, amount: tops.reduce((s, t) => s + t.amount, 0), kind: 'line' });
+                } else {
+                    tops.forEach(t => rows.push({ label: @js(__('Up to')) + ' ' + q.current_anchor + ' · ' + t.name + ' · ' + t.days + 'd', amount: t.amount, kind: 'line' }));
+                }
+                (q.complimentary || []).forEach(c => rows.push({ label: @js(__('Free renewal')) + ' · ' + c.name, amount: c.amount, kind: 'discount' }));
+                if (q.volume > 0) rows.push({ label: @js(__('Multi-branch discount')), amount: q.volume, kind: 'discount' });
+                if (q.manual > 0) rows.push({ label: @js(__('Your discount')), amount: q.manual, kind: 'discount' });
+                return { rows, finalLabel: @js(__('Total payable')), final: q.final, note: @js(__('New renewal date')) + ': ' + q.new_anchor + ' — ' + @js(__('all branches together.')) };
+            }
+            if (k === 'order') {
+                const r = this.dueRows[this.sheet.id];
+                if (!r) return { rows: [], final: 0 };
+                const rows = r.lines.map(l => l.free
+                    ? { label: @js(__('Free renewal')) + ' · ' + l.name, amount: 0, kind: 'subtle' }
+                    : { label: l.name + (l.from && l.to ? ' · ' + l.from + ' → ' + l.to : ''), amount: l.amount, kind: 'line' });
+                if (r.discount > 0) rows.push({ label: @js(__('Includes discounts of')), amount: r.discount, kind: 'subtle' });
+                return { rows, finalLabel: @js(__('Total payable')), final: r.amount, note: @js(__('The amount on your invoice')) + ' ' + r.invoice + '.' };
+            }
+            if (k === 'plan') {
+                const a = this.addable[this.sheet.id];
+                if (!a) return { rows: [], final: 0 };
+                const rows = [{ label: a.days + ' ' + @js(__('days to')) + ' ' + a.anchor + ' · ' + this.money(a.unit) + ' ' + @js(__('per term, prorated')), amount: a.prorated, kind: 'line' }];
+                if (a.volume > 0) rows.push({ label: @js(__('Multi-branch discount')), amount: a.volume, kind: 'discount' });
+                if (a.manual > 0) rows.push({ label: @js(__('Your discount')), amount: a.manual, kind: 'discount' });
+                return { rows, finalLabel: @js(__('Total payable')), final: a.amount, note: @js(__('Covered to')) + ' ' + a.anchor + ' — ' + @js(__('then it renews with every other branch.')) };
+            }
+            if (k === 'align') {
+                const o = this.alignOffer;
+                if (!o) return { rows: [], final: 0 };
+                return { rows: o.lines.map(l => ({ label: l.name + ' · ' + l.days + ' ' + @js(__('days')), amount: l.amount, kind: 'line' })), finalLabel: @js(__('Total payable')), final: o.total, note: @js(__('Every branch then renews together on')) + ' ' + o.anchor + '.' };
+            }
+            if (k === 'add') {
+                const n = this.newBranch || {};
+                const name = this.add.name || @js(__('New branch'));
+                if (n.mode === 'trial') return { rows: [{ label: name + ' · ' + @js(__('joins your free trial')), amount: 0, kind: 'line' }], finalLabel: @js(__('Payable now')), final: 0, note: @js(__('It works until')) + ' ' + n.until + '. ' + @js(__('Every branch is billed together when you subscribe.')) };
+                if (n.mode === 'prorate') {
+                    const rows = [{ label: name + ' · ' + n.days + ' ' + @js(__('days to')) + ' ' + n.anchor, amount: n.prorated, kind: 'line' }];
+                    if (n.volume > 0) rows.push({ label: @js(__('Multi-branch discount')), amount: n.volume, kind: 'discount' });
+                    if (n.manual > 0) rows.push({ label: @js(__('Your discount')), amount: n.manual, kind: 'discount' });
+                    return { rows, finalLabel: @js(__('Payable now')), final: n.final, note: @js(__('Then it renews with every branch on')) + ' ' + n.anchor + '. ' + @js(__('Or add it now and pay later — it stays switched off until it is paid for.')) };
+                }
+                return { rows: [{ label: name + ' · ' + @js(__('added to your plan')), amount: 0, kind: 'line' }], finalLabel: @js(__('Payable now')), final: 0, note: @js(__('It starts when you subscribe, at')) + ' ' + this.money(n.yearly) + '/' + @js(__('yr or')) + ' ' + this.money(n.monthly) + '/' + @js(__('mo per branch.')) };
+            }
+            return { rows: [], final: 0 };
+        },
+
+        // ── Paying. A SHAPE goes to the server, never an amount. ──
+        pay() {
+            const k = this.sheet.kind;
+            const expected = this.sheetSummary.final;
+            if (k === 'renew') return this.start({ charge: 'renewal', period: this.period }, expected);
+            if (k === 'order') return this.start({ charge: 'order', order_id: this.sheet.id }, expected);
+            if (k === 'plan') return this.start({ charge: 'add_branch', branch_id: this.sheet.id }, expected);
+            if (k === 'align') return this.start({ charge: 'align' }, expected);
+        },
+
         toast(message, type) {
             if (window.showToast) return window.showToast(message, type || 'info');
             if (window.Swal) return Swal.fire({ toast: true, position: 'top-end', icon: type === 'error' ? 'error' : (type || 'info'), title: message, showConfirmButton: false, timer: 4500 });
@@ -565,28 +780,15 @@ document.addEventListener('alpine:init', () => {
             return data;
         },
 
-        // ── Starting a charge ──
-        // The browser sends a charge SHAPE — never an amount. Every figure the
-        // customer pays is read from the server's pending order (S2 audit brief).
-        // `expected` is ONLY for telling the customer if the price moved since the page
-        // loaded — it is never sent to the server, and never what they are charged.
-        payRenewal() { return this.start({ charge: 'renewal', period: this.period }, this.q().final); },
-        payAddBranch(id) { return this.start({ charge: 'add_branch', branch_id: id }); },
-        payOrder(id) { return this.start({ charge: 'order', order_id: id }); },
-
+        // `expected` only tells the owner if the price moved since the page loaded —
+        // it is never sent, and never what they are charged.
         async start(body, expected) {
             this.loading = true;
             try {
                 const result = await this.post(@json(route('admin.subscription.checkout')), body);
-
-                // The page can be hours old. If the server's amount differs from what
-                // this page showed, say so BEFORE the payment window opens — Razorpay
-                // shows the right figure, but nobody should be surprised by it.
-                if (result.mode === 'checkout' && expected !== undefined
-                    && Math.abs(result.razorpay.amount / 100 - expected) > 0.005) {
+                if (result.mode === 'checkout' && expected !== undefined && Math.abs(result.razorpay.amount / 100 - expected) > 0.005) {
                     this.toast('The total has been updated since this page loaded — it is now ' + this.money(result.razorpay.amount / 100) + '.', 'info');
                 }
-
                 this.handle(result);
             } catch (e) {
                 this.toast(e.message, 'error');
@@ -609,19 +811,16 @@ document.addEventListener('alpine:init', () => {
 
         handle(result) {
             if (result.mode === 'link') {
-                // The team already sent a link for this charge — pay THAT, never a
-                // second demand beside it. Same tab, so the page reflects it on return.
                 this.toast(result.message, 'info');
                 window.location.href = result.url;
                 return;
             }
             if (result.mode === 'checkout') {
-                this.renewOpen = false;
-                this.addOpen = false;
+                this.sheet.open = false;
                 return this.openCheckout(result.razorpay);
             }
-            // 'paid', 'created' or 'held' — nothing to pay right now. 'held' means a
-            // payment was found that needs a human check: it must not read as success.
+            // 'paid', 'created' or 'held' — 'held' needs a human check: never shown as success.
+            this.sheet.open = false;
             this.toast(result.message, result.mode === 'held' ? 'warning' : 'success');
             setTimeout(() => { window.location.href = result.redirect || window.location.href; }, 1200);
         },
@@ -641,9 +840,7 @@ document.addEventListener('alpine:init', () => {
             rzp.open();
         },
 
-        // ── Confirming ──
-        // ONLY Razorpay's three ids. Which charge this paid for is looked up on the
-        // server from the Razorpay order id; the amount is read back from Razorpay.
+        // ONLY Razorpay's three ids — the server finds the charge and reads the amount.
         async confirm(response) {
             try {
                 const result = await this.post(@json(route('admin.subscription.confirm')), {

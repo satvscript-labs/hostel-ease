@@ -90,17 +90,26 @@ class SubscriptionController extends Controller
         $selfServe = $account->selfServeEnabled();
         $canManage = $viewerOwnsAccount && $selfServe && $this->checkout->isEnabled();
 
+        $addable = $canManage ? $this->addableBranches($account, $branches) : [];
+
+        // "Bring all up to date" — offered when two or more branches are behind, and
+        // not while an align is already billed (that one is in Payment due).
+        $alignDue = collect($due)->contains(fn (SubscriptionOrder $o) => $o->kind?->value === 'align' && $o->wouldExtendCoverage());
+        $alignOffer = $canManage && count($addable) >= 2 && ! $alignDue ? $this->alignOffer($account) : null;
+
         return view('admin.subscription.index', [
             'account' => $account,
             'branches' => $branches,
             'billableCount' => $billable->count(),
-            'orders' => $account->orders()->where('payment_status', PaymentStatus::Paid->value)->latest('id')->limit(10)->get(),
+            'history' => $this->history($account),
+            'alignOffer' => $alignOffer,
+            'newBranch' => $canManage ? $this->newBranchQuote($account) : null,
             'quotes' => $quotes,
             'displayPeriod' => $displayPeriod,
             'yearlySaving' => $this->yearlySaving($quotes),
             'due' => $due->map(fn (SubscriptionOrder $o) => $this->dueRow($o))->values()->all(),
             'openRenewal' => $openRenewal ? $this->dueRow($openRenewal) : null,
-            'addable' => $canManage ? $this->addableBranches($account, $branches) : [],
+            'addable' => $addable,
             // "Add & pay" only means something against a live PAID cycle; on a trial
             // account a new branch simply joins the plan at the first renewal.
             'canAddPaid' => $canManage
@@ -124,7 +133,7 @@ class SubscriptionController extends Controller
     public function checkout(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'charge' => ['required', Rule::in(['renewal', 'add_branch', 'order'])],
+            'charge' => ['required', Rule::in(['renewal', 'add_branch', 'align', 'order'])],
             'period' => ['required_if:charge,renewal', 'nullable', Rule::in(['yearly', 'monthly'])],
             // Posted DB references, so integers (standards §1.1 rule 3), resolved
             // inside this account below — never trusted as they arrive.
@@ -147,6 +156,7 @@ class SubscriptionController extends Controller
             $result = match ($data['charge']) {
                 'renewal' => $this->checkout->startRenewal($account, $data['period']),
                 'add_branch' => $this->checkout->startAddBranch($account, $branch),
+                'align' => $this->checkout->startAlign($account),
                 'order' => $this->checkout->startForOrder($account, $order),
             };
         } catch (RuntimeException $e) {
@@ -392,6 +402,10 @@ class SubscriptionController extends Controller
             ])->values()->all(),
             'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
+            // Which branches this renews, and which are left out because they are
+            // closing — so the owner never has to guess what they are paying for.
+            'included' => $this->billing->includedBranches($account)->pluck('name')->values()->all(),
+            'closing' => $this->billing->allBranches($account)->filter(fn (Hostel $b) => $b->isCancelled())->pluck('name')->values()->all(),
         ];
     }
 
@@ -445,7 +459,125 @@ class SubscriptionController extends Controller
             'raised' => $o->created_at?->format('d M Y'),
             'link_url' => $linkUrl,
             'link_expires' => $linkUrl ? $o->payment_link_expires_at?->format('d M Y') : null,
+            // The breakdown shown before paying: what each line buys. Display only —
+            // what is charged is the order's own amount, read on the server.
+            'kind' => $o->kind?->value,
+            'subtotal' => (float) $o->subtotal,
+            'discount' => (float) $o->discount_total,
+            'lines' => $o->lines->map(fn ($l) => [
+                'name' => $l->branch?->name ?? __('Branch'),
+                'from' => $l->start_date?->format('d M Y'),
+                'to' => $l->end_date?->format('d M Y'),
+                'amount' => (float) $l->amount,
+                'free' => (bool) $l->complimentary,
+            ])->values()->all(),
         ];
+    }
+
+    /** What "Bring all up to date" costs — Align's own quote, line by line. */
+    protected function alignOffer(SubscriptionAccount $account): ?array
+    {
+        $q = $this->billing->quoteAlign($account);
+        if ($q['count'] < 2) {
+            return null;
+        }
+
+        return [
+            'count' => $q['count'],
+            'total' => round((float) $q['subtotal'], 2),
+            'anchor' => $q['anchor']?->format('d M Y'),
+            'lines' => collect($q['lines'])->map(fn (array $l) => [
+                'name' => $l['branch']->name,
+                'days' => (int) $l['days'],
+                'amount' => round((float) $l['amount'], 2),
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * What adding a branch would mean, shown BEFORE it is added:
+     *   trial     — it joins the running trial, free until it ends;
+     *   prorate   — on a live paid plan: this much now, to the renewal date;
+     *   subscribe — no live paid plan: it joins the plan at the next payment.
+     */
+    protected function newBranchQuote(SubscriptionAccount $account): array
+    {
+        if ($this->billing->trialJoinable($account)) {
+            return ['mode' => 'trial', 'until' => $account->current_period_end->format('d M Y')];
+        }
+
+        if ($account->period?->isPaid() && $account->current_period_end?->isFuture()) {
+            $q = $this->billing->quoteAddBranch($account, null);
+
+            return [
+                'mode' => 'prorate',
+                'days' => (int) $q['days_remaining'],
+                'unit' => round((float) $q['unit'], 2),
+                'prorated' => round((float) $q['prorated'], 2),
+                'volume' => round((float) ($q['breakdown']['volume_amount'] ?? 0), 2),
+                'manual' => round((float) ($q['breakdown']['manual_amount'] ?? 0), 2),
+                'final' => round((float) $q['breakdown']['final'], 2),
+                'anchor' => $q['anchor']?->format('d M Y'),
+                'term' => $account->period->label(),
+            ];
+        }
+
+        return [
+            'mode' => 'subscribe',
+            'yearly' => round($this->billing->unitPrice($account, \App\Enums\BillingPeriod::Yearly), 2),
+            'monthly' => round($this->billing->unitPrice($account, \App\Enums\BillingPeriod::Monthly), 2),
+        ];
+    }
+
+    /**
+     * Payments & receipts. Money paid, plus the free grants as "Free" — never the
+     * internal ₹0 adjustments the ledger keeps for itself.
+     */
+    protected function history(SubscriptionAccount $account): array
+    {
+        return $account->orders()
+            ->where('payment_status', PaymentStatus::Paid->value)
+            ->where(fn ($q) => $q->whereNull('kind')->orWhere('kind', '!=', \App\Enums\OrderKind::Adjustment->value))
+            ->latest('id')
+            ->limit(12)
+            ->get()
+            ->map(fn (SubscriptionOrder $o) => [
+                'label' => $o->kind?->label() ?? __('Payment'),
+                'amount' => (float) $o->amount,
+                'free' => (float) $o->amount <= 0,
+                'branches' => $o->quantity,
+                'period' => $o->period?->isPaid() ? $o->period->label() : null,
+                'date' => $o->created_at?->format('d M Y'),
+                'invoice' => $o->invoiceNumber(),
+                'receipt' => (float) $o->amount > 0 ? route('admin.subscription.receipt', $o) : null,
+            ])
+            ->all();
+    }
+
+    /**
+     * Download the receipt for a payment on THIS account. Paid, money-bearing orders
+     * only — a crafted id from another account, a pending charge or a ₹0 grant is a 404.
+     */
+    public function receipt(Request $request, SubscriptionOrder $order)
+    {
+        $account = $this->billing->accountForViewer($request->user());
+
+        abort_unless(
+            $order->account_id === $account->id
+                && $order->payment_status === PaymentStatus::Paid
+                && (float) $order->amount > 0,
+            404,
+        );
+
+        $order->load(['lines.branch', 'account.owner']);
+
+        $this->logger->log('order.invoice', 'Owner downloaded receipt '.$order->invoiceNumber(), $order);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('superadmin.orders.invoice_pdf', [
+            'order' => $order,
+            'account' => $account,
+            'company' => config('hostelease.company'),
+        ])->download($order->invoiceNumber().'.pdf');
     }
 
     /**
@@ -465,8 +597,14 @@ class SubscriptionController extends Controller
                 $q = $this->billing->quoteAddBranch($account, $b);
 
                 return [$b->id => [
+                    'name' => $b->name,
                     'amount' => round((float) $q['breakdown']['final'], 2),
                     'days' => (int) $q['days_remaining'],
+                    'unit' => round((float) $q['unit'], 2),
+                    'prorated' => round((float) $q['prorated'], 2),
+                    'volume' => round((float) ($q['breakdown']['volume_amount'] ?? 0), 2),
+                    'manual' => round((float) ($q['breakdown']['manual_amount'] ?? 0), 2),
+                    'anchor' => $q['anchor']?->format('d M Y'),
                 ]];
             })
             ->filter(fn (array $q) => $q['amount'] >= 1)

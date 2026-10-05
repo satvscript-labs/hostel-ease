@@ -197,9 +197,19 @@ class SubscriptionOrder extends Model
             : 'extends';
     }
 
-    /** A renewal's top-up lines (see coverageState); empty for every other kind. */
+    /**
+     * The lines that are TOP-UPS (see coverageState). A renewal's top-ups end before
+     * its furthest date; an Align is nothing but top-ups, so every line counts — a
+     * branch it covers that was since paid for another way would be paid twice.
+     */
     public function topUpLines(): \Illuminate\Support\Collection
     {
+        if ($this->kind === OrderKind::Align) {
+            $this->loadMissing('lines');
+
+            return $this->lines->values();
+        }
+
         if ($this->kind !== OrderKind::Renewal) {
             return collect();
         }

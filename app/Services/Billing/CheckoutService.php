@@ -227,6 +227,84 @@ class CheckoutService
     }
 
     /**
+     * Bring EVERY behind branch onto the renewal date in one payment — the owner's
+     * version of Account 360's Align, priced by the same quoteAlign().
+     *
+     * Same rules as a single top-up: a live PAID cycle only; one open align demand at
+     * a time; an operator's align is what gets paid; the owner's own earlier attempt is
+     * reused at the same price and branch set, otherwise superseded (asking Razorpay
+     * first). A branch paid for another way since makes an open align stale, never
+     * payable twice (SubscriptionOrder::coverageState).
+     *
+     * @return array{mode:'link'|'checkout'|'paid'|'held', order:SubscriptionOrder, url?:string, razorpay?:array, message?:string}
+     *
+     * @throws RuntimeException with an owner-readable message
+     */
+    public function startAlign(SubscriptionAccount $account): array
+    {
+        return DB::transaction(function () use ($account) {
+            $this->lock($account);
+            $account->refresh();
+
+            $anchor = $account->current_period_end;
+            if (! $account->period?->isPaid() || ! $anchor || ! $anchor->isFuture()) {
+                throw new RuntimeException('Renew your plan to bring these branches on — they will renew together with the rest.');
+            }
+
+            $quote = $this->billing->quoteAlign($account);
+            if ($quote['count'] === 0) {
+                throw new RuntimeException('Every branch is already covered to your renewal date. Nothing to pay.');
+            }
+
+            $pending = $account->orders()
+                ->where('payment_status', PaymentStatus::Pending->value)
+                ->where('kind', OrderKind::Align->value)
+                ->orderByDesc('id')
+                ->get();
+
+            $open = $pending->first(fn (SubscriptionOrder $o) => $o->wouldExtendCoverage(fresh: true));
+
+            foreach ($pending as $stale) {
+                if (($open && $stale->is($open)) || ! $this->isOwnersOwn($stale)) {
+                    continue;
+                }
+                if ($result = $this->supersede($stale)) {
+                    return $result;
+                }
+            }
+
+            if ($open && ! $this->isOwnersOwn($open)) {
+                return $this->payExisting($open);
+            }
+
+            if ($open) {
+                $orderBranches = $open->lines()->pluck('branch_id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+                $quoteBranches = collect($quote['lines'])->map(fn (array $l) => (int) $l['branch']->id)->sort()->values()->all();
+
+                if ($orderBranches === $quoteBranches && $open->amountPaise() === (int) round($quote['subtotal'] * 100)) {
+                    return $this->payExisting($open);
+                }
+
+                if ($result = $this->supersede($open)) {
+                    return $result;
+                }
+            }
+
+            $order = $this->billing->align($account, [
+                'payment_status' => PaymentStatus::Pending->value,
+                'collection' => CollectionMethod::Checkout->value,
+                'remarks' => 'Branches brought onto the renewal date by the owner',
+            ]);
+
+            if (! $order || $order->amountPaise() < 100) {
+                throw new RuntimeException('There is nothing to pay to bring your branches onto the renewal date.');
+            }
+
+            return $this->payExisting($order);
+        });
+    }
+
+    /**
      * Pay a charge that is already open — an operator's proforma or link, or the
      * owner's own earlier attempt. What the "Payment due" panel calls.
      *
