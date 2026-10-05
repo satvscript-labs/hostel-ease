@@ -147,7 +147,22 @@ class User extends Authenticatable
      */
     public function canAccessPresence(): bool
     {
+        return config('presence.enabled') && $this->roleMayUsePresence();
+    }
+
+    /** The roles Presence is FOR — independent of whether the module is switched on. */
+    public function roleMayUsePresence(): bool
+    {
         return in_array($this->role, ['hostel_admin', 'manager', 'warden'], true);
+    }
+
+    /**
+     * Presence is switched off but this role would use it: the sidebar shows a
+     * "Coming soon" teaser instead of the module (premium add-on, not on sale yet).
+     */
+    public function seesPresenceTeaser(): bool
+    {
+        return ! config('presence.enabled') && $this->roleMayUsePresence();
     }
 
     /** Concrete list of areas (expanding the '*' wildcard) for the client. */

@@ -25,6 +25,12 @@ class CheckPresenceAccess
             return redirect()->route('login');
         }
 
+        // Switched off (config presence.enabled): every Presence URL, bookmarked or
+        // typed, lands on the Coming-soon page for the roles it is meant for.
+        if (! config('presence.enabled') && $user->roleMayUsePresence()) {
+            return redirect()->route('admin.presence.soon');
+        }
+
         // Same allow-list the sidebar and User::canAccessPresence() use.
         if (! $user->canAccessPresence()) {
             return redirect()->route('admin.dashboard')

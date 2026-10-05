@@ -368,6 +368,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                     ->withTrashed()->name('staff.salary.destroy');
             });
 
+            // Presence is a premium add-on that is switched off (config presence.enabled).
+            // Outside the presence.access group on purpose: that middleware sends every other
+            // Presence URL here while the module is off.
+            Route::get('presence/coming-soon', fn () => view('admin.presence.coming_soon'))->name('presence.soon');
+
             // --- New module: Presence / In-Out Register (gate device) ---
             // Explicit allow-list gate (owner Q6), NOT access:* — viewer holds
             // ['*'] and must be excluded (01 §8). P2 = Devices & Enrollment;

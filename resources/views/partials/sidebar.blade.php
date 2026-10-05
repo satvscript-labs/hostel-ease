@@ -182,6 +182,13 @@
                     </a>
                 </div>
             </div>
+            @elseif($user->seesPresenceTeaser())
+            {{-- Switched off: a teaser, not the module. One link, to the Coming-soon page. --}}
+            <a class="sidebar-link {{ request()->routeIs('admin.presence.soon') ? 'is-active' : '' }}" href="{{ route('admin.presence.soon') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-door-open"></i></span>
+                <span class="sidebar-link-label">{{ __('Presence') }}</span>
+                <span class="badge rounded-pill ms-auto" style="background: color-mix(in srgb, var(--he-primary) 14%, transparent); color: var(--he-primary); font-weight: 700; font-size: 0.66rem;">{{ __('Soon') }}</span>
+            </a>
             @endif
 
             {{-- Reports (Solo section) --}}

@@ -13,6 +13,13 @@
 */
 
 return [
+    // Master switch. OFF by default so a missing .env value fails safe: the module
+    // is a premium add-on that is not on sale yet. Off = every Presence page shows
+    // "Coming soon", the sidebar shows a teaser, the dashboard tile / reports /
+    // last-seen chips are hidden, and the gate-polling jobs do nothing.
+    // Tests turn it on in phpunit.xml; a dev machine sets PRESENCE_ENABLED=true.
+    'enabled' => (bool) env('PRESENCE_ENABLED', false),
+
     // Which adapter backs PresenceService. 'timewatch' = the iDMS HTTP adapter;
     // 'fake' = the in-memory scriptable adapter (tests, local dev without a box).
     'driver' => env('PRESENCE_DRIVER', 'timewatch'),
