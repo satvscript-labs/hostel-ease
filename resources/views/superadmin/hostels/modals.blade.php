@@ -190,14 +190,11 @@
                             ]" />
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted">VALID FROM</label>
-                            <input type="date" name="subscription_start" x-model="e_start" class="form-control bg-white border shadow-sm" required>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted">VALID UNTIL</label>
-                            <input type="date" name="subscription_end" x-model="e_end" class="form-control bg-white border shadow-sm" required>
+                        {{-- Coverage dates are not edited here (doc 22): they follow the
+                             account's one renewal date. Gifts and corrections live on the
+                             customer's account (Give free time · Add to cycle · Void). --}}
+                        <div class="col-md-8 d-flex align-items-end">
+                            <div class="small text-muted"><i class="fa-solid fa-calendar-check me-1"></i>Coverage <span x-text="e_end ? 'until ' + e_end : ''"></span> follows the customer's renewal date — change it from their account.</div>
                         </div>
                     </div>
                 </div>
@@ -270,8 +267,7 @@ document.addEventListener('alpine:init', () => {
         e_city: {!! json_encode(old('is_edit') ? old('city', '') : '') !!},
         e_state: {!! json_encode(old('is_edit') ? old('state', '') : '') !!},
         e_gst_number: {!! json_encode(old('is_edit') ? old('gst_number', '') : '') !!},
-        e_start: {!! json_encode(old('is_edit') ? old('subscription_start', '') : '') !!},
-        e_end: {!! json_encode(old('is_edit') ? old('subscription_end', '') : '') !!},
+        e_end: '',
         e_status: {!! json_encode(old('is_edit') ? old('status', '') : '') !!},
         editUrl: {!! json_encode(old('is_edit') && old('hostel_public_id') ? url('superadmin/hostels/'.old('hostel_public_id')) : '') !!},
 
@@ -292,7 +288,6 @@ document.addEventListener('alpine:init', () => {
             this.e_city = h.city;
             this.e_state = h.state;
             this.e_gst_number = h.gst_number;
-            this.e_start = h.subscription_start;
             this.e_end = h.subscription_end;
             this.e_status = h.status;
             this.editUrl = `{{ url('superadmin/hostels') }}/${id}`;

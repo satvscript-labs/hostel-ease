@@ -58,8 +58,16 @@
 
     <x-he-billing-summary data="addSummary" />
 
+    {{-- Bring up to date FREE (doc 22): ₹0, recorded as a gift. --}}
+    <input type="hidden" name="complimentary" :value="addFree ? 1 : 0">
+    <div class="form-check form-switch mt-3">
+        <input class="form-check-input" type="checkbox" role="switch" id="addFree" x-model="addFree">
+        <label class="form-check-label fw-semibold" for="addFree">Complimentary — bring it up to date free</label>
+    </div>
+
+    <div x-show="!addFree" x-collapse>
     <label class="form-label fw-bold small text-muted mt-3">AMOUNT OVERRIDE (₹) <span class="fw-normal">— optional</span></label>
-    <input type="number" step="0.01" min="0" name="amount" x-model="addOverride"
+    <input type="number" step="0.01" min="0" name="amount" x-model="addOverride" :disabled="addFree"
         class="form-control bg-white border shadow-sm" :placeholder="'Auto (' + heMoney(addSummary.final) + ')'">
     <div class="form-text">Enter a lower amount to record a manual discount; the difference is logged on the order.</div>
 
@@ -77,12 +85,13 @@
         The branch is <strong>not</strong> co-terminated until the link is paid — until then this is a
         quote, and the branch keeps whatever coverage it already has.
     </div>
+    </div>
 
     <x-slot:footer>
         <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="addOpen=false">Cancel</button>
         <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
             <i class="fa-solid me-2" :class="addCollect === 'link' ? 'fa-link' : 'fa-plus'"></i>
-            <span x-text="addCollect === 'link' ? 'Create link' : 'Add branch'"></span>
+            <span x-text="addFree ? 'Bring up to date free' : (addCollect === 'link' ? 'Create link' : 'Add branch')"></span>
         </button>
     </x-slot:footer>
 </x-he-modal>
@@ -225,76 +234,105 @@
     </x-slot:footer>
 </x-he-modal>
 
-{{-- ── Comp (complimentary ₹0 coverage) ── --}}
-<x-he-modal open="compOpen" title="Complimentary coverage" icon="gift"
-    :action="route('superadmin.accounts.comp', $account)" :size="600">
-    <input type="hidden" name="period" :value="compTerm">
-    {{-- Selected branch ids submit as branches[] --}}
-    <template x-for="id in compSelected" :key="id"><input type="hidden" name="branches[]" :value="id"></template>
+{{-- ── Give free time (doc 22) ──
+     One renewal date per account: a gift never moves one branch's date. Two choices,
+     each a small form of its own; "Free renewals" is the default. --}}
+<template x-teleport="body">
+<div class="custom-overlay-backdrop" x-show="giftOpen" x-transition.opacity @click.self="giftOpen=false" x-cloak style="display:none;">
+    <div class="custom-overlay-modal" style="max-width:560px;" :class="{'is-open':giftOpen}">
+        <div class="custom-overlay-header">
+            <h5 class="fw-bold mb-0"><i class="fa-solid fa-gift text-primary me-2"></i>Give free time</h5>
+            <button type="button" class="btn-close" @click="giftOpen=false"></button>
+        </div>
 
-    {{-- Term + multiplier --}}
-    <div class="row g-3 mb-3">
-        <div class="col-sm-6">
-            <label class="form-label fw-bold small text-muted">TERM</label>
+        <div class="px-4 pt-3" style="background:#fafafa;">
             <div class="d-flex gap-2">
-                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="compTerm==='monthly'?'btn-primary':'btn-light border'" @click="compTerm='monthly'">Monthly</button>
-                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="compTerm==='yearly'?'btn-primary':'btn-light border'" @click="compTerm='yearly'">Yearly</button>
+                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="giftMode==='renewals'?'btn-primary':'btn-light border'" @click="giftMode='renewals'"><i class="fa-solid fa-gift me-1"></i>Free renewals</button>
+                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="giftMode==='extend'?'btn-primary':'btn-light border'" @click="giftMode='extend'"><i class="fa-solid fa-calendar-plus me-1"></i>{{ $trialJoinable ? 'Extend trial' : 'Extend renewal date' }}</button>
             </div>
         </div>
-        <div class="col-sm-6">
-            <label class="form-label fw-bold small text-muted">HOW MANY</label>
-            <div class="comp-stepper">
-                <button type="button" class="comp-step tactile-btn" @click="compMultiplier = Math.max(1, (parseInt(compMultiplier)||1) - 1)"><i class="fa-solid fa-minus"></i></button>
-                <input type="number" min="1" max="60" name="multiplier" x-model.number="compMultiplier" class="comp-step-input">
-                <button type="button" class="comp-step tactile-btn" @click="compMultiplier = Math.min(60, (parseInt(compMultiplier)||1) + 1)"><i class="fa-solid fa-plus"></i></button>
+
+        {{-- Free renewals --}}
+        <form method="POST" action="{{ route('superadmin.accounts.free-renewals', $account) }}" x-show="giftMode==='renewals'">
+            @csrf
+            <template x-for="id in giftSelected" :key="id"><input type="hidden" name="branches[]" :value="id"></template>
+            <div class="custom-overlay-body">
+                <p class="small text-muted mb-3">The selected branches renew for <strong>₹0</strong> at their next renewal{{ $account->current_period_end ? ' ('.$account->current_period_end->format('d M Y').')' : '' }}. The renewal date does not change.</p>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label fw-bold small text-muted mb-0">BRANCHES</label>
+                    <button type="button" class="btn btn-link btn-sm text-decoration-none fw-semibold p-0" @click="toggleGiftAll()" x-text="giftAllSelected ? 'Clear all' : 'Select all'"></button>
+                </div>
+                <div class="row g-2 mb-3">
+                    <template x-for="b in giftBranches" :key="b.id">
+                        <div class="col-sm-6">
+                            <button type="button" class="comp-tile w-100" :class="{ 'is-selected': giftSelected.includes(b.id) }" @click="toggleGiftBranch(b.id)">
+                                <span class="comp-tile-check"><i class="fa-solid fa-check"></i></span>
+                                <span class="text-start">
+                                    <span class="comp-tile-name" x-text="b.name"></span>
+                                    <span class="comp-tile-end" x-text="b.free ? (b.free + ' free renewal' + (b.free > 1 ? 's' : '') + ' now') : 'none now'"></span>
+                                </span>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <label class="form-label fw-bold small text-muted">FREE RENEWALS EACH</label>
+                <div class="comp-stepper" style="max-width:200px;">
+                    <button type="button" class="comp-step tactile-btn" @click="giftCount = Math.max(0, (parseInt(giftCount)||0) - 1)"><i class="fa-solid fa-minus"></i></button>
+                    <input type="number" min="0" max="10" name="count" x-model.number="giftCount" class="comp-step-input">
+                    <button type="button" class="comp-step tactile-btn" @click="giftCount = Math.min(10, (parseInt(giftCount)||0) + 1)"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div class="form-text" x-text="giftCount === 0 ? 'Removes their free renewals.' : ('Each selected branch will have ' + giftCount + ' free ' + (giftCount > 1 ? 'renewals' : 'renewal') + ' — one is used per renewal.')"></div>
+
+                <label class="form-label fw-bold small text-muted mt-3">NOTE <span class="fw-normal">(optional — kept in the activity log)</span></label>
+                <input type="text" name="reason" maxlength="255" class="form-control bg-white border shadow-sm" placeholder="e.g. Referred two customers">
             </div>
-            <div class="form-text">= <span class="fw-bold text-primary" x-text="compMultiplierLabel"></span> of free coverage</div>
-        </div>
-    </div>
-
-    {{-- Branch selector (checkbox tiles) --}}
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label class="form-label fw-bold small text-muted mb-0">BRANCHES</label>
-        <button type="button" class="btn btn-link btn-sm text-decoration-none fw-semibold p-0" @click="toggleCompAll()" x-text="compAllSelected ? 'Clear all' : 'Select all'"></button>
-    </div>
-    <div class="row g-2 mb-1">
-        <template x-for="b in compBranches" :key="b.id">
-            <div class="col-sm-6">
-                <button type="button" class="comp-tile w-100" :class="{ 'is-selected': compSelected.includes(b.id) }" @click="toggleCompBranch(b.id)">
-                    <span class="comp-tile-check"><i class="fa-solid fa-check"></i></span>
-                    <span class="text-start">
-                        <span class="comp-tile-name" x-text="b.name"></span>
-                        <span class="comp-tile-end" x-text="'ends ' + b.endLabel"></span>
-                    </span>
-                </button>
+            <div class="custom-overlay-footer">
+                <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="giftOpen=false">Cancel</button>
+                <button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" :disabled="!giftSelected.length"><i class="fa-solid fa-gift me-2"></i>Save</button>
             </div>
-        </template>
-    </div>
+        </form>
 
-    {{-- Live gift preview --}}
-    <div class="comp-preview mt-3" x-show="compSelected.length" x-cloak>
-        <div class="comp-preview-head">
-            <i class="fa-solid fa-gift text-primary me-2"></i>
-            <span x-text="compSelected.length"></span> branch(es) get <span class="fw-bold" x-text="compMultiplierLabel"></span> free
-            <span class="comp-preview-badge">₹0.00 · Complimentary</span>
-        </div>
-        <template x-for="row in compPreview" :key="row.name">
-            <div class="comp-preview-row">
-                <span class="fw-semibold text-dark" x-text="row.name"></span>
-                <span class="small text-muted"><span x-text="row.from"></span> <i class="fa-solid fa-arrow-right-long mx-1" style="font-size:.7rem;"></i> <span class="fw-semibold text-success" x-text="row.to"></span></span>
+        {{-- Extend renewal date / trial --}}
+        <form method="POST" action="{{ route('superadmin.accounts.extend', $account) }}" x-show="giftMode==='extend'" x-cloak>
+            @csrf
+            <div class="custom-overlay-body">
+                @if($canExtend)
+                    <p class="small text-muted mb-3">Every branch on the plan moves together, so the account keeps one date.{{ $trialJoinable ? ' This extends the free trial.' : '' }}</p>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-5">
+                            <label class="form-label fw-bold small text-muted">BY</label>
+                            <input type="number" min="1" :max="giftUnit === 'months' ? 12 : 366" name="amount" x-model.number="giftAmount" class="form-control bg-white border shadow-sm" required>
+                        </div>
+                        <div class="col-7">
+                            <input type="hidden" name="unit" :value="giftUnit">
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="giftUnit==='days'?'btn-primary':'btn-light border'" @click="giftUnit='days'">Days</button>
+                                <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="giftUnit==='months'?'btn-primary':'btn-light border'" @click="giftUnit='months'">Months</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="he-summary shadow-sm mt-3">
+                        <div class="he-summary-row he-summary-row--line"><span>{{ $trialJoinable ? 'Trial ends' : 'Renewal date' }}</span><span class="he-summary-amt">{{ $account->current_period_end->format('d M Y') }} → <span class="text-success" x-text="giftNewDate"></span></span></div>
+                        <div class="he-summary-row he-summary-row--subtle"><span>Charged</span><span class="he-summary-amt">₹0</span></div>
+                    </div>
+                    <label class="form-label fw-bold small text-muted mt-3">REASON</label>
+                    <input type="text" name="reason" maxlength="255" class="form-control bg-white border shadow-sm" placeholder="e.g. Two weeks of downtime in March" required>
+                @else
+                    <div class="text-muted small"><i class="fa-solid fa-circle-info me-1"></i>This account has no live renewal date to move. Renew it first; free renewals still work.</div>
+                @endif
             </div>
-        </template>
+            <div class="custom-overlay-footer">
+                <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="giftOpen=false">Cancel</button>
+                @if($canExtend)
+                    <button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="fa-solid fa-calendar-plus me-2"></i>Extend</button>
+                @endif
+            </div>
+        </form>
     </div>
-    <div class="text-danger small mt-2" x-show="!compSelected.length" x-cloak><i class="fa-solid fa-triangle-exclamation me-1"></i>Select at least one branch.</div>
-
-    <label class="form-label fw-bold small text-muted mt-3">REASON</label>
-    <input type="text" name="reason" class="form-control bg-white border shadow-sm" placeholder="Why this comp? (e.g. referred 3 customers)" required>
-
-    <x-slot:footer>
-        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="compOpen=false">Cancel</button>
-        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" :disabled="!compSelected.length"><i class="fa-solid fa-gift me-2"></i>Grant</button>
-    </x-slot:footer>
-</x-he-modal>
+</div>
+</template>
 
 {{-- ── Custom unit price (per-period) ── --}}
 <x-he-modal open="overrideOpen" title="Custom unit price" icon="tag"

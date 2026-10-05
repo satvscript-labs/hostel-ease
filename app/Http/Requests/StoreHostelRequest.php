@@ -39,9 +39,8 @@ class StoreHostelRequest extends FormRequest
             'state' => ['nullable', 'string', 'max:100'],
             'gst_number' => ['nullable', 'string', 'max:20'],
             'status' => ['required', Rule::in(array_keys(config('hostelease.hostel_status')))],
-            // Update only
-            'subscription_start' => [$this->isMethod('put') ? 'required' : 'nullable', 'date'],
-            'subscription_end' => [$this->isMethod('put') ? 'required' : 'nullable', 'date', 'after:subscription_start'],
+            // NO coverage dates (doc 22): only the billing service writes coverage, and
+            // a date typed here bypassed it — it now follows the account's renewal date.
             // Creation only
             'plan' => [$this->isMethod('post') ? 'required' : 'nullable', Rule::in(['yearly', 'monthly', 'trial'])],
             // May only LOWER the server's quote (enforced in the billing service too);

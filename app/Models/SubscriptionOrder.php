@@ -157,6 +157,10 @@ class SubscriptionOrder extends Model
      * A top-up line is a renewal line ending BEFORE the order's furthest end: term
      * lines all end on the new anchor, top-ups end on the anchor that was current
      * when the renewal was quoted. Orders without top-ups behave exactly as before.
+     *
+     * Also 'stale': an UNPAID renewal priced with a branch's free renewal that the
+     * branch no longer holds (removed, or used by another renewal) — paying it would
+     * hand out a gift that is not there. Re-quoting prices that branch normally.
      */
     public function coverageState(bool $fresh = false): string
     {
@@ -170,7 +174,10 @@ class SubscriptionOrder extends Model
             return 'covered';
         }
 
-        return $this->topUpLines()->contains(fn (SubscriptionOrderLine $line) => ! $extends($line))
+        $giftGone = $this->payment_status === PaymentStatus::Pending
+            && $this->lines->contains(fn (SubscriptionOrderLine $line) => $line->complimentary && (int) ($line->branch?->free_renewals ?? 0) < 1);
+
+        return $giftGone || $this->topUpLines()->contains(fn (SubscriptionOrderLine $line) => ! $extends($line))
             ? 'stale'
             : 'extends';
     }

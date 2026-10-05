@@ -39,7 +39,7 @@ class AuditCoverage extends Command
 {
     protected $signature = 'hostelease:audit-coverage
         {--csv= : Write row-level findings to this CSV path}
-        {--fix : Correct what checks 1, 4 and 5 found (decision D1). Shortens over-granted coverage, re-derives account anchors, repairs stale cycle starts}
+        {--fix : Bring every account onto one renewal date (doc 22): coverage past it becomes free renewals; re-derives anchors; repairs stale cycle starts}
         {--force : Skip the --fix confirmation prompt}';
 
     protected $description = 'Audit (and optionally correct) subscription coverage against what the ledger supports (S0 / decision D1).';
@@ -57,17 +57,19 @@ class AuditCoverage extends Command
     /**
      * Corrections --fix would apply, collected by the checks that run before it.
      *
-     * @var array{coverage: array<int, array{branch: Hostel, to: Carbon, over: int}>, cycle_start: array<int, array{account: SubscriptionAccount, to: Carbon}>}
+     * @var array{cycle_start: array<int, array{account: SubscriptionAccount, to: Carbon}>}
      */
-    private array $fixes = ['coverage' => [], 'cycle_start' => []];
+    private array $fixes = ['cycle_start' => []];
 
     public function handle(): int
     {
         $fix = (bool) $this->option('fix');
+        $this->rows = [];
+        $this->fixes = ['cycle_start' => []];
 
         $this->line('');
         $this->info($fix
-            ? '  Coverage audit — FIX MODE. Findings in checks 1, 4 and 5 will be corrected.'
+            ? '  Coverage audit — FIX MODE. Coverage past a renewal date becomes free renewals; anchors and cycle starts are repaired.'
             : '  Coverage audit — read-only. Nothing is modified.');
         $this->line('  '.now()->format('d M Y H:i').'  ·  grace window: '.config('hostelease.grace_days').' days');
         $this->line('');
@@ -77,6 +79,7 @@ class AuditCoverage extends Command
         $this->checkMissingCoverage();
         $this->checkAnchorDrift();
         $this->checkStalePeriodStart();
+        $this->checkPastRenewalDate();
 
         $this->summarise($over, $fix);
 
@@ -116,7 +119,17 @@ class AuditCoverage extends Command
      */
     private function applyFixes(): int
     {
-        $coverage = $this->fixes['coverage'];
+        // ONE RENEWAL DATE PER ACCOUNT (doc 22, owner decision 2026-10-06): coverage a
+        // branch holds past its account's renewal date — gifted time, a hand edit, an
+        // old double-stamp — is not deleted, it becomes free renewals. Planned first
+        // (nothing written), shown, confirmed, then applied.
+        $billing = app(\App\Services\Billing\AccountBillingService::class);
+        $coverage = [];
+        foreach (SubscriptionAccount::cursor() as $account) {
+            foreach ($billing->foldGiftsIntoFreeRenewals($account, dryRun: true) as $row) {
+                $coverage[] = $row + ['account' => $account];
+            }
+        }
         $cycleStarts = $this->fixes['cycle_start'];
 
         if (! $coverage && ! $cycleStarts) {
@@ -127,7 +140,10 @@ class AuditCoverage extends Command
         }
 
         $this->warn('  --fix will change data:');
-        $this->line('    · '.count($coverage).' branch(es) shortened to the coverage their payments bought');
+        foreach ($coverage as $row) {
+            $this->line("    · {$row['branch']->name}: ".$row['from']->format('d M Y').' → '.$row['to']->format('d M Y')
+                ." ({$row['days']} days past the renewal date) = {$row['free_renewals']} free renewal(s)");
+        }
         $this->line('    · every account anchor + status re-derived from the corrected branches');
         $this->line('    · '.count($cycleStarts).' account cycle start(s) repaired');
         $this->line('');
@@ -140,31 +156,31 @@ class AuditCoverage extends Command
 
         $logger = app(\App\Services\ActivityLogger::class);
 
-        // 1. Branch coverage.
-        foreach ($coverage as $fix) {
-            $branch = $fix['branch'];
-            $was = $branch->subscription_end;
+        // 1. One renewal date per account; the excess becomes free renewals.
+        $done = 0;
+        foreach (collect($coverage)->pluck('account')->unique('id') as $account) {
+            foreach ($billing->foldGiftsIntoFreeRenewals($account->fresh()) as $row) {
+                $branch = $row['branch'];
+                $done++;
 
-            Tenant::set($branch->id);
-            try {
-                $branch->forceFill(['subscription_end' => $fix['to']])->save();
-                $logger->log(
-                    'subscription.update',
-                    "Coverage corrected (D1): {$branch->name} shortened from "
-                        .$was->format('d M Y').' to '.$fix['to']->format('d M Y')
-                        ." — {$fix['over']} days were not covered by any payment.",
-                    $branch,
-                    ['from' => $was->toDateString(), 'to' => $fix['to']->toDateString(), 'over_days' => $fix['over']],
-                );
-            } finally {
-                Tenant::clear();
+                Tenant::set($branch->id);
+                try {
+                    $logger->log(
+                        'subscription.update',
+                        "One renewal date: {$branch->name} brought back from ".$row['from']->format('d M Y').' to '.$row['to']->format('d M Y')
+                            ." — {$row['days']} days past the renewal date became {$row['free_renewals']} free renewal(s).",
+                        $branch,
+                        ['from' => $row['from']->toDateString(), 'to' => $row['to']->toDateString(), 'days' => $row['days'], 'free_renewals' => $row['free_renewals']],
+                    );
+                } finally {
+                    Tenant::clear();
+                }
+
+                $this->line("    ✓ {$branch->name}: ".$row['from']->format('d M Y').' → '.$row['to']->format('d M Y')." · +{$row['free_renewals']} free renewal(s)");
             }
-
-            $this->line("    ✓ {$branch->name}: ".$was->format('d M Y').' → '.$fix['to']->format('d M Y'));
         }
 
         // 2. Account anchors + status, from the corrected mirrors.
-        $billing = app(\App\Services\Billing\AccountBillingService::class);
         $anchorsMoved = 0;
         foreach (SubscriptionAccount::cursor() as $account) {
             $before = $account->current_period_end?->toDateString();
@@ -191,6 +207,10 @@ class AuditCoverage extends Command
             $start = $period->cycleStart($account->current_period_end);
             $was = $account->current_period_start?->toDateString();
 
+            if ($was === $start->toDateString()) {
+                continue;   // already right once the dates above were corrected
+            }
+
             $account->forceFill(['current_period_start' => $start])->save();
             $startsFixed++;
 
@@ -206,7 +226,7 @@ class AuditCoverage extends Command
         }
 
         $this->line('');
-        $this->info("  Corrected: ".count($coverage).' branch coverage · '.$anchorsMoved.' anchor(s) · '.$startsFixed.' cycle start(s).');
+        $this->info("  Corrected: {$done} branch(es) onto their renewal date · {$anchorsMoved} anchor(s) · {$startsFixed} cycle start(s).");
         $this->line('  Re-run without --fix to confirm the ledger is clean.');
         $this->line('');
 
@@ -326,8 +346,6 @@ class AuditCoverage extends Command
             $pastDays += $over - $future;
             $futureValue += $value;
 
-            // What --fix would set this branch to.
-            $this->fixes['coverage'][] = ['branch' => $branch, 'to' => $paidUpTo, 'over' => $over];
 
             $findings[] = [
                 $branch->name,
@@ -560,6 +578,44 @@ class AuditCoverage extends Command
     // -----------------------------------------------------------------
 
     /** @param  array<int, array<int, mixed>>  $findings */
+    // -----------------------------------------------------------------
+    // 6. Past the renewal date (doc 22)
+    // -----------------------------------------------------------------
+
+    /**
+     * Branches holding coverage past their account's renewal date — old gifts, hand
+     * edits, double-stamps. Each one splits the account's single date. Read-only here
+     * (a dry run of the fold); --fix turns the excess into free renewals.
+     */
+    private function checkPastRenewalDate(): void
+    {
+        $this->components->twoColumnDetail('<options=bold>6. Branches past their renewal date</>', 'one date');
+
+        $billing = app(\App\Services\Billing\AccountBillingService::class);
+        $findings = [];
+
+        foreach (SubscriptionAccount::with('owner')->cursor() as $account) {
+            foreach ($billing->foldGiftsIntoFreeRenewals($account, dryRun: true) as $row) {
+                $findings[] = [
+                    $row['branch']->name,
+                    $account->owner?->name ?? '—',
+                    $row['to']->format('d M Y'),
+                    $row['from']->format('d M Y'),
+                    $row['days'],
+                    $row['free_renewals'],
+                ];
+            }
+        }
+
+        if ($findings) {
+            $this->line('     Each one moves its account\'s renewal date. --fix brings it back to the date and');
+            $this->line('     keeps the time as free renewals.');
+        }
+
+        $this->render($findings, ['Branch', 'Owner', 'Renewal date', 'Covered to', 'Days past', 'Free renewals'],
+            'Every branch ends on its account\'s renewal date.');
+    }
+
     private function render(array $findings, array $headers, string $cleanMessage): void
     {
         if (! $findings) {

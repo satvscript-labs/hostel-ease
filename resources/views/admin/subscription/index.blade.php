@@ -257,6 +257,9 @@
                                         default => $branch->isActive() ? ($behind ? ['warning', __('Behind')] : ['success', __('Active')]) : ['danger', __('Expired')],
                                     })
                                     <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
+                                    @if($branch->free_renewals > 0 && ! $branch->isCancelled())
+                                        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1"><i class="fa-solid fa-gift me-1"></i>{{ $branch->free_renewals === 1 ? __('Next renewal free') : __(':n renewals free', ['n' => $branch->free_renewals]) }}</span>
+                                    @endif
 
                                     {{-- Bring a behind branch onto the renewal date, at the price
                                          the operator would quote — the same function prices both. --}}
@@ -383,6 +386,9 @@
                             <span class="text-muted"><span x-text="q().quantity"></span> {{ __('branch(es)') }} × <span x-text="money(q().unit)"></span></span>
                             <span class="fw-semibold" x-text="money(q().subtotal)"></span>
                         </div>
+                        <template x-for="c in (q().complimentary || [])" :key="c.name">
+                            <div class="d-flex justify-content-between mb-1 text-success"><span><i class="fa-solid fa-gift me-1"></i>{{ __('Free renewal') }} · <span x-text="c.name"></span></span><span x-text="'−' + money(c.amount)"></span></div>
+                        </template>
                         <template x-if="q().volume > 0">
                             <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Multi-branch discount') }}</span><span x-text="'−' + money(q().volume)"></span></div>
                         </template>
@@ -514,7 +520,7 @@ document.addEventListener('alpine:init', () => {
         quotes: @json($quotes),
         add: { name: '', city: '' },
 
-        money(v) { return '₹' + Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); },
+        money(v) { const n = Number(v || 0); return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2, maximumFractionDigits: 2 }); },
         q() { return this.quotes[this.period]; },
         openRenew() { this.renewOpen = true; },
         openAdd() { this.add = { name: '', city: '' }; this.addOpen = true; },

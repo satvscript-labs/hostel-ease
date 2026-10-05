@@ -216,14 +216,30 @@ class BranchRemovalTest extends TestCase
     // Case 8 — the cancelled branch holds the furthest date
     // -----------------------------------------------------------------
 
+    /** A ₹0 gift line, as an old comp or back-fill left behind (no service makes one past the date any more). */
+    protected function giftLine(\App\Models\SubscriptionAccount $account, \App\Models\Hostel $branch, $end, string $kind = 'comp'): void
+    {
+        $order = \App\Models\SubscriptionOrder::create([
+            'account_id' => $account->id, 'period' => 'yearly', 'kind' => $kind, 'quantity' => 1,
+            'subtotal' => 0, 'discount_total' => 0, 'amount' => 0, 'payment_status' => 'paid',
+            'payment_method' => $kind === 'comp' ? 'comp' : null, 'collection' => 'offline', 'remarks' => 'Test gift',
+        ]);
+        \App\Models\SubscriptionOrderLine::create([
+            'order_id' => $order->id, 'branch_id' => $branch->id, 'amount' => 0,
+            'start_date' => now(), 'end_date' => $end,
+        ]);
+        app(\App\Services\Billing\CoverageMirror::class)->sync($account->fresh());
+        app(\App\Services\Billing\AccountBillingService::class)->refreshAccountAnchor($account->fresh());
+    }
+
     public function test_case_8_a_leaving_branch_does_not_hold_the_anchor_open(): void
     {
         [, $branches, $account] = $this->owner(2);
         $leaving = $branches->first();
         $staying = $branches->last();
 
-        // Give the leaver extra run-out time, so it is the furthest-dated branch.
-        $this->billing()->comp($account->fresh(), 'yearly', 1, [$leaving->id], 'goodwill run-out');
+        // The leaver holds the furthest date (old gifted time — no gift does this any more).
+        $this->giftLine($account->fresh(), $leaving->fresh(), $leaving->fresh()->subscription_end->copy()->addYear());
         $this->assertTrue($leaving->fresh()->subscription_end->greaterThan($staying->fresh()->subscription_end));
 
         $this->billing()->cancelBranch($leaving->fresh(), 'leaving');
@@ -351,20 +367,6 @@ class BranchRemovalTest extends TestCase
         $this->assertSame(0, $align['count'], 'Align offered to top up a branch that is leaving.');
     }
 
-    public function test_case_13_a_cancelled_branch_can_still_be_comped(): void
-    {
-        [, $branches, $account] = $this->owner(2);
-        $leaving = $branches->first();
-        $this->billing()->cancelBranch($leaving, 'leaving');
-        $endBefore = $leaving->fresh()->subscription_end;
-
-        $this->billing()->comp($account->fresh(), 'monthly', 2, [$leaving->id], 'two months on us');
-
-        $this->assertTrue($leaving->fresh()->subscription_end->greaterThan($endBefore));
-        // Gifted time does not put it back in the bill.
-        $this->assertSame(1, $this->billing()->includedBranches($account->fresh())->count());
-    }
-
     public function test_case_14_suspension_and_cancellation_are_independent(): void
     {
         [, $branches, $account] = $this->owner(2);
@@ -464,7 +466,7 @@ class BranchRemovalTest extends TestCase
         $this->assertCount(1, $pending);
 
         // A ₹0 grant is never "owed", so it must not show up as one.
-        $this->billing()->comp($account->fresh(), 'yearly', 1, [$branch->id], 'gift');
+        $this->billing()->extendRenewalDate($account->fresh(), 1, 'months', 'gift');
         $this->assertCount(1, $this->billing()->pendingOrdersForBranch($branch->fresh()));
     }
 

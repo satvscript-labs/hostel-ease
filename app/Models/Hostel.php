@@ -65,6 +65,9 @@ class Hostel extends Model
             'settings' => 'array',
             'curfew_notify' => 'boolean',
             'curfew_notified_at' => 'datetime',
+            // Gifts (doc 22): upcoming renewals of this branch that cost ₹0. Not in
+            // $fillable on purpose — only AccountBillingService sets it.
+            'free_renewals' => 'integer',
             // Branch removal (D11). Not in $fillable on purpose: only
             // AccountBillingService's request/cancel/restore methods may set these,
             // so no form or mass-assignment can change what a customer is billed.

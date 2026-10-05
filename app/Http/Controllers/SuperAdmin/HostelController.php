@@ -258,7 +258,7 @@ class HostelController extends Controller
     {
         $data = $request->safe()->only([
             'name', 'owner_name', 'mobile', 'email', 'address', 'city', 'state',
-            'gst_number', 'subscription_start', 'subscription_end', 'status',
+            'gst_number', 'status',   // never coverage dates — billing owns those (doc 22)
         ]);
 
         // The hostel mobile doubles as the owner's LOGIN username and as the

@@ -94,11 +94,14 @@ class LedgerSpineTest extends TestCase
         $this->billing()->addBranch($account->fresh(), $late, ['payment_status' => 'paid', 'payment_method' => 'cash']);
         $this->assertMirrorsMatchLedger($branches->concat([$late]));
 
-        // Align, comp, and a bare trial.
+        // Align, the two gifts (extend the date; a free renewal used by a renewal).
         $behind = $branches->first();
         $behind->forceFill(['subscription_end' => now()->addDays(5)])->save();
         $this->billing()->align($account->fresh(), ['payment_status' => 'paid', 'payment_method' => 'cash']);
-        $this->billing()->comp($account->fresh(), 'monthly', 2, [$branches->last()->id], 'goodwill');
+        $this->billing()->extendRenewalDate($account->fresh(), 2, 'months', 'goodwill');
+        $this->assertMirrorsMatchLedger($branches->concat([$late]));
+        $this->billing()->setFreeRenewals($account->fresh(), [$branches->last()->id], 1);
+        $this->billing()->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid', 'payment_method' => 'cash']);
         $this->assertMirrorsMatchLedger($branches->concat([$late]));
     }
 
@@ -120,7 +123,7 @@ class LedgerSpineTest extends TestCase
         [, $branches, $account] = $this->account(2);
 
         $this->billing()->renewAccount($account->fresh(), 'monthly', ['payment_status' => 'paid', 'payment_method' => 'upi']);
-        $this->billing()->comp($account->fresh(), 'yearly', 1, [$branches->first()->id], 'gift');
+        $this->billing()->extendRenewalDate($account->fresh(), 1, 'months', 'gift');
         $this->billing()->align($account->fresh(), ['payment_status' => 'paid']);
         // A trial, through the only path one can now take: a brand-new account's
         // first branch (one free trial per account — owner decision, 2026-10-04).
@@ -130,25 +133,6 @@ class LedgerSpineTest extends TestCase
         $this->billing()->recordBranchRenewal($firstBranch, 'trial', ['payment_status' => 'paid']);
 
         $this->assertSame(0, Subscription::count(), 'Something still writes the retired legacy ledger (D8).');
-    }
-
-    public function test_an_operator_hand_edit_becomes_an_adjustment_order_and_survives_a_sync(): void
-    {
-        [, $branches, $account] = $this->account(1);
-        $branch = $branches->first();
-        $newEnd = now()->addYears(2)->startOfDay();
-
-        $order = $this->billing()->adjustCoverage($branch, $newEnd, 'goodwill after the outage');
-
-        $this->assertSame(OrderKind::Adjustment, $order->kind);
-        $this->assertSame(0.0, (float) $order->amount);
-        $this->assertSame($newEnd->toDateString(), $branch->fresh()->subscription_end->toDateString());
-
-        // The point of minting an order: the projection agrees, so the next sync
-        // keeps the hand-moved date instead of reverting it.
-        app(CoverageMirror::class)->sync($account->fresh(), allowShorten: true);
-        $this->assertSame($newEnd->toDateString(), $branch->fresh()->subscription_end->toDateString());
-        $this->assertMirrorsMatchLedger($branches);
     }
 
     public function test_line_amounts_sum_exactly_to_the_order_total(): void
@@ -177,7 +161,7 @@ class LedgerSpineTest extends TestCase
         $this->assertSame(OrderKind::Renewal, $renewal->kind);
         $this->assertSame('offline', $renewal->collection->value);
 
-        $comp = $this->billing()->comp($account->fresh(), 'yearly', 1, [$branches->first()->id], 'gift');
+        $comp = $this->billing()->extendRenewalDate($account->fresh(), 1, 'months', 'gift');
         $this->assertSame(OrderKind::Comp, $comp->kind);
 
         // An online charge is stamped by the presence of a Razorpay order id.
@@ -185,6 +169,22 @@ class LedgerSpineTest extends TestCase
             'payment_status' => 'paid', 'payment_method' => 'online', 'razorpay_order_id' => 'order_x1',
         ]);
         $this->assertSame('checkout', $online->collection->value);
+    }
+
+    /** A ₹0 gift line, as an old comp or back-fill left behind (no service makes one past the date any more). */
+    protected function giftLine(\App\Models\SubscriptionAccount $account, \App\Models\Hostel $branch, $end, string $kind = 'comp'): void
+    {
+        $order = \App\Models\SubscriptionOrder::create([
+            'account_id' => $account->id, 'period' => 'yearly', 'kind' => $kind, 'quantity' => 1,
+            'subtotal' => 0, 'discount_total' => 0, 'amount' => 0, 'payment_status' => 'paid',
+            'payment_method' => $kind === 'comp' ? 'comp' : null, 'collection' => 'offline', 'remarks' => 'Test gift',
+        ]);
+        \App\Models\SubscriptionOrderLine::create([
+            'order_id' => $order->id, 'branch_id' => $branch->id, 'amount' => 0,
+            'start_date' => now(), 'end_date' => $end,
+        ]);
+        app(\App\Services\Billing\CoverageMirror::class)->sync($account->fresh());
+        app(\App\Services\Billing\AccountBillingService::class)->refreshAccountAnchor($account->fresh());
     }
 
     public function test_receivables_count_only_what_is_actually_owed(): void
@@ -195,9 +195,9 @@ class LedgerSpineTest extends TestCase
         $this->billing()->recordBranchRenewal($branches->first(), 'yearly', [
             'amount' => 10000, 'payment_status' => 'pending', 'payment_method' => 'cash',
         ]);
-        // Not owed: a ₹0 gift and a ₹0 correction, even if either were left pending.
-        $this->billing()->comp($account->fresh(), 'yearly', 1, [$branches->first()->id], 'gift');
-        $this->billing()->adjustCoverage($branches->first()->fresh(), now()->addYears(3), 'correction');
+        // Not owed: a ₹0 gift and a ₹0 correction.
+        $this->billing()->extendRenewalDate($account->fresh(), 1, 'months', 'gift');
+        $this->giftLine($account->fresh(), $branches->first()->fresh(), now()->addYears(3), 'adjustment');
 
         $this->assertSame(10000.0, (float) SubscriptionOrder::outstanding()->sum('amount'));
         $this->assertSame(1, SubscriptionOrder::outstanding()->count());

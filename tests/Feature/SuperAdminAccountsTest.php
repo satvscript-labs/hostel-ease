@@ -71,10 +71,10 @@ class SuperAdminAccountsTest extends TestCase
             ->assertSee('Renew all branches')
             ->assertSee('Add branch to cycle')
             ->assertSee('Align branches to renewal date')
-            ->assertSee('Complimentary coverage')
+            ->assertSee('Give free time')
             ->assertSee('he-summary', false)
             ->assertSee('renewSummary', false)
-            ->assertSee('compBranches', false);
+            ->assertSee('giftBranches', false);
     }
 
     public function test_renew_all_advances_the_anchor_and_records_an_order(): void
@@ -135,10 +135,10 @@ class SuperAdminAccountsTest extends TestCase
         $this->assertDatabaseHas('discounts', ['account_id' => $account->id, 'recurrence' => 'every_renewal', 'status' => 'active']);
 
         $branchIds = $account->owner->hostels->pluck('id')->all();
-        $this->actingAs($super)->post(route('superadmin.accounts.comp', $account), [
-            'period' => 'yearly', 'multiplier' => 1, 'branches' => $branchIds, 'reason' => 'goodwill',
+        $this->actingAs($super)->post(route('superadmin.accounts.free-renewals', $account), [
+            'branches' => $branchIds, 'count' => 1, 'reason' => 'goodwill',
         ])->assertRedirect();
-        $this->assertDatabaseHas('subscription_orders', ['account_id' => $account->id, 'amount' => 0, 'payment_method' => 'comp']);
+        $this->assertSame(count($branchIds), \App\Models\Hostel::whereIn('id', $branchIds)->where('free_renewals', 1)->count());
 
         $this->actingAs($super)->post(route('superadmin.accounts.override', $account), ['unit_price_override_yearly' => 8000])->assertRedirect();
         $this->assertSame('8000.00', (string) $account->fresh()->unit_price_override_yearly);

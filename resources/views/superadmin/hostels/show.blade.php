@@ -287,13 +287,9 @@
                     'suspended' => 'Suspended',
                 ]" />
             </div>
-            <div class="col-md-4">
-                <label class="form-label fw-bold small text-muted">VALID FROM</label>
-                <input type="date" name="subscription_start" value="{{ old('subscription_start', optional($hostel->subscription_start)->format('Y-m-d')) }}" class="form-control bg-white border shadow-sm" required>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-bold small text-muted">VALID UNTIL</label>
-                <input type="date" name="subscription_end" value="{{ old('subscription_end', optional($hostel->subscription_end)->format('Y-m-d')) }}" class="form-control bg-white border shadow-sm" required>
+            {{-- Coverage dates follow the account's renewal date (doc 22) — not a form field. --}}
+            <div class="col-md-8 d-flex align-items-end">
+                <div class="small text-muted"><i class="fa-solid fa-calendar-check me-1"></i>Coverage{{ $hostel->subscription_end ? ' until '.$hostel->subscription_end->format('d M Y') : '' }} follows the customer's renewal date — change it from their account.</div>
             </div>
         </div>
 

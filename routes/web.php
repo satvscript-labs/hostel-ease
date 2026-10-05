@@ -167,7 +167,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('accounts/{account}/add-branch', [AccountController::class, 'addBranch'])->name('accounts.add-branch');
         Route::post('accounts/{account}/add-hostel', [AccountController::class, 'addHostel'])->name('accounts.add-hostel');
         Route::post('accounts/{account}/align', [AccountController::class, 'align'])->name('accounts.align');
-        Route::post('accounts/{account}/comp', [AccountController::class, 'comp'])->name('accounts.comp');
+        Route::post('accounts/{account}/free-renewals', [AccountController::class, 'freeRenewals'])->name('accounts.free-renewals');
+        Route::post('accounts/{account}/extend', [AccountController::class, 'extendRenewalDate'])->name('accounts.extend');
         Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
         Route::post('accounts/{account}/billing-mode', [AccountController::class, 'billingMode'])->name('accounts.billing-mode');
         Route::post('accounts/{account}/suspend', [AccountController::class, 'suspend'])->name('accounts.suspend');

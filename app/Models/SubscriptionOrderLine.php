@@ -15,6 +15,7 @@ class SubscriptionOrderLine extends Model
         'order_id',
         'branch_id',
         'amount',
+        'complimentary',   // used one of the branch's free renewals (doc 22)
         'start_date',
         'end_date',
     ];
@@ -23,6 +24,7 @@ class SubscriptionOrderLine extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'complimentary' => 'boolean',
             'start_date' => 'date',
             'end_date' => 'date',
         ];

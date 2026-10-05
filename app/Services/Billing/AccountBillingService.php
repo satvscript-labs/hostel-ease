@@ -369,6 +369,9 @@ class AccountBillingService
                 'remarks' => $payment['remarks'] ?? $order->remarks,
             ]);
 
+            // A free renewal is used when the renewal is PAID, never when it is quoted.
+            $this->spendFreeRenewals($order);
+
             $account = $order->account;
             if ($account) {
                 $this->mirror->sync($account);
@@ -423,6 +426,11 @@ class AccountBillingService
     public function voidOrder(SubscriptionOrder $order, string $reason): SubscriptionOrder
     {
         return DB::transaction(function () use ($order, $reason) {
+            // Voiding a PAID renewal hands back the free renewals it used.
+            if ($order->payment_status === PaymentStatus::Paid) {
+                $this->spendFreeRenewals($order, refund: true);
+            }
+
             $order->update([
                 'payment_status' => PaymentStatus::Voided->value,
                 'remarks' => trim(($order->remarks ? $order->remarks.' · ' : '')."Voided: {$reason}"),
@@ -438,38 +446,6 @@ class AccountBillingService
             }
 
             return $order->fresh();
-        });
-    }
-
-    /**
-     * An operator hand-edits a branch's coverage end date (BRD P1, manual-first).
-     *
-     * Coverage is a projection over order lines in S1, so a bare column write would
-     * be undone by the next sync. Instead the edit mints a ₹0 `adjustment` order
-     * carrying the new date, which means: the projection still holds, and every
-     * hand-moved date leaves a row in the ledger — not just the activity log —
-     * which is what you want the first time a customer argues about a date.
-     */
-    public function adjustCoverage(Hostel $branch, Carbon $newEnd, string $reason, ?Carbon $newStart = null): SubscriptionOrder
-    {
-        $account = $this->accountForBranch($branch);
-
-        if (! $account) {
-            throw new RuntimeException("Cannot adjust branch #{$branch->id}: no owner account could be resolved.");
-        }
-
-        return DB::transaction(function () use ($account, $branch, $newEnd, $newStart, $reason) {
-            $order = $this->makeOrder($account, BillingPeriod::Trial, 1, 0, 0, 0, [
-                'payment_status' => PaymentStatus::Paid->value,
-                'remarks' => "Coverage adjusted by hand: {$reason}",
-            ], OrderKind::Adjustment);
-
-            $this->addLine($order, $branch, 0, $newEnd, $newStart ?? $branch->subscription_start ?? Carbon::now());
-
-            $this->mirror->sync($account);
-            $this->refreshAccountAnchor($account);
-
-            return $order;
         });
     }
 
@@ -627,7 +603,14 @@ class AccountBillingService
             : Carbon::now();
         $newAnchor = $bp->extend($base);
 
-        $breakdown = $this->discounts->preview($account, $subtotal, $quantity, 'renewal');
+        // FREE RENEWALS (doc 22): a branch holding one renews for ₹0. Its share of
+        // the term is taken off before the engine prices the rest; the volume tier
+        // still counts every branch on the plan.
+        $complimentary = $branches->filter(fn (Hostel $b) => (int) $b->free_renewals > 0)
+            ->map(fn (Hostel $b) => ['branch' => $b, 'amount' => $unit])->values()->all();
+        $complimentaryTotal = round(count($complimentary) * $unit, 2);
+
+        $breakdown = $this->discounts->preview($account, max(0, $subtotal - $complimentaryTotal), $quantity, 'renewal');
         $topups = $this->renewalTopUps($account, $branches);
         $topupTotal = round(array_sum(array_column($topups, 'amount')), 2);
 
@@ -635,8 +618,11 @@ class AccountBillingService
             'period' => $bp,
             'quantity' => $quantity,
             'unit' => $unit,
-            // The TERM: N branches × unit, and its discounts.
+            // The TERM: N branches × unit; free renewals off it; then its discounts
+            // (breakdown is the engine's view of what is left to pay).
             'subtotal' => $subtotal,
+            'complimentary' => $complimentary,
+            'complimentary_total' => $complimentaryTotal,
             'breakdown' => $breakdown,
             // Branches BEHIND the current renewal date, brought up to it first.
             'topups' => $topups,
@@ -723,7 +709,8 @@ class AccountBillingService
             $subtotal = round($quote['subtotal'] + $quote['topup_total'], 2);
             [$amount, $discountTotal] = $this->resolveCharge(
                 $subtotal,
-                ['final' => $quote['total'], 'discount_total' => $quote['breakdown']['discount_total']],
+                // Free renewals are recorded as discount: the invoice reads list − gifts − discounts = paid.
+                ['final' => $quote['total'], 'discount_total' => round($quote['complimentary_total'] + $quote['breakdown']['discount_total'], 2)],
                 $payment,
             );
 
@@ -757,7 +744,13 @@ class AccountBillingService
             // split of the term; each top-up keeps its own prorated figure. If the
             // operator lowered the total, every line is scaled down proportionally so
             // the lines still add up to what was charged.
-            $termShares = $this->allocate($quote['breakdown']['final'], $branches->count());
+            // A branch on a free renewal gets a ₹0 line marked complimentary; the paying
+            // branches share the term.
+            $freeIds = array_map(fn (array $c) => $c['branch']->id, $quote['complimentary']);
+            $paying = $branches->reject(fn (Hostel $b) => in_array($b->id, $freeIds, true))->values();
+            $paidShares = array_combine($paying->pluck('id')->all(), $this->allocate($quote['breakdown']['final'], $paying->count())) ?: [];
+            $termShares = $branches->values()->map(fn (Hostel $b) => $paidShares[$b->id] ?? 0.0)->all();
+
             $weights = array_merge($termShares, array_column($quote['topups'], 'amount'));
             $shares = abs(array_sum($weights) - $amount) < 0.005 ? $weights : $this->allocateProportionally($amount, $weights);
 
@@ -766,7 +759,7 @@ class AccountBillingService
                 // line should read 01 Oct 2027 → 01 Oct 2028 on the invoice, not
                 // 03 Oct 2026 → 01 Oct 2028, and acceptOrder() reads it back to
                 // advance current_period_start.
-                $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart);
+                $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart, in_array($branch->id, $freeIds, true));
             }
 
             // A TOP-UP line per behind branch: from where its coverage stops up to the
@@ -799,6 +792,7 @@ class AccountBillingService
                 ]);
 
                 $this->discounts->consume($quote['breakdown']['manual_discount_id']);
+                $this->spendFreeRenewals($order);
             }
 
             return $order;
@@ -1161,37 +1155,178 @@ class AccountBillingService
      *
      * @param  int[]  $branchIds
      */
-    public function comp(SubscriptionAccount $account, string $period, int $multiplier, array $branchIds, string $reason): SubscriptionOrder
-    {
-        return DB::transaction(function () use ($account, $period, $multiplier, $branchIds, $reason) {
-            $bp = $this->paidPeriod($period);
-            $multiplier = max(1, $multiplier);
+    // -----------------------------------------------------------------
+    // Gifts — one renewal date per account (doc 22)
+    // -----------------------------------------------------------------
+    //
+    // A gift never adds dates to one branch: the account's renewal date is the
+    // furthest coverage of any branch, so that moved the date for everyone and left
+    // the others "behind". Instead a gift is one of:
+    //
+    //   · free renewals      — these branches' next N renewals cost ₹0 (the default);
+    //   · extend renewal date — EVERY branch moves together (on a trial: extend trial);
+    //   · bring up to date free — a behind branch up to the date, ₹0 (Add to cycle).
 
-            // allBranches, not includedBranches: comping a CANCELLED branch is
-            // allowed (D11 case 13) — an operator may gift a leaving customer extra
-            // run-out time. It stays out of the billing quantity regardless.
-            $branches = $this->allBranches($account)
-                ->whereIn('id', $branchIds)
+    /**
+     * Set how many upcoming renewals of these branches are free. SETS, not adds — the
+     * same form corrects a mistake (0 removes them). Only branches still on the plan.
+     *
+     * @param  list<int>  $branchIds
+     * @return int how many branches changed
+     */
+    public function setFreeRenewals(SubscriptionAccount $account, array $branchIds, int $count): int
+    {
+        $count = max(0, min(10, $count));
+        $ids = $this->includedBranches($account)->pluck('id')->intersect($branchIds)->values()->all();
+
+        return Hostel::whereIn('id', $ids)->where('free_renewals', '!=', $count)->update(['free_renewals' => $count]);
+    }
+
+    /**
+     * Move the renewal date for the WHOLE account — every branch covered to it moves
+     * with it, so nothing is left out of line. On a running trial this extends the
+     * trial. A branch already behind stays behind: its gap is still owed.
+     */
+    public function extendRenewalDate(SubscriptionAccount $account, int $amount, string $unit, string $reason): SubscriptionOrder
+    {
+        $anchor = $account->current_period_end;
+        if (! $anchor || ! $anchor->copy()->endOfDay()->isFuture()) {
+            throw new RuntimeException('This account has no live renewal date to extend — renew it first.');
+        }
+        if ($amount < 1 || ($unit === 'months' ? $amount > 12 : $amount > 366)) {
+            throw new RuntimeException('Extend by 1–366 days or 1–12 months.');
+        }
+
+        return DB::transaction(function () use ($account, $anchor, $amount, $unit, $reason) {
+            $newAnchor = $unit === 'months' ? $anchor->copy()->addMonths($amount) : $anchor->copy()->addDays($amount);
+            $branches = $this->includedBranches($account)
+                ->filter(fn (Hostel $b) => $b->subscription_end && ! $b->subscription_end->lt($anchor))
                 ->values();
 
-            $order = $this->makeOrder($account, $bp, $branches->count(), 0, 0, 0, [
+            if ($branches->isEmpty()) {
+                throw new RuntimeException('No branch is covered up to the renewal date, so there is nothing to extend.');
+            }
+
+            $label = $amount.' '.($unit === 'months' ? \Illuminate\Support\Str::plural('month', $amount) : \Illuminate\Support\Str::plural('day', $amount));
+            $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, $branches->count(), 0, 0, 0, [
                 'payment_status' => PaymentStatus::Paid->value,
                 'payment_method' => PaymentMethod::Comp->value,
-                'remarks' => 'Complimentary '.$multiplier.'× '.$bp->label().' — '.$reason,
+                'remarks' => "Renewal date extended by {$label} — {$reason}",
             ], OrderKind::Comp);
 
             foreach ($branches as $branch) {
-                $base = $branch->subscription_end && $branch->subscription_end->isFuture()
-                    ? $branch->subscription_end->copy()
-                    : Carbon::now();
-                $newEnd = $bp === BillingPeriod::Monthly ? $base->addMonths($multiplier) : $base->addYears($multiplier);
-                $this->addLine($order, $branch, 0, $newEnd);
+                $this->addLine($order, $branch, 0, $newAnchor, $anchor->copy());
             }
 
             $this->mirror->sync($account);
-            $this->refreshAccountAnchor($account, $bp);
+            $this->refreshAccountAnchor($account);
 
             return $order;
+        });
+    }
+
+    /**
+     * Use (or, on void, hand back) the free renewals a paid renewal consumed.
+     * Idempotent per state change: called once when the order becomes paid, once when
+     * a paid order is voided.
+     */
+    protected function spendFreeRenewals(SubscriptionOrder $order, bool $refund = false): void
+    {
+        if ($order->kind !== OrderKind::Renewal) {
+            return;
+        }
+
+        $ids = $order->lines()->where('complimentary', true)->pluck('branch_id')->all();
+        if ($ids === []) {
+            return;
+        }
+
+        $refund
+            ? Hostel::whereIn('id', $ids)->where('free_renewals', '<', 255)->increment('free_renewals')
+            : Hostel::whereIn('id', $ids)->where('free_renewals', '>', 0)->decrement('free_renewals');
+    }
+
+    /**
+     * Bring an account onto ONE renewal date: coverage a branch holds past it from a
+     * gift (a comp, a hand edit, an old back-fill) becomes free renewals instead.
+     *
+     * The renewal date here is the furthest end of the lines the customer PAID for (or
+     * their trial) — gifts are what is being moved, so they cannot define it. Each
+     * branch past it is brought back to it and credited round(excess ÷ term) free
+     * renewals; the ₹0 gift lines that carried the excess are shortened to the date.
+     * An account with no paid or trial coverage at all is left exactly as it is.
+     *
+     * @return list<array{branch: Hostel, from: Carbon, to: Carbon, days: int, free_renewals: int}>
+     */
+    public function foldGiftsIntoFreeRenewals(SubscriptionAccount $account, bool $dryRun = false): array
+    {
+        return DB::transaction(function () use ($account, $dryRun) {
+            $branches = $this->includedBranches($account);
+            if ($branches->isEmpty()) {
+                return [];
+            }
+
+            $paidKinds = [OrderKind::Purchase->value, OrderKind::Renewal->value, OrderKind::AddBranch->value, OrderKind::Align->value, OrderKind::Trial->value];
+            $date = SubscriptionOrderLine::query()
+                ->join('subscription_orders', 'subscription_orders.id', '=', 'subscription_order_lines.order_id')
+                ->where('subscription_orders.account_id', $account->id)
+                ->where('subscription_orders.payment_status', PaymentStatus::Paid->value)
+                ->whereNull('subscription_orders.deleted_at')
+                ->whereIn('subscription_orders.kind', $paidKinds)
+                ->whereIn('subscription_order_lines.branch_id', $branches->pluck('id'))
+                ->max('subscription_order_lines.end_date');
+
+            if (! $date) {
+                return [];
+            }
+
+            $date = Carbon::parse($date)->startOfDay();
+            $termDays = $account->period === BillingPeriod::Monthly ? 30 : 365;
+            $folded = [];
+
+            foreach ($branches as $branch) {
+                if (! $branch->subscription_end || ! $branch->subscription_end->copy()->startOfDay()->greaterThan($date)) {
+                    continue;
+                }
+
+                $days = (int) $date->diffInDays($branch->subscription_end->copy()->startOfDay());
+                $credits = (int) round($days / $termDays);
+                $row = ['branch' => $branch, 'from' => $branch->subscription_end->copy(), 'to' => $date->copy(), 'days' => $days, 'free_renewals' => $credits];
+
+                if ($dryRun) {
+                    $folded[] = $row;
+
+                    continue;
+                }
+
+                // Shorten the ₹0 gift lines that reach past the date. A paid line never
+                // does — the date is the furthest paid end.
+                $giftLines = SubscriptionOrderLine::query()
+                    ->where('branch_id', $branch->id)
+                    ->whereDate('end_date', '>', $date)
+                    ->whereHas('order', fn ($q) => $q->where('account_id', $account->id)->whereNotIn('kind', $paidKinds))
+                    ->get();
+                foreach ($giftLines as $line) {
+                    $line->update([
+                        'end_date' => $date,
+                        'start_date' => $line->start_date && $line->start_date->greaterThan($date) ? $date : $line->start_date,
+                    ]);
+                }
+
+                if ($credits > 0) {
+                    $branch->forceFill(['free_renewals' => min(255, (int) $branch->free_renewals + $credits)])->save();
+                }
+
+                $folded[] = $row;
+            }
+
+            if ($folded !== [] && ! $dryRun) {
+                // Deliberately shortening: the gift is now held as free renewals.
+                $this->mirror->sync($account, allowShorten: true);
+                $this->refreshAccountAnchor($account);
+            }
+
+            return $folded;
         });
     }
 
@@ -1428,7 +1563,7 @@ class AccountBillingService
      * must record the longer date, or the projection would shorten it on the next
      * sync. The ledger has to be the whole truth, not most of it.
      */
-    protected function addLine(SubscriptionOrder $order, Hostel $branch, float $amount, Carbon $end, ?Carbon $start = null): SubscriptionOrderLine
+    protected function addLine(SubscriptionOrder $order, Hostel $branch, float $amount, Carbon $end, ?Carbon $start = null, bool $complimentary = false): SubscriptionOrderLine
     {
         $end = ($branch->subscription_end && $branch->subscription_end->greaterThan($end))
             ? $branch->subscription_end->copy()
@@ -1438,6 +1573,7 @@ class AccountBillingService
             'order_id' => $order->id,
             'branch_id' => $branch->id,
             'amount' => round($amount, 2),
+            'complimentary' => $complimentary,
             'start_date' => $start ?? Carbon::now(),
             'end_date' => $end,
         ]);

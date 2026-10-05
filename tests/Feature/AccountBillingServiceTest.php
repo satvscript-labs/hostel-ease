@@ -231,39 +231,6 @@ class AccountBillingServiceTest extends TestCase
         $this->assertEqualsWithDelta((float) $order->subtotal - (float) $order->discount_total, (float) $order->amount, 0.01);
     }
 
-    public function test_comp_grants_zero_rupee_coverage(): void
-    {
-        [$owner, $branches] = $this->ownerWithBranches([now()->addMonth()]);
-        $account = SubscriptionAccount::create([
-            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonth(),
-        ]);
-
-        $order = $this->service()->comp($account, 'yearly', 1, $branches->pluck('id')->all(), 'goodwill for a friend');
-
-        $this->assertSame('0.00', (string) $order->amount);
-        $this->assertDatabaseHas('subscription_orders', ['id' => $order->id, 'payment_method' => 'comp', 'payment_status' => 'paid']);
-    }
-
-    public function test_comp_multiplier_extends_selected_branch_by_n_terms(): void
-    {
-        // Two branches; comp only the first, by 5 months. It gains exactly 5 months
-        // from its own end; the second branch is untouched.
-        [$owner, $branches] = $this->ownerWithBranches([now()->addMonths(2), now()->addMonths(2)]);
-        $account = SubscriptionAccount::create([
-            'owner_id' => $owner->id, 'period' => 'yearly', 'status' => 'active', 'current_period_end' => now()->addMonths(2),
-        ]);
-        $first = $branches->first();
-        $second = $branches->last();
-        $expected = $first->subscription_end->copy()->addMonths(5)->toDateString();
-
-        $order = $this->service()->comp($account, 'monthly', 5, [$first->id], 'loyalty gift');
-
-        $this->assertSame('0.00', (string) $order->amount);
-        $this->assertSame(1, $order->quantity);                                         // only one branch comped
-        $this->assertSame($expected, $first->fresh()->subscription_end->toDateString()); // +5 months
-        $this->assertSame(now()->addMonths(2)->toDateString(), $second->fresh()->subscription_end->toDateString()); // untouched
-    }
-
     public function test_custom_price_is_per_period_and_does_not_leak(): void
     {
         // A custom YEARLY price must not change the MONTHLY unit price, and vice-versa.

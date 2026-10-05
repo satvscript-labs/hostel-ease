@@ -11,7 +11,8 @@
 @props(['data'])
 @pushOnce('scripts')
 <script>
-    window.heMoney = (v) => '₹' + Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    // Whole rupees stay whole; anything with paise always shows two digits (₹74,972.60, never ₹74,972.6).
+    window.heMoney = (v) => { const n = Number(v || 0); return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2, maximumFractionDigits: 2 }); };
 </script>
 @endPushOnce
 @pushOnce('styles')

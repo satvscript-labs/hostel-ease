@@ -320,14 +320,14 @@ class AccountController extends Controller
         $trialJoinable = $this->billing->trialJoinable($account);
         $alignBehind = $trialJoinable ? 0 : $alignRaw['count'];
 
-        // Branch data for the Comp modal (checkbox tiles + live gift preview).
-        $compBranches = $branches->map(fn ($b) => [
+        // "Give free time" (doc 22): the branches on the plan with what each holds now,
+        // and whether the renewal date can be extended (it needs a live date).
+        $giftBranches = $billable->map(fn (Hostel $b) => [
             'id' => $b->id,
             'name' => $b->name,
-            'end' => optional($b->subscription_end)->toDateString(),
-            'endLabel' => optional($b->subscription_end)->format('d M Y') ?? 'No coverage',
+            'free' => (int) $b->free_renewals,
         ])->values()->all();
-        $compBranchIds = $branches->pluck('id')->all();
+        $canExtend = (bool) $account->current_period_end?->copy()->endOfDay()->isFuture();
 
         // Add-hostel-to-owner quote (a brand-new branch): prorate to the anchor at
         // the account's own cadence when the cycle is live (discount-aware), else a
@@ -368,7 +368,7 @@ class AccountController extends Controller
         $ownerOpenCharges = $account->orders()->outstanding()
             ->where('collection', CollectionMethod::Checkout->value)->count();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'giftBranches', 'canExtend', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -416,6 +416,10 @@ class AccountController extends Controller
                 'days' => $t['days'],
                 'amount' => round((float) $t['amount'], 2),
             ])->values()->all(),
+            'complimentary' => collect($q['complimentary'])->map(fn (array $c) => [
+                'name' => $c['branch']->name,
+                'amount' => round((float) $c['amount'], 2),
+            ])->values()->all(),
             'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
         ];
@@ -430,6 +434,8 @@ class AccountController extends Controller
             'collect' => ['nullable', Rule::in(['offline', 'link'])],
             'payment_method' => ['nullable', Rule::in(['cash', 'upi', 'cheque', 'rtgs', 'online', 'comp'])],
             'remarks' => ['nullable', 'string', 'max:500'],
+            // "Bring up to date free" (doc 22): ₹0, recorded as a gift, no link.
+            'complimentary' => ['nullable', 'boolean'],
         ]);
 
         $branch = Hostel::findOrFail($data['branch_id']);
@@ -446,6 +452,24 @@ class AccountController extends Controller
             $this->logger->log('subscription.update', "Added {$branch->name} to the free trial", $branch);
 
             return back()->with('success', "{$branch->name} joined the free trial — it works until ".$account->current_period_end->format('d M Y').'.');
+        }
+
+        if ($data['complimentary'] ?? false) {
+            // Only up to a LIVE renewal date: without one, a free branch would set the
+            // account's date on its own.
+            if (! $account->current_period_end?->isFuture()) {
+                return back()->with('error', 'There is no live renewal date to bring this branch up to — renew the account first.');
+            }
+
+            $this->billing->addBranch($account, $branch, [
+                'amount' => 0, 'payment_status' => 'paid', 'payment_method' => 'comp',
+                'kind' => \App\Enums\OrderKind::Comp,
+                'remarks' => trim('Brought up to date free'.(($data['remarks'] ?? '') !== '' ? ' — '.$data['remarks'] : '')),
+            ]);
+            $this->paymentLinks->cancelOvertakenLinks($account);
+            $this->logger->log('subscription.update', "{$branch->name} brought up to the renewal date free", $branch);
+
+            return back()->with('success', "{$branch->name} is now covered to ".$account->current_period_end->format('d M Y').', free.');
         }
 
         try {
@@ -615,29 +639,49 @@ class AccountController extends Controller
         return back()->with('success', "Aligned {$order->quantity} branch(es) to the renewal date.");
     }
 
-    /** Complimentary (₹0) grant — N terms to selected branches. */
-    public function comp(Request $request, SubscriptionAccount $account): RedirectResponse
+    /**
+     * Gift, the default way: these branches' next N renewals are free. Sets the count
+     * (0 removes it), so the same form corrects a mistake.
+     */
+    public function freeRenewals(Request $request, SubscriptionAccount $account): RedirectResponse
     {
         $data = $request->validate([
-            'period' => ['required', Rule::in(['yearly', 'monthly'])],
-            'multiplier' => ['required', 'integer', 'min:1', 'max:60'],
             'branches' => ['required', 'array', 'min:1'],
             'branches.*' => ['integer'],
+            'count' => ['required', 'integer', 'min:0', 'max:10'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $changed = $this->billing->setFreeRenewals($account, array_map('intval', $data['branches']), (int) $data['count']);
+        $what = (int) $data['count'] === 0 ? 'Free renewals removed' : "{$data['count']} free renewal(s) set";
+        $this->logger->log('subscription.update', "{$what} for {$changed} branch(es)".(($data['reason'] ?? '') !== '' ? " — {$data['reason']}" : ''), $account);
+
+        return back()->with('success', $changed === 0
+            ? 'Nothing changed — those branches already had that.'
+            : "{$what} for {$changed} ".\Illuminate\Support\Str::plural('branch', $changed).'. Applied at the next renewal.');
+    }
+
+    /** Gift for the whole account: move the renewal date for every branch together. */
+    public function extendRenewalDate(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate([
+            'amount' => ['required', 'integer', 'min:1', 'max:366'],
+            'unit' => ['required', Rule::in(['days', 'months'])],
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        // Only branches this owner actually holds may be comped.
-        $branchIds = array_values(array_intersect(
-            array_map('intval', $data['branches']),
-            $account->owner?->accessibleHostelIds() ?? [],
-        ));
-        abort_unless(count($branchIds) > 0, 422);
+        $from = $account->current_period_end?->format('d M Y');
+        try {
+            $this->billing->extendRenewalDate($account, (int) $data['amount'], $data['unit'], $data['reason']);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', Refusal::message($e));
+        }
 
-        $order = $this->billing->comp($account, $data['period'], (int) $data['multiplier'], $branchIds, $data['reason']);
-        $this->paymentLinks->cancelOvertakenLinks($account, $order->id);
-        $this->logger->log('subscription.paid', "Comp granted ({$data['multiplier']}× {$data['period']}, {$order->quantity} branch(es)) — {$data['reason']}", $order);
+        $to = $account->fresh()->current_period_end?->format('d M Y');
+        $this->paymentLinks->cancelOvertakenLinks($account);
+        $this->logger->log('subscription.update', "Renewal date extended {$from} → {$to} — {$data['reason']}", $account);
 
-        return back()->with('success', 'Complimentary coverage granted.');
+        return back()->with('success', "Renewal date moved from {$from} to {$to} for every branch.");
     }
 
     /** Set or clear a bespoke per-account unit price. */

@@ -206,7 +206,7 @@
                 <div class="dropdown">
                     <button class="btn btn-outline-light rounded-pill px-3 fw-bold" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2">
-                        <li><button class="dropdown-item rounded-3 py-2" @click="compOpen = true"><i class="fa-solid fa-gift text-primary me-2"></i>Comp (free coverage)</button></li>
+                        <li><button class="dropdown-item rounded-3 py-2" @click="giftOpen = true; giftMode = 'renewals'"><i class="fa-solid fa-gift text-primary me-2"></i>Give free time</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="overrideOpen = true"><i class="fa-solid fa-tag text-primary me-2"></i>Set custom price</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="discountOpen = true"><i class="fa-solid fa-percent text-primary me-2"></i>Add discount</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="billingModeOpen = true"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Who handles billing</button></li>
@@ -298,6 +298,9 @@
                                         default => $branch->isActive() ? ['success', 'Active'] : ['danger', 'Expired'],
                                     })
                                     <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
+                                    @if($branch->free_renewals > 0 && ! $branch->isCancelled())
+                                        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1" title="Renews for ₹0 — one used per renewal"><i class="fa-solid fa-gift me-1"></i>{{ $branch->free_renewals }} free {{ \Illuminate\Support\Str::plural('renewal', $branch->free_renewals) }}</span>
+                                    @endif
 
                                     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                                         @if($behind && $trialJoinable)
@@ -731,7 +734,7 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
-        renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
+        renewOpen: false, addOpen: false, alignOpen: false, giftOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false,
         // Sent here from the Provision form for an existing customer's number.
         addHostelOpen: @js(request()->boolean('add_hostel')),
         billingModeOpen: false, billingModeChoice: @js($account->billing_mode->value),
@@ -780,6 +783,12 @@ document.addEventListener('alpine:init', () => {
                     ? ('Renews all branches to ' + q.new_anchor + (topups.length ? (' · first brings ' + topups.length + ' behind branch(es) up to ' + q.current_anchor) : ''))
                     : '',
             });
+            const free = q.complimentary || [];
+            if (free.length) {
+                // Each free renewal reads as a gift against the term.
+                const lines = free.map(c => ({ label: 'Free renewal · ' + c.name, amount: c.amount, kind: 'discount' }));
+                summary.rows.splice(1, 0, ...lines);
+            }
             if (topups.length) {
                 // Show the term and each top-up as their own lines.
                 summary.rows[0] = { label: summary.rows[0].label, amount: q.subtotal, kind: 'line' };
@@ -887,36 +896,28 @@ document.addEventListener('alpine:init', () => {
             return { rows, finalLabel: 'Payable now', final, note: q.count ? ('Aligns ' + q.count + ' branch(es) to ' + q.anchor) : '' };
         },
 
-        // ── Comp ──
-        compTerm: 'yearly',
-        compMultiplier: 1,
-        compBranches: @json($compBranches),
-        compSelected: @json($compBranchIds),
-        toggleCompBranch(id) {
-            const i = this.compSelected.indexOf(id);
-            if (i === -1) this.compSelected.push(id); else this.compSelected.splice(i, 1);
+        // ── Give free time (doc 22) ──
+        giftMode: 'renewals',
+        giftBranches: @json($giftBranches),
+        giftSelected: @json(collect($giftBranches)->pluck('id')),   // all, by default
+        giftCount: 1,
+        giftAmount: 1,
+        giftUnit: 'months',
+        toggleGiftBranch(id) {
+            const i = this.giftSelected.indexOf(id);
+            if (i === -1) this.giftSelected.push(id); else this.giftSelected.splice(i, 1);
         },
-        get compAllSelected() { return this.compBranches.length > 0 && this.compSelected.length === this.compBranches.length; },
-        toggleCompAll() { this.compSelected = this.compAllSelected ? [] : this.compBranches.map(b => b.id); },
-        get compMultiplierLabel() {
-            const n = parseInt(this.compMultiplier) || 1;
-            const unit = this.compTerm === 'monthly' ? 'month' : 'year';
-            return n + ' ' + unit + (n > 1 ? 's' : '');
-        },
-        compNewEnd(b) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            let from = b.end ? new Date(b.end + 'T00:00:00') : today;
-            if (from < today) from = today;
-            const n = parseInt(this.compMultiplier) || 1;
-            const d = new Date(from);
-            if (this.compTerm === 'yearly') d.setFullYear(d.getFullYear() + n); else d.setMonth(d.getMonth() + n);
+        get giftAllSelected() { return this.giftBranches.length > 0 && this.giftSelected.length === this.giftBranches.length; },
+        toggleGiftAll() { this.giftSelected = this.giftAllSelected ? [] : this.giftBranches.map(b => b.id); },
+        get giftNewDate() {
+            const base = @json($account->current_period_end?->toDateString());
+            if (!base) return '—';
+            const d = new Date(base + 'T00:00:00');
+            const n = parseInt(this.giftAmount) || 0;
+            if (this.giftUnit === 'months') d.setMonth(d.getMonth() + n); else d.setDate(d.getDate() + n);
             return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
         },
-        get compPreview() {
-            return this.compBranches
-                .filter(b => this.compSelected.includes(b.id))
-                .map(b => ({ name: b.name, from: b.endLabel, to: this.compNewEnd(b) }));
-        },
+        addFree: false,
 
         // ── Add hostel to owner ── (Paid co-terminate at the account cadence, or Trial)
         ahPlan: 'paid',

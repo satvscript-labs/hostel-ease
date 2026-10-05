@@ -152,7 +152,7 @@ class AuditCoverageCommandTest extends TestCase
     // --fix (decision D1)
     // -----------------------------------------------------------------
 
-    public function test_fix_shortens_coverage_to_what_the_payments_bought(): void
+    public function test_fix_brings_the_branch_back_to_what_was_paid_and_credits_the_excess(): void
     {
         [$owner, $branch] = $this->ownerWithBranch();
         app(AccountBillingService::class)->recordBranchRenewal($branch, 'yearly', [
@@ -175,6 +175,8 @@ class AuditCoverageCommandTest extends TestCase
             $account->fresh()->current_period_end->toDateString(),
             'The account anchor was not re-derived from the corrected branch.',
         );
+        // The year past the renewal date is not lost — it is the next renewal, free (doc 22).
+        $this->assertSame(1, $branch->fresh()->free_renewals);
     }
 
     public function test_fix_repairs_a_stale_cycle_start(): void
@@ -197,6 +199,22 @@ class AuditCoverageCommandTest extends TestCase
         );
     }
 
+    /** A ₹0 gift line, as an old comp or back-fill left behind (no service makes one past the date any more). */
+    protected function giftLine(\App\Models\SubscriptionAccount $account, \App\Models\Hostel $branch, $end, string $kind = 'comp'): void
+    {
+        $order = \App\Models\SubscriptionOrder::create([
+            'account_id' => $account->id, 'period' => 'yearly', 'kind' => $kind, 'quantity' => 1,
+            'subtotal' => 0, 'discount_total' => 0, 'amount' => 0, 'payment_status' => 'paid',
+            'payment_method' => $kind === 'comp' ? 'comp' : null, 'collection' => 'offline', 'remarks' => 'Test gift',
+        ]);
+        \App\Models\SubscriptionOrderLine::create([
+            'order_id' => $order->id, 'branch_id' => $branch->id, 'amount' => 0,
+            'start_date' => now(), 'end_date' => $end,
+        ]);
+        app(\App\Services\Billing\CoverageMirror::class)->sync($account->fresh());
+        app(\App\Services\Billing\AccountBillingService::class)->refreshAccountAnchor($account->fresh());
+    }
+
     public function test_a_backfilled_adjustment_is_not_reported_as_an_overage(): void
     {
         // The S1 migration gives coverage that predates the ledger a ₹0 `adjustment`
@@ -208,7 +226,7 @@ class AuditCoverageCommandTest extends TestCase
             'amount' => 10000, 'payment_status' => 'paid', 'payment_method' => 'cash', 'transaction_number' => 'adj_1',
         ]);
 
-        app(AccountBillingService::class)->adjustCoverage($branch->fresh(), now()->addYears(3), 'goodwill');
+        $this->giftLine(\App\Models\SubscriptionAccount::sole(), $branch->fresh(), now()->addYears(3), 'adjustment');
 
         $this->artisan('hostelease:audit-coverage')
             ->expectsOutputToContain('Every branch holds exactly the coverage its payments bought.')
