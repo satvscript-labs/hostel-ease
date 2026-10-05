@@ -171,6 +171,90 @@
     .branch-tile-check i { opacity:0; transition:opacity .2s; }
     .branch-tile.is-selected .branch-tile-check i { opacity:1; }
 
+    /* ══ Profile & team — premium pass ══
+       One quiet language: soft layered shadows, a hairline ring instead of a border,
+       generous radius, and colour reserved for STATE (green verified · amber needs you). */
+    :root { --pf-ring: 0 0 0 1px rgba(15,23,42,.06); --pf-lift: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px -8px rgba(15,23,42,.10); }
+    .pf-card { background:#fff; border-radius:20px; box-shadow:var(--pf-ring), var(--pf-lift); overflow:hidden; }
+    .pf-card-head { display:flex; align-items:center; gap:.6rem; padding:1.1rem 1.5rem 0; font-weight:800; font-size:.95rem; color:var(--he-text-main,#0f172a); letter-spacing:-.01em; }
+    .pf-card-head i { color:var(--he-primary,#4f46e5); font-size:.9rem; }
+
+    /* Identity hero */
+    .pf-band { overflow:hidden; height:104px; background:var(--he-gradient-mesh, linear-gradient(135deg,#0f172a 0%,#1e1b4b 55%,#312e81 100%)); position:relative; }
+    .pf-band::after { content:''; position:absolute; right:-40px; top:-60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(147,51,234,.55) 0%, transparent 68%); filter:blur(18px); }
+    .pf-band::before { content:''; position:absolute; left:-30px; bottom:-70px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle, rgba(79,70,229,.5) 0%, transparent 70%); filter:blur(16px); }
+    .pf-identity-body { padding:0 1.5rem 1.5rem; text-align:center; }
+    .pf-ava { width:84px; height:84px; margin:-42px auto .85rem; border-radius:26px; background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:800; border:4px solid #fff; box-shadow:0 12px 28px -6px rgba(79,70,229,.45); position:relative; z-index:1; }
+    .pf-name { font-weight:800; font-size:1.2rem; letter-spacing:-.02em; margin:0; color:var(--he-text-main,#0f172a); }
+    .pf-role { font-size:.8rem; color:var(--he-text-muted,#64748b); margin-top:.1rem; }
+    .pf-chips { display:flex; flex-wrap:wrap; justify-content:center; gap:.4rem; margin:.9rem 0 1.1rem; }
+    .pf-chip { display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .75rem; border-radius:9999px; font-size:.72rem; font-weight:700; border:0; line-height:1.2; }
+    .pf-chip i { font-size:.68rem; }
+    .pf-chip--brand { background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea)); color:#fff; }
+    .pf-chip--soft { background:var(--he-primary-soft, rgba(79,70,229,.1)); color:var(--he-primary,#4f46e5); }
+    .pf-chip--ok { background:rgba(16,185,129,.12); color:#047857; }
+    .pf-chip--warn { background:rgba(245,158,11,.14); color:#b45309; cursor:pointer; transition:transform .2s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)), background .2s; }
+    .pf-chip--warn:hover { background:rgba(245,158,11,.24); transform:translateY(-1px); }
+    .pf-facts { text-align:left; }
+
+    /* Email card — state is the headline */
+    .pf-mail { display:flex; align-items:center; gap:1.1rem; padding:1.25rem 1.5rem; position:relative; }
+    .pf-mail::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:#cbd5e1; }
+    .pf-mail.is-ok::before { background:linear-gradient(180deg,#10b981,#34d399); }
+    .pf-mail.is-warn::before { background:linear-gradient(180deg,#f59e0b,#fbbf24); }
+    .pf-mail-ic { width:48px; height:48px; border-radius:15px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.15rem; background:#f1f5f9; color:#64748b; }
+    .pf-mail.is-ok .pf-mail-ic { background:rgba(16,185,129,.12); color:#059669; }
+    .pf-mail.is-warn .pf-mail-ic { background:rgba(245,158,11,.14); color:#d97706; }
+    .pf-mail-text { min-width:0; flex:1 1 auto; }
+    .pf-mail-label { display:flex; align-items:center; gap:.5rem; font-size:.7rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--he-text-muted,#64748b); }
+    .pf-mail-value { font-weight:700; font-size:1.02rem; color:var(--he-text-main,#0f172a); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:.1rem; }
+    .pf-mail-hint { font-size:.76rem; color:var(--he-text-muted,#64748b); margin-top:.1rem; line-height:1.4; }
+    .pf-mail-act { display:flex; flex-direction:column; align-items:center; gap:.1rem; flex-shrink:0; }
+    @media (max-width: 575.98px) {
+        .pf-mail { flex-wrap:wrap; }
+        .pf-mail-text { flex-basis:calc(100% - 70px); }
+        .pf-mail-act { flex-direction:row; width:100%; justify-content:flex-start; gap:.6rem; }
+    }
+    .pf-mini { font-size:.62rem; font-weight:800; letter-spacing:.02em; text-transform:none; padding:.15rem .5rem; border-radius:9999px; }
+    .pf-mini--ok { background:rgba(16,185,129,.12); color:#047857; }
+    .pf-mini--warn { background:rgba(245,158,11,.16); color:#b45309; }
+
+    /* Form language */
+    .pf-label { display:block; font-size:.78rem; font-weight:700; color:var(--he-text-muted,#64748b); margin-bottom:.4rem; }
+    .pf-input { height:48px; border-radius:14px; border:1.5px solid rgba(15,23,42,.1); background:#fff; font-weight:600; padding:0 1rem; transition:border-color .2s, box-shadow .2s; }
+    .pf-input:focus { border-color:var(--he-primary,#4f46e5); box-shadow:0 0 0 4px rgba(79,70,229,.12); }
+    .pf-input.is-invalid { border-color:var(--he-danger,#ef4444); background-image:none; }
+    .pf-locked { display:flex; align-items:center; gap:.7rem; height:48px; padding:0 1rem; border-radius:14px; background:#f8fafc; border:1.5px dashed rgba(15,23,42,.1); color:var(--he-text-muted,#64748b); font-weight:600; }
+    .pf-locked i { font-size:.75rem; opacity:.7; }
+    .pf-help { font-size:.74rem; color:var(--he-text-muted,#64748b); margin-top:.45rem; line-height:1.45; }
+    .pf-error { display:flex; align-items:center; gap:.45rem; margin-top:.5rem; font-size:.78rem; font-weight:600; color:var(--he-danger,#ef4444); }
+    .pf-code { display:block; width:100%; text-align:center; height:64px; border-radius:16px; border:1.5px solid rgba(15,23,42,.1); background:#f8fafc; font-size:1.9rem; font-weight:800; letter-spacing:.55em; padding-left:.55em; font-variant-numeric:tabular-nums; color:var(--he-text-main,#0f172a); transition:border-color .2s, box-shadow .2s, background .2s; }
+    .pf-code:focus { outline:0; background:#fff; border-color:var(--he-primary,#4f46e5); box-shadow:0 0 0 4px rgba(79,70,229,.12); }
+    .pf-code.is-invalid { border-color:var(--he-danger,#ef4444); background:#fff; }
+    .pf-code::placeholder { color:#cbd5e1; letter-spacing:.35em; }
+    .pf-note { display:flex; align-items:flex-start; gap:.6rem; padding:.65rem .85rem; border-radius:12px; font-size:.78rem; font-weight:600; line-height:1.4; }
+    .pf-note i { margin-top:.12rem; }
+    .pf-note--ok { background:rgba(16,185,129,.1); color:#047857; }
+    .pf-note--dev { border:1.5px dashed #f59e0b; background:#fffbeb; color:#92400e; }
+
+    /* Team: email state under the name, verified tick, count pill */
+    .su-mail { display:flex; align-items:center; gap:.35rem; font-size:.72rem; margin-top:.1rem; min-width:0; }
+    .su-mail span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .su-mail i { font-size:.62rem; flex-shrink:0; }
+    .su-tag { flex-shrink:0; font-weight:700; font-size:.66rem; padding:.1rem .45rem; border-radius:9999px; background:rgba(245,158,11,.16); }
+    .su-mail.ok { color:#047857; }
+    .su-mail.warn { color:#b45309; }
+    .su-mail.none { color:#94a3b8; }
+    .su-count { font-size:.68rem; font-weight:800; padding:.18rem .55rem; border-radius:9999px; background:var(--he-primary-soft, rgba(79,70,229,.1)); color:var(--he-primary,#4f46e5); margin-left:.5rem; vertical-align:middle; }
+    .su-card { border-radius:20px; box-shadow:var(--pf-ring), var(--pf-lift); border:0; overflow:hidden; }
+    .su-head { padding:1.15rem 1.5rem; border-bottom:1px solid rgba(15,23,42,.06); }
+    .su-avatar { width:42px; height:42px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:800; flex-shrink:0; font-size:.95rem; }
+    .su-avatar--staff { background:linear-gradient(135deg,#eef2ff,#e0e7ff); color:#4338ca; }
+    .su-avatar--admin { background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea)); color:#fff; box-shadow:0 6px 14px -4px rgba(79,70,229,.45); }
+    .role-chip { transition:transform .25s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)), box-shadow .25s; border-radius:16px; border:0; box-shadow:var(--pf-ring), 0 1px 2px rgba(15,23,42,.03); }
+    @media (hover:hover) { .role-chip:hover { transform:translateY(-2px); box-shadow:var(--pf-ring), var(--pf-lift) !important; } }
+    @media (prefers-reduced-motion: reduce) { .role-chip, .pf-chip--warn { transition:none; } .role-chip:hover, .pf-chip--warn:hover { transform:none; } }
+
     /* Plan cards (renew modal) */
 </style>
 @endpush
@@ -219,77 +303,116 @@
 
     {{-- ══ TAB: PROFILE ══ --}}
     <div x-show="activeTab === 'profile'" x-transition:enter="st-panel-enter" x-transition:enter-start="st-panel-from" x-transition:enter-end="st-panel-to" x-cloak style="display:none;">
+        @php($mailVerified = (bool) $owner->email_verified_at)
         <div class="row g-4">
+
+            {{-- Identity: a quiet hero, the facts that matter, and the two places you go from here. --}}
             <div class="col-lg-5">
-                <div class="panel-card shadow-sm p-4 h-100">
-                    <div class="d-flex align-items-center gap-3 mb-3">
-                        <div class="st-avatar">{{ strtoupper(substr($owner->name, 0, 1)) }}</div>
-                        <div class="min-w-0">
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <h5 class="fw-bold mb-0 text-dark text-truncate">{{ $owner->name }}</h5>
-                                @if($viewerIsOwner)
-                                    <span class="badge rounded-pill text-white" style="font-size:.62rem; background:var(--he-gradient-pop, linear-gradient(135deg,#4f46e5,#9333ea));"><i class="fa-solid fa-crown me-1" style="font-size:.5rem;"></i>{{ __('Owner') }}</span>
-                                @else
-                                    <span class="badge bg-primary-subtle text-primary rounded-pill" style="font-size:.62rem;"><i class="fa-solid fa-user-shield me-1" style="font-size:.5rem;"></i>{{ __('Admin') }}</span>
-                                @endif
-                            </div>
-                            <div class="text-muted small">{{ config('hostelease.roles.'.$owner->role, ucfirst($owner->role)) }}</div>
+                <div class="pf-card pf-identity h-100">
+                    <div class="pf-band" aria-hidden="true"></div>
+                    <div class="pf-identity-body">
+                        <div class="pf-ava">{{ strtoupper(mb_substr($owner->name, 0, 1)) }}</div>
+                        <h5 class="pf-name">{{ $owner->name }}</h5>
+                        <div class="pf-role">{{ config('hostelease.roles.'.$owner->role, ucfirst($owner->role)) }}</div>
+
+                        <div class="pf-chips">
+                            @if($viewerIsOwner)
+                                <span class="pf-chip pf-chip--brand"><i class="fa-solid fa-crown"></i>{{ __('Owner') }}</span>
+                            @else
+                                <span class="pf-chip pf-chip--soft"><i class="fa-solid fa-user-shield"></i>{{ __('Admin') }}</span>
+                            @endif
+                            @if($mailVerified)
+                                <span class="pf-chip pf-chip--ok"><i class="fa-solid fa-circle-check"></i>{{ __('Email verified') }}</span>
+                            @else
+                                <button type="button" class="pf-chip pf-chip--warn" @click="openEmailModal(@js($owner->email ?? ''))"><i class="fa-solid fa-envelope"></i>{{ __('Verify your email') }}</button>
+                            @endif
                         </div>
-                    </div>
-                    <div class="px-1">
-                        <div class="st-kv"><span class="k">{{ __('Login (mobile)') }}</span><span class="v">{{ hostelease_phone($owner->mobile) }}</span></div>
-                        <div class="st-kv"><span class="k">{{ __('Branches') }}</span><span class="v">{{ $myBranches->count() }}</span></div>
-                        <div class="st-kv"><span class="k">{{ __('Renewal date') }}</span><span class="v">{{ $account->current_period_end?->format('d M Y') ?? '—' }}</span></div>
-                        <div class="st-kv"><span class="k">{{ __('Member since') }}</span><span class="v">{{ $owner->created_at?->format('M Y') ?? '—' }}</span></div>
-                        <div class="st-kv"><span class="k">{{ __('Last login') }}</span><span class="v">{{ $owner->last_login_at?->format('d M Y · h:i A') ?? '—' }}</span></div>
-                    </div>
-                    {{-- Action tiles (W9): full-width rows that always fit the
-                         card — the old loose pills overflowed it on phones. --}}
-                    <div class="mt-3 pt-3 border-top d-grid gap-2">
-                        <a href="{{ route('profile.password') }}" class="st-action tactile-btn">
-                            <span class="st-action-ic"><i class="fa-solid fa-key"></i></span>
-                            <span class="st-action-txt">
-                                <span class="st-action-name">{{ __('Change password') }}</span>
-                                <span class="st-action-sub">{{ __('Update your login password') }}</span>
-                            </span>
-                            <i class="fa-solid fa-chevron-right st-action-chev"></i>
-                        </a>
-                        <a href="{{ route('admin.subscription.index') }}" class="st-action tactile-btn">
-                            <span class="st-action-ic"><i class="fa-solid fa-receipt"></i></span>
-                            <span class="st-action-txt">
-                                <span class="st-action-name">{{ __('Subscription') }}</span>
-                                <span class="st-action-sub">{{ __('Plan, coverage and renewals') }}</span>
-                            </span>
-                            <i class="fa-solid fa-chevron-right st-action-chev"></i>
-                        </a>
+
+                        <div class="pf-facts">
+                            <div class="st-kv"><span class="k">{{ __('Login (mobile)') }}</span><span class="v">{{ hostelease_phone($owner->mobile) }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Branches') }}</span><span class="v">{{ $myBranches->count() }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Renewal date') }}</span><span class="v">{{ $account->current_period_end?->format('d M Y') ?? '—' }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Member since') }}</span><span class="v">{{ $owner->created_at?->format('M Y') ?? '—' }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Last login') }}</span><span class="v">{{ $owner->last_login_at?->format('d M Y · h:i A') ?? '—' }}</span></div>
+                        </div>
+
+                        <div class="pt-3 mt-2 border-top d-grid gap-2">
+                            <a href="{{ route('profile.password') }}" class="st-action tactile-btn">
+                                <span class="st-action-ic"><i class="fa-solid fa-key"></i></span>
+                                <span class="st-action-txt">
+                                    <span class="st-action-name">{{ __('Change password') }}</span>
+                                    <span class="st-action-sub">{{ __('Update your login password') }}</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-right st-action-chev"></i>
+                            </a>
+                            <a href="{{ route('admin.subscription.index') }}" class="st-action tactile-btn">
+                                <span class="st-action-ic"><i class="fa-solid fa-receipt"></i></span>
+                                <span class="st-action-txt">
+                                    <span class="st-action-name">{{ __('Subscription') }}</span>
+                                    <span class="st-action-sub">{{ __('Plan, coverage and renewals') }}</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-right st-action-chev"></i>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-7">
-                <div class="panel-card shadow-sm h-100">
-                    <div class="p-3 px-4 border-bottom"><h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-id-card text-primary me-2"></i>{{ __('Profile info') }}</h6></div>
-                    <form method="POST" action="{{ route('profile.update') }}" class="p-4">
+
+            <div class="col-lg-7 d-flex flex-column gap-4">
+
+                {{-- Email: its state is the headline, the action is one button. --}}
+                <div class="pf-card pf-mail {{ $mailVerified ? 'is-ok' : ($owner->email ? 'is-warn' : 'is-empty') }}">
+                    <div class="pf-mail-ic" aria-hidden="true">
+                        <i class="fa-solid {{ $mailVerified ? 'fa-shield-halved' : ($owner->email ? 'fa-envelope-circle-check' : 'fa-envelope') }}"></i>
+                    </div>
+                    <div class="pf-mail-text">
+                        <div class="pf-mail-label">{{ __('Email') }}
+                            @if($mailVerified)<span class="pf-mini pf-mini--ok">{{ __('Verified') }}</span>
+                            @elseif($owner->email)<span class="pf-mini pf-mini--warn">{{ __('Not verified') }}</span>@endif
+                        </div>
+                        <div class="pf-mail-value">{{ $owner->email ?: __('No email added yet') }}</div>
+                        <div class="pf-mail-hint">
+                            @if($mailVerified)
+                                {{ __('Receipts and renewal reminders are sent here.') }}
+                            @elseif($owner->email)
+                                {{ __('Verify it to receive receipts and renewal reminders.') }}
+                            @else
+                                {{ __('Add and verify an email to receive receipts and renewal reminders.') }}
+                            @endif
+                        </div>
+                    </div>
+                    <div class="pf-mail-act">
+                        @if(! $mailVerified && $owner->email)
+                            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openEmailModal(@js($owner->email))">{{ __('Verify') }}</button>
+                            <button type="button" class="btn btn-link btn-sm text-muted fw-semibold text-decoration-none" @click="openEmailModal()">{{ __('Change') }}</button>
+                        @elseif($mailVerified)
+                            <button type="button" class="btn btn-light border rounded-pill px-4 fw-semibold tactile-btn" @click="openEmailModal()">{{ __('Change') }}</button>
+                        @else
+                            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm tactile-btn" @click="openEmailModal()"><i class="fa-solid fa-plus me-1"></i>{{ __('Add email') }}</button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="pf-card">
+                    <div class="pf-card-head"><i class="fa-solid fa-id-card"></i>{{ __('Personal details') }}</div>
+                    <form method="POST" action="{{ route('profile.update') }}" class="p-4 pt-3">
                         @csrf @method('PUT')
                         <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted">{{ __('FULL NAME') }} <span class="text-danger">*</span></label>
-                                <input type="text" name="name" value="{{ old('name', $owner->name) }}" class="form-control bg-white border shadow-sm" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted">{{ __('EMAIL') }}</label>
-                                <input type="email" name="email" value="{{ old('email', $owner->email) }}" class="form-control bg-white border shadow-sm" placeholder="you@example.com">
+                            <div class="col-12">
+                                <label class="pf-label">{{ __('Full name') }} <span class="text-danger">*</span></label>
+                                <input type="text" name="name" value="{{ old('name', $owner->name) }}" class="form-control pf-input" required maxlength="150">
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-bold small text-muted">{{ __('LOGIN MOBILE') }}</label>
-                                <div class="input-group shadow-sm">
-                                    <span class="input-group-text bg-light fw-bold text-muted"><i class="fa-solid fa-lock" style="font-size:.7rem;"></i></span>
-                                    <input type="text" value="{{ hostelease_phone($owner->mobile) }}" class="form-control bg-light border" disabled>
+                                <label class="pf-label">{{ __('Login mobile') }}</label>
+                                <div class="pf-locked">
+                                    <i class="fa-solid fa-lock"></i>
+                                    <span>{{ hostelease_phone($owner->mobile) }}</span>
                                 </div>
-                                <div class="form-text">{{ __('Your mobile is your login and links your branches — contact HostelEase support to change it.') }}</div>
+                                <div class="pf-help">{{ __('Your mobile is your login and links your branches — contact HostelEase support to change it.') }}</div>
                             </div>
                         </div>
-                        <div class="mt-3 text-end">
-                            <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i>{{ __('Save') }}</button>
+                        <div class="mt-4 text-end">
+                            <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm tactile-btn"><i class="fa-solid fa-check me-2"></i>{{ __('Save changes') }}</button>
                         </div>
                     </form>
                 </div>
@@ -321,10 +444,10 @@
             </div></div>
         </div>
 
-        <div class="panel-card shadow-sm">
-            <div class="p-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <div class="panel-card su-card">
+            <div class="su-head d-flex justify-content-between align-items-center">
                 <div>
-                    <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-users-gear text-primary me-2"></i>{{ __('Team & access') }}</h6>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-users-gear text-primary me-2"></i>{{ __('Team & access') }}<span class="su-count">{{ $users->count() }}</span></h6>
                     <div class="text-muted" style="font-size:.72rem;">{{ __('Everyone with access to your branches. Admins are set up with HostelEase; you add and manage staff.') }}</div>
                 </div>
                 {{-- Desktop only — phones get the FAB (§4.10 .he-page-head rule:
@@ -348,16 +471,24 @@
                         'roleLabel' => $isCoAdmin ? __('Admin') : ($roles[$u->role] ?? ucfirst($u->role)),
                         'branches' => $u->hostels->pluck('id')->all(), 'is_active' => (bool) $u->is_active,
                         'isCoAdmin' => $isCoAdmin,
-                        'urls' => ['toggle' => route('admin.users.toggle', $u), 'reset' => route('admin.users.reset', $u), 'destroy' => route('admin.users.destroy', $u)]])
+                        'email' => $u->email, 'emailVerified' => (bool) $u->email_verified_at,
+                        'urls' => ['toggle' => route('admin.users.toggle', $u), 'reset' => route('admin.users.reset', $u), 'destroy' => route('admin.users.destroy', $u), 'verify' => route('admin.users.verification', $u)]])
                     <div class="su-row">
                         <div class="su-who">
-                            <div class="{{ $isCoAdmin ? 'bg-primary-subtle text-primary' : 'bg-light text-secondary' }} rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm flex-shrink-0" style="width:40px; height:40px;">{{ strtoupper(substr($u->name, 0, 1)) }}</div>
+                            <div class="su-avatar {{ $isCoAdmin ? 'su-avatar--admin' : 'su-avatar--staff' }}">{{ strtoupper(mb_substr($u->name, 0, 1)) }}</div>
                             <div class="su-text">
                                 <div class="su-name text-truncate">{{ $u->name }}@if($u->id === $owner->id)<span class="text-muted fw-normal small"> · {{ __('you') }}</span>@endif</div>
                                 {{-- iOS secondary line: TEXT, never a chip pile.
                                      The role/branches segment hides on the wide
                                      tier where they own aligned columns. --}}
                                 <div class="su-sub text-truncate">{{ hostelease_phone($u->mobile) }}<span class="su-sub-extra"> · {{ $isCoAdmin ? __('Admin') : ($roles[$u->role] ?? ucfirst($u->role)) }}@if($u->hostels->isNotEmpty()) · {{ $u->hostels->pluck('name')->implode(', ') }}@endif</span></div>
+                                @if($u->email && $u->email_verified_at)
+                                    <div class="su-mail ok"><i class="fa-solid fa-circle-check"></i><span>{{ $u->email }}</span></div>
+                                @elseif($u->email)
+                                    <div class="su-mail warn"><i class="fa-solid fa-circle-exclamation"></i><span>{{ $u->email }}</span><b class="su-tag">{{ __('not verified') }}</b></div>
+                                @else
+                                    <div class="su-mail none"><i class="fa-regular fa-envelope"></i><span>{{ __('No email') }}</span></div>
+                                @endif
                             </div>
                             <span class="su-dot {{ $u->is_active ? 'on' : 'off' }}" title="{{ $u->is_active ? __('Active') : __('Disabled') }}"></span>
                             <button type="button" class="su-more tactile-btn" @click='openSheet(@json($ud))' title="{{ __('Actions') }}" aria-label="{{ __('Actions for :name', ['name' => $u->name]) }}">
@@ -398,6 +529,12 @@
                                     <button class="he-icon-btn" title="{{ __('Reset password') }}" aria-label="{{ __('Reset password') }}"><i class="fa-solid fa-key text-warning"></i></button>
                                 </form>
                             @else
+                                @if($u->email && ! $u->email_verified_at)
+                                    <form action="{{ route('admin.users.verification', $u) }}" method="POST" class="m-0">
+                                        @csrf
+                                        <button class="he-icon-btn" title="{{ __('Send verification') }}" aria-label="{{ __('Send verification') }}"><i class="fa-solid fa-envelope-circle-check text-primary"></i></button>
+                                    </form>
+                                @endif
                                 <button type="button" @click='openUserModal(@json($ud))' class="he-icon-btn" title="{{ __('Edit user') }}" aria-label="{{ __('Edit user') }}"><i class="fa-solid fa-pen"></i></button>
                                 <form action="{{ route('admin.users.reset', $u) }}" method="POST" class="m-0" data-confirm="{{ __('Reset password for :name?', ['name' => $u->name]) }}">
                                     @csrf @method('PATCH')
@@ -535,6 +672,10 @@
                 <button type="button" class="su-sheet-item" x-show="!sheet.user.isCoAdmin" @click="sheet.open = false; openUserModal(sheet.user)">
                     <span class="si-ic"><i class="fa-solid fa-pen"></i></span>{{ __('Edit user & access') }}
                 </button>
+                <form x-show="sheet.user.email && !sheet.user.emailVerified && !sheet.user.isCoAdmin" :action="sheet.user.urls?.verify" method="POST">
+                    @csrf
+                    <button class="su-sheet-item" type="submit"><span class="si-ic"><i class="fa-solid fa-envelope-circle-check"></i></span>{{ __('Send verification') }}</button>
+                </form>
                 <form :action="sheet.user.urls?.reset" method="POST" data-confirm="{{ __('Reset this password?') }}">
                     @csrf @method('PATCH')
                     <button class="su-sheet-item" type="submit"><span class="si-ic"><i class="fa-solid fa-key"></i></span>{{ __('Reset password') }}</button>
@@ -582,6 +723,14 @@
                         <div class="col-md-6">
                             <label class="form-label fw-bold small text-muted">{{ __('ROLE') }} <span class="text-danger">*</span></label>
                             <x-he-select name="role" :submit="false" compact x-model="modals.user.form.role" placeholder="{{ __('— Select role —') }}" :options="$roles" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">{{ __('EMAIL') }} <span class="fw-normal">({{ __('optional') }})</span></label>
+                            <input type="email" name="email" x-model="modals.user.form.email" class="form-control bg-white border shadow-sm @error('email') is-invalid @enderror" placeholder="name@example.com" maxlength="150" autocomplete="off">
+                            @error('email')<div class="pf-error"><i class="fa-solid fa-circle-exclamation"></i>{{ $message }}</div>@enderror
+                            <div class="pf-help" x-show="!modals.user.isEdit">{{ __('We email them a link to confirm it, so they can receive updates. They log in with their mobile.') }}</div>
+                            <div class="pf-help" x-show="modals.user.isEdit">{{ __('Changing the email asks them to confirm the new address.') }}</div>
                         </div>
 
                         {{-- What the picked role can actually touch (W9) — straight
@@ -637,6 +786,80 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </template>
+
+    {{-- ══ Email verification — two quiet steps: the address, then the 6-digit code.
+         Nothing is saved to the account until the code is right. Opens straight on the
+         code step when a code is already on its way. ══ --}}
+    <template x-teleport="body">
+        <div class="custom-overlay-backdrop" x-show="modals.email.open" x-transition.opacity @click="modals.email.open = false" x-cloak style="display:none;">
+            <div class="custom-overlay-modal" style="max-width:440px;" :class="{ 'is-open': modals.email.open }" x-show="modals.email.open" @click.stop>
+                <div class="custom-overlay-header">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-envelope-circle-check text-primary me-2"></i><span x-text="modals.email.step === 1 ? @js(__('Your email')) : @js(__('Check your email'))"></span></h5>
+                    <button type="button" class="btn-close shadow-none" @click="modals.email.open = false"></button>
+                </div>
+
+                @if(session('email_status'))
+                    <div class="mx-4 mt-3 pf-note pf-note--ok" role="status"><i class="fa-solid fa-circle-check"></i><span>{{ session('email_status') }}</span></div>
+                @endif
+                @if($emailDevCode)
+                    <div class="mx-4 mt-3 pf-note pf-note--dev"><i class="fa-solid fa-code"></i><span>{{ __('Local development — mail is not set up here, so the code is:') }} <strong style="letter-spacing:2px;">{{ $emailDevCode }}</strong></span></div>
+                @endif
+
+                {{-- Step 1 — the address --}}
+                <form x-show="modals.email.step === 1" method="POST" action="{{ route('profile.email.send') }}" @submit="modals.email.busy = true">
+                    @csrf
+                    <div class="custom-overlay-body">
+                        <p class="text-muted small mb-3">{{ __('We will send a 6-digit code to this address. It is saved only after you enter the code.') }}</p>
+                        <label class="pf-label" for="pf-email">{{ __('Email address') }}</label>
+                        <input id="pf-email" type="email" name="email" x-ref="emailInput" x-model="modals.email.value" class="form-control pf-input {{ $errors->emailFlow->has('email') ? 'is-invalid' : '' }}" placeholder="you@example.com" autocomplete="email" inputmode="email" maxlength="150" required>
+                        @if($errors->emailFlow->has('email'))
+                            <div class="pf-error"><i class="fa-solid fa-circle-exclamation"></i>{{ $errors->emailFlow->first('email') }}</div>
+                        @endif
+                    </div>
+                    <div class="custom-overlay-footer">
+                        <button type="button" class="btn btn-light border rounded-pill px-4 fw-bold" @click="modals.email.open = false">{{ __('Cancel') }}</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" :disabled="modals.email.busy || !modals.email.value">
+                            <span x-show="!modals.email.busy">{{ __('Send code') }}</span>
+                            <span x-show="modals.email.busy" x-cloak class="spinner-border spinner-border-sm"></span>
+                        </button>
+                    </div>
+                </form>
+
+                {{-- Step 2 — the code --}}
+                <div x-show="modals.email.step === 2" x-cloak>
+                    <form method="POST" action="{{ route('profile.email.verify') }}" @submit="modals.email.busy = true"
+                          x-data="{ code: '', set(v) { this.code = (v || '').replace(/\D/g, '').slice(0, 6); this.$refs.code.value = this.code; } }">
+                        @csrf
+                        <div class="custom-overlay-body">
+                            <p class="text-muted small mb-3">
+                                {{ __('We sent a 6-digit code to') }} <strong class="text-dark">{{ $emailPending ? \App\Services\Auth\SignupVerification::maskEmail($emailPending) : '' }}</strong>.
+                                {{ __('It expires in :m minutes.', ['m' => \App\Services\Auth\SignupVerification::CODE_TTL_MINUTES]) }}
+                            </p>
+                            <input type="text" name="code" x-ref="code" class="pf-code {{ $errors->emailFlow->has('code') ? 'is-invalid' : '' }}" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" @input="set($event.target.value)" required aria-label="{{ __('Verification code') }}">
+                            @if($errors->emailFlow->has('code'))
+                                <div class="pf-error justify-content-center"><i class="fa-solid fa-circle-exclamation"></i>{{ $errors->emailFlow->first('code') }}</div>
+                            @endif
+                        </div>
+                        <div class="custom-overlay-footer">
+                            <button type="button" class="btn btn-link text-muted fw-semibold text-decoration-none me-auto px-0" @click="modals.email.step = 1">{{ __('Use a different email') }}</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" :disabled="modals.email.busy || code.length < 6">
+                                <span x-show="!modals.email.busy"><i class="fa-solid fa-check me-1"></i>{{ __('Verify') }}</span>
+                                <span x-show="modals.email.busy" x-cloak class="spinner-border spinner-border-sm"></span>
+                            </button>
+                        </div>
+                    </form>
+                    <form method="POST" action="{{ route('profile.email.resend') }}" class="text-center pb-3 -mt-2"
+                          x-data="{ wait: {{ (int) $emailResendIn }}, init() { setInterval(() => { if (this.wait > 0) this.wait--; }, 1000); } }">
+                        @csrf
+                        <button type="submit" class="btn btn-link btn-sm fw-semibold text-decoration-none" :disabled="wait > 0">
+                            <span x-show="wait === 0">{{ __('Send a new code') }}</span>
+                            <span x-show="wait > 0" x-cloak>{{ __('Send a new code in') }} <span x-text="Math.floor(wait / 60) + ':' + String(wait % 60).padStart(2, '0')" style="font-variant-numeric:tabular-nums;"></span></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </template>
 
@@ -719,8 +942,16 @@
                         mobile: {!! json_encode(old('mobile') ? substr(preg_replace('/\D+/', '', old('mobile')), -10) : '') !!},
                         role: {!! json_encode(old('role', '')) !!},
                         branches: {!! json_encode(array_map('intval', old('branches', []))) !!},
+                        email: {!! json_encode(old('email', '')) !!},
                         is_active: true,
                     },
+                },
+                // Opens by itself only when a step just happened (a code was sent, or one was wrong).
+                email: {
+                    open: {{ ($errors->emailFlow->any() || session('email_status')) ? 'true' : 'false' }},
+                    step: {{ $errors->emailFlow->has('email') ? 1 : ($emailPending ? 2 : 1) }},
+                    busy: false,
+                    value: {!! json_encode(old('email', '')) !!},
                 },
                 rename: { open: false, action: '', form: { name: '', address: '', city: '' } },
             },
@@ -744,6 +975,15 @@
                 if (i === -1) this.modals.user.form.branches.push(id); else this.modals.user.form.branches.splice(i, 1);
             },
 
+            openEmailModal(prefill = '') {
+                const m = this.modals.email;
+                m.value = prefill || '';
+                m.step = 1;
+                m.busy = false;
+                m.open = true;
+                this.$nextTick(() => this.$refs.emailInput && this.$refs.emailInput.focus());
+            },
+
             openUserModal(user = null) {
                 const m = this.modals.user;
                 if (user) {
@@ -757,6 +997,7 @@
                         mobile: (user.mobile || '').slice(-10),
                         role: user.role || '',
                         branches: (user.branches || []).map(Number),
+                        email: user.email || '',
                         is_active: user.is_active,
                     };
                 } else {
@@ -764,7 +1005,7 @@
                     m.title = '{{ __('Add User') }}';
                     m.action = '{{ route('admin.users.store') }}';
                     m.method = 'POST';
-                    m.form = { id: null, name: '', mobile: '', role: '', branches: [], is_active: true };
+                    m.form = { id: null, name: '', mobile: '', role: '', branches: [], email: '', is_active: true };
                 }
                 m.open = true;
             },

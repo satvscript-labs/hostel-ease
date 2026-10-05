@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\StaffInviteMail;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Support\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -23,9 +26,12 @@ class UserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['email' => $this->cleanEmail($request->input('email'))]);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mobile' => ['required', 'regex:/^\+91\d{10}$|^\d{10}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
+            'email' => ['nullable', 'email:rfc', 'max:150', Rule::unique('users', 'email')],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'branches' => ['required', 'array', 'min:1'],
             'branches.*' => ['integer', 'exists:hostels,id'],
@@ -46,37 +52,111 @@ class UserController extends Controller
             'mobile' => $mobile,
             'password' => Hash::make($password),
             'role' => $data['role'],
+            'email' => $this->cleanEmail($data['email'] ?? null),
             'is_active' => true,
         ]);
 
         $user->hostels()->sync($branchIds);
         $this->logger->log('user.create', "Added {$data['role']} {$user->name}", $user);
 
-        return back()->with('active_tab', 'users')->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
-            ->with('success', 'User created — share the login below.');
+        $response = back()->with('active_tab', 'users')->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
+            ->with('success', __('User created — share the login below.'));
+
+        // A team member with an email gets a welcome and a one-tap confirmation link.
+        // Mail trouble must never undo the account that was just made.
+        if ($user->email && ! $this->sendInvite($user)) {
+            $response->with('success', null)->with('warning', __('User created, but we could not email :email. Use "Send verification" on their row to try again.', ['email' => $user->email]));
+        }
+
+        return $response;
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->authorizeManage($user);
+        $request->merge(['email' => $this->cleanEmail($request->input('email'))]);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
+            'email' => ['nullable', 'email:rfc', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
             'role' => ['required', Rule::in(array_keys(config('hostelease.staff_roles')))],
             'branches' => ['required', 'array', 'min:1'],
             'branches.*' => ['integer', 'exists:hostels,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
+
+        $branchIds = $this->allowedBranchIds($request, $data['branches']);
+        abort_unless(count($branchIds) > 0, 422);
+
+        $email = $this->cleanEmail($data['email'] ?? null);
+        $emailChanged = $email !== ($user->email ? mb_strtolower($user->email) : null);
+
         $user->update([
             'name' => $data['name'],
             'role' => $data['role'],
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        $branchIds = $this->allowedBranchIds($request, $data['branches']);
-        abort_unless(count($branchIds) > 0, 422);
+        // A different address is a different, unproven address: never keep the old
+        // "verified" mark on it.
+        if ($emailChanged) {
+            $user->forceFill(['email' => $email, 'email_verified_at' => null])->save();
+        }
+
         $user->hostels()->sync($branchIds);
 
-        return back()->with('active_tab', 'users')->with('success', 'User updated.');
+        $response = back()->with('active_tab', 'users')->with('success', __('User updated.'));
+
+        if ($emailChanged && $email && ! $this->sendInvite($user->refresh())) {
+            $response->with('success', null)->with('warning', __('Saved, but we could not email :email. Use "Send verification" on their row to try again.', ['email' => $email]));
+        }
+
+        return $response;
+    }
+
+    /** Email the team member their one-tap confirmation link again. */
+    public function resendVerification(User $user): RedirectResponse
+    {
+        $this->authorizeManage($user);
+
+        if (! $user->email) {
+            return back()->with('active_tab', 'users')->with('warning', __('Add an email to :name first.', ['name' => $user->name]));
+        }
+
+        if ($user->email_verified_at) {
+            return back()->with('active_tab', 'users')->with('success', __(':name\'s email is already verified.', ['name' => $user->name]));
+        }
+
+        return $this->sendInvite($user)
+            ? back()->with('active_tab', 'users')->with('success', __('Verification sent to :email.', ['email' => $user->email]))
+            : back()->with('active_tab', 'users')->with('warning', __('We could not email :email. Check the address and try again.', ['email' => $user->email]));
+    }
+
+    protected function cleanEmail(?string $email): ?string
+    {
+        $email = $email === null ? '' : mb_strtolower(trim($email));
+
+        return $email === '' ? null : $email;
+    }
+
+    protected function sendInvite(User $user): bool
+    {
+        try {
+            $user->loadMissing('hostels:id,name');
+            $actor = auth()->user();
+
+            Mail::to($user->email)->send(new StaffInviteMail(
+                $user,
+                config('hostelease.staff_roles.'.$user->role, ucfirst($user->role)),
+                $user->hostels->pluck('name')->implode(', ') ?: config('app.name', 'HostelEase'),
+                $actor?->name ?? config('app.name', 'HostelEase'),
+            ));
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Team invite email could not be sent', ['user' => $user->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     /** Enable/disable a login. Co-admins allowed (operational control); the

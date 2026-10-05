@@ -84,6 +84,11 @@ Route::middleware('guest')->group(function () {
 
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
+// The link in a team invite: signed, expiring, bound to the address it was sent to.
+// Open to anyone holding the link — a new team member has not logged in yet.
+Route::get('email/confirm/{user}/{hash}', \App\Http\Controllers\Auth\EmailConfirmController::class)
+    ->middleware(['signed', 'throttle:20,1'])->name('email.confirm');
+
 /*
 |--------------------------------------------------------------------------
 | Authenticated (tenant-aware)
@@ -107,6 +112,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('profile/password', [ProfileController::class, 'edit'])->name('profile.password');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+    // Email is proven by a 6-digit code before it is saved or shown as verified.
+    Route::post('profile/email', [ProfileController::class, 'sendEmailCode'])->middleware('throttle:6,1')->name('profile.email.send');
+    Route::post('profile/email/resend', [ProfileController::class, 'resendEmailCode'])->middleware('throttle:4,1')->name('profile.email.resend');
+    Route::post('profile/email/verify', [ProfileController::class, 'verifyEmailCode'])->middleware('throttle:12,1')->name('profile.email.verify');
 
     // Switch active branch (multi-branch hostel admins)
     Route::get('branch/{hostel}/switch', [BranchController::class, 'switch'])->name('branch.switch');
@@ -431,6 +440,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::patch('users/{user}/toggle', [\App\Http\Controllers\Admin\UserController::class, 'toggle'])->name('users.toggle');
                 Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');
                 Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
+                Route::post('users/{user}/verification', [\App\Http\Controllers\Admin\UserController::class, 'resendVerification'])->middleware('throttle:6,1')->name('users.verification');
             });
         });
 });

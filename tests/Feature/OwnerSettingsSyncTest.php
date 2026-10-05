@@ -71,7 +71,8 @@ class OwnerSettingsSyncTest extends TestCase
 
         $owner->refresh();
         $this->assertSame('Renamed Owner', $owner->name);
-        $this->assertSame('owner@new.example', $owner->email);
+        // The email only ever changes through the code flow (ProfileEmailVerificationTest).
+        $this->assertNotSame('owner@new.example', $owner->email);
         // Still the mobile it was seeded with — stored normalised (+91…),
         // which is what the model now guarantees for every login.
         $this->assertSame('+919800000001', $owner->mobile); // unchanged

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Hostel;
 use App\Models\User;
+use App\Services\Auth\EmailVerification;
 use App\Services\Billing\AccountBillingService;
 use App\Support\Tenant;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class SettingsController extends Controller
 {
     public function __construct(
         protected AccountBillingService $accountBilling,
+        protected EmailVerification $emailVerification,
     ) {}
 
     public function index(Request $request): View
@@ -89,6 +91,11 @@ class SettingsController extends Controller
             'studentStats' => $studentStats,
             'account' => $account,
             'activeHostelId' => Tenant::id(),
+            // Email verification from the profile: a code may already be on its way
+            // (the modal then opens straight on the code step).
+            'emailPending' => ($pending = $this->emailVerification->pending($owner)) ? $pending['email'] : null,
+            'emailResendIn' => $this->emailVerification->secondsUntilResend($owner),
+            'emailDevCode' => app()->environment('local') ? session('profile.email.dev_code') : null,
         ]);
     }
 }
