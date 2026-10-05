@@ -128,6 +128,9 @@
                                 <i class="fa-solid fa-lock me-2"></i>{{ __('Pay') }} {{ hostelease_money($openRenewal['amount']) }}
                             </button>
                         @endif
+                        @if($canManage && $openRenewal['own'])
+                            <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="openRenew()"><i class="fa-solid fa-repeat me-2"></i>{{ __('Change term') }}</button>
+                        @endif
                         @if($canManage)
                             <button class="btn btn-outline-light rounded-pill px-3 fw-bold" @click="openAdd()"><i class="fa-solid fa-plus me-2"></i>{{ __('Add a branch') }}</button>
                         @endif
@@ -161,9 +164,21 @@
                 <div><div class="sub-metric-lbl">{{ $status === AccountStatus::Trial ? __('Trial ends') : __('Renews on') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $anchorFmt ?? '—' }}</div></div>
                 <div><div class="sub-metric-lbl">{{ __('Term') }}</div><div class="h4 fw-bold mb-0 sub-metric">{{ $account->period?->isPaid() ? $account->period->label() : __('Trial') }}</div></div>
                 <div>
-                    <div class="sub-metric-lbl">{{ __('Next total') }}</div>
-                    <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($q['final']) }}</div>
-                    @if($q['discount'] > 0)<div class="small text-white-50" style="white-space:nowrap;">{{ __('Discount') }} −{{ hostelease_money($q['discount']) }}</div>@endif
+                    @if($openRenewal)
+                        {{-- Something is already billed: that is the number, in its own term. --}}
+                        <div class="sub-metric-lbl">{{ __('Due now') }}</div>
+                        <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($openRenewal['amount']) }}</div>
+                        <div class="small text-white-50" style="white-space:nowrap;">{{ $openRenewal['period'] }}</div>
+                    @elseif($status === AccountStatus::Trial)
+                        {{-- No term chosen yet: show both, never one as if it were THE price. --}}
+                        <div class="sub-metric-lbl">{{ __('After the trial') }}</div>
+                        <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($quotes['yearly']['final']) }}<span class="fs-6 fw-normal text-white-50">/{{ __('yr') }}</span></div>
+                        <div class="small text-white-50" style="white-space:nowrap;">{{ __('or') }} {{ hostelease_money($quotes['monthly']['final']) }}/{{ __('mo') }}</div>
+                    @else
+                        <div class="sub-metric-lbl">{{ __('Next total') }}</div>
+                        <div class="h4 fw-bold mb-0 sub-metric">{{ hostelease_money($q['final']) }}</div>
+                        @if($q['discount'] > 0)<div class="small text-white-50" style="white-space:nowrap;">{{ __('Discount') }} −{{ hostelease_money($q['discount']) }}</div>@endif
+                    @endif
                 </div>
             </div>
         </div>
@@ -192,7 +207,7 @@
                          covered — is shown, but never offered: paying it would buy
                          nothing (S3 audit). We clear it up on our side. --}}
                     @if($row['stale'])
-                        <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Part of it was paid separately, so the amount has changed.') }}">
+                        <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Your branches changed since this was raised, so the amount has changed.') }}">
                             <i class="fa-solid fa-rotate me-1"></i>{{ __('Amount changed — renew again for the new total') }}
                         </span>
                     @elseif(! $row['payable'])
@@ -204,9 +219,14 @@
                             <i class="fa-solid fa-lock me-1"></i>{{ __('Pay securely') }}
                         </a>
                     @elseif($canManage)
-                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="payOrder({{ $row['id'] }})" :disabled="loading">
-                            <i class="fa-solid fa-lock me-1"></i>{{ __('Pay now') }}
-                        </button>
+                        <div class="d-flex align-items-center gap-3">
+                            @if($row['own'])
+                                <button type="button" class="btn btn-link btn-sm text-muted p-0" @click="openRenew()">{{ __('Change term') }}</button>
+                            @endif
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="payOrder({{ $row['id'] }})" :disabled="loading">
+                                <i class="fa-solid fa-lock me-1"></i>{{ __('Pay now') }}
+                            </button>
+                        </div>
                     @else
                         <span class="small text-muted">{{ __('Contact us to pay') }}</span>
                     @endif
@@ -335,7 +355,7 @@
                     @endif
                 @else
                     <div class="flex-shrink-0">
-                        <div class="small text-muted lh-1">{{ __('Next total') }}</div>
+                        <div class="small text-muted lh-1" x-text="period === 'monthly' ? @js(__('Monthly total')) : @js(__('Yearly total'))"></div>
                         <div class="fw-bold text-dark" x-text="money(q().final)"></div>
                     </div>
                     <button class="btn btn-primary rounded-pill px-4 fw-bold flex-grow-1 tactile-btn" @click="openRenew()"><i class="fa-solid fa-arrows-rotate me-2"></i>{{ $hero['cta'] }}</button>

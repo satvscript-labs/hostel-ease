@@ -488,7 +488,7 @@
                                                         <div>
                                                             @if($order->coverageState() === 'stale')
                                                                 <span class="od-k">Out of date</span>
-                                                                <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>A top-up in it has since been paid separately — collecting this charges it twice. Void it and renew again.</span>
+                                                                <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>The branches, a top-up or a free renewal changed since it was raised — its amount is no longer right. Void it and renew again.</span>
                                                             @else
                                                                 <span class="od-k">Overtaken</span>
                                                                 <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Already covered by a later payment — collecting this buys nothing. Void it.</span>

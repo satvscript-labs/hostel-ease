@@ -148,7 +148,7 @@ class PaymentLinkService
         // so a link would ask the customer to pay for nothing.
         $state = $order->coverageState(fresh: true);
         if ($state === 'stale') {
-            throw new RuntimeException('A top-up included in this renewal has since been paid separately, so collecting this would charge for it twice. Void it and renew again — the new quote leaves that branch\'s top-up out.');
+            throw new RuntimeException('This renewal is out of date — a branch joined, a top-up was paid separately, or a free renewal changed since it was raised, so collecting it would charge the wrong amount. Void it and renew again to get the right total.');
         }
         if ($state !== 'extends') {
             throw new RuntimeException('Everything this charge covers is already paid up — it has been overtaken (a later renewal or another payment covered it). Void it rather than collecting for it.');

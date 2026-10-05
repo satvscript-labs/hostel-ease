@@ -158,7 +158,8 @@ class SubscriptionOrder extends Model
      * lines all end on the new anchor, top-ups end on the anchor that was current
      * when the renewal was quoted. Orders without top-ups behave exactly as before.
      *
-     * Also 'stale': an UNPAID renewal priced with a branch's free renewal that the
+     * Also 'stale': an UNPAID renewal quoted before a branch joined the plan (it would
+     * renew only some of the account), and an UNPAID renewal priced with a branch's free renewal that the
      * branch no longer holds (removed, or used by another renewal) — paying it would
      * hand out a gift that is not there. Re-quoting prices that branch normally.
      */
@@ -174,10 +175,24 @@ class SubscriptionOrder extends Model
             return 'covered';
         }
 
+        // A branch JOINED THE TRIAL after this renewal was quoted: the quote leaves it
+        // out, so paying it would renew only some of the account and strand that branch
+        // on the trial's end date. Re-quoting includes it. (Only the trial join: any
+        // other branch added later waits to be paid for, and a branch REMOVED since is
+        // fine — it was quoted and is still paid for, S3 audit.)
+        $branchJoined = $this->kind === OrderKind::Renewal && $this->payment_status === PaymentStatus::Pending
+            && SubscriptionOrderLine::query()
+                ->whereNotIn('branch_id', $this->lines->pluck('branch_id'))
+                ->whereHas('order', fn ($q) => $q->where('account_id', $this->account_id)
+                    ->where('kind', OrderKind::Trial->value)
+                    ->where('payment_status', PaymentStatus::Paid->value)
+                    ->where('id', '>', $this->id))   // raised later (ids only grow; timestamps tie within a second)
+                ->exists();
+
         $giftGone = $this->payment_status === PaymentStatus::Pending
             && $this->lines->contains(fn (SubscriptionOrderLine $line) => $line->complimentary && (int) ($line->branch?->free_renewals ?? 0) < 1);
 
-        return $giftGone || $this->topUpLines()->contains(fn (SubscriptionOrderLine $line) => ! $extends($line))
+        return $branchJoined || $giftGone || $this->topUpLines()->contains(fn (SubscriptionOrderLine $line) => ! $extends($line))
             ? 'stale'
             : 'extends';
     }

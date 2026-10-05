@@ -402,7 +402,7 @@ class CheckoutService
         // open a payment for a charge whose every date is already covered.
         $state = $order->coverageState(fresh: true);
         if ($state === 'stale') {
-            throw new RuntimeException('Part of this charge has already been paid separately, so its amount is out of date. Start the renewal again and you will see the correct total.');
+            throw new RuntimeException('This charge is out of date — your branches or free renewals changed since it was raised, so its amount is no longer right. Start the renewal again and you will see the correct total.');
         }
         if ($state !== 'extends') {
             throw new RuntimeException('Everything this charge covers is already paid up, so there is nothing to pay on it. If you think that is wrong, please contact us.');

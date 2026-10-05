@@ -432,6 +432,10 @@ class SubscriptionController extends Controller
             // Part of it was paid separately since: not "already covered" — the rest
             // is still owed, at a new amount.
             'stale' => $state === 'stale',
+            // The owner's OWN checkout attempt (no link, not the operator's): they may
+            // abandon it and choose the other term — startRenewal supersedes it. An
+            // operator's charge is theirs to change, so it never offers this.
+            'own' => $o->kind?->value === 'renewal' && $o->collection === \App\Enums\CollectionMethod::Checkout && ! $o->hasLiveLink(),
             'id' => $o->id,
             'label' => $o->kind?->label() ?? 'Charge',
             'invoice' => $o->invoiceNumber(),

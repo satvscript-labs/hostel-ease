@@ -154,7 +154,7 @@ class PaymentSettlement
             return self::ALREADY;
         }
 
-        if ($stale) {
+        if ($stale && $doubleTopUp > 0) {
             $this->notifications->push(
                 null,
                 'payment_no_coverage',
