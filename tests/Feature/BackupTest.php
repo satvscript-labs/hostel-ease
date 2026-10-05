@@ -334,6 +334,23 @@ class BackupTest extends TestCase
         $this->assertSame('2 files', $service->latest('files')['detail']);
     }
 
+    public function test_backups_are_not_readable_by_other_accounts(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows' || ! class_exists(\ZipArchive::class)) {
+            $this->markTestSkipped('POSIX file modes only');
+        }
+
+        // The files archive holds Aadhaar scans. ZipArchive::close() recreates the file
+        // with the default mode (0644 on the server), so this guards the chmod after it.
+        $service = app(BackupService::class);
+        $dir = $service->directory().DIRECTORY_SEPARATOR;
+
+        foreach ([$service->create(), $service->createFiles()] as $name) {
+            $this->assertSame('0600', substr(sprintf('%o', fileperms($dir.$name)), -4), $name);
+            $this->assertSame('0600', substr(sprintf('%o', fileperms($dir.$name.'.json')), -4), $name.'.json');
+        }
+    }
+
     public function test_an_empty_upload_folder_still_backs_up(): void
     {
         if (! class_exists(\ZipArchive::class)) {

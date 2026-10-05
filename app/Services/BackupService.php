@@ -163,6 +163,9 @@ class BackupService
             if (! $zip->close()) {
                 throw new \RuntimeException('the zip could not be finished (is the disk full?)');
             }
+            // close() writes a fresh file with the default mode, so restrict it NOW: the
+            // archive holds Aadhaar scans and must not be world-readable.
+            @chmod($partial, 0600);
 
             $check = $this->verifyZip($partial, $count + 1);
             if ($check !== null) {
@@ -368,12 +371,14 @@ class BackupService
     {
         $path = $this->directory().DIRECTORY_SEPARATOR.$filename;
 
-        file_put_contents($this->metaPath($filename), json_encode(array_merge([
+        $meta = $this->metaPath($filename);
+        file_put_contents($meta, json_encode(array_merge([
             'created_at' => now()->toIso8601String(),
             'bytes' => filesize($path),
             'sha256' => hash_file('sha256', $path),
             'verified_at' => now()->toIso8601String(),
         ], $extra), JSON_PRETTY_PRINT));
+        @chmod($meta, 0600);
     }
 
     /** Two backups in the same second must not overwrite each other. */
