@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AccountStatus;
+use App\Enums\BillingMode;
 use App\Enums\BillingPeriod;
 use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,6 +31,14 @@ class SubscriptionAccount extends Model
         'auto_debit',
         'razorpay_subscription_id',
         'notes',
+        // billing_mode is NOT fillable on purpose: only the operator's Account 360
+        // action sets it (forceFill), so no create()/update() elsewhere can flip a
+        // customer between self-serve and managed by accident.
+    ];
+
+    /** A model made in memory is self-serve too — before any refresh() reads the DB default. */
+    protected $attributes = [
+        'billing_mode' => 'self_serve',
     ];
 
     protected function casts(): array
@@ -42,6 +51,8 @@ class SubscriptionAccount extends Model
             'unit_price_override_yearly' => 'decimal:2',
             'unit_price_override_monthly' => 'decimal:2',
             'auto_debit' => 'boolean',
+            'billing_mode' => BillingMode::class,
+            'billing_mode_changed_at' => 'datetime',
         ];
     }
 
@@ -58,6 +69,27 @@ class SubscriptionAccount extends Model
     public function discounts(): HasMany
     {
         return $this->hasMany(Discount::class, 'account_id');
+    }
+
+    /**
+     * May the OWNER start a charge from their own Subscription page right now?
+     *
+     * The one answer every owner-side surface asks — the page, the checkout and
+     * add-branch endpoints, the reminder email, the dashboard notice. Both must hold:
+     * the platform-wide kill switch is on, AND this customer is self-serve.
+     *
+     * Settling money already taken never asks this: a payment in flight when an
+     * account is switched to managed still lands (confirm + webhook are ungated).
+     */
+    public function selfServeEnabled(): bool
+    {
+        return (bool) config('hostelease.owner_self_serve')
+            && $this->billing_mode === BillingMode::SelfServe;
+    }
+
+    public function isManaged(): bool
+    {
+        return $this->billing_mode === BillingMode::Managed;
     }
 
     /** Whether branches under this account are currently entitled to work. */

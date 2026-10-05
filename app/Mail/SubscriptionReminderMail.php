@@ -42,6 +42,12 @@ class SubscriptionReminderMail extends Mailable implements ShouldQueue
                 'kind' => $this->kind,
                 'daysUntil' => $this->daysUntil,
                 'isTrial' => $this->account->period?->value === 'trial',
+                // Self-serve owners are sent to their Subscription page to pay; a
+                // managed customer is told we will handle it (BillingMode). Read when
+                // the queued mail is SENT, so a change on Account 360 in between counts.
+                'selfServe' => $this->account->selfServeEnabled(),
+                'renewUrl' => route('admin.subscription.index'),
+                'supportEmail' => config('hostelease.company.email'),
             ],
         );
     }

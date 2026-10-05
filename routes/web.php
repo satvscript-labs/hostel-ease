@@ -168,6 +168,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('accounts/{account}/align', [AccountController::class, 'align'])->name('accounts.align');
         Route::post('accounts/{account}/comp', [AccountController::class, 'comp'])->name('accounts.comp');
         Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
+        Route::post('accounts/{account}/billing-mode', [AccountController::class, 'billingMode'])->name('accounts.billing-mode');
         Route::post('accounts/{account}/suspend', [AccountController::class, 'suspend'])->name('accounts.suspend');
         Route::post('accounts/{account}/reactivate', [AccountController::class, 'reactivate'])->name('accounts.reactivate');
         Route::post('accounts/{account}/discounts', [AccountController::class, 'storeDiscount'])->name('accounts.discounts.store');

@@ -33,8 +33,11 @@ use RuntimeException;
  *   · anyone on the account sees the page;
  *   · only the ACCOUNT OWNER starts a charge — gated on the owner FK, never the role,
  *     because a co-admin IS a hostel_admin;
- *   · starting a charge needs `owner_self_serve` ON — it is the kill switch;
- *   · confirming a payment needs neither: it settles money already taken.
+ *   · starting a charge needs SubscriptionAccount::selfServeEnabled() — the
+ *     platform kill switch (`owner_self_serve`) ON *and* this customer self-serve
+ *     rather than managed by HostelEase (BillingMode, set on Account 360);
+ *   · confirming a payment needs none of that: it settles money already taken,
+ *     so a checkout in flight when the account is switched to managed still lands.
  *
  * Lives outside the subscription.active gate (routes/web.php) so an expired owner can
  * still reach it to pay.
@@ -80,7 +83,11 @@ class SubscriptionController extends Controller
         // overtaken one is listed below as already covered, never offered (S3 audit).
         $openRenewal = $due->first(fn (SubscriptionOrder $o) => $o->kind?->value === 'renewal' && $o->wouldExtendCoverage());
 
-        $selfServe = (bool) config('hostelease.owner_self_serve');
+        // Self-serve for THIS customer: platform switch on AND not managed by us.
+        // When false the page reads "Managed by HostelEase" — the same words whether
+        // the platform switch is off or this account is managed, on purpose: an owner
+        // has no reason to know which, and every reason not to ask for the other.
+        $selfServe = $account->selfServeEnabled();
         $canManage = $viewerOwnsAccount && $selfServe && $this->checkout->isEnabled();
 
         return view('admin.subscription.index', [
@@ -266,6 +273,15 @@ class SubscriptionController extends Controller
             return [$account, response()->json([
                 'message' => 'Online billing is handled by HostelEase support right now — please contact us and we will set it up for you.',
             ], 503)];
+        }
+
+        // This customer's billing is handled by HostelEase (Account 360). The page
+        // hides every button that leads here; this is the server saying the same to a
+        // stale tab or a crafted request.
+        if ($account->isManaged()) {
+            return [$account, response()->json([
+                'message' => 'Billing on your account is handled by the HostelEase team — please contact us and we will set it up for you.',
+            ], 403)];
         }
 
         if ($account->owner_id !== $viewer->id) {

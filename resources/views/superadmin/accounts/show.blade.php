@@ -133,6 +133,39 @@
     .comp-preview-badge { margin-left:auto; font-size:.72rem; font-weight:700; color: var(--he-success,#10b981); background: var(--he-success-soft,#d1fae5); border-radius: var(--he-radius-full,9999px); padding:.2rem .6rem; }
     .comp-preview-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.5rem 1rem; }
     .comp-preview-row + .comp-preview-row { border-top:1px dashed rgba(15,23,42,.07); }
+
+    /* ── Billing management (BillingMode) ──
+       The hero pill states WHO handles this customer's billing at a glance and is
+       the way in to change it; the modal offers the two modes as tiles that each
+       say what the owner will see, because that — not the setting's name — is the
+       decision the operator is actually making. */
+    .a360-mode { display:inline-flex; align-items:center; gap:.4rem; border-radius: var(--he-radius-full, 9999px); padding:.38rem .8rem;
+        font-size:.74rem; font-weight:700; color:#fff; background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);
+        transition: background .2s ease, border-color .2s ease; cursor:pointer; }
+    .a360-mode:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.35); }
+    .a360-mode:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+    .a360-mode.is-managed { background: rgba(251,191,36,.18); border-color: rgba(251,191,36,.45); color:#fde68a; }
+    .a360-mode.is-managed:hover { background: rgba(251,191,36,.26); }
+    .a360-mode-off { font-weight:600; opacity:.7; }
+    .a360-mode-edit { font-size:.6rem; opacity:.7; }
+
+    .bm-tile { display:flex; gap:.85rem; align-items:flex-start; background:#fff; border:1.5px solid rgba(15,23,42,.1); border-radius: var(--he-radius-lg, 16px);
+        padding:1rem 1.05rem; cursor:pointer; transition: all .2s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)); }
+    .bm-tile + .bm-tile { margin-top:.65rem; }
+    .bm-tile:hover { border-color: rgba(79,70,229,.4); }
+    .bm-tile.is-selected { border-color: var(--he-primary, #4f46e5); background: var(--he-primary-soft, rgba(79,70,229,.06)); box-shadow: 0 6px 16px rgba(79,70,229,.1); }
+    .bm-tile input { position:absolute; opacity:0; pointer-events:none; }
+    .bm-tile:has(input:focus-visible) { outline:2px solid var(--he-primary, #4f46e5); outline-offset:2px; }
+    .bm-ic { width:40px; height:40px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.95rem;
+        background: var(--he-bg-surface-raised, #f1f5f9); color: var(--he-text-muted, #64748b); transition: all .2s ease; }
+    .bm-tile.is-selected .bm-ic { background: var(--he-primary, #4f46e5); color:#fff; }
+    .bm-title { font-weight:800; color: var(--he-text-main, #0f172a); font-size:.95rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .bm-now { font-size:.62rem; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color: var(--he-text-muted, #64748b);
+        background: var(--he-bg-surface-raised, #f1f5f9); border-radius: var(--he-radius-full, 9999px); padding:.15rem .5rem; }
+    .bm-desc { font-size:.84rem; color: var(--he-text-muted, #64748b); margin:.15rem 0 .5rem; line-height:1.45; }
+    .bm-sees { list-style:none; padding:0; margin:0; display:grid; gap:.3rem; }
+    .bm-sees li { display:flex; gap:.5rem; font-size:.8rem; color: var(--he-text-main, #334155); line-height:1.4; }
+    .bm-sees i { width:.9rem; margin-top:.2rem; text-align:center; flex-shrink:0; }
 </style>
 @endpush
 
@@ -148,6 +181,13 @@
                 <div class="d-flex align-items-center gap-2 mb-1">
                     <h1 class="h3 fw-bold mb-0">{{ $account->owner?->name ?? 'Customer' }}</h1>
                     <span class="badge bg-{{ $account->status->color() }}-subtle text-{{ $account->status->color() }} rounded-pill px-3 py-2">{{ $account->status->label() }}</span>
+                    <button type="button" class="a360-mode {{ $account->isManaged() ? 'is-managed' : '' }}" @click="billingModeOpen = true"
+                            title="Who handles this customer's billing — click to change">
+                        <i class="fa-solid fa-{{ $account->billing_mode->icon() }}"></i>
+                        {{ $account->billing_mode->label() }}
+                        @if(! $account->isManaged() && ! $selfServeLive)<span class="a360-mode-off">· off for everyone</span>@endif
+                        <i class="fa-solid fa-pen a360-mode-edit"></i>
+                    </button>
                 </div>
                 <div class="text-white-50 small">
                     <i class="fa-solid fa-mobile-screen me-1"></i>{{ $account->owner?->mobile ?? '—' }}
@@ -166,6 +206,7 @@
                         <li><button class="dropdown-item rounded-3 py-2" @click="compOpen = true"><i class="fa-solid fa-gift text-primary me-2"></i>Comp (free coverage)</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="overrideOpen = true"><i class="fa-solid fa-tag text-primary me-2"></i>Set custom price</button></li>
                         <li><button class="dropdown-item rounded-3 py-2" @click="discountOpen = true"><i class="fa-solid fa-percent text-primary me-2"></i>Add discount</button></li>
+                        <li><button class="dropdown-item rounded-3 py-2" @click="billingModeOpen = true"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Who handles billing</button></li>
                         <li><hr class="dropdown-divider"></li>
                         @if($account->status->value === 'suspended')
                             <li>
@@ -578,6 +619,70 @@
     {{-- ══ Modals ══ --}}
     <template x-teleport="body">
         <div>
+            {{-- Who handles billing (BillingMode) --}}
+            <div class="custom-overlay-backdrop" x-show="billingModeOpen" x-transition.opacity @click.self="billingModeOpen=false" x-cloak style="display:none;">
+                <form method="POST" action="{{ route('superadmin.accounts.billing-mode', $account) }}" class="custom-overlay-modal" style="max-width:560px;" :class="{'is-open':billingModeOpen}">
+                    @csrf
+                    <div class="custom-overlay-header">
+                        <div>
+                            <h5 class="fw-bold mb-0">Who handles billing</h5>
+                            <div class="small text-muted">For {{ $account->owner?->name ?? 'this customer' }}@if($account->billing_mode_changed_at) · set {{ $account->billing_mode_changed_at->format('d M Y') }}@endif</div>
+                        </div>
+                        <button type="button" class="btn-close" @click="billingModeOpen=false"></button>
+                    </div>
+                    <div class="custom-overlay-body">
+                        @if(! $selfServeLive)
+                            <div class="d-flex gap-2 align-items-start p-3 mb-3 rounded-3 small" style="background: var(--he-info-soft, #e0f2fe); color:#075985;">
+                                <i class="fa-solid fa-circle-info mt-1"></i>
+                                <div>Self-serve is <strong>switched off for every customer</strong> right now, so this owner sees “Managed by HostelEase” whichever you pick. Your choice applies the moment it is switched on.</div>
+                            </div>
+                        @endif
+
+                        <label class="bm-tile" :class="{ 'is-selected': billingModeChoice === 'self_serve' }">
+                            <input type="radio" name="mode" value="self_serve" x-model="billingModeChoice">
+                            <span class="bm-ic"><i class="fa-solid fa-user-check"></i></span>
+                            <span class="flex-grow-1 min-w-0">
+                                <span class="bm-title">The owner <span class="text-muted fw-semibold">· self-serve</span>@if(! $account->isManaged())<span class="bm-now">Current</span>@endif</span>
+                                <span class="bm-desc d-block">They renew, add branches and pay online themselves. You can still do everything here.</span>
+                                <ul class="bm-sees">
+                                    <li><i class="fa-solid fa-check text-success"></i>Renew and Add a branch buttons on their Subscription page</li>
+                                    <li><i class="fa-solid fa-check text-success"></i>Reminders point them to that page to pay</li>
+                                </ul>
+                            </span>
+                        </label>
+
+                        <label class="bm-tile" :class="{ 'is-selected': billingModeChoice === 'managed' }">
+                            <input type="radio" name="mode" value="managed" x-model="billingModeChoice">
+                            <span class="bm-ic"><i class="fa-solid fa-shield-halved"></i></span>
+                            <span class="flex-grow-1 min-w-0">
+                                <span class="bm-title">HostelEase <span class="text-muted fw-semibold">· managed</span>@if($account->isManaged())<span class="bm-now">Current</span>@endif</span>
+                                <span class="bm-desc d-block">You renew and add branches for them from this page. For owners who asked, or who need it handled.</span>
+                                <ul class="bm-sees">
+                                    <li><i class="fa-solid fa-shield-halved text-warning"></i>Their page reads “Managed by HostelEase” — no Renew or Add buttons</li>
+                                    <li><i class="fa-solid fa-check text-success"></i>They can still pay any link you send, and ask to remove a branch</li>
+                                    <li><i class="fa-solid fa-check text-success"></i>A payment they are already making still goes through</li>
+                                </ul>
+                            </span>
+                        </label>
+
+                        @if($ownerOpenCharges > 0)
+                            <div x-show="billingModeChoice === 'managed' && '{{ $account->billing_mode->value }}' !== 'managed'" x-transition.opacity
+                                 class="d-flex gap-2 align-items-start p-3 mt-3 rounded-3 small" style="background: var(--he-warning-soft, #fef3c7); color:#92400e;">
+                                <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+                                <div>The owner started {{ $ownerOpenCharges }} {{ $ownerOpenCharges === 1 ? 'charge that is' : 'charges that are' }} still unpaid. {{ $ownerOpenCharges === 1 ? 'It stays' : 'They stay' }} in Orders below — send a payment link, or void {{ $ownerOpenCharges === 1 ? 'it' : 'them' }}.</div>
+                            </div>
+                        @endif
+
+                        <label class="form-label fw-bold small text-muted mt-3 mb-1">NOTE <span class="fw-normal">(optional — kept in the activity log)</span></label>
+                        <input type="text" name="reason" maxlength="255" class="form-control bg-white border shadow-sm" placeholder="e.g. Owner asked us to handle renewals">
+                    </div>
+                    <div class="custom-overlay-footer">
+                        <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="billingModeOpen=false">Cancel</button>
+                        <button class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" :disabled="billingModeChoice === '{{ $account->billing_mode->value }}'">Save</button>
+                    </div>
+                </form>
+            </div>
+
             {{-- Suspend --}}
             <div class="custom-overlay-backdrop" x-show="suspendOpen" x-transition.opacity @click.self="suspendOpen=false" x-cloak style="display:none;">
                 <form method="POST" action="{{ route('superadmin.accounts.suspend', $account) }}" class="custom-overlay-modal" style="max-width:480px;" :class="{'is-open':suspendOpen}">
@@ -611,6 +716,7 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('account360', () => ({
         renewOpen: false, addOpen: false, alignOpen: false, compOpen: false, overrideOpen: false, discountOpen: false, suspendOpen: false, addHostelOpen: false,
+        billingModeOpen: false, billingModeChoice: @js($account->billing_mode->value),
         dType: 'percentage',
 
         r2(v) { return Math.round(v * 100) / 100; },

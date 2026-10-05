@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SuperAdmin;
 
+use App\Enums\BillingMode;
 use App\Enums\BillingPeriod;
 use App\Enums\CollectionMethod;
 use App\Http\Controllers\Controller;
@@ -132,6 +133,7 @@ class AccountController extends Controller
         $accounts = SubscriptionAccount::query()
             ->with(['owner:id,name,mobile', 'owner.hostels:id'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when(BillingMode::tryFrom((string) $request->input('billing')), fn ($q, BillingMode $mode) => $q->where('billing_mode', $mode->value))
             ->when($dueDays, fn ($q) => $q->where('status', '!=', 'suspended')
                 ->whereNotNull('current_period_end')
                 ->where('current_period_end', '<=', now()->addDays($dueDays)->endOfDay()))
@@ -353,7 +355,16 @@ class AccountController extends Controller
         // Add hostel while it is still unused. The server refuses it regardless.
         $trialAvailable = $this->billing->trialAvailable($account);
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable'));
+        // Billing management (BillingMode). `selfServeLive` is the platform switch:
+        // while it is off, nobody self-serves and the card says so, rather than letting
+        // the operator believe "Self-serve" means the owner can pay today.
+        // `ownerOpenCharges` = charges the OWNER started that are still unpaid — they
+        // stay open if the account is switched to managed, and the modal says so.
+        $selfServeLive = (bool) config('hostelease.owner_self_serve');
+        $ownerOpenCharges = $account->orders()->outstanding()
+            ->where('collection', CollectionMethod::Checkout->value)->count();
+
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'selfServeLive', 'ownerOpenCharges'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -972,6 +983,49 @@ class AccountController extends Controller
         );
 
         return back()->with('success', 'Removal request closed and the owner notified.');
+    }
+
+    /**
+     * Who handles this customer's billing: the owner (self-serve) or HostelEase (managed).
+     *
+     * Only the owner's ability to START a charge changes. Everything on this page keeps
+     * working either way, payments already in flight still settle, and charges the
+     * owner opened before the switch stay open (send a link for them, or void them).
+     */
+    public function billingMode(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $data = $request->validate([
+            'mode' => ['required', Rule::enum(BillingMode::class)],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $mode = BillingMode::from($data['mode']);
+        $owner = $account->owner?->name ?? 'this customer';
+
+        if ($account->billing_mode === $mode) {
+            return back()->with('warning', "Billing for {$owner} is already {$mode->label()}.");
+        }
+
+        $from = $account->billing_mode;
+        $account->forceFill(['billing_mode' => $mode, 'billing_mode_changed_at' => now()])->save();
+
+        $reason = trim((string) ($data['reason'] ?? ''));
+        $this->logger->log(
+            'subscription.update',
+            "Billing changed from {$from?->label()} to {$mode->label()}".($reason !== '' ? " — {$reason}" : ''),
+            $account,
+            ['billing_mode' => ['from' => $from?->value, 'to' => $mode->value], 'reason' => $reason ?: null],
+        );
+
+        $message = $mode === BillingMode::Managed
+            ? "HostelEase now manages billing for {$owner}. Their Subscription page shows it straight away; they can still pay any link you send."
+            : "{$owner} now manages their own billing.";
+
+        if (! config('hostelease.owner_self_serve')) {
+            $message .= ' Self-serve is switched off for every customer at the moment, so nothing changes on their side until it is switched on.';
+        }
+
+        return back()->with('success', $message);
     }
 
     /** Manual override: suspend the account and every included branch (BR-18). */

@@ -166,19 +166,24 @@ class DashboardController extends Controller
         $isTrial = $account->period?->value === 'trial';
         $end = $account->current_period_end->format('d M Y');
         $noun = $isTrial ? 'trial' : 'subscription';
+        // What to do about it depends on who handles billing (BillingMode): a
+        // self-serve owner renews; a managed customer is told we will.
+        $selfServe = $account->selfServeEnabled();
 
         $alert = match (true) {
             $account->status === \App\Enums\AccountStatus::Grace => [
                 'tone' => 'danger', 'icon' => 'triangle-exclamation',
                 'title' => 'Grace period — your '.$noun.' has expired',
-                'msg' => "It ended on {$end}. Access continues for a short grace window — renew now to avoid interruption.",
+                'msg' => "It ended on {$end}. Access continues for a short grace window — "
+                    .($selfServe ? 'renew now to avoid interruption.' : 'contact us to renew and avoid interruption.'),
             ],
             $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days >= 0 && $days <= 7 => [
                 'tone' => 'warning', 'icon' => 'clock',
                 'title' => $isTrial
                     ? ($days === 0 ? 'Your trial ends today' : "Your trial ends in {$days} day(s)")
                     : ($days === 0 ? 'Renewal due today' : "Renewal due in {$days} day(s)"),
-                'msg' => "Your {$noun} renews on {$end}. Renew soon to keep every branch active.",
+                'msg' => "Your {$noun} renews on {$end}. "
+                    .($selfServe ? 'Renew soon to keep every branch active.' : 'Our team will be in touch to renew it for you.'),
             ],
             $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days <= 30 => [
                 'tone' => 'info', 'icon' => 'calendar-check',

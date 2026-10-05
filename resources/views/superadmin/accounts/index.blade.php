@@ -35,6 +35,11 @@
         min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .sac-ltv { min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .sac-days { font-size: .72rem; }
+    /* Managed by HostelEase (BillingMode): a quiet second line under the status, so
+       the operator's own book of customers is visible without a column of its own. */
+    .sac-status { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
+    .sac-managed { display: inline-flex; align-items: center; gap: .3rem; font-size: .68rem; font-weight: 700;
+        color: #b45309; white-space: nowrap; }
     .sac-chev { color: var(--he-text-muted); margin-left: auto; }
 
     /* Wide ≥880 container: one-line subgrid — the LIST owns the template, every
@@ -48,6 +53,7 @@
         .sac-row { display: grid; grid-template-columns: subgrid; }
         .sac-id { flex: none; }
         .sac-branches, .sac-status { justify-self: center; text-align: center; }
+        .sac-status { align-items: center; }
         .sac-ltv { justify-self: end; text-align: right; }
         .sac-cell-lbl { display: none; } /* header row carries the labels on wide */
         .sac-chev { margin-left: 0; }
@@ -174,6 +180,14 @@
                     'trial' => ['label' => __('Trial'), 'icon' => 'gift'],
                     'suspended' => ['label' => __('Suspended'), 'icon' => 'ban'],
                 ]" />
+            {{-- Who handles billing (BillingMode): the operator's own book of managed
+                 customers is a list worth pulling up on its own. --}}
+            <x-he-select name="billing" icon="shield-halved" label="Billing" :selected="request('billing', '')"
+                :options="[
+                    '' => ['label' => __('All billing'), 'icon' => 'shield-halved'],
+                    'self_serve' => ['label' => __('Self-serve'), 'icon' => 'user-check'],
+                    'managed' => ['label' => __('Managed by HostelEase'), 'icon' => 'shield-halved'],
+                ]" />
         </form>
     </div>
 
@@ -207,6 +221,9 @@
 
                     <div class="sac-status">
                         <span class="badge bg-{{ $account->status->color() }}-subtle text-{{ $account->status->color() }} border border-{{ $account->status->color() }}-subtle rounded-pill px-3 py-2">{{ $account->status->label() }}</span>
+                        @if($account->isManaged())
+                            <span class="sac-managed" title="{{ __('Managed by HostelEase — you renew and add branches for them') }}"><i class="fa-solid fa-shield-halved"></i>{{ __('Managed') }}</span>
+                        @endif
                     </div>
 
                     <div class="sac-renews">
