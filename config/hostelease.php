@@ -193,8 +193,30 @@ return [
     */
     'owner_self_serve' => (bool) env('HOSTELEASE_OWNER_SELF_SERVE', false),
 
-    // Path to the mysqldump binary (XAMPP: D:\xampp\mysql\bin\mysqldump.exe).
-    'dump_binary' => env('DB_DUMP_BINARY', 'mysqldump'),
+    /*
+    |--------------------------------------------------------------------------
+    | Backups
+    |--------------------------------------------------------------------------
+    | Written in PHP, with no mysqldump and no shell: Hostinger's shared hosting
+    | disables proc_open, which is exactly what the old mysqldump approach needed
+    | (and what made every nightly backup fail there). See App\Services\Backup.
+    |
+    | `path`        where archives live. storage/app is never web-served.
+    | `skip_data`   tables dumped as STRUCTURE ONLY: sessions, caches, queued jobs and
+    |               reset tokens are throwaway, and putting live session ids into a
+    |               file people download is a leak with no upside.
+    | `stale_*`     how old the newest backup may get before the Super Admin is warned.
+    | `keep_min`    prune never deletes the newest N of a kind, however old, so a
+    |               stretch of failed backups cannot prune the last good one away.
+    */
+    'backup' => [
+        'path' => storage_path('app/backups'),
+        'skip_data' => ['sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs', 'password_reset_tokens'],
+        'rows_per_insert' => 200,
+        'stale_database_hours' => 36,
+        'stale_files_days' => 10,
+        'keep_min' => 3,
+    ],
 
     'expense_categories' => [
         'electricity' => 'Electricity',

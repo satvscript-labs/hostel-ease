@@ -225,6 +225,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
         Route::post('backups', [BackupController::class, 'store'])->name('backups.store');
         Route::get('backups/{filename}/download', [BackupController::class, 'download'])->name('backups.download');
+        Route::post('backups/{filename}/verify', [BackupController::class, 'verify'])->name('backups.verify');
         Route::delete('backups/{filename}', [BackupController::class, 'destroy'])->name('backups.destroy');
     });
 

@@ -15,6 +15,7 @@ class GenerateNotifications extends Command
     public function handle(NotificationService $service): int
     {
         $service->generateForSuperAdmin();
+        $service->syncBackupAlerts(app(\App\Services\BackupService::class));
 
         Hostel::query()->each(fn (Hostel $hostel) => $service->generateForHostel($hostel));
 

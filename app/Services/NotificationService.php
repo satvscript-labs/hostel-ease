@@ -141,6 +141,35 @@ class NotificationService
     }
 
     /**
+     * Raise (or clear) the Super Admin's "your backups are going stale" alerts. Runs daily
+     * from hostelease:generate-notifications. A failed run raises its own alert straight
+     * away (RunBackup); this one catches the case where nothing runs at all (a cron entry
+     * that was never added, or that stopped), which is otherwise completely silent.
+     */
+    public function syncBackupAlerts(\App\Services\BackupService $backups): void
+    {
+        $labels = [
+            \App\Services\BackupService::DATABASE => 'Database',
+            \App\Services\BackupService::FILES => 'Uploaded files',
+        ];
+
+        foreach ($backups->health() as $type => $state) {
+            if (! $state['stale']) {
+                $this->clear(null, 'backup_stale', $type);
+
+                continue;
+            }
+
+            $this->push(null, 'backup_stale', $type,
+                "{$labels[$type]} backup is out of date",
+                $state['last']
+                    ? 'The newest one is from '.$state['last']->diffForHumans().'. Check the cron job.'
+                    : 'There is no backup yet. Check the cron job.',
+                $type === \App\Services\BackupService::DATABASE ? 'danger' : 'warning');
+        }
+    }
+
+    /**
      * Count obligations whose promise_date has arrived and are still unpaid (current tenant).
      */
     protected function promisesDueCount(): int

@@ -19,8 +19,12 @@ Artisan::command('inspire', function () {
 Schedule::command('hostelease:process-subscription-lifecycle')->dailyAt('07:30');
 // Refresh dashboard alerts every morning.
 Schedule::command('hostelease:generate-notifications')->dailyAt('08:00');
-// Nightly database backup (keeps 30 days).
+// Nightly database backup + weekly backup of the uploaded files (keeps 30 days).
+// NOTE: Hostinger disables proc_open, which Laravel's scheduler needs, so there
+// `schedule:run` cannot be used and each of these is its own cron entry instead
+// (see _artifact/SSH_Deployment.md §5). These lines serve every host where it can.
 Schedule::command('hostelease:backup --prune=30')->dailyAt('02:00');
+Schedule::command('hostelease:backup --files --prune=30')->weeklyOn(0, '03:00');
 
 
 Schedule::command('hostel:generate-invoices')->dailyAt('01:00');

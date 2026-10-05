@@ -35,14 +35,14 @@
 @section('content')
 @php
     $totalSize = collect($backups)->sum('size');
-    $lastBackup = count($backups) > 0 ? $backups[0] : null;
-    $healthy = $lastBackup && $lastBackup['created_at']->diffInHours(now()) < 24;
+    $db = $health['database'];
+    $files = $health['files'];
 @endphp
 <div class="page-enter">
     <div class="he-page-head mb-4 stagger-1">
         <div>
             <h1 class="he-page-title">{{ __('System Backups') }}</h1>
-            <p class="he-page-sub">{{ __('Database snapshots and automated recovery points.') }}</p>
+            <p class="he-page-sub">{{ __('Your database and uploaded files, backed up and checked.') }}</p>
         </div>
         <button form="backupForm" class="btn btn-premium shadow-sm rounded-pill px-4 fw-semibold tactile-btn d-none d-md-inline-flex align-items-center">
             <i class="fa-solid fa-cloud-arrow-up me-2"></i>{{ __('Create Backup Now') }}
@@ -56,13 +56,20 @@
 
     {{-- ── Health band ── --}}
     <div class="he-stats mb-4 stagger-2">
-        <div class="he-stats__grid" style="--he-stats-cols: 3;">
+        <div class="he-stats__grid" style="--he-stats-cols: 4;">
             <div class="he-stat he-stat--hero">
                 <div class="he-stat__head">
-                    <div class="he-stat__icon" style="background: rgba(255,255,255,.15); color: {{ $healthy ? '#6ee7b7' : '#fbbf24' }};"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div class="he-stat__label">{{ __('Last backup') }} <span class="opacity-50">· {{ $healthy ? __('healthy') : __('needs backup') }}</span></div>
+                    <div class="he-stat__icon" style="background: rgba(255,255,255,.15); color: {{ $db['stale'] ? '#fbbf24' : '#6ee7b7' }};"><i class="fa-solid fa-database"></i></div>
+                    <div class="he-stat__label">{{ __('Database') }} <span class="opacity-50">· {{ $db['stale'] ? __('needs backup') : __('healthy') }}</span></div>
                 </div>
-                <div class="he-stat__value">{{ $lastBackup ? $lastBackup['created_at']->diffForHumans(short: true) : __('None yet') }}</div>
+                <div class="he-stat__value">{{ $db['last'] ? $db['last']->diffForHumans(short: true) : __('None yet') }}</div>
+            </div>
+            <div class="he-stat">
+                <div class="he-stat__head">
+                    <div class="he-stat__icon" style="background: {{ $files['stale'] ? 'var(--he-warning-soft, #fef3c7)' : 'var(--he-success-soft, #d1fae5)' }}; color: {{ $files['stale'] ? '#b45309' : '#047857' }};"><i class="fa-solid fa-folder-open"></i></div>
+                    <div class="he-stat__label">{{ __('Files') }} <span class="opacity-50">· {{ $files['stale'] ? __('needs backup') : __('healthy') }}</span></div>
+                </div>
+                <div class="he-stat__value">{{ $files['last'] ? $files['last']->diffForHumans(short: true) : __('None yet') }}</div>
             </div>
             <div class="he-stat">
                 <div class="he-stat__head">
@@ -74,7 +81,7 @@
             <div class="he-stat">
                 <div class="he-stat__head">
                     <div class="he-stat__icon" style="background: var(--he-info-soft); color: var(--he-info);"><i class="fa-solid fa-clock-rotate-left"></i></div>
-                    <div class="he-stat__label">{{ __('Snapshots kept') }}</div>
+                    <div class="he-stat__label">{{ __('Backups kept') }}</div>
                 </div>
                 <div class="he-stat__value">{{ count($backups) }}</div>
             </div>
@@ -83,7 +90,10 @@
 
     <div class="d-flex align-items-start gap-2 mb-3 p-3 rounded-3 stagger-3" style="background: var(--he-info-soft); color: #0369a1; font-size:.84rem; font-weight:600;">
         <i class="fa-solid fa-circle-info mt-1"></i>
-        <div>{{ __('Nightly auto-backup runs at 02:00 and keeps 30 days. Files live in') }} <code>storage/app/backups</code>.</div>
+        <div>
+            {{ __('The database is backed up every night and the uploaded files (Aadhaar scans, photos, documents) every week. Each backup is read back and checked before it is kept, and 30 days are kept.') }}
+            <strong>{{ __('Backups sit on the same server as the app, so download one now and then and keep it somewhere else.') }}</strong>
+        </div>
     </div>
 
     {{-- ── Snapshots — aligned rows ── --}}
@@ -93,15 +103,19 @@
                 @forelse($backups as $b)
                     <div class="bk-row">
                         <div class="bk-main">
-                            <div class="bk-ic"><i class="fa-solid fa-file-zipper"></i></div>
+                            <div class="bk-ic"><i class="fa-solid {{ $b['type'] === 'files' ? 'fa-folder-open' : 'fa-database' }}"></i></div>
                             <div class="bk-text">
                                 <div class="bk-name text-truncate">{{ $b['name'] }}</div>
-                                <div class="bk-sub text-truncate"><span class="d-sm-none">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB · </span><span class="bk-sub-when">{{ $b['created_at']->format('d M Y H:i') }} · </span>{{ $b['created_at']->diffForHumans() }}</div>
+                                <div class="bk-sub text-truncate">{{ $b['type'] === 'files' ? __('Uploaded files') : __('Database') }}@if($b['detail']) · {{ $b['detail'] }}@endif @if($b['verified']) · <i class="fa-solid fa-circle-check text-success" title="{{ __('Checked when it was made') }}"></i>@endif · <span class="d-sm-none">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB · </span><span class="bk-sub-when">{{ $b['created_at']->format('d M Y H:i') }} · </span>{{ $b['created_at']->diffForHumans() }}</div>
                             </div>
                         </div>
                         <div class="bk-size">{{ number_format($b['size'] / 1024 / 1024, 2) }} MB</div>
                         <div class="bk-when">{{ $b['created_at']->format('d M Y H:i') }}</div>
                         <div class="bk-acts he-act-row">
+                            <form action="{{ route('superadmin.backups.verify', $b['name']) }}" method="POST" class="m-0">
+                                @csrf
+                                <button class="he-icon-btn" title="{{ __('Check it is complete') }}" aria-label="{{ __('Verify :file', ['file' => $b['name']]) }}"><i class="fa-solid fa-shield-halved"></i></button>
+                            </form>
                             <a href="{{ route('superadmin.backups.download', $b['name']) }}" class="he-icon-btn" title="{{ __('Download') }}" aria-label="{{ __('Download :file', ['file' => $b['name']]) }}"><i class="fa-solid fa-download"></i></a>
                             <form action="{{ route('superadmin.backups.destroy', $b['name']) }}" method="POST" class="m-0" data-confirm="{{ __('Delete this snapshot permanently?') }}">
                                 @csrf @method('DELETE')
@@ -111,7 +125,7 @@
                     </div>
                 @empty
                     <div class="p-3" style="grid-column:1/-1;">
-                        <x-he-empty-state icon="cloud-arrow-up" title="{{ __('No backups yet') }}" subtitle="{{ __('Create your first snapshot to secure the database.') }}" />
+                        <x-he-empty-state icon="cloud-arrow-up" title="{{ __('No backups yet') }}" subtitle="{{ __('Create your first backup to secure the database.') }}" />
                     </div>
                 @endforelse
             </div>
