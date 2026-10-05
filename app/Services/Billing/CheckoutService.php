@@ -128,12 +128,13 @@ class CheckoutService
                 // and reusing that order would charge for the old set - the new branch
                 // left out of the renewal the owner thinks they paid for.
                 $fresh = $this->billing->quoteRenewal($account, $period);
-                $orderBranches = $open->lines()->pluck('branch_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+                // unique(): a branch with a top-up has two lines on the order.
+                $orderBranches = $open->lines()->pluck('branch_id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
                 $quoteBranches = collect($fresh['branch_ids'])->map(fn ($id) => (int) $id)->sort()->values()->all();
 
                 $unchanged = $open->period?->value === $period
                     && $orderBranches === $quoteBranches
-                    && $open->amountPaise() === (int) round($fresh['breakdown']['final'] * 100);
+                    && $open->amountPaise() === (int) round($fresh['total'] * 100);
 
                 if ($unchanged) {
                     return $this->payExisting($open);
@@ -399,7 +400,11 @@ class CheckoutService
         // The last gate before money (S3 audit). Whatever route led here - the
         // Payment due list, a reused attempt, an operator's proforma or link - never
         // open a payment for a charge whose every date is already covered.
-        if (! $order->wouldExtendCoverage(fresh: true)) {
+        $state = $order->coverageState(fresh: true);
+        if ($state === 'stale') {
+            throw new RuntimeException('Part of this charge has already been paid separately, so its amount is out of date. Start the renewal again and you will see the correct total.');
+        }
+        if ($state !== 'extends') {
             throw new RuntimeException('Everything this charge covers is already paid up, so there is nothing to pay on it. If you think that is wrong, please contact us.');
         }
 

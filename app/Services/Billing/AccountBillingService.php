@@ -219,15 +219,41 @@ class AccountBillingService
         return DB::transaction(function () use ($account, $branch, $period, $payment) {
             $bp = BillingPeriod::tryFrom($period) ?? BillingPeriod::Yearly;
 
-            // ONE FREE TRIAL PER ACCOUNT (owner decision, 2026-10-04). Every trial in
-            // the product is granted through this method, so the rule lives here and
-            // nowhere else: self-signup, the owner's Add branch, and the operator's
-            // Add hostel / provisioning all meet it.
+            // ONE FREE TRIAL PER ACCOUNT (owner decision, 2026-10-04) — and a branch
+            // added WHILE that trial runs joins it (owner decision, 2026-10-05): it
+            // works free until the trial ends, and everything is billed together when
+            // the customer subscribes, or expires with the trial if they do not. Every
+            // trial in the product is granted through this method, so the rule lives
+            // here and nowhere else: self-signup, the owner's Add branch, and the
+            // operator's Add hostel / Add to trial all meet it.
+            $joinsTrial = false;
             if ($bp === BillingPeriod::Trial && ! $this->trialAvailable($account, $branch)) {
-                throw new RuntimeException('This customer has already had their free trial — the trial belongs to the account, once, not to each branch. Choose a paid plan for this branch.');
+                if (! $this->trialJoinable($account)) {
+                    throw new RuntimeException('This customer has already had their free trial, and it has ended — the trial belongs to the account, once, not to each branch. Choose a paid plan for this branch.');
+                }
+                $joinsTrial = true;
             }
 
             $quote = $this->branchBilling->quote($branch, $bp->value);
+
+            // A paid single-branch term is priced at THIS ACCOUNT's unit price — its
+            // negotiated rate when it has one — never the list price the per-branch
+            // quoter knows about. (Reached when an account with no live cycle adds a
+            // branch; the list price ignored a customer's custom rate.)
+            if ($bp->isPaid()) {
+                $quote['amount'] = $this->unitPrice($account, $bp);
+            }
+
+            if ($joinsTrial) {
+                // Same window as the account's trial: today → the day it ends. ₹0, and
+                // no posted amount can change that.
+                $quote['start'] = Carbon::now()->startOfDay();
+                $quote['end'] = $account->current_period_end->copy();
+                $quote['amount'] = 0.0;
+                unset($payment['amount']);
+                $payment['remarks'] ??= 'Joined the free trial (until '.$account->current_period_end->format('d M Y').')';
+            }
+
             $amount = $payment['amount'] ?? $quote['amount'];
 
             $order = $this->makeOrder(
@@ -289,6 +315,16 @@ class AccountBillingService
      * This also retires the trial-vs-renewal-date problem (16_S3_AUDIT.md §4): a
      * trial can no longer be added to an account that has a renewal date of its own.
      */
+    public function trialJoinable(SubscriptionAccount $account): bool
+    {
+        // The account's trial is RUNNING: a trial cadence, trial status, and its end
+        // date not yet passed (today counts — the trial covers its last day).
+        return $account->period === BillingPeriod::Trial
+            && $account->status === AccountStatus::Trial
+            && $account->current_period_end
+            && $account->current_period_end->copy()->endOfDay()->isFuture();
+    }
+
     public function trialAvailable(SubscriptionAccount $account, ?Hostel $forBranch = null): bool
     {
         $hadTrial = $account->orders()
@@ -358,7 +394,7 @@ class AccountBillingService
                 // the start date would stick at whatever it was — finding F15 again,
                 // reached down the payment-link path instead of the renewal one.
                 $cycleStart = $order->kind === OrderKind::Renewal
-                    ? $order->lines()->min('start_date')
+                    ? $order->termStartDate()
                     : null;
 
                 $this->refreshAccountAnchor(
@@ -591,15 +627,73 @@ class AccountBillingService
             : Carbon::now();
         $newAnchor = $bp->extend($base);
 
+        $breakdown = $this->discounts->preview($account, $subtotal, $quantity, 'renewal');
+        $topups = $this->renewalTopUps($account, $branches);
+        $topupTotal = round(array_sum(array_column($topups, 'amount')), 2);
+
         return [
             'period' => $bp,
             'quantity' => $quantity,
             'unit' => $unit,
+            // The TERM: N branches × unit, and its discounts.
             'subtotal' => $subtotal,
-            'breakdown' => $this->discounts->preview($account, $subtotal, $quantity, 'renewal'),
+            'breakdown' => $breakdown,
+            // Branches BEHIND the current renewal date, brought up to it first.
+            'topups' => $topups,
+            'topup_total' => $topupTotal,
+            // What the customer pays. Use THIS as the price — not breakdown.final,
+            // which is the term alone.
+            'total' => round($breakdown['final'] + $topupTotal, 2),
+            'current_anchor' => $topups ? $account->current_period_end->copy() : null,
             'new_anchor' => $newAnchor,
             'branch_ids' => $branches->pluck('id')->all(),
         ];
+    }
+
+    /**
+     * What a renewal must also charge for branches BEHIND the current renewal date.
+     *
+     * A renewal extends every branch from the current anchor. Coverage is the latest
+     * paid end date — not a continuous span — so a branch whose coverage stops before
+     * that anchor (typically one added mid-term and not yet paid for) would be
+     * switched on today and ride FREE until the anchor. Found 2026-10-05: a branch
+     * added 182 days before the anchor got ₹4,986 of coverage for nothing.
+     *
+     * So, on a live PAID cycle, each such branch also pays its stretch up to the
+     * anchor — priced exactly as Align prices it (prorate(), at the account's current
+     * cadence, no discounts: the renewal's discounts apply to the term and are never
+     * applied twice). A TRIAL cycle charges none: branches added during a running
+     * trial share it (owner decision, 2026-10-05). An expired or suspended account has
+     * no live anchor to catch up to — its renewal starts today for every branch.
+     *
+     * @return list<array{branch: Hostel, from: Carbon, days: int, amount: float}>
+     */
+    protected function renewalTopUps(SubscriptionAccount $account, Collection $branches): array
+    {
+        $anchor = $account->current_period_end;
+
+        if (! $account->period?->isPaid() || ! $account->isEntitled() || ! $anchor || ! $anchor->isFuture()) {
+            return [];
+        }
+
+        $cadence = $this->paidPeriod($account->period->value);
+        $unit = $this->unitPrice($account, $cadence);
+        $topups = [];
+
+        foreach ($branches as $branch) {
+            if ($branch->subscription_end && ! $branch->subscription_end->lt($anchor)) {
+                continue;   // already covered to the anchor
+            }
+
+            $from = $this->prorationStart($branch);
+            $line = $this->prorate($anchor, $from, $unit, $cadence);
+
+            if ($line['amount'] > 0) {
+                $topups[] = ['branch' => $branch, 'from' => $from->copy()->startOfDay(), 'days' => $line['days'], 'amount' => $line['amount']];
+            }
+        }
+
+        return $topups;
     }
 
     /**
@@ -621,7 +715,17 @@ class AccountBillingService
         return DB::transaction(function () use ($account, $period, $payment, $branches) {
             $quote = $this->quoteRenewal($account, $period);
             $anchor = $quote['new_anchor'];
-            [$amount, $discountTotal] = $this->resolveCharge($quote['subtotal'], $quote['breakdown'], $payment);
+
+            // The charge = the term (with its discounts) + any top-ups for branches
+            // behind the current renewal date. Subtotal and the "auto" total both carry
+            // the top-ups, so subtotal − discount = amount still holds and an operator
+            // override is still measured against the whole bill.
+            $subtotal = round($quote['subtotal'] + $quote['topup_total'], 2);
+            [$amount, $discountTotal] = $this->resolveCharge(
+                $subtotal,
+                ['final' => $quote['total'], 'discount_total' => $quote['breakdown']['discount_total']],
+                $payment,
+            );
 
             // The cycle START advances with the cycle END (S0 · finding F15). It
             // used to be written `?? now()`, i.e. once and never again, so after
@@ -642,24 +746,35 @@ class AccountBillingService
                 $account,
                 $quote['period'],
                 $quote['quantity'],
-                $quote['subtotal'],
+                $subtotal,
                 $discountTotal,
                 $amount,
                 $payment + ['manual_discount_id' => $quote['breakdown']['manual_discount_id'] ?? null],
                 OrderKind::Renewal,
             );
 
-            // Largest-remainder allocation (finding F12): an equal rounded share left
-            // Σ lines ≠ order amount (three branches on ₹20,000 gave ₹20,000.01).
-            // Harmless while lines are presentational; load-bearing the moment they
-            // carry tax (S7), and confusing on an invoice long before that.
-            $shares = $this->allocate($amount, $branches->count());
+            // Lines sum EXACTLY to the amount (finding F12). Term shares are an equal
+            // split of the term; each top-up keeps its own prorated figure. If the
+            // operator lowered the total, every line is scaled down proportionally so
+            // the lines still add up to what was charged.
+            $termShares = $this->allocate($quote['breakdown']['final'], $branches->count());
+            $weights = array_merge($termShares, array_column($quote['topups'], 'amount'));
+            $shares = abs(array_sum($weights) - $amount) < 0.005 ? $weights : $this->allocateProportionally($amount, $weights);
+
             foreach ($branches->values() as $i => $branch) {
                 // start_date = the real cycle start, not "now". An advance renewal's
                 // line should read 01 Oct 2027 → 01 Oct 2028 on the invoice, not
                 // 03 Oct 2026 → 01 Oct 2028, and acceptOrder() reads it back to
                 // advance current_period_start.
                 $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart);
+            }
+
+            // A TOP-UP line per behind branch: from where its coverage stops up to the
+            // CURRENT anchor — so the invoice shows what the extra money bought, and a
+            // top-up paid some other way first (Add to plan) makes this order stale
+            // rather than payable twice (SubscriptionOrder::coverageState()).
+            foreach ($quote['topups'] as $j => $topup) {
+                $this->addLine($order, $topup['branch'], $shares[$branches->count() + $j], $quote['current_anchor'], $topup['from']);
             }
             $this->mirror->sync($account);
 
@@ -1335,6 +1450,28 @@ class AccountBillingService
      *
      * @return array<int, float>
      */
+    protected function allocateProportionally(float $amount, array $weights): array
+    {
+        $total = array_sum($weights);
+        if ($total <= 0) {
+            return $this->allocate($amount, count($weights));
+        }
+
+        // Largest remainder on paise, so the shares sum EXACTLY to $amount.
+        $totalPaise = (int) round($amount * 100);
+        $raw = array_map(fn ($w) => $totalPaise * $w / $total, $weights);
+        $floors = array_map(fn ($r) => (int) floor($r), $raw);
+        $left = $totalPaise - array_sum($floors);
+
+        $order = array_keys($raw);
+        usort($order, fn ($a, $b) => ($raw[$b] - $floors[$b]) <=> ($raw[$a] - $floors[$a]));
+        foreach (array_slice($order, 0, $left) as $i) {
+            $floors[$i]++;
+        }
+
+        return array_map(fn ($p) => $p / 100, $floors);
+    }
+
     protected function allocate(float $amount, int $parts): array
     {
         if ($parts < 1) {

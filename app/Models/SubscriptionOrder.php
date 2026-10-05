@@ -140,17 +140,65 @@ class SubscriptionOrder extends Model
      */
     public function wouldExtendCoverage(bool $fresh = false): bool
     {
+        return $this->coverageState($fresh) === 'extends';
+    }
+
+    /**
+     * What paying this charge NOW would do — the snapshot question (S3 audit), with
+     * a third answer since renewals carry top-ups (2026-10-05):
+     *
+     *   'extends'  it still buys exactly what it was quoted for.
+     *   'stale'    a renewal whose TOP-UP for a behind branch has since been paid
+     *              some other way (Add to plan, Align, a comp). The term would still
+     *              buy a year, but that branch's top-up would be paid twice — so it
+     *              is not offered; a fresh renewal re-quotes without it.
+     *   'covered'  every date it would grant is already in place.
+     *
+     * A top-up line is a renewal line ending BEFORE the order's furthest end: term
+     * lines all end on the new anchor, top-ups end on the anchor that was current
+     * when the renewal was quoted. Orders without top-ups behave exactly as before.
+     */
+    public function coverageState(bool $fresh = false): string
+    {
         $fresh ? $this->load('lines.branch') : $this->loadMissing('lines.branch');
 
-        return $this->lines->contains(function (SubscriptionOrderLine $line) {
-            $branch = $line->branch;
-            if (! $branch || ! $line->end_date) {
-                return false;
-            }
+        $extends = fn (SubscriptionOrderLine $line) => $line->branch && $line->end_date
+            && (! $line->branch->subscription_end
+                || $line->end_date->copy()->startOfDay()->greaterThan($line->branch->subscription_end->copy()->startOfDay()));
 
-            return ! $branch->subscription_end
-                || $line->end_date->copy()->startOfDay()->greaterThan($branch->subscription_end->copy()->startOfDay());
-        });
+        if (! $this->lines->contains($extends)) {
+            return 'covered';
+        }
+
+        return $this->topUpLines()->contains(fn (SubscriptionOrderLine $line) => ! $extends($line))
+            ? 'stale'
+            : 'extends';
+    }
+
+    /** A renewal's top-up lines (see coverageState); empty for every other kind. */
+    public function topUpLines(): \Illuminate\Support\Collection
+    {
+        if ($this->kind !== OrderKind::Renewal) {
+            return collect();
+        }
+
+        $this->loadMissing('lines');
+        $furthest = $this->lines->max(fn (SubscriptionOrderLine $l) => $l->end_date?->toDateString());
+
+        return $this->lines->filter(fn (SubscriptionOrderLine $l) => $l->end_date && $l->end_date->toDateString() < $furthest)->values();
+    }
+
+    /**
+     * Where this renewal's TERM starts — the earliest start among the lines that end
+     * on the order's furthest date. Not simply the earliest line: a top-up line starts
+     * earlier (where the behind branch's coverage stopped), and reading that as the
+     * cycle start would stretch the account's "current period" backwards.
+     */
+    public function termStartDate(): ?string
+    {
+        $furthest = $this->lines()->max('end_date');
+
+        return $furthest ? $this->lines()->where('end_date', $furthest)->min('start_date') : null;
     }
 
     /**

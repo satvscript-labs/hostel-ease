@@ -297,7 +297,15 @@
                                     <span class="badge bg-{{ $chip[0] }}-subtle text-{{ $chip[0] }} rounded-pill px-3 py-2">{{ $chip[1] }}</span>
 
                                     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                                        @if($behind)
+                                        @if($behind && $trialJoinable)
+                                            {{-- Running trial: the branch shares it, free (owner decision, 2026-10-05). --}}
+                                            <form method="POST" action="{{ route('superadmin.accounts.add-branch', $account) }}" class="d-inline"
+                                                  data-confirm="Add {{ $branch->name }} to the free trial? It works until {{ $account->current_period_end->format('d M Y') }} and is billed with the rest when they subscribe.">
+                                                @csrf
+                                                <input type="hidden" name="branch_id" value="{{ $branch->id }}">
+                                                <button class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-semibold shadow-sm"><i class="fa-solid fa-gift me-1"></i>Add to trial</button>
+                                            </form>
+                                        @elseif($behind)
                                             <button class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openAdd({{ $branch->id }}, @js($branch->name))" title="Prorate to the renewal date"><i class="fa-solid fa-plus me-1"></i>Add to cycle</button>
                                         @endif
 
@@ -472,8 +480,13 @@
                                                          so it is flagged here and refused everywhere else. Void it. --}}
                                                     @if($order->payment_status->value === 'pending' && ! $order->wouldExtendCoverage())
                                                         <div>
-                                                            <span class="od-k">Overtaken</span>
-                                                            <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Already covered by a later payment — collecting this buys nothing. Void it.</span>
+                                                            @if($order->coverageState() === 'stale')
+                                                                <span class="od-k">Out of date</span>
+                                                                <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>A top-up in it has since been paid separately — collecting this charges it twice. Void it and renew again.</span>
+                                                            @else
+                                                                <span class="od-k">Overtaken</span>
+                                                                <span class="od-v text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Already covered by a later payment — collecting this buys nothing. Void it.</span>
+                                                            @endif
                                                         </div>
                                                     @endif
                                                     @if($order->hasOpenCheckout())
@@ -749,12 +762,27 @@ document.addEventListener('alpine:init', () => {
         renewOverride: '',
         get renewSummary() {
             const q = this.renewQuotes[this.period] || {};
-            return this.buildSummary({
+            const topups = q.topups || [];
+            const topupTotal = topups.reduce((s, t) => s + t.amount, 0);
+            const summary = this.buildSummary({
                 lineLabel: (q.quantity || 0) + ' branch(es) × ' + heMoney(q.unit) + '/' + (this.period === 'monthly' ? 'mo' : 'yr'),
-                subtotal: q.subtotal, volume: q.volume, manual: q.manual, auto: q.auto,
+                // The engine discounts apply to the TERM; top-ups are added after them,
+                // undiscounted (priced exactly as Align would). Subtotal and auto both
+                // carry them, so an override is still measured against the whole bill.
+                subtotal: (q.subtotal || 0) + topupTotal, volume: q.volume, manual: q.manual, auto: q.auto,
                 override: this.renewOverride,
-                note: q.quantity ? ('Renews all branches to ' + q.new_anchor) : '',
+                note: q.quantity
+                    ? ('Renews all branches to ' + q.new_anchor + (topups.length ? (' · first brings ' + topups.length + ' behind branch(es) up to ' + q.current_anchor) : ''))
+                    : '',
             });
+            if (topups.length) {
+                // Show the term and each top-up as their own lines.
+                summary.rows[0] = { label: summary.rows[0].label, amount: q.subtotal, kind: 'line' };
+                const at = summary.rows.findIndex(r => r.kind !== 'line') ;
+                const lines = topups.map(t => ({ label: 'Top-up · ' + t.name + ' · ' + t.days + 'd to ' + q.current_anchor, amount: t.amount, kind: 'line' }));
+                summary.rows.splice(at === -1 ? summary.rows.length : at, 0, ...lines);
+            }
+            return summary;
         },
 
         // ── Payment links (S2) ──
@@ -892,7 +920,9 @@ document.addEventListener('alpine:init', () => {
         addHostelQuote: @json($addHostelQuote),
         get addHostelSummary() {
             if (this.ahPlan === 'trial') {
-                return { rows: [{ label: '14-day free trial', amount: 0, kind: 'line' }], finalLabel: 'Payable now', final: 0, note: 'Starts a 14-day trial from today (own clock, not co-terminated)' };
+                return @js($trialJoinable)
+                    ? { rows: [{ label: 'Joins the free trial', amount: 0, kind: 'line' }], finalLabel: 'Payable now', final: 0, note: 'Works until the trial ends (' + @js($account->current_period_end?->format('d M Y')) + '), then billed with every branch when they subscribe' }
+                    : { rows: [{ label: '14-day free trial', amount: 0, kind: 'line' }], finalLabel: 'Payable now', final: 0, note: 'Starts the account\'s free trial today' };
             }
             const q = this.addHostelQuote;
             const rows = [];

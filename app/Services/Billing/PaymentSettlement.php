@@ -129,6 +129,13 @@ class PaymentSettlement
         // almost certainly a duplicate (a stale link paid from an old SMS, a second
         // renewal raised for the same period), so a human is told to refund it.
         $buysSomething = $order->wouldExtendCoverage(fresh: true);
+        // A STALE renewal paid anyway (an old link): the term still lands, but a
+        // top-up inside it was already paid another way — that part is paid twice.
+        $stale = ! $buysSomething && $order->coverageState() === 'stale';
+        $doubleTopUp = $stale
+            ? round((float) $order->topUpLines()->filter(fn ($l) => $l->branch?->subscription_end
+                && ! $l->end_date->copy()->startOfDay()->greaterThan($l->branch->subscription_end->copy()->startOfDay()))->sum('amount'), 2)
+            : 0.0;
 
         try {
             $this->billing->acceptOrder($order, [
@@ -147,7 +154,21 @@ class PaymentSettlement
             return self::ALREADY;
         }
 
-        if (! $buysSomething) {
+        if ($stale) {
+            $this->notifications->push(
+                null,
+                'payment_no_coverage',
+                'payment_no_coverage:'.$paymentId,
+                'Renewal paid with a top-up that was already paid — refund '.hostelease_money($doubleTopUp),
+                ($order->account?->owner?->name ?? 'account #'.$order->account_id)." paid {$order->invoiceNumber()} (".hostelease_money($paidPaise / 100).'). The renewal has been applied, '
+                    .'but it included a top-up for a branch that had already been paid for separately, so '.hostelease_money($doubleTopUp).' was paid twice. Refund that part.',
+                'danger',
+            );
+
+            Log::warning('Stale renewal paid: a top-up was paid twice', [
+                'order_id' => $order->id, 'payment' => $paymentId, 'double_paid' => $doubleTopUp,
+            ]);
+        } elseif (! $buysSomething) {
             $this->notifications->push(
                 null,
                 'payment_no_coverage',

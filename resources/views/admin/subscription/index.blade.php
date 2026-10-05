@@ -191,7 +191,11 @@
                     {{-- An OVERTAKEN charge — every date it would grant is already
                          covered — is shown, but never offered: paying it would buy
                          nothing (S3 audit). We clear it up on our side. --}}
-                    @if(! $row['payable'])
+                    @if($row['stale'])
+                        <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Part of it was paid separately, so the amount has changed.') }}">
+                            <i class="fa-solid fa-rotate me-1"></i>{{ __('Amount changed — renew again for the new total') }}
+                        </span>
+                    @elseif(! $row['payable'])
                         <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
                             <i class="fa-solid fa-circle-check me-1"></i>{{ __('Already covered — nothing to pay') }}
                         </span>
@@ -385,6 +389,16 @@
                         <template x-if="q().manual > 0">
                             <div class="d-flex justify-content-between mb-1 text-success"><span>{{ __('Your discount') }}</span><span x-text="'−' + money(q().manual)"></span></div>
                         </template>
+                        {{-- Branches behind the current renewal date are brought up to it
+                             first — otherwise they would run free until then. --}}
+                        <template x-if="(q().topups || []).length">
+                            <div class="mt-2 pt-2 border-top">
+                                <div class="small text-muted mb-1">{{ __('Brings these branches up to') }} <span class="fw-semibold text-dark" x-text="q().current_anchor"></span> {{ __('first') }}:</div>
+                                <template x-for="t in q().topups" :key="t.name">
+                                    <div class="d-flex justify-content-between mb-1"><span class="text-muted"><span x-text="t.name"></span> · <span x-text="t.days"></span> {{ __('days') }}</span><span class="fw-semibold" x-text="money(t.amount)"></span></div>
+                                </template>
+                            </div>
+                        </template>
                         <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                             <span class="fw-bold">{{ __('Total payable') }}</span>
                             <span class="h4 fw-bold mb-0 text-primary" x-text="money(q().final)"></span>
@@ -420,7 +434,9 @@
                         <i class="fa-solid fa-circle-info me-1"></i>
                         {{-- The free trial belongs to the ACCOUNT, once (owner decision,
                              2026-10-04) — a branch added later is never a trial branch. --}}
-                        @if($canAddPaid)
+                        @if($trialJoinable)
+                            {{ __('It joins your free trial and works straight away, until') }} {{ $anchorFmt }}. {{ __('Every branch is billed together when you subscribe.') }}
+                        @elseif($canAddPaid)
                             {{ __('A new branch becomes active once it is paid for — prorated to') }} {{ $anchorFmt }} {{ __('so everything renews together. You will see the exact amount before you pay.') }}
                         @else
                             {{ __('A new branch becomes active when you subscribe — it is included in your plan from your first payment.') }}

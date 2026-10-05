@@ -616,9 +616,12 @@ class PaymentLinkTest extends TestCase
 
         $this->fakeLinkCreated('plink_TRIAL');
 
+        // The subscription link (a pending renewal). On a running trial a behind branch
+        // JOINS the trial rather than being billed into it (owner decision 2026-10-05),
+        // so the subscribe link is where an unpaid charge could still mislabel a trial.
         $this->actingAs($this->superAdmin())
-            ->post(route('superadmin.accounts.add-branch', $account), [
-                'branch_id' => $fresh->id, 'collect' => 'link',
+            ->post(route('superadmin.accounts.renew', $account), [
+                'period' => 'yearly', 'collect' => 'link',
             ])
             ->assertSessionHas('payment_link');
 
@@ -626,6 +629,26 @@ class PaymentLinkTest extends TestCase
         $this->assertSame('trial', $account->period->value, 'An unpaid link must not change the cadence.');
         $this->assertSame('trial', $account->status->value, 'An unpaid link must not make a trial look like a paying account.');
         $this->assertNull($fresh->fresh()->subscription_end, 'And it must grant no coverage.');
+    }
+
+    /** On a running trial, "Add to cycle" for a behind branch joins the trial — ₹0, no link. */
+    public function test_on_a_running_trial_a_behind_branch_joins_the_trial_instead_of_being_billed(): void
+    {
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9000000035']);
+        $live = Hostel::factory()->create(['mobile' => '9000000035', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => now()->addDays(10)]);
+        $fresh = Hostel::factory()->create(['mobile' => '9000000035', 'owner_id' => $owner->id, 'status' => 'active', 'subscription_end' => null]);
+        $owner->hostels()->sync([$live->id, $fresh->id]);
+        $account = SubscriptionAccount::create(['owner_id' => $owner->id, 'period' => 'trial', 'status' => 'trial', 'current_period_end' => now()->addDays(10)]);
+        Http::fake();   // nothing may reach Razorpay
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $fresh->id, 'collect' => 'link'])
+            ->assertSessionHas('success');
+
+        Http::assertNothingSent();
+        $this->assertSame($account->current_period_end->toDateString(), $fresh->fresh()->subscription_end->toDateString());
+        $this->assertSame('trial', $account->fresh()->period->value);
+        $this->assertSame(0.0, (float) SubscriptionOrder::sole()->amount);
     }
 
     /** The other half: paying it IS the moment a trial becomes a paying account. */
@@ -644,7 +667,7 @@ class PaymentLinkTest extends TestCase
         $this->fakeLinkCreated('plink_PROMOTE');
 
         $this->actingAs($this->superAdmin())
-            ->post(route('superadmin.accounts.add-branch', $account), ['branch_id' => $fresh->id, 'collect' => 'link']);
+            ->post(route('superadmin.accounts.renew', $account), ['period' => 'yearly', 'collect' => 'link']);
 
         $order = SubscriptionOrder::latest('id')->first();
 
@@ -658,7 +681,7 @@ class PaymentLinkTest extends TestCase
         $account->refresh();
         $this->assertSame('yearly', $account->period->value);
         $this->assertSame('active', $account->status->value);
-        $this->assertNotNull($fresh->fresh()->subscription_end, 'And the branch is now co-terminated.');
+        $this->assertNotNull($fresh->fresh()->subscription_end, 'And every branch is now on the paid plan.');
     }
 
     // =================================================================

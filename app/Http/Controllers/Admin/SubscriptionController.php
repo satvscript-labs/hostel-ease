@@ -107,6 +107,7 @@ class SubscriptionController extends Controller
                 && $account->period?->isPaid()
                 && $account->current_period_end?->isFuture(),
             'selfServe' => $selfServe,
+            'trialJoinable' => $this->billing->trialJoinable($account),
             'razorpayEnabled' => $this->checkout->isEnabled(),
             'canManage' => $canManage,
             'viewerOwnsAccount' => $viewerOwnsAccount,
@@ -188,12 +189,36 @@ class SubscriptionController extends Controller
         // on a live paid plan, or as part of the plan when the owner subscribes or
         // renews. recordBranchRenewal() refuses a second trial anyway; this path
         // simply never asks for one.
-        $branch = DB::transaction(fn () => $hostels->createBranchForOwner($account->owner, [
-            'name' => $data['name'],
-            'city' => $data['city'] ?? null,
-        ]));
+        // WHILE THE TRIAL RUNS a new branch joins it (owner decision, 2026-10-05):
+        // it works free until the trial ends and is billed with everything else when
+        // the owner subscribes. Outside a trial it starts with no coverage and is
+        // activated by paying for it.
+        $joinsTrial = $this->billing->trialJoinable($account);
 
-        $this->logger->log('branch.created', "Owner added branch {$branch->name} (inactive until paid)", $branch);
+        $branch = DB::transaction(function () use ($hostels, $account, $data, $joinsTrial) {
+            $branch = $hostels->createBranchForOwner($account->owner, [
+                'name' => $data['name'],
+                'city' => $data['city'] ?? null,
+            ]);
+
+            if ($joinsTrial) {
+                $this->billing->recordBranchRenewal($branch, 'trial', ['payment_status' => 'paid']);
+            }
+
+            return $branch;
+        });
+
+        $this->logger->log('branch.created', $joinsTrial
+            ? "Owner added branch {$branch->name} (joined the free trial)"
+            : "Owner added branch {$branch->name} (inactive until paid)", $branch);
+
+        if ($joinsTrial) {
+            return response()->json([
+                'mode' => 'created',
+                'message' => "{$branch->name} has been added to your free trial — it works until ".$account->current_period_end->format('d M Y').'. Every branch is billed together when you subscribe.',
+                'redirect' => route('admin.subscription.index'),
+            ]);
+        }
 
         $onPaidPlan = $account->period?->isPaid() && $account->current_period_end?->isFuture();
 
@@ -354,7 +379,14 @@ class SubscriptionController extends Controller
             'volume' => round((float) ($b['volume_amount'] ?? 0), 2),
             'manual' => round((float) ($b['manual_amount'] ?? 0), 2),
             'discount' => round((float) ($b['discount_total'] ?? 0), 2),
-            'final' => round((float) $b['final'], 2),
+            // What the owner pays: the term plus any top-ups below.
+            'final' => round((float) $q['total'], 2),
+            'topups' => collect($q['topups'])->map(fn (array $t) => [
+                'name' => $t['branch']->name,
+                'days' => $t['days'],
+                'amount' => round((float) $t['amount'], 2),
+            ])->values()->all(),
+            'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
         ];
     }
@@ -384,7 +416,8 @@ class SubscriptionController extends Controller
         // checkout or "contact us" rather than to a dangerous link.
         // Would paying it still buy anything? An overtaken charge is shown as
         // already covered, with no way to pay it - not its link, not checkout.
-        $payable = $o->wouldExtendCoverage();
+        $state = $o->coverageState();
+        $payable = $state === 'extends';
 
         $linkUrl = $payable && $o->hasLiveLink() && str_starts_with((string) $o->payment_link_url, 'https://')
             ? $o->payment_link_url
@@ -392,6 +425,9 @@ class SubscriptionController extends Controller
 
         return [
             'payable' => $payable,
+            // Part of it was paid separately since: not "already covered" — the rest
+            // is still owed, at a new amount.
+            'stale' => $state === 'stale',
             'id' => $o->id,
             'label' => $o->kind?->label() ?? 'Charge',
             'invoice' => $o->invoiceNumber(),

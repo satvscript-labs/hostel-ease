@@ -162,6 +162,9 @@
              only offered while this account's trial is still unused. --}}
         @if($trialAvailable)
         <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='trial'?'btn-primary':'btn-light border'" @click="ahPlan='trial'">Trial (14 days)</button>
+        @elseif($trialJoinable)
+        {{-- The trial is running: a new branch joins it (owner decision, 2026-10-05). --}}
+        <button type="button" class="btn flex-fill rounded-pill fw-bold tactile-btn" :class="ahPlan==='trial'?'btn-primary':'btn-light border'" @click="ahPlan='trial'">Join trial (until {{ $account->current_period_end->format('d M') }})</button>
         @endif
     </div>
 

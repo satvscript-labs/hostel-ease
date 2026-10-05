@@ -66,6 +66,27 @@ class OwnerSelfServeBillingTest extends TestCase
         return [$owner, $acct, $ids];
     }
 
+    /**
+     * Back the fixture's coverage with the ledger, the way S1's back-fill backs every
+     * real branch. Only tests that VOID something need it: a void re-derives coverage
+     * from paid lines, so coverage written straight onto a branch would be wiped — a
+     * state production cannot reach.
+     */
+    protected function backCoverage(SubscriptionAccount $account, array $ids): void
+    {
+        $backing = SubscriptionOrder::create([
+            'account_id' => $account->id, 'period' => 'yearly', 'kind' => 'adjustment', 'quantity' => count($ids),
+            'subtotal' => 0, 'discount_total' => 0, 'amount' => 0, 'payment_status' => 'paid', 'collection' => 'offline',
+            'remarks' => 'Test fixture: coverage back-fill',
+        ]);
+        foreach ($ids as $id) {
+            \App\Models\SubscriptionOrderLine::create([
+                'order_id' => $backing->id, 'branch_id' => $id, 'amount' => 0,
+                'start_date' => now()->subMonths(10), 'end_date' => Hostel::find($id)->subscription_end,
+            ]);
+        }
+    }
+
     /** Razorpay order creation, with a sequence of ids. */
     protected function fakeOrders(string ...$ids): void
     {
@@ -173,12 +194,13 @@ class OwnerSelfServeBillingTest extends TestCase
 
     public function test_reopening_after_the_price_changed_supersedes_the_old_attempt(): void
     {
-        [$owner, $account] = $this->owner(2);
+        [$owner, $account, $ids] = $this->owner(2);
+        $this->backCoverage($account, $ids);   // the old attempt is voided below
         $this->fakeOrders('order_S1', 'order_S2');
         Http::fake(['api.razorpay.com/v1/orders/order_S1/payments' => Http::response(['items' => []], 200)]);
 
         $this->startRenewal($owner)->assertOk();
-        $old = SubscriptionOrder::sole();
+        $old = SubscriptionOrder::where('kind', 'renewal')->sole();
 
         $account->update(['unit_price_override_yearly' => 8500]);   // the operator changes the price
 
@@ -613,21 +635,33 @@ class OwnerSelfServeBillingTest extends TestCase
         $this->assertTrue($billing->trialAvailable($account, $first));
         $trial = $billing->recordBranchRenewal($first, 'trial', ['payment_status' => 'paid']);
 
-        // Used. A second branch — or the first again — cannot have one.
-        $second = Hostel::factory()->create(['mobile' => '9700000051', 'owner_id' => $owner->id]);
+        // Used: never a SECOND 14-day trial. A branch added while the trial runs
+        // joins it instead — same end date, ₹0 (owner decision, 2026-10-05).
+        $second = Hostel::factory()->create(['mobile' => '9700000051', 'owner_id' => $owner->id, 'subscription_start' => null, 'subscription_end' => null]);
         $owner->hostels()->syncWithoutDetaching([$second->id]);
         $this->assertFalse($billing->trialAvailable($account->fresh(), $second));
+        $this->assertTrue($billing->trialJoinable($account->fresh()));
 
+        $joined = $billing->recordBranchRenewal($second, 'trial', ['payment_status' => 'paid']);
+        $this->assertSame(0.0, (float) $joined->amount);
+        $this->assertSame($account->fresh()->current_period_end->toDateString(), $second->fresh()->subscription_end->toDateString(), 'Joins the SAME window — no fresh 14 days.');
+
+        // Once the trial is over, there is nothing to join and no second trial.
+        $this->travelTo($account->fresh()->current_period_end->copy()->addDays(5));
+        $billing->refreshAccountAnchor($account->fresh());
+        $third = Hostel::factory()->create(['mobile' => '9700000051', 'owner_id' => $owner->id, 'subscription_start' => null, 'subscription_end' => null]);
+        $owner->hostels()->syncWithoutDetaching([$third->id]);
         try {
-            $billing->recordBranchRenewal($second, 'trial', ['payment_status' => 'paid']);
-            $this->fail('A second trial must be refused.');
+            $billing->recordBranchRenewal($third, 'trial', ['payment_status' => 'paid']);
+            $this->fail('A trial after the trial ended must be refused.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('already had their free trial', $e->getMessage());
         }
-        $this->assertSame(1, SubscriptionOrder::where('kind', 'trial')->count());
+        $this->travelBack();
 
         // A trial voided as a MISTAKE does not count as used — but the account still
         // has another branch, so it stays unavailable.
+        $billing->voidOrder($joined, 'recorded in error');
         $billing->voidOrder($trial, 'recorded in error');
         $this->assertFalse($billing->trialAvailable($account->fresh(), $second));
     }
@@ -944,7 +978,11 @@ class OwnerSelfServeBillingTest extends TestCase
         Http::fake(['api.razorpay.com/v1/payment_links/plink_AB/cancel' => Http::response(['id' => 'plink_AB', 'status' => 'cancelled'], 200)]);
         $this->startRenewal($owner)->assertOk();
 
-        $this->fakePayment('pay_RN', 2000000, 'order_RN');
+        // The renewal brings the behind branch up to the anchor too (2026-10-05), so it
+        // costs more than 2 × ₹10,000 — pay what the order says.
+        $renewal = SubscriptionOrder::where('kind', 'renewal')->sole();
+        $this->assertGreaterThan(2000000, $renewal->amountPaise());
+        $this->fakePayment('pay_RN', $renewal->amountPaise(), 'order_RN');
         $this->actingAs($owner)->postJson(route('admin.subscription.confirm'), [
             'razorpay_order_id' => 'order_RN', 'razorpay_payment_id' => 'pay_RN', 'razorpay_signature' => $this->sign('order_RN', 'pay_RN'),
         ])->assertOk()->assertJsonPath('state', 'applied');

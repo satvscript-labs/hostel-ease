@@ -314,7 +314,11 @@ class AccountController extends Controller
                 'amount' => round((float) $l['amount'], 2),
             ])->values()->all(),
         ];
-        $alignBehind = $alignRaw['count'];
+        // A RUNNING TRIAL: branches added during it share it (owner decision,
+        // 2026-10-05), so a behind branch is offered "Add to trial" (₹0), never a paid
+        // top-up into time the customer has not started paying for.
+        $trialJoinable = $this->billing->trialJoinable($account);
+        $alignBehind = $trialJoinable ? 0 : $alignRaw['count'];
 
         // Branch data for the Comp modal (checkbox tiles + live gift preview).
         $compBranches = $branches->map(fn ($b) => [
@@ -364,7 +368,7 @@ class AccountController extends Controller
         $ownerOpenCharges = $account->orders()->outstanding()
             ->where('collection', CollectionMethod::Checkout->value)->count();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'selfServeLive', 'ownerOpenCharges'));
+        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'compBranches', 'compBranchIds', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -404,7 +408,15 @@ class AccountController extends Controller
             'subtotal' => round((float) $q['subtotal'], 2),
             'volume' => round((float) $q['breakdown']['volume_amount'], 2),
             'manual' => round((float) $q['breakdown']['manual_amount'], 2),
-            'auto' => round((float) $q['breakdown']['final'], 2),
+            // The term after its discounts; the charge is `auto` + the top-ups.
+            'term' => round((float) $q['breakdown']['final'], 2),
+            'auto' => round((float) $q['total'], 2),
+            'topups' => collect($q['topups'])->map(fn (array $t) => [
+                'name' => $t['branch']->name,
+                'days' => $t['days'],
+                'amount' => round((float) $t['amount'], 2),
+            ])->values()->all(),
+            'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
         ];
     }
@@ -422,6 +434,19 @@ class AccountController extends Controller
 
         $branch = Hostel::findOrFail($data['branch_id']);
         abort_unless(in_array($branch->id, $account->owner?->accessibleHostelIds() ?? [], true), 403);
+
+        // A running trial: the branch joins it, free, until the trial ends. Nothing is
+        // collected — a ₹0 charge can have no payment link.
+        if ($this->billing->trialJoinable($account)) {
+            try {
+                $this->billing->recordBranchRenewal($branch, 'trial', ['payment_status' => 'paid']);
+            } catch (\RuntimeException $e) {
+                return back()->with('error', Refusal::message($e));
+            }
+            $this->logger->log('subscription.update', "Added {$branch->name} to the free trial", $branch);
+
+            return back()->with('success', "{$branch->name} joined the free trial — it works until ".$account->current_period_end->format('d M Y').'.');
+        }
 
         try {
             [$order, $viaLink] = $this->collectOrRecord(

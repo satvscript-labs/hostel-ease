@@ -146,7 +146,11 @@ class PaymentLinkService
 
         // Overtaken (S3 audit): every date this charge would grant is already covered,
         // so a link would ask the customer to pay for nothing.
-        if (! $order->wouldExtendCoverage(fresh: true)) {
+        $state = $order->coverageState(fresh: true);
+        if ($state === 'stale') {
+            throw new RuntimeException('A top-up included in this renewal has since been paid separately, so collecting this would charge for it twice. Void it and renew again — the new quote leaves that branch\'s top-up out.');
+        }
+        if ($state !== 'extends') {
             throw new RuntimeException('Everything this charge covers is already paid up — it has been overtaken (a later renewal or another payment covered it). Void it rather than collecting for it.');
         }
 
