@@ -74,18 +74,11 @@ class NotificationService
     {
         Tenant::set($hostel->id);
 
-        // Subscription due
-        $days = $hostel->daysUntilExpiry();
-        if ($days !== null && $days <= 30) {
-            $this->push($hostel->id, 'subscription_due', 'sub',
-                'Subscription expiring',
-                "Your subscription "
-                .($days < 0 ? 'has expired' : "expires in {$days} day(s)").
-                ". Please renew.",
-                $days <= 7 ? 'danger' : 'warning');
-        } else {
-            $this->clear($hostel->id, 'subscription_due', 'sub');
-        }
+        // Renewal reminders moved to the account level (S4): the daily lifecycle job
+        // posts ONE `renewal_reminder` entry per account, once per stage. This old
+        // per-branch alert was re-raised every day after being read, once per branch,
+        // and shown to staff — clear whatever is left of it.
+        $this->clear($hostel->id, 'subscription_due', 'sub');
 
         // Students leaving within 7 days
         $leaving = Student::leavingWithin(7)->count();

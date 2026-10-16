@@ -138,61 +138,38 @@ class DashboardController extends Controller
 
         $feed = $feed->sortByDesc('time')->take(10)->values();
 
-        $subAlert = $this->subscriptionAlert();
+        [$renewalCard, $askEmail] = $this->renewalCard();
 
-        return view('admin.dashboard', compact('stats', 'charts', 'feed', 'subAlert'));
+        return view('admin.dashboard', compact('stats', 'charts', 'feed', 'renewalCard', 'askEmail'));
     }
 
     /**
-     * A dismissible subscription heads-up for the active branch's account
-     * (grace / renewal due within 30 days / trial ending). Owners who fully
-     * lapse never reach the dashboard — they're redirected by
-     * EnsureActiveSubscription — so this covers the "still active but
-     * approaching / in grace" window they land on.
+     * The renewal card (S4 · 24_S4_DESIGN.md §7) for the active branch's account, and
+     * the gentle "add your email" ask for an owner reminders cannot reach by email.
+     * Hostel admins only — staff never see billing. Owners who fully lapse never reach
+     * the dashboard (EnsureActiveSubscription), so the card covers the run-up and grace.
+     *
+     * @return array{0: ?array, 1: bool}
      */
-    protected function subscriptionAlert(): ?array
+    protected function renewalCard(): array
     {
+        $viewer = auth()->user();
         $hostel = \App\Support\Tenant::id() ? \App\Models\Hostel::find(\App\Support\Tenant::id()) : null;
-        if (! $hostel) {
-            return null;
+        if (! $hostel || ! $viewer->isHostelAdmin()) {
+            return [null, false];
         }
 
         $account = app(\App\Services\Billing\AccountBillingService::class)->accountForBranch($hostel);
-        if (! $account || ! $account->current_period_end) {
-            return null;
+        if (! $account) {
+            return [null, false];
         }
 
-        $days = $account->daysUntilAnchor();
-        $isTrial = $account->period?->value === 'trial';
-        $end = $account->current_period_end->format('d M Y');
-        $noun = $isTrial ? 'trial' : 'subscription';
-        // What to do about it depends on who handles billing (BillingMode): a
-        // self-serve owner renews; a managed customer is told we will.
-        $selfServe = $account->selfServeEnabled();
+        $card = app(\App\Services\Billing\RenewalCard::class)->for($account, $viewer);
+        // Only the account owner holds the email reminders go to. Read from the row:
+        // the session's user model need not carry the column (strict mode).
+        $askEmail = $account->owner_id === $viewer->id
+            && ! \App\Models\User::whereKey($viewer->id)->value('email_verified_at');
 
-        $alert = match (true) {
-            $account->status === \App\Enums\AccountStatus::Grace => [
-                'tone' => 'danger', 'icon' => 'triangle-exclamation',
-                'title' => 'Grace period — your '.$noun.' has expired',
-                'msg' => "It ended on {$end}. Access continues for a short grace window — "
-                    .($selfServe ? 'renew now to avoid interruption.' : 'contact us to renew and avoid interruption.'),
-            ],
-            $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days >= 0 && $days <= 7 => [
-                'tone' => 'warning', 'icon' => 'clock',
-                'title' => $isTrial
-                    ? ($days === 0 ? 'Your trial ends today' : "Your trial ends in {$days} day(s)")
-                    : ($days === 0 ? 'Renewal due today' : "Renewal due in {$days} day(s)"),
-                'msg' => "Your {$noun} renews on {$end}. "
-                    .($selfServe ? 'Renew soon to keep every branch active.' : 'Our team will be in touch to renew it for you.'),
-            ],
-            $account->status === \App\Enums\AccountStatus::Active && $days !== null && $days <= 30 => [
-                'tone' => 'info', 'icon' => 'calendar-check',
-                'title' => $isTrial ? "Your trial ends in {$days} days" : "Renewal coming up in {$days} days",
-                'msg' => "Your {$noun} renews on {$end}.",
-            ],
-            default => null,
-        };
-
-        return $alert ? $alert + ['isOwner' => auth()->user()->isHostelAdmin()] : null;
+        return [$card, $askEmail];
     }
 }

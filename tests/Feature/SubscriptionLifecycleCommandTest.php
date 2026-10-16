@@ -44,7 +44,7 @@ class SubscriptionLifecycleCommandTest extends TestCase
 
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertQueued(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $account->id && $mail->kind === 'upcoming');
+        Mail::assertSent(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $account->id && $mail->kind() === 'upcoming');
         $this->assertDatabaseHas('subscription_reminder_logs', ['account_id' => $account->id, 'window' => 'due_7', 'status' => 'sent']);
     }
 
@@ -54,7 +54,7 @@ class SubscriptionLifecycleCommandTest extends TestCase
 
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertNothingQueued();
+        Mail::assertNothingSent();
         $this->assertDatabaseCount('subscription_reminder_logs', 0);
     }
 
@@ -65,8 +65,8 @@ class SubscriptionLifecycleCommandTest extends TestCase
 
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertQueued(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $grace->id && $mail->kind === 'grace');
-        Mail::assertQueued(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $expired->id && $mail->kind === 'expired');
+        Mail::assertSent(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $grace->id && $mail->kind() === 'grace');
+        Mail::assertSent(SubscriptionReminderMail::class, fn ($mail) => $mail->account->id === $expired->id && $mail->kind() === 'expired');
     }
 
     public function test_missing_email_is_skipped_not_errored(): void
@@ -75,8 +75,8 @@ class SubscriptionLifecycleCommandTest extends TestCase
 
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertNothingQueued();
-        $this->assertDatabaseHas('subscription_reminder_logs', ['account_id' => $account->id, 'window' => 'due_7', 'status' => 'skipped_no_email']);
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('subscription_reminder_logs', ['account_id' => $account->id, 'window' => 'due_7', 'status' => 'no_email']);
     }
 
     public function test_running_twice_does_not_duplicate_the_same_window(): void
@@ -86,7 +86,7 @@ class SubscriptionLifecycleCommandTest extends TestCase
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertQueuedCount(1);
+        Mail::assertSentCount(1);
         $this->assertSame(1, SubscriptionReminderLog::where('account_id', $account->id)->where('window', 'due_7')->count());
     }
 
@@ -97,7 +97,7 @@ class SubscriptionLifecycleCommandTest extends TestCase
 
         $this->artisan('hostelease:process-subscription-lifecycle')->assertSuccessful();
 
-        Mail::assertNothingQueued();
+        Mail::assertNothingSent();
         $this->assertSame('suspended', $account->fresh()->status->value, 'A suspended account must not be auto-recomputed away from suspended by the daily tick.');
     }
 }

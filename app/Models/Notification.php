@@ -11,6 +11,9 @@ class Notification extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /** Feed entries only a hostel admin (owner / co-admin) sees. */
+    public const ADMIN_ONLY_TYPES = ['renewal_reminder', 'subscription_due'];
+
     protected $fillable = [
         'hostel_id',
         'user_id',
@@ -51,9 +54,19 @@ class Notification extends Model
      */
     public function scopeForUser($query, $user)
     {
-        return $user->isSuperAdmin()
-            ? $query->whereNull('hostel_id')
-            : $query->where('hostel_id', $user->hostel_id);
+        if ($user->isSuperAdmin()) {
+            return $query->whereNull('hostel_id');
+        }
+
+        $query->where('hostel_id', $user->hostel_id);
+
+        // Billing reminders are for whoever can act on them — the owner and
+        // co-admins — never for staff roles sharing the branch feed (S4 · R7).
+        if (! $user->isHostelAdmin()) {
+            $query->whereNotIn('type', self::ADMIN_ONLY_TYPES);
+        }
+
+        return $query;
     }
 
     public function markAsRead(): void

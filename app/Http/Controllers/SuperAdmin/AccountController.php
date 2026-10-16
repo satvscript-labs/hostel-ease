@@ -131,7 +131,7 @@ class AccountController extends Controller
 
         // Eager-load owner + branch pivot for the count; no per-row queries (NFR-4).
         $accounts = SubscriptionAccount::query()
-            ->with(['owner:id,name,mobile', 'owner.hostels:id'])
+            ->with(['owner:id,name,mobile,email,email_verified_at', 'owner.hostels:id'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when(BillingMode::tryFrom((string) $request->input('billing')), fn ($q, BillingMode $mode) => $q->where('billing_mode', $mode->value))
             ->when($dueDays, fn ($q) => $q->where('status', '!=', 'suspended')
@@ -368,7 +368,19 @@ class AccountController extends Controller
         $ownerOpenCharges = $account->orders()->outstanding()
             ->where('collection', CollectionMethod::Checkout->value)->count();
 
-        return view('superadmin.accounts.show', compact('account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'giftBranches', 'canExtend', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
+        // Reminders panel (S4): reachability, what the owner has been told, the nudge.
+        $reminders = app(\App\Services\Billing\RenewalReminders::class);
+        $reminderStage = $account->current_period_end ? $reminders->stage($account) : null;
+        $reminderPanel = [
+            'email' => $account->owner?->email,
+            'verified' => (bool) $account->owner?->email_verified_at,
+            'stage' => $reminderStage,
+            'canNudge' => $reminderStage !== null && filled($account->owner?->mobile),
+            'lastNudged' => $account->last_nudged_at,
+            'logs' => $account->reminderLogs()->latest('id')->limit(5)->get(),
+        ];
+
+        return view('superadmin.accounts.show', compact('reminderPanel', 'account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'giftBranches', 'canExtend', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -1095,6 +1107,32 @@ class AccountController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * "Nudge on WhatsApp" (S4 · 24_S4_DESIGN.md §6): opens wa.me with a prefilled
+     * message built by RenewalReminders — the same date, amount and link the owner's
+     * emails carry — and records when, so the next operator does not nudge twice.
+     * Free: a click-to-chat link, no WhatsApp Business API.
+     */
+    public function nudge(SubscriptionAccount $account): RedirectResponse
+    {
+        $account->loadMissing('owner');
+        $reminders = app(\App\Services\Billing\RenewalReminders::class);
+        // Same rule as the button on Account 360: only while a renewal is coming up
+        // (or in grace / just expired) — a nudge about nothing reads as spam.
+        $url = $account->current_period_end && $reminders->stage($account)
+            ? hostelease_whatsapp_link($account->owner?->mobile, $reminders->nudgeMessage($account))
+            : null;
+
+        if (! $url) {
+            return back()->with('warning', 'Nothing to nudge about — this customer has no renewal coming up, or no mobile number on file.');
+        }
+
+        $account->forceFill(['last_nudged_at' => now()])->save();
+        $this->logger->log('subscription.nudge', 'Nudged on WhatsApp about the renewal', $account);
+
+        return redirect()->away($url);
     }
 
     /** Manual override: suspend the account and every included branch (BR-18). */

@@ -210,7 +210,7 @@
                         <div class="sac-ic"><i class="fa-solid fa-user-tie"></i></div>
                         <div class="sac-text">
                             <div class="sac-name text-truncate">{{ $account->owner?->name ?? __('Unknown owner') }}</div>
-                            <div class="sac-sub text-truncate"><i class="fa-solid fa-mobile-screen text-primary me-1"></i>{{ $account->owner?->mobile ?? '—' }}</div>
+                            <div class="sac-sub text-truncate"><i class="fa-solid fa-mobile-screen text-primary me-1"></i>{{ $account->owner?->mobile ?? '—' }}@if(! $account->owner?->email) <span class="badge rounded-pill bg-danger-subtle text-danger ms-1" style="font-size:.6rem;" title="{{ __('Renewal reminders reach this owner in the app only') }}">{{ __('No email') }}</span>@elseif(! $account->owner->email_verified_at) <span class="badge rounded-pill bg-warning-subtle text-warning ms-1" style="font-size:.6rem;">{{ __('Email not verified') }}</span>@endif</div>
                         </div>
                     </div>
 

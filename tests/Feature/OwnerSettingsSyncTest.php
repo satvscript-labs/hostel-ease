@@ -158,7 +158,7 @@ class OwnerSettingsSyncTest extends TestCase
     {
         $owner = $this->owner(1); // anchor +6 months → outside the 30-day window
         $this->actingAs($owner)->get(route('admin.dashboard'))
-            ->assertOk()->assertDontSee('class="sub-alert ', false);
+            ->assertOk()->assertDontSee('class="rc rc--', false);
 
         // Move the account + branch to 5 days out → the warning banner appears.
         SubscriptionAccount::where('owner_id', $owner->id)->update(['current_period_end' => now()->addDays(5), 'status' => 'active']);
@@ -166,8 +166,8 @@ class OwnerSettingsSyncTest extends TestCase
 
         $this->actingAs($owner)->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('sub-alert', false)
-            ->assertSee('Renewal due in 5 day(s)');
+            ->assertSee('class="rc rc--soon"', false)
+            ->assertSee('Your plan renews in 5 days');
     }
 
     public function test_change_password_page_renders_the_premium_ui(): void

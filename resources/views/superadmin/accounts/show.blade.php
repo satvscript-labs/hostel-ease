@@ -241,6 +241,8 @@
         </div>
     </div>
 
+    @include('superadmin.accounts._reminders')
+
     <div class="row g-4">
         {{-- ── Branches ── --}}
         <div class="col-lg-5">

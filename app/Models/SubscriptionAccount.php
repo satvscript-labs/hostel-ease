@@ -53,6 +53,7 @@ class SubscriptionAccount extends Model
             'auto_debit' => 'boolean',
             'billing_mode' => BillingMode::class,
             'billing_mode_changed_at' => 'datetime',
+            'last_nudged_at' => 'datetime',
         ];
     }
 
@@ -64,6 +65,11 @@ class SubscriptionAccount extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(SubscriptionOrder::class, 'account_id');
+    }
+
+    public function reminderLogs(): HasMany
+    {
+        return $this->hasMany(SubscriptionReminderLog::class, 'account_id');
     }
 
     public function discounts(): HasMany

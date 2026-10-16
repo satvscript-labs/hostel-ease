@@ -915,6 +915,18 @@
                     url.searchParams.set('tab', tab);
                     window.history.replaceState({}, '', url);
                 });
+
+                // ?email=1 — from the dashboard's "Add your email" ask (S4): open the
+                // verify window straight away, once, then drop the flag from the URL.
+                const here = new URL(window.location);
+                if (here.searchParams.get('email') === '1') {
+                    here.searchParams.delete('email');
+                    window.history.replaceState({}, '', here);
+                    if (!this.modals.email.open) {
+                        this.activeTab = 'profile';
+                        this.$nextTick(() => this.openEmailModal(@js($owner->email_verified_at ? '' : ($owner->email ?? ''))));
+                    }
+                }
             },
 
             // What each role can touch — the SAME config CheckAccess enforces,

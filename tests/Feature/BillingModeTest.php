@@ -322,20 +322,21 @@ class BillingModeTest extends TestCase
     {
         [, $account] = $this->owner();
 
-        $html = (new SubscriptionReminderMail($account, 'upcoming', 5))->render();
+        $html = (new SubscriptionReminderMail($account, 'due_7'))->render();
         $this->assertStringContainsString(route('admin.subscription.index'), $html);
-        $this->assertStringContainsString('Renew now', $html);
+        $this->assertStringContainsString('Review &amp; renew', $html);
 
         $this->manage($account);
-        $html = (new SubscriptionReminderMail($account->fresh(), 'upcoming', 5))->render();
+        $html = (new SubscriptionReminderMail($account->fresh(), 'due_7'))->render();
         $this->assertStringContainsString('Our team will be in touch to renew it for you', $html);
-        $this->assertStringNotContainsString('Renew now', $html);
+        $this->assertStringNotContainsString('Review &amp; renew', $html);
 
         // Platform switch off: everyone is effectively managed.
         $account->forceFill(['billing_mode' => BillingMode::SelfServe])->save();
         config(['hostelease.owner_self_serve' => false]);
-        $html = (new SubscriptionReminderMail($account->fresh(), 'expired', -2))->render();
-        $this->assertStringContainsString('Please contact us at', $html);
+        $html = (new SubscriptionReminderMail($account->fresh(), 'expired'))->render();
+        $this->assertStringContainsString('Our team will be in touch to renew it for you', $html);
+        $this->assertStringNotContainsString('Renew and restore access', $html);
     }
 
     public function test_the_dashboard_notice_follows_the_mode(): void
@@ -343,10 +344,11 @@ class BillingModeTest extends TestCase
         [$owner, $account] = $this->owner(1, ['current_period_end' => now()->addDays(5)]);
 
         $this->actingAs($owner)->get(route('admin.dashboard'))
-            ->assertOk()->assertSee('Renew soon to keep every branch active.');
+            ->assertOk()->assertSee('Review & renew')->assertDontSee('We look after your billing');
 
         $this->manage($account);
         $this->actingAs($owner)->get(route('admin.dashboard'))
-            ->assertOk()->assertSee('Our team will be in touch to renew it for you.');
+            ->assertOk()->assertSee('We look after your billing — our team will be in touch to renew it.')
+            ->assertDontSee('Review & renew');
     }
 }

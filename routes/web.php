@@ -146,6 +146,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('subscription/confirm', [\App\Http\Controllers\Admin\SubscriptionController::class, 'confirm'])
             ->middleware('throttle:30,1')->name('subscription.confirm');
 
+        // "Remind me later" on the dashboard renewal card (S4). Quiets the card only;
+        // the server picks the date from the renewal date.
+        Route::post('subscription/reminders/snooze', [\App\Http\Controllers\Admin\RenewalSnoozeController::class, 'store'])
+            ->middleware('throttle:12,1')->name('subscription.snooze');
+        Route::delete('subscription/reminders/snooze', [\App\Http\Controllers\Admin\RenewalSnoozeController::class, 'destroy'])->name('subscription.snooze.clear');
+
         // Branch removal REQUESTS (D11). The owner asks; only the Super Admin can
         // actually cancel. Deliberately not gated by owner_self_serve — asking is
         // not a billing operation, and an owner must always be able to start the
@@ -181,6 +187,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('accounts/{account}/extend', [AccountController::class, 'extendRenewalDate'])->name('accounts.extend');
         Route::post('accounts/{account}/override', [AccountController::class, 'override'])->name('accounts.override');
         Route::post('accounts/{account}/billing-mode', [AccountController::class, 'billingMode'])->name('accounts.billing-mode');
+        // S4: manual WhatsApp nudge (a wa.me link) — POST because it records who was nudged.
+        Route::post('accounts/{account}/nudge', [AccountController::class, 'nudge'])->name('accounts.nudge');
         Route::post('accounts/{account}/suspend', [AccountController::class, 'suspend'])->name('accounts.suspend');
         Route::post('accounts/{account}/reactivate', [AccountController::class, 'reactivate'])->name('accounts.reactivate');
         Route::post('accounts/{account}/discounts', [AccountController::class, 'storeDiscount'])->name('accounts.discounts.store');
