@@ -116,11 +116,13 @@ class RenewalReminders
             return 'due_'.$window;
         }
 
-        if ($account->status === AccountStatus::Grace) {
+        $status = $this->billing->computeStatus($account);
+
+        if ($status === AccountStatus::Grace) {
             return 'grace';
         }
 
-        if ($account->status === AccountStatus::Expired && -$days <= self::EXPIRED_EMAIL_DAYS) {
+        if ($status === AccountStatus::Expired && -$days <= self::EXPIRED_EMAIL_DAYS) {
             return 'expired';
         }
 
@@ -157,7 +159,10 @@ class RenewalReminders
             return ['tone' => $tone, 'days' => $days];
         }
 
-        return match ($account->status) {
+        // Computed, not the stored status: that is refreshed by the 07:30 job, so on
+        // the morning after the renewal date it still read "active" and the card
+        // vanished exactly when it mattered most (S4 audit A1).
+        return match ($this->billing->computeStatus($account)) {
             AccountStatus::Grace => ['tone' => 'grace', 'days' => $days],
             AccountStatus::Expired => ['tone' => 'expired', 'days' => $days],
             default => null,
@@ -260,7 +265,7 @@ class RenewalReminders
         $when = match (true) {
             $days > 0 => __('renews on :date (in :n days)', ['date' => $date, 'n' => $days]),
             $days === 0 => __('renews today (:date)', ['date' => $date]),
-            $account->status === AccountStatus::Grace => __('ended on :date — access continues until :until', ['date' => $date, 'until' => $c['grace_until']->format('d M Y')]),
+            $this->billing->computeStatus($account) === AccountStatus::Grace => __('ended on :date — access continues until :until', ['date' => $date, 'until' => $c['grace_until']->format('d M Y')]),
             default => __('ended on :date and access is paused', ['date' => $date]),
         };
 

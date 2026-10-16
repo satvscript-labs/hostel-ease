@@ -53,10 +53,12 @@
                         <span class="badge rounded-pill bg-success-subtle text-success"><i class="fa-solid fa-envelope me-1"></i>Emailed</span>
                     @elseif($log->status === 'failed')
                         <span class="badge rounded-pill bg-danger-subtle text-danger" title="{{ $log->detail['error'] ?? '' }}"><i class="fa-solid fa-triangle-exclamation me-1"></i>Email failed · {{ $log->attempts }} {{ $log->attempts === 1 ? 'try' : 'tries' }}</span>
-                    @elseif($log->status === 'no_email')
+                    @elseif(in_array($log->status, ['no_email', 'skipped_no_email'], true))
                         <span class="badge rounded-pill bg-secondary-subtle text-secondary">No email</span>
                     @endif
-                    <span class="badge rounded-pill bg-primary-subtle text-primary"><i class="fa-solid fa-bell me-1"></i>In app</span>
+                    @if(($log->detail['in_app'] ?? null) === 'posted')
+                        <span class="badge rounded-pill bg-primary-subtle text-primary"><i class="fa-solid fa-bell me-1"></i>In app</span>
+                    @endif
                     <span class="text-muted ms-auto">for {{ $log->cycle_end?->format('d M Y') }}</span>
                 </div>
             @endforeach

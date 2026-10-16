@@ -606,7 +606,14 @@ class AccountBillingService
         // FREE RENEWALS (doc 22): a branch holding one renews for ₹0. Its share of
         // the term is taken off before the engine prices the rest; the volume tier
         // still counts every branch on the plan.
-        $complimentary = $branches->filter(fn (Hostel $b) => (int) $b->free_renewals > 0)
+        //
+        // A free renewal is worth one renewal of the term the account RENEWS ON (doc 22:
+        // a monthly account gets a free month). Renewing on a different term does not
+        // use it — otherwise a monthly customer holding one could pick Yearly and get a
+        // free YEAR (S4 audit A6). It stays held for the next renewal on its own term.
+        // An account with no paid term yet (a trial) uses it on whichever term it picks.
+        $giftsApply = ! $account->period?->isPaid() || $account->period === $bp;
+        $complimentary = $branches->filter(fn (Hostel $b) => $giftsApply && (int) $b->free_renewals > 0)
             ->map(fn (Hostel $b) => ['branch' => $b, 'amount' => $unit])->values()->all();
         $complimentaryTotal = round(count($complimentary) * $unit, 2);
 
@@ -623,6 +630,9 @@ class AccountBillingService
             'subtotal' => $subtotal,
             'complimentary' => $complimentary,
             'complimentary_total' => $complimentaryTotal,
+            // Free renewals held but not used on THIS term (they are for the account's
+            // own term) — so the page can say why, instead of silently charging.
+            'gifts_waiting' => $giftsApply ? 0 : $branches->filter(fn (Hostel $b) => (int) $b->free_renewals > 0)->count(),
             'breakdown' => $breakdown,
             // Branches BEHIND the current renewal date, brought up to it first.
             'topups' => $topups,

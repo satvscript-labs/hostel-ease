@@ -105,14 +105,19 @@ class ProcessSubscriptionLifecycle extends Command
             } catch (QueryException) {
                 return null;
             }
+        }
 
-            // In-app goes out exactly once per window, whatever happens to the email.
+        // In-app goes out exactly once per window, whatever happens to the email —
+        // including on the retry of a run that died before posting it (S4 audit A3).
+        $detail = (array) $log->detail;
+        if (($detail['in_app'] ?? null) !== 'posted') {
             $this->postBell($account, $window, $reminders, $billing, $notifications);
+            $detail['in_app'] = 'posted';
+            $log->update(['detail' => $detail]);
         }
 
         $owner = $account->owner;
         $email = $owner?->email;
-        $detail = (array) $log->detail + ['in_app' => 'posted'];
 
         if (! $email) {
             $status = 'no_email';
@@ -164,7 +169,10 @@ class ProcessSubscriptionLifecycle extends Command
             default => __('Our team will be in touch to renew it for you.'),
         };
 
+        // A new stage is NEWS: a fresh entry at the top of the bell, not the unread
+        // "7 days" one rewritten in place under its old time (S4 audit A7).
         foreach ($billing->includedBranches($account) as $branch) {
+            $notifications->clear($branch->id, self::BELL_TYPE, 'account:'.$account->id);
             $notifications->push($branch->id, self::BELL_TYPE, 'account:'.$account->id, $title, $message, $level);
         }
     }

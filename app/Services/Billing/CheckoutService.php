@@ -145,6 +145,26 @@ class CheckoutService
                 }
             }
 
+            // Nothing to pay: every branch holds a free renewal and nothing else is
+            // owed. Razorpay refuses an order under ₹1, so this used to dead-end at
+            // "Amount must be at least 100 paise" (S4 audit A5). Recorded as a paid ₹0
+            // renewal — the same record an operator's offline ₹0 renewal makes, which
+            // spends the free renewals. The total is the server's quote, never posted.
+            $quote = $this->billing->quoteRenewal($account, $period);
+            if ((int) round($quote['total'] * 100) === 0) {
+                $order = $this->billing->renewAccount($account, $period, [
+                    'payment_status' => PaymentStatus::Paid->value,
+                    'collection' => CollectionMethod::Offline->value,
+                    'remarks' => 'Free renewal claimed by the owner',
+                ]);
+
+                return [
+                    'mode' => 'paid',
+                    'order' => $order,
+                    'message' => 'Renewed — free this time. Every branch now runs to '.$account->fresh()->current_period_end?->format('d M Y').'.',
+                ];
+            }
+
             $order = $this->billing->renewAccount($account, $period, [
                 'payment_status' => PaymentStatus::Pending->value,
                 'collection' => CollectionMethod::Checkout->value,

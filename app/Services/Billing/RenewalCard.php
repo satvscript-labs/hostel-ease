@@ -64,7 +64,9 @@ class RenewalCard
 
         $note = match (true) {
             $c['link_url'] !== null => null,
-            $c['managed'] => __('We look after your billing — our team will be in touch to renew it.'),
+            // Managed — or self-serve switched off for everyone, which the owner page
+            // also shows as "Managed by HostelEase" (S4 audit A2).
+            ! $c['self_serve'] => __('We look after your billing — our team will be in touch to renew it.'),
             ! $isOwner => __('The account owner renews the plan.'),
             default => null,
         };

@@ -550,6 +550,13 @@
                         <div class="small text-muted mt-2" x-show="(quotes[period].closing || []).length">
                             <i class="fa-solid fa-circle-info me-1"></i>{{ __('Not included (closing):') }} <span x-text="(quotes[period].closing || []).join(', ')"></span>
                         </div>
+                        {{-- A free renewal is worth one renewal of the account's own term (doc 22). --}}
+                        <div class="small mt-2 text-primary" x-show="quotes[period].gifts_waiting > 0">
+                            <i class="fa-solid fa-gift me-1"></i>
+                            <span x-text="quotes[period].gifts_term === 'monthly'
+                                ? @js(__('Your free renewal is for a monthly renewal — choose Monthly to use it. It stays saved until then.'))
+                                : @js(__('Your free renewal is for a yearly renewal — choose Yearly to use it. It stays saved until then.'))"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -582,7 +589,8 @@
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" @click="closeSheet()" :disabled="loading">{{ __('Cancel') }}</button>
                             <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" @click="pay()" :disabled="loading">
-                                <span x-show="!loading"><i class="fa-solid fa-lock me-1"></i>{{ __('Pay') }} <span x-text="money(sheetSummary.final)"></span></span>
+                                <span x-show="!loading && !sheetFree"><i class="fa-solid fa-lock me-1"></i>{{ __('Pay') }} <span x-text="money(sheetSummary.final)"></span></span>
+                                <span x-show="!loading && sheetFree"><i class="fa-solid fa-gift me-1"></i>{{ __('Renew for free') }}</span>
                                 <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                             </button>
                         </div>
@@ -668,7 +676,9 @@ document.addEventListener('alpine:init', () => {
             this.bump = false; this.$nextTick(() => { this.bump = true; setTimeout(() => this.bump = false, 360); });
         },
 
-        get sheetPays() { return this.sheet.kind && (this.sheet.kind !== 'add' || (this.addStep === 2 && this.newBranch?.mode === 'prorate')); },
+        get sheetPays() { return this.sheet.kind && !this.sheetFree && (this.sheet.kind !== 'add' || (this.addStep === 2 && this.newBranch?.mode === 'prorate')); },
+        // A renewal every branch's free renewal covers: nothing goes to Razorpay (S4 audit A5).
+        get sheetFree() { return this.sheet.kind === 'renew' && Number(this.sheetSummary.final) === 0; },
         get addCta() {
             const n = this.newBranch || {};
             if (n.mode === 'prorate') return @js(__('Add & pay')) + ' ' + this.money(n.final);

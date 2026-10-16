@@ -400,6 +400,8 @@ class SubscriptionController extends Controller
                 'name' => $c['branch']->name,
                 'amount' => round((float) $c['amount'], 2),
             ])->values()->all(),
+            'gifts_waiting' => (int) $q['gifts_waiting'],
+            'gifts_term' => $account->period?->isPaid() ? $account->period->value : null,
             'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),
             // Which branches this renews, and which are left out because they are
