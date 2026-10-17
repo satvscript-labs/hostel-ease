@@ -113,6 +113,100 @@ class BillingLabTest extends TestCase
         $this->assertStringContainsString('Every account anchor matches its furthest branch', Artisan::output());
     }
 
+    // ── L4: never void dates a later payment is built on ──────────────────
+
+    public function test_l4_an_extension_cannot_be_voided_once_a_renewal_is_bought_on_top(): void
+    {
+        [$owner, $account] = $this->renewedAhead('yearly', 1);
+        $extension = $this->billing->extendRenewalDate($account, 15, 'days', 'goodwill');
+        $this->billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid']); // starts ON the extended date
+        $end = $account->fresh()->current_period_end->copy();
+
+        $this->assertNotNull($this->billing->voidBlockedReason($extension));
+        $admin = User::factory()->superAdmin()->create();
+        $this->actingAs($admin)->patch(route('superadmin.accounts.orders.void', $account), ['order_id' => $extension->id, 'reason' => 'oops'], ['HTTP_REFERER' => '/'])
+            ->assertSessionHas('warning');
+
+        $this->assertSame('paid', $extension->fresh()->payment_status->value, 'not voided');
+        $this->assertTrue($account->fresh()->current_period_end->equalTo($end));
+
+        $this->expectException(\RuntimeException::class);
+        $this->billing->voidOrder($extension->fresh(), 'service backstop');
+    }
+
+    public function test_l4_newest_first_still_works(): void
+    {
+        [, $account] = $this->renewedAhead('yearly', 1);
+        $extension = $this->billing->extendRenewalDate($account, 15, 'days', 'goodwill');
+        $renewal = $this->billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid']);
+
+        $this->billing->voidOrder($renewal, 'cheque bounced');   // the newest one first
+        $this->billing->voidOrder($extension->fresh(), 'withdrawn'); // now nothing sits on it
+
+        $this->assertSame('voided', $extension->fresh()->payment_status->value);
+    }
+
+    public function test_l4_a_void_with_nothing_built_on_it_is_unchanged(): void
+    {
+        [, $account] = $this->renewedAhead('yearly', 1);
+        $only = $account->orders()->sole();
+
+        $this->assertNull($this->billing->voidBlockedReason($only));
+        $this->billing->voidOrder($only, 'bounced');
+        $this->assertSame(AccountStatus::Expired, $account->fresh()->status);
+    }
+
+    // ── L5: an owner's attempt a payment made pointless is cleared ────────
+
+    public function test_l5_an_owners_covered_checkout_attempt_is_voided_when_a_payment_covers_it(): void
+    {
+        config(['services.razorpay.enabled' => true, 'services.razorpay.key' => 'rzp_test_key', 'services.razorpay.secret' => 'rzp_test_secret']);
+        \Illuminate\Support\Facades\Http::fake(['api.razorpay.com/v1/orders/*/payments' => \Illuminate\Support\Facades\Http::response(['items' => []], 200)]);
+
+        [$owner, $account] = $this->renewedAhead('yearly', 1);
+        $second = app(HostelService::class)->createBranchForOwner($owner, ['name' => 'Second']);
+        $attempt = $this->billing->addBranch($account, $second, ['payment_status' => 'pending', 'collection' => 'checkout']);
+        $attempt->forceFill(['razorpay_order_id' => 'order_L5'])->save();
+        $this->assertSame(1, SubscriptionOrder::outstanding()->count());
+
+        // The operator then renews everything — the top-up covers "Second".
+        $renewal = $this->billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid']);
+        app(\App\Services\Billing\PaymentLinkService::class)->cancelOvertakenLinks($account->fresh(), $renewal->id);
+
+        $this->assertSame('voided', $attempt->fresh()->payment_status->value);
+        $this->assertSame(0, SubscriptionOrder::outstanding()->count(), 'nothing left in receivables that nobody owes');
+    }
+
+    public function test_l5_an_attempt_with_a_payment_in_flight_is_left_alone(): void
+    {
+        config(['services.razorpay.enabled' => true, 'services.razorpay.key' => 'rzp_test_key', 'services.razorpay.secret' => 'rzp_test_secret']);
+        \Illuminate\Support\Facades\Http::fake(['api.razorpay.com/v1/orders/*/payments' => \Illuminate\Support\Facades\Http::response(['items' => [['id' => 'pay_1', 'status' => 'authorized', 'amount' => 100]]], 200)]);
+
+        [$owner, $account] = $this->renewedAhead('yearly', 1);
+        $second = app(HostelService::class)->createBranchForOwner($owner, ['name' => 'Second']);
+        $attempt = $this->billing->addBranch($account, $second, ['payment_status' => 'pending', 'collection' => 'checkout']);
+        $attempt->forceFill(['razorpay_order_id' => 'order_L5b'])->save();
+
+        $renewal = $this->billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid']);
+        app(\App\Services\Billing\PaymentLinkService::class)->cancelOvertakenLinks($account->fresh(), $renewal->id);
+
+        $this->assertSame('pending', $attempt->fresh()->payment_status->value, 'a payment in flight is never turned into a refund case');
+    }
+
+    public function test_l5_an_attempt_that_still_buys_something_is_kept(): void
+    {
+        config(['services.razorpay.enabled' => true, 'services.razorpay.key' => 'rzp_test_key', 'services.razorpay.secret' => 'rzp_test_secret']);
+        \Illuminate\Support\Facades\Http::fake(['api.razorpay.com/v1/orders/*/payments' => \Illuminate\Support\Facades\Http::response(['items' => []], 200)]);
+
+        [$owner, $account] = $this->renewedAhead('yearly', 1);
+        $second = app(HostelService::class)->createBranchForOwner($owner, ['name' => 'Second']);
+        $attempt = $this->billing->addBranch($account, $second, ['payment_status' => 'pending', 'collection' => 'checkout']);
+
+        app(\App\Services\Billing\PaymentLinkService::class)->cancelOvertakenLinks($account->fresh());
+
+        $this->assertSame('pending', $attempt->fresh()->payment_status->value);
+    }
+
     // ── the lab itself ─────────────────────────────────────────────────────
 
     protected function lab(string $code): SubscriptionAccount

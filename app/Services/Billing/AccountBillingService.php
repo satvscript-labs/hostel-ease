@@ -425,6 +425,10 @@ class AccountBillingService
      */
     public function voidOrder(SubscriptionOrder $order, string $reason): SubscriptionOrder
     {
+        if ($blocked = $this->voidBlockedReason($order)) {
+            throw new RuntimeException($blocked);
+        }
+
         return DB::transaction(function () use ($order, $reason) {
             // Voiding a PAID renewal hands back the free renewals it used.
             if ($order->payment_status === PaymentStatus::Paid) {
@@ -447,6 +451,44 @@ class AccountBillingService
 
             return $order->fresh();
         });
+    }
+
+    /**
+     * Why a PAID order cannot be voided right now — or null when it can.
+     *
+     * Voiding withdraws the dates an order granted. But when a LATER payment starts on
+     * or after those dates for the same branch — a renewal bought on top of an
+     * extension, the next year paid on top of this one — the later lines stay, the
+     * branch stays covered straight through, and the "withdrawn" days are simply given
+     * away (billing lab L4: a voided 5-day extension under a paid month). Newest first:
+     * void the later payment, then this one.
+     */
+    public function voidBlockedReason(SubscriptionOrder $order): ?string
+    {
+        if ($order->payment_status !== PaymentStatus::Paid) {
+            return null;
+        }
+
+        foreach ($order->lines()->get(['branch_id', 'start_date']) as $line) {
+            $later = SubscriptionOrderLine::query()
+                ->join('subscription_orders', 'subscription_orders.id', '=', 'subscription_order_lines.order_id')
+                ->where('subscription_order_lines.branch_id', $line->branch_id)
+                ->where('subscription_orders.id', '>', $order->id)
+                ->where('subscription_orders.account_id', $order->account_id)
+                ->where('subscription_orders.payment_status', PaymentStatus::Paid->value)
+                ->whereNull('subscription_orders.deleted_at')
+                ->when($line->start_date, fn ($q) => $q->whereDate('subscription_order_lines.start_date', '>=', $line->start_date))
+                ->orderBy('subscription_orders.id')
+                ->value('subscription_orders.id');
+
+            if ($later) {
+                $invoice = SubscriptionOrder::find($later)?->invoiceNumber() ?? '#'.$later;
+
+                return "A later payment ({$invoice}) is built on this one's dates — voiding this one would not take any time back, it would only leave a gap that stays covered. Void {$invoice} first (newest first), then this one.";
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -319,6 +319,8 @@ class PaymentLinkService
             return 0;
         }
 
+        $this->voidOvertakenAttempts($account, $exceptOrderId);
+
         $cancelled = 0;
 
         $live = $account->orders()
@@ -337,6 +339,51 @@ class PaymentLinkService
         }
 
         return $cancelled;
+    }
+
+    /**
+     * The owner's OWN unpaid checkout attempts that a payment has since made pointless
+     * — an "Add to plan" for a branch a Renew-all top-up then covered, say. They sat in
+     * receivables forever as money nobody owed (billing lab L5); they are voided here,
+     * after every payment that grants coverage, as S3 already does for renewals.
+     *
+     * Only attempts that would buy NOTHING ('covered') — a 'stale' one still owes part
+     * and is re-priced by the owner's next Renew. Razorpay is asked first: an attempt
+     * with a payment started, authorised or captured is left alone (voiding it would
+     * turn that payment into a refund case). Best effort — it never throws, because it
+     * runs right after money has been applied.
+     */
+    protected function voidOvertakenAttempts(SubscriptionAccount $account, ?int $exceptOrderId): int
+    {
+        $voided = 0;
+
+        $attempts = $account->orders()
+            ->where('payment_status', PaymentStatus::Pending->value)
+            ->where('collection', \App\Enums\CollectionMethod::Checkout->value)
+            ->get()
+            ->reject(fn (SubscriptionOrder $o) => $o->id === $exceptOrderId || $o->hasLiveLink());
+
+        foreach ($attempts as $order) {
+            if ($order->coverageState(fresh: true) !== 'covered') {
+                continue;
+            }
+
+            try {
+                if ($order->razorpay_order_id) {
+                    $payments = $this->razorpay->fetchOrderPayments($order->razorpay_order_id);
+                    if (collect($payments)->contains(fn (array $p) => in_array($p['status'] ?? null, ['created', 'authorized', 'captured'], true))) {
+                        continue;
+                    }
+                }
+
+                $this->billing->voidOrder($order, 'Overtaken — another payment already covers it');
+                $voided++;
+            } catch (\Throwable $e) {
+                Log::warning('Could not clear an overtaken checkout attempt', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $voided;
     }
 
     /**

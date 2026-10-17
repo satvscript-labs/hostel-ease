@@ -921,6 +921,12 @@ class AccountController extends Controller
 
         $order = $account->orders()->whereKey($data['order_id'])->firstOr(fn () => abort(404));
 
+        // Before anything is touched (a live link cancelled, say): a payment built on
+        // this one's dates means voiding it would withdraw nothing (billing lab L4).
+        if ($blocked = $this->billing->voidBlockedReason($order)) {
+            return back()->with('warning', $blocked);
+        }
+
         $wasPaid = $order->payment_status->value === 'paid';
 
         // A voided charge must not remain payable. Same reasoning as acceptOrder():
