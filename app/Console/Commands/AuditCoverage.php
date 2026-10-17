@@ -479,8 +479,12 @@ class AuditCoverage extends Command
         $findings = [];
 
         foreach (SubscriptionAccount::with('owner')->cursor() as $account) {
+            // The BILLED branches — the same set the anchor is derived from
+            // (refreshAccountAnchor). A cancelled branch keeps working to its paid end
+            // (D11) but no longer sets the date, so counting it flagged every closing
+            // account — anchor none, its last branch still covered — as drift (lab audit L2).
             $branches = $account->owner
-                ? Hostel::whereIn('id', $account->owner->accessibleHostelIds())->get()
+                ? Hostel::whereIn('id', $account->owner->accessibleHostelIds())->whereNull('cancelled_at')->get()
                 : collect();
 
             if ($branches->isEmpty()) {

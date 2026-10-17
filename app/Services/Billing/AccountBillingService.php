@@ -863,10 +863,14 @@ class AccountBillingService
      *     denominator are therefore days of the SAME calendar stretch, which is
      *     what makes "half a cycle costs half a unit" true in February, in a leap
      *     year, everywhere.
-     *  2. It is clamped at one unit price. A top-up TO the anchor can never cost
-     *     more than a full term — if it would, the account needs a renewal, not a
-     *     top-up. (Before the clamp, a branch added against a two-year-out anchor
-     *     was quoted ₹20,014 for one branch.)
+     *  2. Each WHOLE term in the gap costs exactly one unit, and only the part-term
+     *     left over is prorated (clamped at one unit, so day-count wobble never
+     *     prices a part-term above a full one). An anchor can legitimately be more
+     *     than one term away — an owner who renews ahead — and the old flat
+     *     one-unit clamp then sold every extra term free: a branch added to an
+     *     account renewed a year ahead got 731 days for ₹10,000 (lab audit L3).
+     *     The ₹20,014 the clamp was first added for came from F1's wrongly
+     *     doubled anchors, which S0 removed.
      *  3. Both ends are pinned to midnight, so the same action costs the same
      *     whether it is done at 9am or 11pm, and the branch is covered for the
      *     day it is added.
@@ -885,10 +889,26 @@ class AccountBillingService
         $cycleDays = $period->cycleDays($anchorDay);
         $days = $anchorDay->greaterThan($fromDay) ? (int) $fromDay->diffInDays($anchorDay) : 0;
 
+        if ($days === 0) {
+            return ['days' => 0, 'cycle_days' => $cycleDays, 'amount' => 0.0];
+        }
+
+        // Whole terms back from the anchor, while a full one still fits after $from.
+        $wholeTerms = 0;
+        $cursor = $anchorDay->copy();
+        while ($wholeTerms < 100 && ($start = $period->cycleStart($cursor)->startOfDay())->greaterThanOrEqualTo($fromDay)) {
+            $wholeTerms++;
+            $cursor = $start;
+        }
+
+        // The part-term left before them, at the daily rate of ITS cycle.
+        $partDays = $cursor->greaterThan($fromDay) ? (int) $fromDay->diffInDays($cursor) : 0;
+        $part = $partDays > 0 ? min($unit, round($unit * $partDays / $period->cycleDays($cursor), 2)) : 0.0;
+
         return [
             'days' => $days,
             'cycle_days' => $cycleDays,
-            'amount' => $days > 0 ? min($unit, round($unit * $days / $cycleDays, 2)) : 0.0,
+            'amount' => round($wholeTerms * $unit + $part, 2),
         ];
     }
 
@@ -1197,6 +1217,13 @@ class AccountBillingService
      * with it, so nothing is left out of line. On a running trial this extends the
      * trial. A branch already behind stays behind: its gap is still owed.
      */
+    /**
+     * How an extension's order is recognised: its remarks begin with this (this method is
+     * the only writer). foldGiftsIntoFreeRenewals() reads it — an extension MOVES the
+     * account's date, it is not stray gift time to be folded away.
+     */
+    public const EXTENSION_REMARK = 'Renewal date extended by';
+
     public function extendRenewalDate(SubscriptionAccount $account, int $amount, string $unit, string $reason): SubscriptionOrder
     {
         $anchor = $account->current_period_end;
@@ -1221,7 +1248,7 @@ class AccountBillingService
             $order = $this->makeOrder($account, $account->period ?? BillingPeriod::Yearly, $branches->count(), 0, 0, 0, [
                 'payment_status' => PaymentStatus::Paid->value,
                 'payment_method' => PaymentMethod::Comp->value,
-                'remarks' => "Renewal date extended by {$label} — {$reason}",
+                'remarks' => self::EXTENSION_REMARK." {$label} — {$reason}",
             ], OrderKind::Comp);
 
             foreach ($branches as $branch) {
@@ -1288,6 +1315,24 @@ class AccountBillingService
 
             if (! $date) {
                 return [];
+            }
+
+            // An "Extend renewal date" is part of the date, not a gift past it. It is a
+            // ₹0 comp order, so the paid-kinds query above does not see it — and --fix
+            // used to treat every extension as stray gift time: it cut every branch back
+            // to the old date and converted, say, 15 days into round(15/365) = 0 free
+            // renewals, silently undoing the operator's extension (lab audit L1).
+            $extendedTo = SubscriptionOrderLine::query()
+                ->join('subscription_orders', 'subscription_orders.id', '=', 'subscription_order_lines.order_id')
+                ->where('subscription_orders.account_id', $account->id)
+                ->where('subscription_orders.payment_status', PaymentStatus::Paid->value)
+                ->whereNull('subscription_orders.deleted_at')
+                ->where('subscription_orders.kind', OrderKind::Comp->value)
+                ->where('subscription_orders.remarks', 'like', self::EXTENSION_REMARK.'%')
+                ->whereIn('subscription_order_lines.branch_id', $branches->pluck('id'))
+                ->max('subscription_order_lines.end_date');
+            if ($extendedTo && Carbon::parse($extendedTo)->greaterThan(Carbon::parse($date))) {
+                $date = $extendedTo;
             }
 
             $date = Carbon::parse($date)->startOfDay();

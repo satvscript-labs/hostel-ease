@@ -144,18 +144,31 @@ class ProrationTest extends TestCase
         $this->assertSame(1639.34, $q['prorated']);   // 10000 × 60 / 366
     }
 
-    public function test_a_top_up_is_clamped_at_one_unit_price(): void
+    public function test_each_whole_term_in_the_gap_costs_one_unit(): void
     {
-        // The ₹20,014 bug: an anchor left two years out by F1 priced a single
-        // branch above a full term. A top-up TO the anchor can never cost more than
-        // one term — beyond that the account needs a renewal, not a top-up.
+        // The anchor two years out is LEGITIMATE now — an owner who renewed a year
+        // ahead (F1's wrongly doubled anchors, which the old flat one-unit clamp was
+        // written against, are gone since S0). Two whole terms cost two units; the
+        // old clamp sold the second year free (billing lab L3).
         Carbon::setTestNow('2026-10-02 12:00:00');
         [$account] = $this->account(Carbon::parse('2028-10-02'));
 
         $q = $this->quote($account);
 
         $this->assertSame(731, $q['days_remaining']);
-        $this->assertSame(10000.00, $q['prorated']);
+        $this->assertSame(20000.00, $q['prorated']);
+    }
+
+    public function test_a_part_term_is_still_capped_at_one_unit(): void
+    {
+        // One whole term plus a single day: the day is prorated, never a second unit.
+        Carbon::setTestNow('2026-10-01 12:00:00');
+        [$account] = $this->account(Carbon::parse('2027-10-02'));
+
+        $q = $this->quote($account);
+
+        $this->assertSame(366, $q['days_remaining']);
+        $this->assertSame(10027.40, $q['prorated']);   // 10000 + 10000 × 1 / 365
     }
 
     public function test_the_price_does_not_depend_on_the_time_of_day(): void
