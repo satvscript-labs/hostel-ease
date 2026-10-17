@@ -86,6 +86,34 @@ class BillingLabTest extends TestCase
         $this->assertLessThan(10000, (float) $q['prorated']);
     }
 
+    /** The audit agrees: a top-up that paid for two terms holds two terms, not "one term + over-granted". */
+    public function test_l3_the_audit_accepts_a_correctly_paid_multi_term_top_up(): void
+    {
+        [$owner, $account] = $this->renewedAhead();
+        $second = app(HostelService::class)->createBranchForOwner($owner, ['name' => 'Second']);
+        $this->billing->addBranch($account, $second, ['payment_status' => 'paid']);
+
+        Artisan::call('hostelease:audit-coverage');
+
+        $this->assertStringContainsString('Every branch holds exactly the coverage its payments bought', Artisan::output());
+    }
+
+    /** …and a customer who lapsed and came back holds nothing they did not pay for. */
+    public function test_the_audit_does_not_count_a_lapse_as_over_granted(): void
+    {
+        $owner = User::factory()->create(['role' => 'hostel_admin', 'mobile' => '9444400002']);
+        app(HostelService::class)->createBranchForOwner($owner, ['name' => 'Only']);
+        $account = $this->billing->accountFor($owner);
+        $this->travelTo(now()->subDays(420));
+        $this->billing->renewAccount($account, 'yearly', ['payment_status' => 'paid']);
+        $this->travelBack();
+        $this->billing->renewAccount($account->fresh(), 'yearly', ['payment_status' => 'paid']); // back after a 55-day lapse
+
+        Artisan::call('hostelease:audit-coverage');
+
+        $this->assertStringContainsString('Every branch holds exactly the coverage its payments bought', Artisan::output());
+    }
+
     // ── L1: an extension is part of the date, never folded away ───────────
 
     public function test_l1_fix_keeps_an_extension_of_the_renewal_date(): void
@@ -226,7 +254,7 @@ class BillingLabTest extends TestCase
         $this->seed(BillingLabSeeder::class);
         $this->seed(BillingLabSeeder::class); // re-runnable: rebuilds, never duplicates
 
-        $this->assertSame(54, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
+        $this->assertSame(60, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
         $reminders = app(RenewalReminders::class);
 
         // The ledger agrees with every date it made.
@@ -270,6 +298,18 @@ class BillingLabTest extends TestCase
         $this->assertGreaterThanOrEqual(3, $this->lab('S3-28')->orders()->where('payment_status', 'paid')->count());
         $this->assertSame(0.0, (float) $this->billing->quoteRenewal($this->lab('S3-29'), 'monthly')['total']);
         $this->assertSame(9000.0, (float) $this->billing->quoteRenewal($this->lab('S3-29'), 'yearly')['total']);
+
+        // S5 — each one shows what its name says on the Revenue page.
+        $rev = new \App\Services\Billing\RevenueMetrics;
+        $mrr = $rev->mrrByAccount();
+        $this->assertGreaterThan(9000, $rev->deferred() - 0, 'S5-01 adds a whole year of deferred revenue');
+        $this->assertEqualsWithDelta(10000 / 12, $mrr[$this->lab('S5-01')->id], 0.02, 'S5-01: the advance year adds no MRR yet');
+        $this->assertArrayHasKey($this->lab('S5-02')->id, $mrr);
+        $this->assertTrue($rev->lines()->contains(fn ($l) => $l->account === $this->lab('S5-02')->id && $l->start->lessThan(now()->subDays(60))), 'S5-02 had paid before — a comeback');
+        $this->assertArrayHasKey($this->lab('S5-03')->id, $mrr);
+        $this->assertArrayNotHasKey($this->lab('S5-04')->id, $mrr, 'S5-04: voided');
+        $this->assertSame(now()->subDays(3)->toDateString(), $this->lab('S5-05')->orders()->where('payment_status', 'paid')->latest('id')->first()->paid_at->toDateString());
+        $this->assertEqualsWithDelta(2 * 10000 / 12, $mrr[$this->lab('S5-06')->id], 0.02, 'S5-06: two branches now');
 
         // S4 — the card stage each one is named for
         $expect = ['S4-01' => null, 'S4-02' => 'calm', 'S4-03' => 'soon', 'S4-04' => 'final', 'S4-05' => 'today', 'S4-06' => 'grace',

@@ -78,6 +78,7 @@ class BillingLabSeeder extends Seeder
                 $this->phaseS2();
                 $this->phaseS3();
                 $this->phaseS4();
+                $this->phaseS5();
             });
         } finally {
             Carbon::setTestNow();
@@ -259,6 +260,42 @@ class BillingLabSeeder extends Seeder
         $o = $this->owner('S3-29', 'Trial Free Month', 'trial + a free renewal = one FREE MONTH: Monthly ₹0 · Yearly ₹9,000 (one month off), never a free year');
         [$a, $b] = $this->trialAccount($o, 'S3-29', ['Gifted Trial'], daysLeft: 4);
         $this->billing->setFreeRenewals($a, [$b[0]->id], 1);
+    }
+
+    // ── S5 · revenue (28_S5_DESIGN.md) ──────────────────────────────────────
+    //
+    // The whole lab already gives the Revenue page a year of history; these six add
+    // the cases it would not otherwise show.
+
+    protected function phaseS5(): void
+    {
+        $o = $this->owner('S5-01', 'Advance Renewal', 'renewed a year AHEAD today: cash this month, but deferred — not MRR — until it starts');
+        [$a] = $this->paidAccount($o, 'S5-01', ['Main'], daysLeft: 165);
+        $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-01-AHEAD', 'remarks' => 'Lab S5-01: renewed a year ahead']);
+
+        $o = $this->owner('S5-02', 'Came Back', 'plan ran out 60 days ago, renewed 5 days ago: "Came back" in How MRR moved, not "New"');
+        [$a] = $this->paidAccount($o, 'S5-02', ['Main'], daysLeft: -60);
+        $this->at(now()->subDays(5)->setTime(10, 0), fn () => $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-02-BACK', 'remarks' => 'Lab S5-02: came back']));
+
+        $o = $this->owner('S5-03', 'Trial Converted', 'trial began 30 days ago, subscribed when it ended: counts as "Subscribed" in its trial month');
+        [$a] = $this->trialAccount($o, 'S5-03', ['Converted'], daysLeft: -16);
+        $this->at(now()->subDays(16)->setTime(11, 0), fn () => $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-03-SUBSCRIBED', 'remarks' => 'Lab S5-03: subscribed after the trial']));
+
+        $o = $this->owner('S5-04', 'Voided Payment', 'paid 3 days ago, then voided (cheque bounced): in NO figure — not cash, not MRR');
+        [$a] = $this->paidAccount($o, 'S5-04', ['Main'], daysLeft: 362);
+        $this->billing->voidOrder($a->orders()->sole(), 'Lab S5-04: cheque bounced');
+
+        $o = $this->owner('S5-05', 'Proforma Paid Late', 'proforma raised 40 days ago, paid 3 days ago: cash THIS month (by when it was paid)');
+        [$a] = $this->paidAccount($o, 'S5-05', ['Main'], daysLeft: 20);
+        $order = $this->at(now()->subDays(40)->setTime(10, 0), fn () => $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'pending', 'collection' => 'offline', 'remarks' => 'Lab S5-05: proforma raised 40 days ago']));
+        $this->at(now()->subDays(3)->setTime(10, 0), fn () => $this->billing->acceptOrder($order->fresh(), ['payment_method' => 'rtgs', 'transaction_number' => 'LAB-S5-05-PAID']));
+
+        $o = $this->owner('S5-06', 'Contraction', 'had 3 branches, renewed 10 days ago with 2 ("Leaving" cancelled): "Contraction" in the month it renewed');
+        [$a, $b] = $this->paidAccount($o, 'S5-06', ['Keep A', 'Keep B', 'Leaving'], daysLeft: -10);
+        $this->at(now()->subDays(10)->setTime(9, 0), function () use ($a, $b) {
+            $this->billing->cancelBranch($b[2], 'Lab S5-06: closing this branch');
+            $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-06-RENEWED', 'remarks' => 'Lab S5-06: renewed with two branches']);
+        });
     }
 
     // ── S4 · reminders (26_S4_MANUAL_TESTING.md) ────────────────────────────

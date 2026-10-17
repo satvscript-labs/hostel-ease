@@ -31,6 +31,10 @@
                 <span class="sidebar-link-icon"><i class="fa-solid fa-users-gear"></i></span>
                 <span class="sidebar-link-label">{{ __('Customers') }}</span>
             </a>
+            <a class="sidebar-link {{ request()->routeIs('superadmin.revenue') ? 'is-active' : '' }}" href="{{ route('superadmin.revenue') }}">
+                <span class="sidebar-link-icon"><i class="fa-solid fa-chart-column"></i></span>
+                <span class="sidebar-link-label">{{ __('Revenue') }}</span>
+            </a>
             <a class="sidebar-link {{ request()->routeIs('superadmin.hostels.*') ? 'is-active' : '' }}" href="{{ route('superadmin.hostels.index') }}">
                 <span class="sidebar-link-icon"><i class="fa-solid fa-hotel"></i></span>
                 <span class="sidebar-link-label">{{ __('Hostels') }}</span>

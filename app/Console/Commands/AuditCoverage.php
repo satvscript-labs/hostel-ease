@@ -267,7 +267,7 @@ class AuditCoverage extends Command
         /** @var array<int, array{period:string, grants:int, entitled:int, first:?Carbon}> $perBranch */
         $perBranch = [];
 
-        $accrue = function (int $branchId, string $plan, ?Carbon $start, ?Carbon $end, bool $fullSpanEntitled) use (&$perBranch): void {
+        $accrue = function (int $branchId, string $plan, ?Carbon $start, ?Carbon $end, bool $fullSpanEntitled, int $terms = 1) use (&$perBranch): void {
             if (! $start || ! $end || $end->lessThanOrEqualTo($start)) {
                 return;
             }
@@ -281,12 +281,14 @@ class AuditCoverage extends Command
             // operator correction (including the S1 migration's back-fill of coverage
             // that predates the ledger) — for both, the whole span is entitled by
             // definition, so measuring them against "one term" would invent an overage
-            // that never existed. Everything else buys at most one term; a proration
-            // buys less.
-            $entitled = $fullSpanEntitled ? $span : min($span, $oneTerm);
+            // that never existed. Everything else buys as many whole terms as it paid
+            // for (one, normally; more for a top-up to an anchor renewed ahead — lab
+            // L3) plus at most the part-term in its span; a proration buys less.
+            $entitled = $fullSpanEntitled ? $span : min($span, $oneTerm * max(1, $terms));
 
-            $perBranch[$branchId] ??= ['period' => $period->value, 'grants' => 0, 'entitled' => 0, 'first' => null];
+            $perBranch[$branchId] ??= ['period' => $period->value, 'grants' => 0, 'entitled' => 0, 'first' => null, 'ranges' => []];
             $perBranch[$branchId]['grants']++;
+            $perBranch[$branchId]['ranges'][] = [$startDay, $end->copy()->startOfDay()];
             $perBranch[$branchId]['entitled'] += $entitled;
             $perBranch[$branchId]['first'] = $perBranch[$branchId]['first'] && $perBranch[$branchId]['first']->lessThan($startDay)
                 ? $perBranch[$branchId]['first']
@@ -305,7 +307,23 @@ class AuditCoverage extends Command
         // Order ids that merely mirror a legacy row — their lines are duplicates.
         $mirroredOrderIds = SubscriptionOrder::whereNotNull('legacy_subscription_id')->pluck('id')->all();
 
-        foreach (SubscriptionOrderLine::with('order')->whereNotIn('order_id', $mirroredOrderIds ?: [0])->cursor() as $line) {
+        // Whole terms a paid line bought = its amount ÷ the account's unit price for that
+        // term, rounded down — at least one (a ₹0 free renewal is one term). Unit prices
+        // are read once per account.
+        $billing = app(\App\Services\Billing\AccountBillingService::class);
+        $units = [];
+        $termsPaid = function (SubscriptionOrderLine $line) use ($billing, &$units): int {
+            $period = $line->order->period;
+            if (! $period?->isPaid() || (float) $line->amount <= 0) {
+                return 1;
+            }
+            $key = $line->order->account_id.':'.$period->value;
+            $units[$key] ??= ($account = $line->order->account) ? $billing->unitPrice($account, $period) : 0.0;
+
+            return $units[$key] > 0 ? max(1, (int) floor(((float) $line->amount + 0.01) / $units[$key])) : 1;
+        };
+
+        foreach (SubscriptionOrderLine::with('order.account')->whereNotIn('order_id', $mirroredOrderIds ?: [0])->cursor() as $line) {
             if ($line->order?->payment_status?->value !== 'paid') {
                 continue;
             }
@@ -317,6 +335,7 @@ class AuditCoverage extends Command
                 $line->end_date,
                 in_array($line->order->kind, [\App\Enums\OrderKind::Comp, \App\Enums\OrderKind::Adjustment], true)
                     || $line->order->payment_method?->value === 'comp',
+                $termsPaid($line),
             );
         }
 
@@ -328,8 +347,16 @@ class AuditCoverage extends Command
                 continue;   // no coverage, or no grants at all — checks 2 and 3 cover those
             }
 
-            $paidUpTo = $roll['first']->copy()->addDays($roll['entitled']);
             $heldDay = $held->copy()->startOfDay();
+
+            // Days with NO grant at all between the first one and today's end — a
+            // customer who lapsed and later came back. Those days were never held, so
+            // they push "paid up to" out rather than reading as coverage nobody paid
+            // for (lab S5-02: a 55-day lapse was reported as 55 days over-granted).
+            // Only gaps BETWEEN grants: time past the last grant is exactly what this
+            // check exists to catch (a hand-edited end date, F1's doubled year).
+            $lastGrantEnd = collect($roll['ranges'])->max(fn ($r) => $r[1]);
+            $paidUpTo = $roll['first']->copy()->addDays($roll['entitled'] + $this->gapDays($roll['ranges'], $roll['first'], $lastGrantEnd));
             $over = (int) $paidUpTo->diffInDays($heldDay, false);
 
             if ($over <= 1) {
@@ -374,6 +401,29 @@ class AuditCoverage extends Command
         }
 
         return ['future_days' => $futureDays, 'future_value' => $futureValue, 'past_days' => $pastDays];
+    }
+
+    /**
+     * Days inside [$from, $to) that no range covers.
+     *
+     * @param  list<array{0: Carbon, 1: Carbon}>  $ranges
+     */
+    private function gapDays(array $ranges, Carbon $from, Carbon $to): int
+    {
+        usort($ranges, fn ($a, $b) => $a[0] <=> $b[0]);
+        $covered = 0;
+        $cursor = $from->copy();
+
+        foreach ($ranges as [$start, $end]) {
+            $start = $start->greaterThan($cursor) ? $start : $cursor;
+            $end = $end->lessThan($to) ? $end : $to;
+            if ($end->greaterThan($start)) {
+                $covered += (int) $start->diffInDays($end);
+                $cursor = $end->copy();
+            }
+        }
+
+        return max(0, (int) $from->diffInDays($to) - $covered);
     }
 
     /** What N days of coverage are worth at this branch's account rate. */

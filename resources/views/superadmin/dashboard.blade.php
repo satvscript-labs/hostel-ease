@@ -62,7 +62,7 @@
             <div class="he-stat he-stat--hero">
                 <div class="he-stat__head">
                     <div class="he-stat__icon" style="background: rgba(255, 255, 255, 0.15); color: #6ee7b7;"><i class="fa-solid fa-sack-dollar"></i></div>
-                    <div class="he-stat__label">{{ __('Revenue') }} · {{ now()->format('M') }} <span class="opacity-50">· {{ __('lifetime') }} {{ hostelease_money($stats['total_income']) }}</span></div>
+                    <div class="he-stat__label">{{ __('Cash collected') }} · {{ now()->format('M') }} <span class="opacity-50">· {{ __('lifetime') }} {{ hostelease_money($stats['total_income']) }}</span></div>
                 </div>
                 <div class="he-stat__value">{{ hostelease_money($stats['monthly_revenue']) }}</div>
             </div>
@@ -94,7 +94,10 @@
     <div class="row g-4 mb-4 stagger-3">
         <div class="col-xl-7">
             <div class="panel-card h-100">
-                <div class="panel-head"><h6><i class="fa-solid fa-chart-line me-2" style="color: var(--he-primary);"></i>{{ __('Revenue — last 12 months') }}</h6></div>
+                <div class="panel-head">
+                    <h6><i class="fa-solid fa-chart-line me-2" style="color: var(--he-primary);"></i>{{ __('Cash collected — last 12 months') }}</h6>
+                    <a href="{{ route('superadmin.revenue') }}" class="btn btn-sm btn-white border rounded-pill px-3 fw-semibold">{{ __('Revenue & MRR') }}</a>
+                </div>
                 <div class="panel-body">
                     <div class="sad-chart-shell" id="revShell">
                         <div class="sad-chart-skeleton skeleton"></div>

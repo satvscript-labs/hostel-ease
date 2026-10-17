@@ -170,6 +170,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     */
     Route::middleware('role:super_admin')->prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('dashboard', [SuperAdminDashboard::class, 'index'])->name('dashboard');
+        // S5: revenue you can trust — MRR, cash vs earned, deferred, churn, trials (doc 28).
+        Route::get('revenue', [\App\Http\Controllers\SuperAdmin\RevenueController::class, 'index'])->name('revenue');
 
         // --- Module 12: Hostels, Subscriptions, Admins ---
         Route::get('hostels/owner-lookup', [HostelController::class, 'ownerLookup'])->name('hostels.owner-lookup');

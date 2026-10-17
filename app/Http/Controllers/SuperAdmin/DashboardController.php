@@ -21,11 +21,14 @@ class DashboardController extends Controller
                 ->orWhere('subscription_end', '<', now())->count(),
             'due_renewals' => Hostel::expiringWithin(30)->count(),
             'total_students' => Student::acrossHostels()->count(),
-            // Revenue reads from the account-level order ledger (every paid path
-            // writes an order), so consolidated Account 360 renewals are counted.
+            // CASH, read from the order ledger and dated by when it was PAID (S5):
+            // created_at is when a charge was raised, which is a different day for a
+            // payment link or a proforma. Revenue proper — MRR, earned, deferred —
+            // lives on superadmin.revenue.
             'total_income' => (float) SubscriptionOrder::paid()->sum('amount'),
             'monthly_revenue' => (float) SubscriptionOrder::paid()
-                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->where('paid_at', '>=', now()->startOfMonth())
+                ->where('paid_at', '<', now()->startOfMonth()->addMonthNoOverflow())
                 ->sum('amount'),
         ];
 
@@ -41,9 +44,9 @@ class DashboardController extends Controller
         // Revenue + registrations for the last 12 months (grouped in PHP — DB-agnostic).
         $since = now()->subMonths(11)->startOfMonth();
 
-        $revenue = SubscriptionOrder::paid()->where('created_at', '>=', $since)
-            ->get(['amount', 'created_at'])
-            ->groupBy(fn ($s) => $s->created_at->format('Y-m'))
+        $revenue = SubscriptionOrder::paid()->where('paid_at', '>=', $since)
+            ->get(['amount', 'paid_at'])
+            ->groupBy(fn ($s) => $s->paid_at->format('Y-m'))
             ->map(fn ($g) => (float) $g->sum('amount'));
 
         $registrations = Hostel::where('created_at', '>=', $since)

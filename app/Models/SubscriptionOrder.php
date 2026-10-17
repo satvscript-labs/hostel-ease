@@ -23,6 +23,23 @@ class SubscriptionOrder extends Model
 {
     use HasPublicId, SoftDeletes;
 
+    /**
+     * WHEN it was paid (S5 · 28_S5_DESIGN.md §5) — stamped once, the first time the
+     * order is saved as paid, by whichever of the many money paths makes it so
+     * (created paid, accepted, settled by checkout or link, a free renewal). Never
+     * cleared: a voided order still records when it had been paid. Cash-by-month reads
+     * this; created_at is when the charge was RAISED, which is a different day for a
+     * link or a proforma.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (SubscriptionOrder $order) {
+            if ($order->paid_at === null && $order->payment_status === PaymentStatus::Paid) {
+                $order->paid_at = now();
+            }
+        });
+    }
+
     protected $fillable = [
         'account_id',
         'period',
@@ -57,6 +74,7 @@ class SubscriptionOrder extends Model
             'payment_method' => PaymentMethod::class,
             'payment_link_status' => PaymentLinkStatus::class,
             'payment_link_expires_at' => 'datetime',
+            'paid_at' => 'datetime',
             'payment_link_attempts' => 'integer',
             'quantity' => 'integer',
             'subtotal' => 'decimal:2',
