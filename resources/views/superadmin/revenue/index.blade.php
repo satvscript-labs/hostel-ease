@@ -72,7 +72,7 @@
                     <div class="he-stat__icon" style="background: var(--he-primary-soft); color: var(--he-primary);"><i class="fa-solid fa-user-check"></i></div>
                     <div class="he-stat__label">{{ __('Paying customers') }}<span class="rv-help" tabindex="0" title="{{ __('Customers with a paid plan running today. Customers on a free renewal are counted under "customers" but pay nothing this term.') }}">?</span></div>
                 </div>
-                <div class="he-stat__value">{{ $tiles['paying'] }} <span class="fs-6 opacity-50 fw-normal">/ {{ $tiles['customers'] }}</span></div>
+                <div class="he-stat__value">{{ $tiles['paying'] }} <span class="fs-6 opacity-50 fw-normal">{{ __('of') }} {{ $tiles['customers'] }}</span></div>
                 <div class="rv-sub">{{ __('Average') }} {{ $money($tiles['arpa']) }} {{ __('a month') }}</div>
             </div>
             <div class="he-stat">
@@ -109,6 +109,11 @@
                     <div class="rv-aged-key"><span><i style="background:#94a3b8"></i>0–7d</span><span><i style="background:#f59e0b"></i>8–30d</span><span><i style="background:#dc2626"></i>30d+</span></div>
                 @else
                     <div class="rv-sub">{{ __('nothing outstanding') }}</div>
+                @endif
+                @if($r['stale_count'])
+                    <div class="rv-sub text-danger" title="{{ __('Charges a later payment already covered. Nobody owes them — void them on the customer\'s Account 360.') }}">
+                        <i class="fa-solid fa-circle-exclamation me-1"></i>{{ trans_choice(':n charge already covered — void it|:n charges already covered — void them', $r['stale_count'], ['n' => $r['stale_count']]) }}
+                    </div>
                 @endif
             </div>
         </div>

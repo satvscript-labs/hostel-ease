@@ -107,7 +107,7 @@
                                 <div>
                                     <div class="stat-label">Awaiting payment</div>
                                     <div class="stat-value text-warning mb-0">{{ hostelease_money($summary['receivable']) }}</div>
-                                    <div class="small text-muted">{{ $summary['receivable_count'] }} unpaid {{ \Illuminate\Support\Str::plural('charge', $summary['receivable_count']) }}</div>
+                                    <div class="small text-muted">{{ $summary['receivable_count'] }} unpaid {{ \Illuminate\Support\Str::plural('charge', $summary['receivable_count']) }}@if($summary['receivable_stale_count']) · <span class="text-danger">{{ $summary['receivable_stale_count'] }} already covered — void {{ $summary['receivable_stale_count'] === 1 ? 'it' : 'them' }}</span>@endif</div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-3 small">
                                     <div><div class="stat-label">0–7 days</div><div class="fw-bold text-dark" style="font-variant-numeric:tabular-nums;">{{ hostelease_money($summary['receivable_aged']['fresh']) }}</div></div>

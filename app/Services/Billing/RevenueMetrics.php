@@ -178,13 +178,28 @@ class RevenueMetrics
 
     // ── receivables ─────────────────────────────────────────────────────────
 
-    /** @return array{total: float, count: int, fresh: float, mid: float, old: float} */
+    /**
+     * Charges raised and not paid, aged by when raised — only those that would still BUY
+     * something. A charge a later payment already covered ("Already covered — nothing to
+     * pay" on the owner's page) is money nobody can collect; it is counted apart as
+     * `stale` so the operator voids it, not chased as debt (S5 audit B2). The Customers
+     * page reads this same method, so the two never disagree.
+     *
+     * @return array{total: float, count: int, fresh: float, mid: float, old: float, stale: float, stale_count: int}
+     */
     public function receivables(?CarbonInterface $date = null): array
     {
         $date = $this->day($date);
-        $out = ['total' => 0.0, 'count' => 0, 'fresh' => 0.0, 'mid' => 0.0, 'old' => 0.0];
+        $out = ['total' => 0.0, 'count' => 0, 'fresh' => 0.0, 'mid' => 0.0, 'old' => 0.0, 'stale' => 0.0, 'stale_count' => 0];
 
-        foreach (SubscriptionOrder::outstanding()->get(['amount', 'created_at']) as $o) {
+        foreach (SubscriptionOrder::outstanding()->with('lines.branch')->get() as $o) {
+            if ($o->coverageState() === 'covered') {
+                $out['stale'] += (float) $o->amount;
+                $out['stale_count']++;
+
+                continue;
+            }
+
             $age = (int) $o->created_at->copy()->startOfDay()->diffInDays($date);
             $bucket = $age <= 7 ? 'fresh' : ($age <= 30 ? 'mid' : 'old');
             $out[$bucket] += (float) $o->amount;
@@ -247,7 +262,17 @@ class RevenueMetrics
             return null;
         }
 
-        $lost = $this->lostCustomers()->filter(fn ($r) => $r['ended']->greaterThanOrEqualTo($from) && $r['ended']->lessThan($to))->count();
+        // Dated by the LAST COVERED DAY (the end date is exclusive): a plan that ends on
+        // 1 Sep was last used on 31 Aug, so it is August's loss — and August's base has
+        // it. Dated by the end date it fell into September, whose base no longer did,
+        // and vanished from every rate (S5 audit B1).
+        $from = $this->day($from);
+        $to = $this->day($to);
+        $lost = $this->lostCustomers()->filter(function ($r) use ($from, $to) {
+            $lastDay = $r['ended']->copy()->subDay();
+
+            return $lastDay->greaterThanOrEqualTo($from) && $lastDay->lessThan($to);
+        })->count();
 
         return round($lost / $base * 100, 1);
     }

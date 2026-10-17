@@ -34,8 +34,10 @@ class RevenueController extends Controller
 
         // Twelve months: cash, earned, MRR on the month's last day, churn.
         $months = collect($metrics->months(12))->map(function (array $m) use ($metrics, $today) {
-            $lastDay = $m['to']->copy()->subDay();
-            $asOf = $lastDay->greaterThan($today) ? $today : $lastDay;   // this month: as of today
+            // The same instant "How MRR moved" closes each month on — the 1st of the next
+            // (this month: today) — so the chart, the table and the movement agree to
+            // the rupee (S5 audit B6).
+            $asOf = $m['to']->greaterThan($today) ? $today : $m['to'];
 
             return [
                 'key' => $m['key'],

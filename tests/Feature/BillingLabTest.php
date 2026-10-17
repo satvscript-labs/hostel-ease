@@ -254,12 +254,13 @@ class BillingLabTest extends TestCase
         $this->seed(BillingLabSeeder::class);
         $this->seed(BillingLabSeeder::class); // re-runnable: rebuilds, never duplicates
 
-        $this->assertSame(60, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
+        $this->assertSame(63, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
         $reminders = app(RenewalReminders::class);
 
         // The ledger agrees with every date it made.
         Artisan::call('hostelease:audit-coverage');
         $audit = Artisan::output();
+        $this->assertStringContainsString('Every branch holds exactly the coverage its payments bought', $audit);
         $this->assertStringContainsString('Every account anchor matches its furthest branch', $audit);
         $this->assertStringContainsString('Every branch ends on its account\'s renewal date', $audit);
         $this->assertStringContainsString('Every account cycle is one term long', $audit);
@@ -310,6 +311,11 @@ class BillingLabTest extends TestCase
         $this->assertArrayNotHasKey($this->lab('S5-04')->id, $mrr, 'S5-04: voided');
         $this->assertSame(now()->subDays(3)->toDateString(), $this->lab('S5-05')->orders()->where('payment_status', 'paid')->latest('id')->first()->paid_at->toDateString());
         $this->assertEqualsWithDelta(2 * 10000 / 12, $mrr[$this->lab('S5-06')->id], 0.02, 'S5-06: two branches now');
+        $this->assertSame(1, $rev->receivables()['stale_count'], 'S5-07: the one overtaken proforma — flagged, not owed');
+        $s508 = $rev->lostCustomers()->firstWhere('account', $this->lab('S5-08')->id);
+        if (now()->day > 1 + (int) config('hostelease.grace_days') + 1) {   // past its grace window this month
+            $this->assertSame(now()->startOfMonth()->toDateString(), $s508['ended']->toDateString(), 'S5-08 ended on the 1st');
+        }
 
         // S4 — the card stage each one is named for
         $expect = ['S4-01' => null, 'S4-02' => 'calm', 'S4-03' => 'soon', 'S4-04' => 'final', 'S4-05' => 'today', 'S4-06' => 'grace',

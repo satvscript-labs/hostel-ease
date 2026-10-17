@@ -168,27 +168,19 @@ class AccountController extends Controller
 
         // Receivables (S1 item 14) — real now that a pending charge mints an order
         // (S0 · F3). `outstanding()` excludes the ₹0 kinds, which are never owed.
-        $outstanding = SubscriptionOrder::outstanding()->get(['amount', 'created_at']);
-        $aged = fn (?int $from, ?int $to) => (float) $outstanding
-            ->filter(function ($o) use ($from, $to) {
-                $days = (int) $o->created_at->diffInDays(now());
-
-                return ($from === null || $days >= $from) && ($to === null || $days <= $to);
-            })
-            ->sum('amount');
+        // One definition with the Revenue page (S5 audit B2): only charges that would
+        // still buy something are owed; overtaken ones are counted apart, to be voided.
+        $owed = app(\App\Services\Billing\RevenueMetrics::class)->receivables();
 
         $summary = [
             'accounts' => SubscriptionAccount::count(),
             'active' => SubscriptionAccount::where('status', 'active')->count(),
             'due_30' => $dueSoon(30),
             'revenue' => (float) SubscriptionOrder::paid()->sum('amount'),
-            'receivable' => (float) $outstanding->sum('amount'),
-            'receivable_count' => $outstanding->count(),
-            'receivable_aged' => [
-                'fresh' => $aged(null, 7),
-                'mid' => $aged(8, 30),
-                'old' => $aged(31, null),
-            ],
+            'receivable' => $owed['total'],
+            'receivable_count' => $owed['count'],
+            'receivable_aged' => ['fresh' => $owed['fresh'], 'mid' => $owed['mid'], 'old' => $owed['old']],
+            'receivable_stale_count' => $owed['stale_count'],
             // Open removal requests, so an owner's ask is never quietly missed (D11).
             'removal_requests' => Hostel::whereNotNull('cancellation_requested_at')->whereNull('cancelled_at')->count(),
             // Payment links sent and not yet paid (S2). A different question from

@@ -296,6 +296,22 @@ class BillingLabSeeder extends Seeder
             $this->billing->cancelBranch($b[2], 'Lab S5-06: closing this branch');
             $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-06-RENEWED', 'remarks' => 'Lab S5-06: renewed with two branches']);
         });
+
+        // S5 audit (doc 29) cases.
+        $o = $this->owner('S5-07', 'Stale Proforma', 'audit B2: our proforma, then the customer paid by transfer — "already covered — void it", NOT owed');
+        [$a] = $this->paidAccount($o, 'S5-07', ['Main'], daysLeft: 100);
+        $this->at(now()->subDays(5)->setTime(10, 0), fn () => $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'pending', 'collection' => 'offline', 'remarks' => 'Lab S5-07: proforma — then paid another way']));
+        $this->at(now()->subDays(2)->setTime(10, 0), fn () => $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'rtgs', 'transaction_number' => 'LAB-S5-07-TRANSFER', 'remarks' => 'Lab S5-07: paid by bank transfer']));
+
+        $o = $this->owner('S5-08', 'Ended On The 1st', 'audit B1: plan ended on the 1st of this month — last used LAST month, so it is last month\'s churn');
+        $this->paidAccount($o, 'S5-08', ['Main'], daysLeft: -(now()->day - 1));
+
+        $o = $this->owner('S5-09', 'Negotiated Two Years', 'audit B3: renewed a year ahead, then a branch added at a negotiated price for both years — the audit stays clean');
+        [$a] = $this->paidAccount($o, 'S5-09', ['Main'], daysLeft: 200);
+        $this->billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-09-AHEAD', 'remarks' => 'Lab S5-09: a year ahead']);
+        $branch = $this->branch($o, 'S5-09', 'Added For Two Years');
+        $q = $this->billing->quoteAddBranch($a->fresh(), $branch);
+        $this->billing->addBranch($a->fresh(), $branch, ['payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S5-09-ADD', 'amount' => round((float) $q['prorated'] * 0.95, 2), 'remarks' => 'Lab S5-09: negotiated 5% off two years']);
     }
 
     // ── S4 · reminders (26_S4_MANUAL_TESTING.md) ────────────────────────────

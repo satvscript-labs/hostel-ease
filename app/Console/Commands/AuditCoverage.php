@@ -320,7 +320,11 @@ class AuditCoverage extends Command
             $key = $line->order->account_id.':'.$period->value;
             $units[$key] ??= ($account = $line->order->account) ? $billing->unitPrice($account, $period) : 0.0;
 
-            return $units[$key] > 0 ? max(1, (int) floor(((float) $line->amount + 0.01) / $units[$key])) : 1;
+            // Any real share of a further term (over 5% of a unit) allows up to that term
+            // — the line's own length still caps it. So a negotiated ₹19,000 for two
+            // years, or 1.47 units for a year and 200 days, is honest (S5 audit B3);
+            // F1's shape — one unit paid, two terms held — still reads as one term.
+            return $units[$key] > 0 ? max(1, (int) ceil((float) $line->amount / $units[$key] - 0.05)) : 1;
         };
 
         foreach (SubscriptionOrderLine::with('order.account')->whereNotIn('order_id', $mirroredOrderIds ?: [0])->cursor() as $line) {
