@@ -653,11 +653,18 @@ class AccountBillingService
         // a monthly account gets a free month). Renewing on a different term does not
         // use it — otherwise a monthly customer holding one could pick Yearly and get a
         // free YEAR (S4 audit A6). It stays held for the next renewal on its own term.
-        // An account with no paid term yet (a trial) uses it on whichever term it picks.
-        $giftsApply = ! $account->period?->isPaid() || $account->period === $bp;
+        //
+        // An account with NO paid term yet (a trial) has no plan for the gift to follow,
+        // so there it is worth ONE MONTH (owner decision, 2026-10-17): free on Monthly,
+        // one monthly unit off on Yearly (₹10,000 → ₹9,000) — never a free year.
+        $hasPaidTerm = (bool) $account->period?->isPaid();
+        $giftsApply = ! $hasPaidTerm || $account->period === $bp;
+        $credit = ! $hasPaidTerm && $bp !== BillingPeriod::Monthly
+            ? min($unit, $this->unitPrice($account, BillingPeriod::Monthly))
+            : $unit;
         $complimentary = $branches->filter(fn (Hostel $b) => $giftsApply && (int) $b->free_renewals > 0)
-            ->map(fn (Hostel $b) => ['branch' => $b, 'amount' => $unit])->values()->all();
-        $complimentaryTotal = round(count($complimentary) * $unit, 2);
+            ->map(fn (Hostel $b) => ['branch' => $b, 'amount' => $credit, 'partial' => $credit < $unit])->values()->all();
+        $complimentaryTotal = round(count($complimentary) * $credit, 2);
 
         $breakdown = $this->discounts->preview($account, max(0, $subtotal - $complimentaryTotal), $quantity, 'renewal');
         $topups = $this->renewalTopUps($account, $branches);
@@ -798,9 +805,16 @@ class AccountBillingService
             // the lines still add up to what was charged.
             // A branch on a free renewal gets a ₹0 line marked complimentary; the paying
             // branches share the term.
-            $freeIds = array_map(fn (array $c) => $c['branch']->id, $quote['complimentary']);
+            // A part-free branch (a trial's free MONTH taken off a yearly term) still pays
+            // — just less — and its line is still marked as having used the gift.
+            $giftIds = array_map(fn (array $c) => $c['branch']->id, $quote['complimentary']);
+            $freeIds = array_map(fn (array $c) => $c['branch']->id, array_filter($quote['complimentary'], fn (array $c) => empty($c['partial'])));
+            $partialCredit = collect($quote['complimentary'])->filter(fn (array $c) => ! empty($c['partial']))
+                ->mapWithKeys(fn (array $c) => [$c['branch']->id => (float) $c['amount']])->all();
             $paying = $branches->reject(fn (Hostel $b) => in_array($b->id, $freeIds, true))->values();
-            $paidShares = array_combine($paying->pluck('id')->all(), $this->allocate($quote['breakdown']['final'], $paying->count())) ?: [];
+            $paidShares = array_combine($paying->pluck('id')->all(), $partialCredit === []
+                ? $this->allocate($quote['breakdown']['final'], $paying->count())
+                : $this->allocateProportionally($quote['breakdown']['final'], $paying->map(fn (Hostel $b) => max(0, (float) $quote['unit'] - ($partialCredit[$b->id] ?? 0)))->all())) ?: [];
             $termShares = $branches->values()->map(fn (Hostel $b) => $paidShares[$b->id] ?? 0.0)->all();
 
             $weights = array_merge($termShares, array_column($quote['topups'], 'amount'));
@@ -811,7 +825,7 @@ class AccountBillingService
                 // line should read 01 Oct 2027 → 01 Oct 2028 on the invoice, not
                 // 03 Oct 2026 → 01 Oct 2028, and acceptOrder() reads it back to
                 // advance current_period_start.
-                $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart, in_array($branch->id, $freeIds, true));
+                $this->addLine($order, $branch, $shares[$i], $anchor, $cycleStart, in_array($branch->id, $giftIds, true));
             }
 
             // A TOP-UP line per behind branch: from where its coverage stops up to the

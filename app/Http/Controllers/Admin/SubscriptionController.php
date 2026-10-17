@@ -399,6 +399,7 @@ class SubscriptionController extends Controller
             'complimentary' => collect($q['complimentary'])->map(fn (array $c) => [
                 'name' => $c['branch']->name,
                 'amount' => round((float) $c['amount'], 2),
+                'partial' => ! empty($c['partial']),
             ])->values()->all(),
             'gifts_waiting' => (int) $q['gifts_waiting'],
             'gifts_term' => $account->period?->isPaid() ? $account->period->value : null,
@@ -471,7 +472,9 @@ class SubscriptionController extends Controller
                 'from' => $l->start_date?->format('d M Y'),
                 'to' => $l->end_date?->format('d M Y'),
                 'amount' => (float) $l->amount,
-                'free' => (bool) $l->complimentary,
+                // Free only when it cost nothing: a trial's free month on a yearly term
+                // uses the gift but still pays the rest.
+                'free' => (bool) $l->complimentary && (float) $l->amount <= 0,
             ])->values()->all(),
         ];
     }

@@ -431,6 +431,7 @@ class AccountController extends Controller
             'complimentary' => collect($q['complimentary'])->map(fn (array $c) => [
                 'name' => $c['branch']->name,
                 'amount' => round((float) $c['amount'], 2),
+                'partial' => ! empty($c['partial']),
             ])->values()->all(),
             'current_anchor' => $q['current_anchor']?->format('d M Y'),
             'new_anchor' => $q['new_anchor']->format('d M Y'),

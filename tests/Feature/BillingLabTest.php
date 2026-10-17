@@ -226,7 +226,7 @@ class BillingLabTest extends TestCase
         $this->seed(BillingLabSeeder::class);
         $this->seed(BillingLabSeeder::class); // re-runnable: rebuilds, never duplicates
 
-        $this->assertSame(53, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
+        $this->assertSame(54, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
         $reminders = app(RenewalReminders::class);
 
         // The ledger agrees with every date it made.
@@ -268,6 +268,8 @@ class BillingLabTest extends TestCase
         $this->assertGreaterThan(0, (float) $this->billing->quoteRenewal($this->lab('S3-26'), 'yearly')['total']);
         $this->assertSame(3, $this->billing->quoteAlign($this->lab('S3-27'))['count']);
         $this->assertGreaterThanOrEqual(3, $this->lab('S3-28')->orders()->where('payment_status', 'paid')->count());
+        $this->assertSame(0.0, (float) $this->billing->quoteRenewal($this->lab('S3-29'), 'monthly')['total']);
+        $this->assertSame(9000.0, (float) $this->billing->quoteRenewal($this->lab('S3-29'), 'yearly')['total']);
 
         // S4 — the card stage each one is named for
         $expect = ['S4-01' => null, 'S4-02' => 'calm', 'S4-03' => 'soon', 'S4-04' => 'final', 'S4-05' => 'today', 'S4-06' => 'grace',

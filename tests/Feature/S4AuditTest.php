@@ -160,12 +160,59 @@ class S4AuditTest extends TestCase
     }
 
     /** A6 — a trial account (no paid term yet) uses its free renewal on whichever term it picks. */
-    public function test_a6_a_trial_uses_its_free_renewal_on_the_term_it_picks(): void
+    /**
+     * On a trial there is no plan yet, so a free renewal is worth ONE MONTH (owner,
+     * 2026-10-17): Asha's first month free on Monthly; ₹10,000 → ₹9,000 on Yearly.
+     */
+    public function test_a6_on_a_trial_a_free_renewal_is_worth_one_month(): void
     {
-        [, $a, $h] = $this->acct(5, 'trial', 'trial');
+        [$o, $a, $h] = $this->acct(5, 'trial', 'trial');
+        $h->forceFill(['free_renewals' => 1])->save();
+        $billing = app(AccountBillingService::class);
+
+        $this->assertSame(0.0, (float) $billing->quoteRenewal($a->fresh(), 'monthly')['total'], 'a free first month');
+        $yearly = $billing->quoteRenewal($a->fresh(), 'yearly');
+        $this->assertSame(9000.0, (float) $yearly['total'], 'one month off the year — never a free year');
+        $this->assertTrue($yearly['complimentary'][0]['partial']);
+
+        // Paid: the gift is used, the line pays the rest and is not shown as "Free".
+        $order = $billing->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid']);
+        $line = $order->lines()->sole();
+        $this->assertSame([true, 9000.0], [(bool) $line->complimentary, (float) $line->amount]);
+        $this->assertSame(0, (int) $h->fresh()->free_renewals);
+        $this->assertSame(9000.0, (float) $order->amount);
+
+        // Voided: the gift comes back.
+        $billing->voidOrder($order, 'test');
+        $this->assertSame(1, (int) $h->fresh()->free_renewals);
+    }
+
+    /** Once there IS a plan, the gift follows it exactly as before (owner, 2026-10-17). */
+    public function test_a6_with_a_plan_the_gift_is_a_whole_renewal_of_that_plan(): void
+    {
+        [, $a, $h] = $this->acct(5);
         $h->forceFill(['free_renewals' => 1])->save();
 
-        $this->assertSame(0.0, (float) app(AccountBillingService::class)->quoteRenewal($a->fresh(), 'yearly')['total']);
+        $this->assertSame(0.0, (float) app(AccountBillingService::class)->quoteRenewal($a->fresh(), 'yearly')['total'], 'yearly plan: a free year');
+    }
+
+    /** Two branches on a trial, one with a gift, yearly: the lines still sum to the charge. */
+    public function test_a6_a_trial_free_month_with_other_paying_branches_balances(): void
+    {
+        [$o, $a, $h] = $this->acct(5, 'trial', 'trial');
+        $second = Hostel::factory()->create(['mobile' => $o->mobile, 'owner_id' => $o->id, 'status' => 'active', 'subscription_end' => $a->current_period_end]);
+        $o->hostels()->attach($second->id);
+        $h->forceFill(['free_renewals' => 1])->save();
+
+        $order = app(AccountBillingService::class)->renewAccount($a->fresh(), 'yearly', ['payment_status' => 'paid']);
+        $lines = $order->lines()->get()->keyBy('branch_id');
+
+        $this->assertEqualsWithDelta((float) $order->amount, (float) $lines->sum('amount'), 0.001);
+        $this->assertLessThan((float) $lines[$second->id]->amount, (float) $lines[$h->id]->amount, 'the gifted branch pays less');
+        // …but it still PAYS: its share is the year less one month (9,000 of 19,000).
+        $this->assertEqualsWithDelta((float) $order->amount * 9000 / 19000, (float) $lines[$h->id]->amount, 0.02);
+        $this->assertTrue((bool) $lines[$h->id]->complimentary, 'and its line records the gift used');
+        $this->assertFalse((bool) $lines[$second->id]->complimentary);
     }
 
     /** A7 — a new stage is a fresh bell entry, not the unread old one rewritten under its old time. */

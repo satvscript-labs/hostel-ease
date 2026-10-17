@@ -256,6 +256,9 @@ class BillingLabSeeder extends Seeder
             'payment_status' => 'paid', 'collection' => 'offline', 'payment_method' => 'upi', 'transaction_number' => 'LAB-S3-28-ADD',
         ]));
         $this->billing->extendRenewalDate($a->fresh(), 15, 'days', 'Lab S3-28: goodwill — 15 free days');
+        $o = $this->owner('S3-29', 'Trial Free Month', 'trial + a free renewal = one FREE MONTH: Monthly ₹0 · Yearly ₹9,000 (one month off), never a free year');
+        [$a, $b] = $this->trialAccount($o, 'S3-29', ['Gifted Trial'], daysLeft: 4);
+        $this->billing->setFreeRenewals($a, [$b[0]->id], 1);
     }
 
     // ── S4 · reminders (26_S4_MANUAL_TESTING.md) ────────────────────────────

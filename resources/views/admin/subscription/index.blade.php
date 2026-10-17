@@ -720,7 +720,7 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     tops.forEach(t => rows.push({ label: @js(__('Up to')) + ' ' + q.current_anchor + ' · ' + t.name + ' · ' + t.days + 'd', amount: t.amount, kind: 'line' }));
                 }
-                (q.complimentary || []).forEach(c => rows.push({ label: @js(__('Free renewal')) + ' · ' + c.name, amount: c.amount, kind: 'discount' }));
+                (q.complimentary || []).forEach(c => rows.push({ label: (c.partial ? @js(__('Free month')) : @js(__('Free renewal'))) + ' · ' + c.name, amount: c.amount, kind: 'discount' }));
                 if (q.volume > 0) rows.push({ label: @js(__('Multi-branch discount')), amount: q.volume, kind: 'discount' });
                 if (q.manual > 0) rows.push({ label: @js(__('Your discount')), amount: q.manual, kind: 'discount' });
                 return { rows, finalLabel: @js(__('Total payable')), final: q.final, note: @js(__('New renewal date')) + ': ' + q.new_anchor + ' — ' + @js(__('all branches together.')) };

@@ -788,7 +788,7 @@ document.addEventListener('alpine:init', () => {
             const free = q.complimentary || [];
             if (free.length) {
                 // Each free renewal reads as a gift against the term.
-                const lines = free.map(c => ({ label: 'Free renewal · ' + c.name, amount: c.amount, kind: 'discount' }));
+                const lines = free.map(c => ({ label: (c.partial ? 'Free month (trial gift) · ' : 'Free renewal · ') + c.name, amount: c.amount, kind: 'discount' }));
                 summary.rows.splice(1, 0, ...lines);
             }
             if (topups.length) {
