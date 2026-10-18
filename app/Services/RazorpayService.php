@@ -86,6 +86,9 @@ class RazorpayService
             'currency' => $data['currency'] ?? 'INR',
             'status' => $data['status'] ?? '',
             'order_id' => $data['order_id'] ?? null,
+            // S6: an autopay authorisation payment carries the mandate's token.
+            'token_id' => $data['token_id'] ?? null,
+            'customer_id' => $data['customer_id'] ?? null,
         ];
     }
 
@@ -112,6 +115,130 @@ class RazorpayService
                 'status' => (string) ($p['status'] ?? ''),
             ])
             ->all();
+    }
+
+    // -----------------------------------------------------------------
+    // Recurring payments (S6) — UPI Autopay, charge-at-will
+    // Verified against Razorpay's live docs 2026-10-18 (31_S6_DESIGN.md §2, §10).
+    // -----------------------------------------------------------------
+
+    /**
+     * The Razorpay customer a mandate hangs off. `fail_existing: 0` returns the
+     * existing customer for the same contact instead of erroring, so a second set-up
+     * for the same owner reuses it.
+     *
+     * @return array{id:string}
+     */
+    public function createCustomer(string $name, string $email, string $contact, array $notes = []): array
+    {
+        $data = $this->send('post', '/customers', [
+            'name' => mb_substr($name, 0, 50),
+            'email' => $email,
+            'contact' => $contact,
+            'fail_existing' => '0',
+            'notes' => $this->trimNotes($notes),
+        ], 'Razorpay customer creation failed.');
+
+        return ['id' => (string) ($data['id'] ?? '')];
+    }
+
+    /**
+     * The order whose payment AUTHORISES a UPI Autopay mandate (D-S6-2: it is also
+     * this month's renewal). `frequency: as_presented` = we decide when and how much,
+     * up to `max_amount`.
+     *
+     * @return array{id:string,amount:int}
+     */
+    public function createMandateOrder(int $amountPaise, int $maxAmountPaise, string $customerId, string $receipt, array $notes = []): array
+    {
+        if ($amountPaise < 100) {
+            throw new RuntimeException('Amount must be at least 100 paise.');
+        }
+        if ($amountPaise > $maxAmountPaise) {
+            throw new RuntimeException('This payment is above the autopay limit.');
+        }
+
+        $data = $this->send('post', '/orders', [
+            'amount' => $amountPaise,
+            'currency' => 'INR',
+            'customer_id' => $customerId,
+            'method' => 'upi',
+            'payment_capture' => 1,
+            'receipt' => $receipt,
+            'notes' => $this->trimNotes($notes),
+            'token' => [
+                'max_amount' => $maxAmountPaise,
+                'expire_at' => now()->addYears(10)->timestamp,
+                'frequency' => 'as_presented',
+            ],
+        ], 'Razorpay could not start the autopay set-up.');
+
+        return ['id' => (string) $data['id'], 'amount' => (int) ($data['amount'] ?? $amountPaise)];
+    }
+
+    /**
+     * A debit is TWO calls — the order, then the recurring payment on it — and the
+     * caller stores the order id between them. So if anything dies part-way, what
+     * reached Razorpay is always findable from our side (S6 audit): an order with no
+     * payment is closed by the reconcile; a payment is found on the stored order.
+     *
+     * @return array{id:string}
+     */
+    public function createDebitOrder(int $amountPaise, string $receipt, array $notes = []): array
+    {
+        if ($amountPaise < 100) {
+            throw new RuntimeException('Amount must be at least 100 paise.');
+        }
+
+        $order = $this->send('post', '/orders', [
+            'amount' => $amountPaise,
+            'currency' => 'INR',
+            'payment_capture' => 1,
+            'receipt' => $receipt,
+            'notes' => $this->trimNotes($notes),
+        ], 'Razorpay could not create the autopay order.');
+
+        if (! filled($order['id'] ?? null)) {
+            throw new RuntimeException('Razorpay did not return an order for the autopay debit.', 502);
+        }
+
+        return ['id' => (string) $order['id']];
+    }
+
+    /**
+     * The debit itself, on an active mandate. Razorpay sends the customer the
+     * pre-debit notice and takes the money about 25 hours later — the result
+     * arrives by webhook (order.paid / payment.failed).
+     *
+     * Throws RuntimeException with the HTTP status as its code: 4xx = refused,
+     * nothing will be taken; 503/5xx = unknown (a timeout), and the caller must
+     * treat the debit as possibly running.
+     */
+    public function createRecurringPayment(string $orderId, int $amountPaise, string $customerId, string $tokenId, string $email, string $contact, string $description, array $notes = []): ?string
+    {
+        $payment = $this->send('post', '/payments/create/recurring', [
+            'email' => $email,
+            'contact' => $contact,
+            'amount' => $amountPaise,
+            'currency' => 'INR',
+            'order_id' => $orderId,
+            'customer_id' => $customerId,
+            'token' => $tokenId,
+            'recurring' => true,
+            'description' => mb_substr($description, 0, 50),
+            'notes' => $this->trimNotes($notes),
+        ], 'Razorpay could not start the autopay debit.');
+
+        return isset($payment['razorpay_payment_id']) ? (string) $payment['razorpay_payment_id'] : null;
+    }
+
+    /**
+     * Ask NPCI to cancel a mandate. Returns once Razorpay has accepted the request
+     * (`cancellation_initiated`); token.cancelled confirms it later.
+     */
+    public function cancelToken(string $customerId, string $tokenId): void
+    {
+        $this->send('put', '/customers/'.$customerId.'/tokens/'.$tokenId.'/cancel', [], 'Razorpay could not cancel the autopay mandate.');
     }
 
     // -----------------------------------------------------------------

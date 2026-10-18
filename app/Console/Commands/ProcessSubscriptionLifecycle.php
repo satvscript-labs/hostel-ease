@@ -163,6 +163,8 @@ class ProcessSubscriptionLifecycle extends Command
         };
 
         $message = match (true) {
+            $c['autopay'] === 'paying' => __('Autopay is paying :amount — nothing to do.', ['amount' => hostelease_money($c['waiting_amount'] ?? $c['amount'])]),
+            $c['autopay'] === 'on' => __(':amount will be paid by autopay — nothing to do.', ['amount' => hostelease_money($c['amount'])]),
             $c['waiting_amount'] !== null => __(':amount is waiting to be paid.', ['amount' => hostelease_money($c['waiting_amount'])]),
             $c['free'] => __('Your next renewal is free — nothing to pay.'),
             $c['self_serve'] => __('Renew from your Subscription page — every branch renews together.'),

@@ -195,6 +195,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Autopay (S6 · _artifact/saas_billing_autopay/31_S6_DESIGN.md)
+    |--------------------------------------------------------------------------
+    | UPI Autopay mandates, monthly plans only. OFF by default: Razorpay must also
+    | enable recurring payments on the account. With it off, no mandate is set up and
+    | nothing is debited — but a debit already taken is always applied.
+    |
+    | max_amount   the ceiling every mandate is created with (owner, 2026-10-18: ₹10,000)
+    | attempts     days before the renewal date for each attempt: −3, −1, then +1 (grace)
+    */
+    'autopay' => [
+        'enabled' => (bool) env('HOSTELEASE_AUTOPAY', false),
+        'max_amount' => 10000,
+        'attempts' => [3, 1, -1],
+        // An attempt with no final status after this long is checked with Razorpay.
+        'reconcile_after_hours' => 48,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Backups
     |--------------------------------------------------------------------------
     | Written in PHP, with no mysqldump and no shell: Hostinger's shared hosting

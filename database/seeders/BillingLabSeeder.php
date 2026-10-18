@@ -11,6 +11,7 @@ use App\Models\Hostel;
 use App\Models\Notification;
 use App\Models\RenewalReminderSnooze;
 use App\Models\SubscriptionAccount;
+use App\Models\SubscriptionMandate;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionReminderLog;
 use App\Models\User;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * THE BILLING LAB — one customer per manual test, for S1–S4
+ * THE BILLING LAB — one customer per manual test, for S1–S6
  * (_artifact/saas_billing_autopay/27_BILLING_LAB.md lists them all, with what to do).
  *
  *     php artisan db:seed --class=BillingLabSeeder        # build (or rebuild from scratch)
@@ -79,6 +80,7 @@ class BillingLabSeeder extends Seeder
                 $this->phaseS3();
                 $this->phaseS4();
                 $this->phaseS5();
+                $this->phaseS6();
             });
         } finally {
             Carbon::setTestNow();
@@ -315,6 +317,118 @@ class BillingLabSeeder extends Seeder
     }
 
     // ── S4 · reminders (26_S4_MANUAL_TESTING.md) ────────────────────────────
+
+    // ── S6 · UPI Autopay (33_S6_MANUAL_TESTING.md) ──────────────────────────
+    //
+    // Every account here is MONTHLY. Mandates carry lab tokens (token_LAB_…) that
+    // Razorpay has never seen: they show every screen, and the daily job and Turn off
+    // behave as they would with a token Razorpay refuses. A real mandate comes from
+    // S6-01, in Razorpay test mode.
+
+    protected function phaseS6(): void
+    {
+        $o = $this->owner('S6-01', 'Turn It On', 'monthly ₹2,000, no autopay yet: the renew sheet offers "Renew automatically every month"');
+        $this->paidAccount($o, 'S6-01', ['Main', 'Annex'], daysLeft: 20, period: 'monthly');
+
+        $o = $this->owner('S6-02', 'Autopay On', 'autopay on, renews in 12 days: "₹2,000 by UPI on …", no reminders, Turn off; its co-admin cannot turn it off');
+        [$a] = $this->paidAccount($o, 'S6-02', ['Main', 'Annex'], daysLeft: 12, period: 'monthly');
+        $this->mandate($a, 'S6-02');
+        $this->coAdmin($o, 'S6-02');
+
+        $o = $this->owner('S6-03', 'With The Bank', 'a debit is with the bank right now: no Pay button anywhere; Account 360 refuses accept / link / void / renew');
+        [$a] = $this->paidAccount($o, 'S6-03', ['Main', 'Annex'], daysLeft: 2, period: 'monthly');
+        $m = $this->mandate($a, 'S6-03');
+        $this->at(now()->subDay()->setTime(7, 0), fn () => $this->attempt($a, $m, 1, 'order_LAB_S6_03'));
+
+        $o = $this->owner('S6-04', 'First Try Failed', 'try 1 failed 2 days ago (insufficient balance): try 2 is due today — Account 360 shows the tries');
+        [$a] = $this->paidAccount($o, 'S6-04', ['Main', 'Annex'], daysLeft: 1, period: 'monthly');
+        $m = $this->mandate($a, 'S6-04');
+        $this->at(now()->subDays(2)->setTime(7, 0), fn () => $this->failedAttempt($a, $m, 1, 'Insufficient balance'));
+
+        $o = $this->owner('S6-05', 'All Tries Failed', 'all 3 tries failed, now in grace: "Autopay could not take this month’s payment", Pay button back, reminders back');
+        [$a] = $this->paidAccount($o, 'S6-05', ['Main', 'Annex'], daysLeft: -2, period: 'monthly');
+        $m = $this->mandate($a, 'S6-05');
+        $this->at(now()->subDays(5)->setTime(7, 0), fn () => $this->failedAttempt($a, $m, 1, 'Insufficient balance'));
+        $this->at(now()->subDays(3)->setTime(7, 0), fn () => $this->failedAttempt($a, $m, 2, 'Insufficient balance'));
+        $this->at(now()->subDay()->setTime(7, 0), fn () => $this->failedAttempt($a, $m, 3, 'Debit declined by the bank'));
+        $m->update(['failure_notified_for' => $a->fresh()->current_period_end->toDateString()]);
+
+        $o = $this->owner('S6-06', 'Above The Limit', '11 branches = ₹11,000 a month, above the ₹10,000 mandate: never debited, owner asked to pay');
+        [$a] = $this->paidAccount($o, 'S6-06', array_map(fn ($i) => "Wing {$i}", range(1, 11)), daysLeft: 10, period: 'monthly');
+        $this->mandate($a, 'S6-06');
+
+        $o = $this->owner('S6-07', 'Paused In UPI App', 'the customer paused the mandate in their UPI app: "Autopay is paused", reminders as usual');
+        [$a] = $this->paidAccount($o, 'S6-07', ['Main'], daysLeft: 6, period: 'monthly');
+        $this->mandate($a, 'S6-07', SubscriptionMandate::PAUSED);
+
+        $o = $this->owner('S6-08', 'Turning Off', 'owner pressed Turn off, the bank has not confirmed yet: "Turning autopay off…"');
+        [$a] = $this->paidAccount($o, 'S6-08', ['Main'], daysLeft: 15, period: 'monthly');
+        $this->mandate($a, 'S6-08', SubscriptionMandate::CANCELLING, ['cancelled_by' => 'owner']);
+
+        $o = $this->owner('S6-09', 'Cancelled By Customer', 'cancelled in the UPI app last week: no autopay card, the toggle is offered again; Account 360 says who cancelled');
+        [$a] = $this->paidAccount($o, 'S6-09', ['Main'], daysLeft: 9, period: 'monthly');
+        $this->mandate($a, 'S6-09', SubscriptionMandate::CANCELLED, ['cancelled_by' => 'customer', 'cancelled_at' => now()->subWeek()]);
+
+        $o = $this->owner('S6-10', 'Went Yearly', 'autopay on, then renewed YEARLY: "Autopay is waiting — it pays monthly renewals only"');
+        [$a] = $this->paidAccount($o, 'S6-10', ['Main'], daysLeft: 300);
+        $this->mandate($a, 'S6-10');
+
+        $o = $this->owner('S6-11', 'Operator Bill Waiting', 'autopay on, but we raised a proforma: autopay stays out, the reminders ask for the proforma');
+        [$a] = $this->paidAccount($o, 'S6-11', ['Main', 'Annex'], daysLeft: 5, period: 'monthly');
+        $this->mandate($a, 'S6-11');
+        $this->billing->renewAccount($a->fresh(), 'monthly', ['payment_status' => 'pending', 'collection' => 'offline', 'remarks' => 'Lab S6-11: proforma from the operator']);
+
+        $o = $this->owner('S6-12', 'Managed With Autopay', 'autopay on, then switched to managed: "Autopay is waiting", nothing debited; the owner can still Turn off');
+        [$a] = $this->paidAccount($o, 'S6-12', ['Main'], daysLeft: 8, period: 'monthly');
+        $this->mandate($a, 'S6-12');
+        $a->forceFill(['billing_mode' => BillingMode::Managed->value])->save();
+
+        $o = $this->owner('S6-13', 'Autopay Paid', 'last month paid by autopay: receipt shows it, Account 360 says "Auto-debit", next debit on schedule');
+        [$a] = $this->paidAccount($o, 'S6-13', ['Main', 'Annex'], daysLeft: -20, period: 'monthly');
+        $m = $this->mandate($a, 'S6-13');
+        $this->at(now()->subDays(23)->setTime(7, 0), function () use ($a, $m) {
+            $order = $this->attempt($a, $m, 1, 'order_LAB_S6_13');
+            $this->at(now()->addDay()->setTime(9, 0), fn () => app(\App\Services\Billing\PaymentSettlement::class)
+                ->settle($order->fresh(), 'pay_LAB_S6_13', $order->amountPaise(), 'autopay', 'lab'));
+            $order->fresh()->update(['collection' => 'autopay']);
+        });
+    }
+
+    /** A mandate as the bank would have confirmed it (lab token — Razorpay has never seen it). */
+    protected function mandate(SubscriptionAccount $account, string $code, string $status = SubscriptionMandate::ACTIVE, array $extra = []): SubscriptionMandate
+    {
+        $slug = str_replace('-', '_', $code);
+
+        return SubscriptionMandate::create(array_merge([
+            'account_id' => $account->id, 'provider' => 'razorpay', 'method' => 'upi',
+            'customer_id' => 'cust_LAB_'.$slug, 'token_id' => 'token_LAB_'.$slug,
+            'email' => $account->owner?->email, 'contact' => $account->owner?->mobile,
+            'max_amount' => (float) config('hostelease.autopay.max_amount', 10000), 'status' => $status,
+            'authorised_at' => now()->subMonth(), 'created_by' => $account->owner_id,
+        ], $extra));
+    }
+
+    /** An autopay attempt recorded and sent to the bank, exactly as the daily job leaves it. */
+    protected function attempt(SubscriptionAccount $account, SubscriptionMandate $mandate, int $n, string $razorpayOrderId): SubscriptionOrder
+    {
+        $account = $account->fresh();
+        $order = $this->billing->renewAccount($account, 'monthly', [
+            'payment_status' => 'pending', 'collection' => 'autopay', 'remarks' => 'Autopay debit — attempt '.$n,
+        ]);
+        $order->forceFill([
+            'autopay_due_on' => $account->current_period_end->toDateString(), 'autopay_attempt' => $n,
+            'razorpay_order_id' => $razorpayOrderId,
+        ])->save();
+
+        return $order;
+    }
+
+    protected function failedAttempt(SubscriptionAccount $account, SubscriptionMandate $mandate, int $n, string $reason): void
+    {
+        $order = $this->attempt($account, $mandate, $n, 'order_LAB_'.$account->id.'_'.$n);
+        $this->billing->voidOrder($order, 'Autopay debit failed: '.$reason);
+        $mandate->update(['failure_reason' => $reason]);
+    }
 
     protected function phaseS4(): void
     {
@@ -557,6 +671,10 @@ class BillingLabSeeder extends Seeder
         $hostelIds = Hostel::withTrashed()->whereIn('owner_id', $userIds)->pluck('id');
         $orderIds = SubscriptionOrder::withTrashed()->whereIn('account_id', $accountIds)->pluck('id');
 
+        SubscriptionMandate::whereIn('account_id', $accountIds)->delete();
+        Notification::withTrashed()->whereNull('hostel_id')->whereIn('type', ['autopay_failed', 'autopay_cancel_failed'])
+            ->get()->filter(fn ($n) => in_array((int) str_replace('account:', '', (string) ($n->data['sig'] ?? '')), $accountIds->all(), true))
+            ->each->forceDelete();
         DB::table('subscription_order_lines')->whereIn('order_id', $orderIds)->delete();
         SubscriptionOrder::withTrashed()->whereIn('id', $orderIds)->forceDelete();
         Discount::withTrashed()->whereIn('account_id', $accountIds)->forceDelete();

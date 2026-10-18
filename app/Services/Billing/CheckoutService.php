@@ -48,6 +48,7 @@ class CheckoutService
         protected PaymentSettlement $settlement,
         protected ActivityLogger $logger,
         protected PaymentLinkService $paymentLinks,
+        protected AutopayService $autopay,
     ) {}
 
     public function isEnabled(): bool
@@ -66,14 +67,25 @@ class CheckoutService
      *
      * @throws RuntimeException with an owner-readable message
      */
-    public function startRenewal(SubscriptionAccount $account, string $period): array
+    public function startRenewal(SubscriptionAccount $account, string $period, bool $autopay = false, ?\App\Models\User $viewer = null): array
     {
         if (! in_array($period, ['yearly', 'monthly'], true)) {
             throw new RuntimeException('Choose a yearly or monthly renewal.');
         }
 
-        return DB::transaction(function () use ($account, $period) {
+        return DB::transaction(function () use ($account, $period, $autopay, $viewer) {
             $this->lock($account);
+
+            // S6 · L1: the bank is already taking this renewal by autopay.
+            if ($flying = $this->autopay->inFlight($account)) {
+                throw new RuntimeException($this->inFlightMessage($flying));
+            }
+
+            // S6 (D-S6-2): autopay is switched on WITH this renewal. Every condition is
+            // checked here, on the server, against the quote — the page only offers it.
+            if ($autopay && ($refusal = $this->autopay->setupRefusal($account, $viewer, $period, (float) $this->billing->quoteRenewal($account, $period)['total']))) {
+                throw new RuntimeException($refusal);
+            }
 
             if ($this->billing->includedBranches($account)->isEmpty()) {
                 throw new RuntimeException('There are no branches on your plan to renew. Contact us if that is not right.');
@@ -102,6 +114,12 @@ class CheckoutService
                 if ($result = $this->supersede($stale)) {
                     return $result;
                 }
+            }
+
+            // An operator's charge is paid as it is — autopay is switched on at the next
+            // renewal instead of re-pricing theirs.
+            if ($open && $autopay && ! $this->isOwnersOwn($open) && ! $open->isAutopayInFlight()) {
+                throw new RuntimeException('We have already raised this renewal for you — pay it first, and turn on autopay at your next renewal.');
             }
 
             if ($open && ! $this->isOwnersOwn($open)) {
@@ -136,7 +154,11 @@ class CheckoutService
                     && $orderBranches === $quoteBranches
                     && $open->amountPaise() === (int) round($fresh['total'] * 100);
 
-                if ($unchanged) {
+                // An earlier attempt's Razorpay order cannot carry a mandate: with
+                // autopay asked for, it is replaced, never reused.
+                // ...and the reverse: a mandate-authorisation order is not reused for
+                // a renewal that no longer asks for autopay.
+                if ($unchanged && ! $autopay && ! $this->autopay->pendingSetupFor($open)) {
                     return $this->payExisting($open);
                 }
 
@@ -168,10 +190,10 @@ class CheckoutService
             $order = $this->billing->renewAccount($account, $period, [
                 'payment_status' => PaymentStatus::Pending->value,
                 'collection' => CollectionMethod::Checkout->value,
-                'remarks' => 'Online renewal started by the owner',
+                'remarks' => $autopay ? 'Online renewal started by the owner — and autopay switched on' : 'Online renewal started by the owner',
             ]);
 
-            return $this->payExisting($order);
+            return $autopay ? $this->payWithAutopaySetup($order, $viewer) : $this->payExisting($order);
         });
     }
 
@@ -411,7 +433,7 @@ class CheckoutService
             return ['state' => 'pending', 'message' => 'Payment received — we are confirming it now. Your plan will update within a few minutes.'];
         }
 
-        $result = $this->settleOrder($order, $paymentId, $payment['amount'], 'callback');
+        $result = $this->settleOrder($order, $paymentId, $payment['amount'], 'callback', $payment['token_id'] ?? null, $payment['customer_id'] ?? null);
 
         return match ($result) {
             PaymentSettlement::APPLIED, PaymentSettlement::ALREADY => [
@@ -453,7 +475,7 @@ class CheckoutService
             return;
         }
 
-        $this->settleOrder($order, $paymentId, $paidPaise, 'webhook');
+        $this->settleOrder($order, $paymentId, $paidPaise, 'webhook', $paymentEntity['token_id'] ?? null, $paymentEntity['customer_id'] ?? null);
     }
 
     // -----------------------------------------------------------------
@@ -461,9 +483,14 @@ class CheckoutService
     // -----------------------------------------------------------------
 
     /** Settle, then record what is checkout-specific. */
-    protected function settleOrder(SubscriptionOrder $order, string $paymentId, int $paidPaise, string $source): string
+    protected function settleOrder(SubscriptionOrder $order, string $paymentId, int $paidPaise, string $source, ?string $tokenId = null, ?string $customerId = null): string
     {
         $result = $this->settlement->settle($order, $paymentId, $paidPaise, 'online checkout', $source);
+
+        // S6: a renewal that also set up autopay — its payment carries the mandate.
+        if (in_array($result, [PaymentSettlement::APPLIED, PaymentSettlement::ALREADY], true) && $tokenId) {
+            $this->autopay->onSetupPaid($order, $tokenId, $customerId);
+        }
 
         if ($result === PaymentSettlement::APPLIED) {
             // While pending, `collection` records who OPENED the charge (checkout =
@@ -495,6 +522,12 @@ class CheckoutService
      */
     protected function payExisting(SubscriptionOrder $order): array
     {
+        // S6 · L1: an autopay debit is in flight for this very charge — taking it here
+        // too would be a second payment for one renewal.
+        if ($order->isAutopayInFlight()) {
+            throw new RuntimeException($this->inFlightMessage($order));
+        }
+
         // The last gate before money (S3 audit). Whatever route led here - the
         // Payment due list, a reused attempt, an operator's proforma or link - never
         // open a payment for a charge whose every date is already covered.
@@ -521,6 +554,12 @@ class CheckoutService
         }
 
         $this->assertConfigured();
+
+        // This order's Razorpay order is a mandate authorisation (the owner asked for
+        // autopay with it): it can only be paid as one, so reopen it the same way.
+        if ($order->razorpay_order_id && ($mandate = $this->autopay->pendingSetupFor($order))) {
+            return $this->setupCheckout($order, $order->razorpay_order_id, $mandate->customer_id);
+        }
 
         if (! $order->razorpay_order_id) {
             $rzp = $this->razorpay->createOrder(
@@ -560,6 +599,55 @@ class CheckoutService
                 ]),
             ],
         ];
+    }
+
+    /**
+     * Checkout for a renewal that also switches autopay on (S6 · D-S6-2): the Razorpay
+     * order is a mandate-authorisation order for THIS renewal's amount, so one UPI
+     * approval pays the month and creates the mandate.
+     */
+    protected function payWithAutopaySetup(SubscriptionOrder $order, ?\App\Models\User $owner): array
+    {
+        $this->assertConfigured();
+        if ($order->coverageState(fresh: true) !== 'extends' || ! $owner) {
+            throw new RuntimeException('Autopay could not be set up for this renewal. Please try again.');
+        }
+
+        $setup = $this->autopay->prepareSetup($order, $owner);
+        if (! filled($setup['razorpay_order_id'] ?? null)) {
+            throw new RuntimeException('Online payment could not be started just now. Nothing has been charged — please try again in a moment.');
+        }
+        $order->update(['razorpay_order_id' => $setup['razorpay_order_id']]);
+
+        return $this->setupCheckout($order, $setup['razorpay_order_id'], $setup['customer_id']);
+    }
+
+    /** The Checkout payload for a mandate-authorisation order. */
+    protected function setupCheckout(SubscriptionOrder $order, string $razorpayOrderId, string $customerId): array
+    {
+        $owner = $order->account?->owner;
+
+        return [
+            'mode' => 'checkout',
+            'order' => $order->fresh(),
+            'razorpay' => [
+                'key' => $this->razorpay->keyId(),
+                'order_id' => $razorpayOrderId,
+                'amount' => $order->amountPaise(),
+                'currency' => 'INR',
+                'name' => config('hostelease.company.name', config('app.name')),
+                'description' => $this->description($order).' · autopay',
+                // Recurring authorisation: Razorpay shows the mandate (up to the ceiling).
+                'customer_id' => $customerId,
+                'recurring' => '1',
+                'prefill' => array_filter(['name' => $owner?->name, 'email' => $owner?->email, 'contact' => $owner?->mobile]),
+            ],
+        ];
+    }
+
+    protected function inFlightMessage(SubscriptionOrder $order): string
+    {
+        return 'Your automatic payment of '.hostelease_money($order->amount).' is being processed by your bank — it usually completes within a day. Nothing more to pay.';
     }
 
     /**

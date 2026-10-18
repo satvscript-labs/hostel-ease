@@ -43,6 +43,43 @@
         @endif
     </div>
 
+    {{-- Autopay (S6 · 31_S6_DESIGN.md): the mandate, what it will do next, and this
+         renewal's attempts. --}}
+    @if($ap = $rp['autopay'])
+        @php($m = $ap['mandate'])
+        <div class="border-top px-4 py-2 d-flex flex-wrap align-items-center gap-2 small">
+            <span class="fw-semibold text-dark" style="min-width:120px;"><i class="fa-solid fa-rotate text-primary me-1"></i>Autopay</span>
+            @php($tone = match($m->status) { 'active' => 'success', 'paused', 'cancelling' => 'warning', default => 'secondary' })
+            <span class="badge rounded-pill bg-{{ $tone }}-subtle text-{{ $tone }}">{{ $m->label() }}</span>
+            @if($ap['ended'])
+                <span class="text-muted">{{ $m->cancelled_by === 'customer' ? 'Cancelled by the customer in their UPI app' : ($m->cancelled_by ? 'Turned off by the '.$m->cancelled_by : ($m->failure_reason ?: '')) }} · {{ ($m->cancelled_at ?? $m->updated_at)?->format('d M Y') }}</span>
+            @else
+                <span class="text-muted">UPI · up to {{ hostelease_money($m->max_amount) }}</span>
+                @if($ap['state']['in_flight'])
+                    <span class="badge rounded-pill bg-primary-subtle text-primary">Debit of {{ hostelease_money($ap['state']['in_flight']->amount) }} with the bank since {{ $ap['state']['in_flight']->created_at?->format('d M') }}</span>
+                @elseif($ap['state']['next_on'])
+                    <span class="text-muted">· next debit {{ $ap['state']['next_on']->format('d M Y') }}</span>
+                @endif
+                @if($ap['state']['over_limit'])
+                    <span class="badge rounded-pill bg-warning-subtle text-warning" title="Never split or debited — the customer is asked to pay">Next renewal above the limit</span>
+                @endif
+                @foreach($ap['attempts'] as $try)
+                    <span class="badge rounded-pill {{ $try->payment_status->value === 'paid' ? 'bg-success-subtle text-success' : ($try->payment_status->value === 'voided' ? 'bg-danger-subtle text-danger' : 'bg-light text-dark') }}"
+                          title="{{ $try->remarks }}">
+                        Try {{ $try->autopay_attempt }} · {{ $try->created_at?->format('d M') }} · {{ $try->payment_status->value === 'voided' ? 'failed' : $try->payment_status->value }}
+                    </span>
+                @endforeach
+                @if(in_array($m->status, ['active', 'paused'], true))
+                    <form method="POST" action="{{ route('superadmin.accounts.autopay.cancel', $account) }}" class="m-0 ms-auto"
+                          data-confirm="Turn off this customer's autopay? Nothing more will be debited. A debit already with the bank still completes.">
+                        @csrf
+                        <button class="btn btn-sm btn-light text-danger border rounded-pill px-3 fw-semibold">Turn off autopay</button>
+                    </form>
+                @endif
+            @endif
+        </div>
+    @endif
+
     @if($rp['logs']->isNotEmpty())
         <div class="border-top px-4 py-2">
             @foreach($rp['logs'] as $log)

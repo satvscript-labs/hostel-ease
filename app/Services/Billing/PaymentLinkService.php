@@ -113,6 +113,12 @@ class PaymentLinkService
             throw new RuntimeException('That charge is not attached to a customer account, so there is nobody to send a link to.');
         }
 
+        // S6 · L1: an autopay debit is the bank's to finish — a link beside it would be
+        // a second way to pay one renewal.
+        if ($order->collection === \App\Enums\CollectionMethod::Autopay) {
+            throw new RuntimeException('This renewal is being collected by autopay. Wait for the bank\'s answer — if it fails, raise a fresh charge.');
+        }
+
         // SERIALISE ON THE ACCOUNT ROW before reading what links it already has.
         // Every guard below is a read-then-write, so without a lock two operators
         // clicking "Create link" at the same moment — or one operator double-clicking

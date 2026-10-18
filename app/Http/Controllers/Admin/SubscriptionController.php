@@ -13,6 +13,7 @@ use App\Services\Billing\CheckoutService;
 use App\Services\HostelService;
 use App\Support\Refusal;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -48,6 +49,7 @@ class SubscriptionController extends Controller
         protected AccountBillingService $billing,
         protected CheckoutService $checkout,
         protected ActivityLogger $logger,
+        protected \App\Services\Billing\AutopayService $autopay,
     ) {}
 
     /** The owner's billing page. Reads only — no write on a GET (S1 · F10). */
@@ -120,7 +122,62 @@ class SubscriptionController extends Controller
             'razorpayEnabled' => $this->checkout->isEnabled(),
             'canManage' => $canManage,
             'viewerOwnsAccount' => $viewerOwnsAccount,
+            'autopay' => $this->autopayPanel($account, $viewer, $canManage),
         ]);
+    }
+
+    /**
+     * Turn autopay off (S6). The account OWNER may always do this — managed, on hold
+     * or not: stopping money leaving their bank is never gated. A debit already with
+     * the bank cannot be recalled and resolves normally.
+     */
+    public function cancelAutopay(Request $request): RedirectResponse
+    {
+        $viewer = $request->user();
+        $account = $this->billing->accountForViewer($viewer);
+
+        if ($account->owner_id !== $viewer->id) {
+            return back()->with('error', __('Only the account owner can turn autopay off.'));
+        }
+
+        $mandate = $this->autopay->mandateFor($account);
+        if (! $mandate || $mandate->status === \App\Models\SubscriptionMandate::PENDING) {
+            return back()->with('info', __('Autopay is not on.'));
+        }
+
+        $this->autopay->cancel($mandate, 'owner', $viewer);
+
+        return back()->with('success', $this->autopay->inFlight($account)
+            ? __('Autopay is turned off. The payment your bank is already processing will still complete — nothing after it.')
+            : __('Autopay is turned off. Nothing more will be debited — renew yourself from this page.'));
+    }
+
+    /**
+     * Everything the page says about autopay, decided here. `offer` = this viewer may
+     * switch it on with a monthly renewal; the sheet still checks the total, and the
+     * server checks everything again when they pay.
+     */
+    protected function autopayPanel(SubscriptionAccount $account, \App\Models\User $viewer, bool $canManage): array
+    {
+        $state = $this->autopay->state($account);
+        $mandate = $state['mandate'];
+        $live = $mandate && $mandate->status !== \App\Models\SubscriptionMandate::PENDING ? $mandate : null;
+        $anchor = $account->current_period_end?->copy()->startOfDay();
+
+        return [
+            'offer' => $canManage && $this->autopay->setupRefusal($account, $viewer, 'monthly', 1.0) === null,
+            'ceiling' => $this->autopay->ceiling(),
+            'status' => $live?->status,
+            'next_on' => $state['next_on']?->format('d M Y'),
+            'next_amount' => $live?->isActive() ? (float) $this->billing->quoteRenewal($account, 'monthly')['total'] : null,
+            'max' => $live ? (float) $live->max_amount : null,
+            'in_flight' => $state['in_flight'] ? ['amount' => (float) $state['in_flight']->amount, 'raised' => $state['in_flight']->created_at?->format('d M Y')] : null,
+            'over_limit' => $state['over_limit'],
+            'idle' => $live ? $state['idle'] : null,
+            // Every attempt for THIS renewal has failed (or it was above the limit).
+            'failed' => (bool) ($live && $anchor && $live->failure_notified_for && $live->failure_notified_for->isSameDay($anchor)),
+            'can_turn_off' => $live && $account->owner_id === $viewer->id && in_array($live->status, [\App\Models\SubscriptionMandate::ACTIVE, \App\Models\SubscriptionMandate::PAUSED], true),
+        ];
     }
 
     /**
@@ -138,6 +195,8 @@ class SubscriptionController extends Controller
             // Posted DB references, so integers (standards §1.1 rule 3), resolved
             // inside this account below — never trusted as they arrive.
             'branch_id' => ['required_if:charge,add_branch', 'nullable', 'integer'],
+            // S6: switch autopay on with this renewal (checked again on the server).
+            'autopay' => ['nullable', 'boolean'],
             'order_id' => ['required_if:charge,order', 'nullable', 'integer'],
         ]);
 
@@ -154,7 +213,7 @@ class SubscriptionController extends Controller
 
         try {
             $result = match ($data['charge']) {
-                'renewal' => $this->checkout->startRenewal($account, $data['period']),
+                'renewal' => $this->checkout->startRenewal($account, $data['period'], (bool) ($data['autopay'] ?? false), $request->user()),
                 'add_branch' => $this->checkout->startAddBranch($account, $branch),
                 'align' => $this->checkout->startAlign($account),
                 'order' => $this->checkout->startForOrder($account, $order),
@@ -453,6 +512,8 @@ class SubscriptionController extends Controller
             // abandon it and choose the other term — startRenewal supersedes it. An
             // operator's charge is theirs to change, so it never offers this.
             'own' => $o->kind?->value === 'renewal' && $o->collection === \App\Enums\CollectionMethod::Checkout && ! $o->hasLiveLink(),
+            // S6: the bank is taking this by autopay right now — no way to pay it here.
+            'autopay' => $o->isAutopayInFlight(),
             'id' => $o->id,
             'label' => $o->kind?->label() ?? 'Charge',
             'invoice' => $o->invoiceNumber(),

@@ -15,6 +15,9 @@ Artisan::command('inspire', function () {
 | Renewal reminders, due-fee notifications and vacancy alerts run daily.
 | Commands are registered as their modules are built.
 */
+// S6: raise due autopay debits BEFORE the reminders run, so an account whose debit is in
+// flight hears "being debited", not "please renew".
+Schedule::command('hostelease:charge-due-autopay')->dailyAt('07:00');
 // Advance subscription lifecycle (grace/expiry) + send reminder emails, before alerts refresh.
 Schedule::command('hostelease:process-subscription-lifecycle')->dailyAt('07:30');
 // Refresh dashboard alerts every morning.

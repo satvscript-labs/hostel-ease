@@ -556,7 +556,10 @@
                                                     </a>
                                                 @endif
 
-                                                @if($order->payment_status->value === 'pending')
+                                                @if($order->isAutopayInFlight())
+                                                    {{-- S6 · L1: the bank has this one. Accept, link and void stay away. --}}
+                                                    <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-2"><i class="fa-solid fa-rotate me-1"></i>Autopay debit with the bank — attempt {{ $order->autopay_attempt }}</span>
+                                                @elseif($order->payment_status->value === 'pending')
                                                     <form method="POST" action="{{ route('superadmin.accounts.orders.accept', [$account, $order]) }}"
                                                           data-confirm="Mark {{ hostelease_money($order->amount) }} as received? This grants the coverage on this order.{{ $order->hasOpenCheckout() ? ' The owner also has this open in online checkout — if they pay there as well, that payment will be flagged for a refund.' : '' }}{{ ! $order->wouldExtendCoverage() ? ' WARNING: everything this charge covers is already paid up — accepting money for it buys the customer nothing.' : '' }}">
                                                         @csrf @method('PATCH')
@@ -613,7 +616,7 @@
                                                     @endif
                                                 @endif
 
-                                                @if($order->payment_status->value !== 'voided')
+                                                @if($order->payment_status->value !== 'voided' && ! $order->isAutopayInFlight())
                                                     {{-- The INTEGER id: a posted DB reference, never a URL segment
                                                          (standards §1.1 rule 3). The form action is static. --}}
                                                     <button type="button" class="btn btn-sm btn-light text-muted rounded-pill px-3 fw-semibold shadow-sm"

@@ -75,6 +75,8 @@ class SubscriptionOrder extends Model
             'payment_link_status' => PaymentLinkStatus::class,
             'payment_link_expires_at' => 'datetime',
             'paid_at' => 'datetime',
+            'autopay_due_on' => 'date',
+            'autopay_attempt' => 'integer',
             'payment_link_attempts' => 'integer',
             'quantity' => 'integer',
             'subtotal' => 'decimal:2',
@@ -134,6 +136,19 @@ class SubscriptionOrder extends Model
     }
 
     /** Whether this charge has a link that can still take money. */
+    /**
+     * An autopay debit raised and not yet paid or failed (S6 · L1). On UPI this lasts a
+     * day or more — and while it does, no other path may take money for this charge:
+     * not checkout, not a link, not an offline Accept, not a second renewal.
+     */
+    public function isAutopayInFlight(): bool
+    {
+        // Not "and has a Razorpay order id": the attempt is recorded BEFORE the bank is
+        // asked, so a pending autopay charge may be mid-call (S6 audit).
+        return $this->collection === CollectionMethod::Autopay
+            && $this->payment_status === PaymentStatus::Pending;
+    }
+
     public function hasLiveLink(): bool
     {
         return (bool) $this->payment_link_id && (bool) $this->payment_link_status?->isLive();
@@ -269,6 +284,7 @@ class SubscriptionOrder extends Model
     public function canIssueLink(): bool
     {
         return $this->payment_status === PaymentStatus::Pending
+            && $this->collection !== CollectionMethod::Autopay   // S6 · L1: the bank's to finish
             && ! $this->hasLiveLink()
             && ! $this->hasOpenCheckout()
             && $this->amountPaise() >= 100;

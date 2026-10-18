@@ -94,6 +94,19 @@
     .os-step-amt { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--he-text-main, #0f172a); white-space: nowrap; }
     @media (max-width: 575.98px) { .os-step { flex-wrap: wrap; padding: 1rem 1.1rem; } .os-step-act { width: 100%; } .os-step-act > .btn { width: 100%; } }
 
+    /* Autopay (S6) — one quiet line of state */
+    .os-auto { display: flex; align-items: center; gap: 1rem; padding: .95rem 1.5rem; border-radius: 1rem; background: var(--he-bg-surface, #fff); border: 1px solid rgba(79,70,229,.18); }
+    .os-auto-ic { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--he-primary-soft, rgba(79,70,229,.08)); color: var(--he-primary, #4f46e5); }
+    .os-auto-warn { border-color: rgba(245,158,11,.35); }
+    .os-auto-warn .os-auto-ic { background: var(--he-warning-soft, #fef3c7); color: #b45309; }
+    .os-auto-muted .os-auto-ic { background: var(--he-bg-surface-raised, #f1f5f9); color: var(--he-text-muted, #64748b); }
+    .os-auto-body { flex: 1 1 auto; min-width: 0; }
+    .os-auto-title { font-weight: 700; color: var(--he-text-main, #0f172a); }
+    .os-auto-sub { font-size: .8rem; color: var(--he-text-muted, #64748b); }
+    .os-auto-pick { display: flex; align-items: flex-start; gap: .75rem; padding: .85rem 1rem; border: 1.5px solid rgba(0,0,0,.08); border-radius: 1rem; background: #fff; cursor: pointer; transition: border-color .2s ease, background .2s ease; }
+    .os-auto-pick .form-check-input { width: 1.15rem; height: 1.15rem; margin-top: .15rem !important; }
+    .os-auto-pick.on { border-color: var(--bs-primary); background: rgba(79,70,229,.04); }
+
     /* Branches */
     .os-branch { display: flex; align-items: flex-start; gap: .85rem; padding: .95rem 1.5rem; }
     .os-branch + .os-branch { border-top: 1px solid rgba(15,23,42,.06); }
@@ -178,6 +191,15 @@
                      owner's earlier attempt — is what gets paid, never a second one. --}}
                 @if($status === AccountStatus::Suspended)
                     <a href="mailto:{{ config('hostelease.company.email') }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-headset me-2"></i>{{ __('Contact support') }}</a>
+                @elseif($openRenewal && $openRenewal['autopay'])
+                    {{-- S6: the bank is paying this one. Nothing to press. --}}
+                    <div class="sub-lock">
+                        <span class="sub-lock-ic"><i class="fa-solid fa-rotate"></i></span>
+                        <span>
+                            <span class="sub-lock-title d-block">{{ __('Autopay is paying :amount', ['amount' => hostelease_money($openRenewal['amount'])]) }}</span>
+                            <span class="sub-lock-sub d-block">{{ __('Your bank is processing it — usually within a day. Nothing to do.') }}</span>
+                        </span>
+                    </div>
                 @elseif($openRenewal && ($openRenewal['link_url'] || $canManage))
                     <div class="d-flex flex-wrap gap-2">
                         @if($openRenewal['link_url'])
@@ -267,7 +289,11 @@
                     </div>
                     <div class="os-step-amt">{{ hostelease_money($row['amount']) }}</div>
                     <div class="os-step-act">
-                        @if($row['stale'])
+                        @if($row['autopay'])
+                            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">
+                                <i class="fa-solid fa-rotate me-1"></i>{{ __('Autopay in progress — nothing to pay') }}
+                            </span>
+                        @elseif($row['stale'])
                             <div class="d-flex flex-column align-items-end gap-1">
                                 <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2" title="{{ __('Your branches changed since this was raised, so the amount has changed.') }}">
                                     <i class="fa-solid fa-rotate me-1"></i>{{ __('Amount changed — renew again for the new total') }}
@@ -322,6 +348,63 @@
                     <div class="os-step-amt">{{ hostelease_money($singleBehind['amount']) }}</div>
                     <div class="os-step-act"><button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" @click="openPlan({{ $singleBehind['id'] }})">{{ __('Add to plan') }}</button></div>
                 </div>
+            @endif
+        </div>
+    @endif
+
+    {{-- ══ 2b. Autopay (S6) ══ Only once it exists — it is switched ON in the renew
+         sheet, with a monthly renewal. One line of state, one action. --}}
+    @if($autopay['status'])
+        @php($ap = $autopay)
+        @php($apTone = $ap['failed'] || $ap['over_limit'] ? 'warn' : (in_array($ap['status'], ['paused', 'cancelling'], true) || $ap['idle'] ? 'muted' : 'on'))
+        <div class="os-auto os-auto-{{ $apTone }} shadow-sm mb-4 os-rise" style="--i:4">
+            <span class="os-auto-ic"><i class="fa-solid {{ $apTone === 'warn' ? 'fa-triangle-exclamation' : 'fa-rotate' }}"></i></span>
+            <div class="os-auto-body">
+                <div class="os-auto-title">
+                    @if($ap['in_flight'])
+                        {{ __('Autopay is on') }}
+                    @elseif($ap['status'] === 'cancelling')
+                        {{ __('Turning autopay off…') }}
+                    @elseif($ap['status'] === 'paused')
+                        {{ __('Autopay is paused') }}
+                    @elseif($ap['idle'])
+                        {{ __('Autopay is waiting') }}
+                    @elseif($ap['over_limit'])
+                        {{ __('This month is above your autopay limit') }}
+                    @elseif($ap['failed'])
+                        {{ __('Autopay could not take this month\'s payment') }}
+                    @else
+                        {{ __('Autopay is on') }}
+                    @endif
+                </div>
+                <div class="os-auto-sub">
+                    @if($ap['in_flight'])
+                        {{ __('This month’s :amount is with your bank now · up to :limit a month', ['amount' => hostelease_money($ap['in_flight']['amount']), 'limit' => hostelease_money($ap['max'])]) }}
+                    @elseif($ap['status'] === 'cancelling')
+                        {{ __('Your bank confirms in a few minutes. Nothing more will be debited.') }}
+                    @elseif($ap['status'] === 'paused')
+                        {{ __('Paused in your UPI app — resume it there, or renew yourself from this page.') }}
+                    @elseif($ap['idle'] === 'not_monthly')
+                        {{ __('It pays monthly renewals only. You are on a :term plan, so renew yourself — or turn it off.', ['term' => strtolower($account->period?->label() ?? '')]) }}
+                    @elseif($ap['idle'])
+                        {{ __('Nothing is debited for now — you will be asked to pay your renewal as usual.') }}
+                    @elseif($ap['failed'])
+                        {{ __('Please pay it yourself above to keep every branch running. Autopay will try again next month.') }}
+                    @elseif($ap['over_limit'])
+                        {{ __(':amount is above your :limit limit, so it will not be debited — you will be asked to pay it yourself.', ['amount' => hostelease_money($ap['next_amount']), 'limit' => hostelease_money($ap['max'])]) }}
+                    @elseif($ap['next_on'])
+                        {{ __(':amount by UPI on :date · your bank tells you a day before · up to :limit a month', ['amount' => hostelease_money($ap['next_amount']), 'date' => $ap['next_on'], 'limit' => hostelease_money($ap['max'])]) }}
+                    @else
+                        {{ __('UPI · up to :limit a month', ['limit' => hostelease_money($ap['max'])]) }}
+                    @endif
+                </div>
+            </div>
+            @if($ap['can_turn_off'])
+                <form method="POST" action="{{ route('admin.subscription.autopay.cancel') }}" class="flex-shrink-0"
+                      data-confirm="{{ __('Turn off autopay? You will renew yourself from this page each month.') }}">
+                    @csrf
+                    <button class="btn btn-sm btn-link text-muted fw-semibold text-decoration-none p-0">{{ __('Turn off') }}</button>
+                </form>
             @endif
         </div>
     @endif
@@ -453,7 +536,7 @@
     @endunless
 
     {{-- ── Mobile action bar ── --}}
-    @if($status !== AccountStatus::Suspended && (($openRenewal && ($openRenewal['link_url'] || $canManage)) || ($canManage && $hero['cta'])))
+    @if($status !== AccountStatus::Suspended && ! ($openRenewal['autopay'] ?? false) && (($openRenewal && ($openRenewal['link_url'] || $canManage)) || ($canManage && $hero['cta'])))
         <div class="d-lg-none" style="height:76px;"></div>
         <div class="sub-sticky d-lg-none">
             <div class="d-flex align-items-center justify-content-between gap-3">
@@ -541,6 +624,27 @@
                                 </template>
                             </div>
                         </div>
+                    </div>
+
+                    {{-- S6 · D-S6-2: autopay is switched on WITH a monthly renewal — one UPI
+                         approval pays this month and sets up the next ones. Opt-in, never
+                         pre-ticked: it is a standing permission to take money. --}}
+                    <div x-show="autopayShown" class="mt-3">
+                        <label class="os-auto-pick" :class="{ on: autopayOn }">
+                            <input type="checkbox" class="form-check-input mt-0 flex-shrink-0" x-model="autopayOn">
+                            <span class="min-w-0">
+                                <span class="d-block fw-bold text-dark">{{ __('Renew automatically every month') }}</span>
+                                <span class="d-block small text-muted">{{ __('UPI Autopay, up to :limit a month. Your bank tells you a day before each payment, and you can turn it off anytime.', ['limit' => hostelease_money($autopay['ceiling'])]) }}</span>
+                            </span>
+                        </label>
+                    </div>
+                    @if($autopay['status'] === 'active')
+                        <div x-show="sheet.kind === 'renew' && period === 'yearly'" class="small text-muted mt-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>{{ __('Autopay pays monthly renewals only — on a yearly plan you renew yourself.') }}
+                        </div>
+                    @endif
+                    <div x-show="autopayTooHigh" class="small text-muted mt-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>{{ __('Autopay works for monthly totals up to :limit.', ['limit' => hostelease_money($autopay['ceiling'])]) }}
                     </div>
 
                     {{-- Renew: exactly which branches this renews, and which are left out --}}
@@ -653,6 +757,9 @@ document.addEventListener('alpine:init', () => {
         alignOffer: @json($alignOffer),
         newBranch: @json($newBranch),
         dueRows: @json((object) collect($due)->keyBy('id')->all()),
+        autopayOffer: @json($autopay['offer']),
+        autopayCeiling: @json($autopay['ceiling']),
+        autopayOn: false,
 
         sheet: { open: false, kind: null, id: null },
         addStep: 1,
@@ -676,6 +783,9 @@ document.addEventListener('alpine:init', () => {
             this.bump = false; this.$nextTick(() => { this.bump = true; setTimeout(() => this.bump = false, 360); });
         },
 
+        // Offered on a monthly, paid renewal within the ceiling (the server re-checks all of it).
+        get autopayShown() { const f = Number(this.quotes.monthly.final); return this.autopayOffer && this.sheet.kind === 'renew' && this.period === 'monthly' && f > 0 && f <= this.autopayCeiling; },
+        get autopayTooHigh() { return this.autopayOffer && this.sheet.kind === 'renew' && this.period === 'monthly' && Number(this.quotes.monthly.final) > this.autopayCeiling; },
         get sheetPays() { return this.sheet.kind && !this.sheetFree && (this.sheet.kind !== 'add' || (this.addStep === 2 && this.newBranch?.mode === 'prorate')); },
         // A renewal every branch's free renewal covers: nothing goes to Razorpay (S4 audit A5).
         get sheetFree() { return this.sheet.kind === 'renew' && Number(this.sheetSummary.final) === 0; },
@@ -766,7 +876,7 @@ document.addEventListener('alpine:init', () => {
         pay() {
             const k = this.sheet.kind;
             const expected = this.sheetSummary.final;
-            if (k === 'renew') return this.start({ charge: 'renewal', period: this.period }, expected);
+            if (k === 'renew') return this.start({ charge: 'renewal', period: this.period, autopay: this.autopayShown && this.autopayOn }, expected);
             if (k === 'order') return this.start({ charge: 'order', order_id: this.sheet.id }, expected);
             if (k === 'plan') return this.start({ charge: 'add_branch', branch_id: this.sheet.id }, expected);
             if (k === 'align') return this.start({ charge: 'align' }, expected);
@@ -839,6 +949,8 @@ document.addEventListener('alpine:init', () => {
             const rzp = new Razorpay({
                 key: opts.key, order_id: opts.order_id, amount: opts.amount, currency: opts.currency,
                 name: opts.name, description: opts.description, prefill: opts.prefill,
+                // S6: a renewal that also sets up UPI Autopay (both come from the server).
+                ...(opts.recurring ? { customer_id: opts.customer_id, recurring: opts.recurring } : {}),
                 theme: { color: '#4f46e5' },
                 modal: { ondismiss: () => { this.loading = false; } },
                 handler: (response) => this.confirm(response),

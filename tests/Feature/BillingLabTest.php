@@ -254,7 +254,7 @@ class BillingLabTest extends TestCase
         $this->seed(BillingLabSeeder::class);
         $this->seed(BillingLabSeeder::class); // re-runnable: rebuilds, never duplicates
 
-        $this->assertSame(63, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
+        $this->assertSame(76, User::where('name', 'like', 'Lab S%')->where('mobile', 'like', '%00000')->count());
         $reminders = app(RenewalReminders::class);
 
         // The ledger agrees with every date it made.
@@ -330,6 +330,32 @@ class BillingLabTest extends TestCase
         $this->assertSame(2, $this->lab('S4-15')->reminderLogs()->count());
         $this->assertTrue($reminders->context($this->lab('S4-17'))['free']);
 
+        // S6 — every autopay state, as the switch-on owner page and the daily job see it.
+        config(['hostelease.autopay.enabled' => true, 'services.razorpay.enabled' => true, 'services.razorpay.key' => 'rzp_test_lab', 'services.razorpay.secret' => 'lab']);
+        $autopay = app(\App\Services\Billing\AutopayService::class);
+        $this->assertNull($autopay->mandateFor($this->lab('S6-01')), 'S6-01: not on yet');
+        $this->assertNull($autopay->setupRefusal($this->lab('S6-01'), $this->lab('S6-01')->owner, 'monthly', 2000), 'S6-01: may switch it on');
+        $this->assertSame('on', $autopay->covers($this->lab('S6-02')));
+        $this->assertTrue(User::where('mobile', '+917060200001')->exists(), 'S6-02 co-admin');
+        $this->assertSame('paying', $autopay->covers($this->lab('S6-03')));
+        $this->assertSame(1, $this->lab('S6-04')->orders()->where('collection', 'autopay')->where('payment_status', 'voided')->count());
+        $this->assertSame(now()->toDateString(), $autopay->state($this->lab('S6-04'))['next_on']->toDateString(), 'S6-04: try 2 is today');
+        $this->assertSame(3, $this->lab('S6-05')->orders()->where('collection', 'autopay')->where('payment_status', 'voided')->count());
+        $this->assertNull($autopay->covers($this->lab('S6-05')), 'S6-05: the owner must pay');
+        $this->assertSame('grace', $reminders->stage($this->lab('S6-05'))['tone']);
+        $this->assertTrue($autopay->state($this->lab('S6-06'))['over_limit']);
+        $this->assertNull($autopay->covers($this->lab('S6-06')));
+        $this->assertSame('paused', $autopay->mandateFor($this->lab('S6-07'))->status);
+        $this->assertNull($autopay->covers($this->lab('S6-07')));
+        $this->assertSame('cancelling', $autopay->mandateFor($this->lab('S6-08'))->status);
+        $this->assertNull($autopay->mandateFor($this->lab('S6-09')));
+        $this->assertSame('customer', \App\Models\SubscriptionMandate::where('account_id', $this->lab('S6-09')->id)->value('cancelled_by'));
+        $this->assertSame('not_monthly', $autopay->state($this->lab('S6-10'))['idle']);
+        $this->assertNull($autopay->covers($this->lab('S6-11')), 'S6-11: the proforma is what gets paid');
+        $this->assertSame('paused_by_us', $autopay->state($this->lab('S6-12'))['idle']);
+        $this->assertSame(1, $this->lab('S6-13')->orders()->where('collection', 'autopay')->where('payment_status', 'paid')->count());
+        $this->assertSame('on', $autopay->covers($this->lab('S6-13')));
+
         // Logins follow the 70 P NN 0000 R pattern; co-admins and staff exist where named.
         $this->assertTrue(User::where('mobile', '+917041600001')->where('role', 'hostel_admin')->exists());
         $this->assertTrue(User::where('mobile', '+917041600002')->where('role', 'manager')->exists());
@@ -339,5 +365,6 @@ class BillingLabTest extends TestCase
         $this->assertSame(0, User::withTrashed()->where('name', 'like', 'Lab S%')->count());
         $this->assertSame(0, Hostel::withTrashed()->where('name', 'like', 'S_-__ · %')->count());
         $this->assertSame(0, SubscriptionOrder::withTrashed()->where('remarks', 'like', 'Lab S%')->count());
+        $this->assertSame(0, \App\Models\SubscriptionMandate::where('token_id', 'like', 'token_LAB_%')->count());
     }
 }

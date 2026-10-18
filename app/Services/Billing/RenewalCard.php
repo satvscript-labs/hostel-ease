@@ -45,6 +45,9 @@ class RenewalCard
         };
 
         $money = match (true) {
+            // S6: the bank has it, or will — reassurance, not a demand.
+            $c['autopay'] === 'paying' => __('Autopay is paying :amount — nothing to do', ['amount' => hostelease_money($c['waiting_amount'] ?? $c['amount'])]),
+            $c['autopay'] === 'on' => __(':amount will be paid by autopay — nothing to do', ['amount' => hostelease_money($c['amount'])]),
             $c['waiting_amount'] !== null => __(':amount is waiting to be paid', ['amount' => hostelease_money($c['waiting_amount'])]),
             $c['free'] => __('Nothing to pay — your next renewal is free'),
             $c['is_trial'] => __(':yearly a year or :monthly a month to continue', ['yearly' => hostelease_money($c['amounts']['yearly']), 'monthly' => hostelease_money($c['amounts']['monthly'])]),
@@ -54,6 +57,7 @@ class RenewalCard
         // The one action. A link the operator sent can be paid by any admin; the
         // owner's own page can start a charge only for the owner on self-serve.
         $cta = match (true) {
+            $c['autopay'] !== null => ['label' => __('View subscription'), 'url' => route('admin.subscription.index'), 'external' => false],
             $c['link_url'] !== null => ['label' => __('Pay :amount', ['amount' => hostelease_money($c['waiting_amount'])]), 'url' => $c['link_url'], 'external' => true],
             $c['self_serve'] && $isOwner => ['label' => $c['waiting_amount'] !== null
                 ? __('Pay :amount', ['amount' => hostelease_money($c['waiting_amount'])])

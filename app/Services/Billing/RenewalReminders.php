@@ -105,6 +105,13 @@ class RenewalReminders
 
         $days = $account->daysUntilAnchor();
 
+        // S6: autopay will take (or is taking) this renewal — no "please renew" for
+        // it. Its own notice ("will be debited") goes out when the debit is raised.
+        // If every attempt fails, covers() turns null and the grace reminder follows.
+        if (app(AutopayService::class)->covers($account)) {
+            return null;
+        }
+
         if ($days >= 0) {
             // The smallest window not yet reached is the one this run belongs to.
             $window = collect($this->windows($account))->filter(fn (int $w) => $w >= $days)->min();
@@ -216,6 +223,8 @@ class RenewalReminders
             // The one place to pay: the operator's link if there is one, else the
             // owner's own page when they may pay there. Null = we will contact them.
             'pay_url' => $linkUrl ?? ($selfServe ? route('admin.subscription.index') : null),
+            // S6: 'paying' (with the bank now) | 'on' (will be debited) | null.
+            'autopay' => app(AutopayService::class)->covers($account),
         ];
     }
 
@@ -271,7 +280,11 @@ class RenewalReminders
 
         $lines = [__('Hi :name,', ['name' => $name]), __('Your :noun :when.', ['noun' => $noun, 'when' => $when])];
 
-        if ($c['waiting_amount'] !== null && $c['link_url']) {
+        if ($c['autopay'] === 'paying') {
+            $lines[] = __('Your autopay payment of :amount is being processed — nothing to do.', ['amount' => hostelease_money($c['waiting_amount'] ?? $c['amount'])]);
+        } elseif ($c['autopay'] === 'on') {
+            $lines[] = __(':amount will be paid automatically by UPI Autopay — nothing to do.', ['amount' => hostelease_money($c['amount'])]);
+        } elseif ($c['waiting_amount'] !== null && $c['link_url']) {
             $lines[] = __('Amount: :amount. Pay securely here: :url', ['amount' => hostelease_money($c['waiting_amount']), 'url' => $c['link_url']]);
         } elseif ($c['free']) {
             $lines[] = __('Your next renewal is free — nothing to pay.');

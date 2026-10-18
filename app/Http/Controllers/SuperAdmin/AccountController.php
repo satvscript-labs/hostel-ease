@@ -12,6 +12,7 @@ use App\Models\SubscriptionAccount;
 use App\Models\SubscriptionOrder;
 use App\Services\ActivityLogger;
 use App\Services\Billing\AccountBillingService;
+use App\Services\Billing\AutopayService;
 use App\Services\Billing\PaymentLinkService;
 use App\Services\HostelService;
 use App\Services\NotificationService;
@@ -35,7 +36,22 @@ class AccountController extends Controller
         protected HostelService $hostels,
         protected NotificationService $notifications,
         protected PaymentLinkService $paymentLinks,
+        protected AutopayService $autopay,
     ) {}
+
+    /**
+     * S6 · L1: while the bank is taking a renewal by autopay, nothing here may raise,
+     * accept, link, void or move it — each would be a second way to pay (or a way to
+     * land the bank's payment on a charge that no longer exists).
+     */
+    protected function autopayInFlightRefusal(SubscriptionAccount $account, ?SubscriptionOrder $order = null): ?RedirectResponse
+    {
+        $flying = $order ? ($order->isAutopayInFlight() ? $order : null) : $this->autopay->inFlight($account);
+
+        return $flying
+            ? back()->with('warning', 'An autopay debit of '.hostelease_money($flying->amount).' is with the customer\'s bank right now. Wait for its answer (usually within a day) — if it fails, the charge is voided and you can act then.')
+            : null;
+    }
 
     /**
      * Shared tail for the three charge actions (renew / add-branch / align).
@@ -370,9 +386,32 @@ class AccountController extends Controller
             'canNudge' => $reminderStage !== null && filled($account->owner?->mobile),
             'lastNudged' => $account->last_nudged_at,
             'logs' => $account->reminderLogs()->latest('id')->limit(5)->get(),
+            'autopay' => $this->autopayPanel($account),
         ];
 
         return view('superadmin.accounts.show', compact('reminderPanel', 'account', 'branches', 'billable', 'orders', 'discounts', 'renewQuotes', 'displayPeriod', 'addQuotes', 'alignQuote', 'alignBehind', 'giftBranches', 'canExtend', 'addHostelQuote', 'paidPeriod', 'ownerEmail', 'removalImpact', 'accountClosing', 'linksEnabled', 'liveLinks', 'shareSeed', 'shareTo', 'trialAvailable', 'trialJoinable', 'selfServeLive', 'ownerOpenCharges'));
+    }
+
+    /** Account 360's autopay line (S6): the mandate, the next debit, this renewal's attempts. */
+    protected function autopayPanel(SubscriptionAccount $account): ?array
+    {
+        $state = $this->autopay->state($account);
+        $mandate = $state['mandate'];
+        if (! $mandate || $mandate->status === \App\Models\SubscriptionMandate::PENDING) {
+            // The last one, if it ended — so "the customer cancelled it" is visible.
+            $last = \App\Models\SubscriptionMandate::where('account_id', $account->id)
+                ->whereIn('status', \App\Models\SubscriptionMandate::TERMINAL)->latest('id')->first();
+
+            return $last ? ['mandate' => $last, 'ended' => true, 'attempts' => collect(), 'state' => $state] : null;
+        }
+
+        $attempts = $account->current_period_end
+            ? $account->orders()->where('collection', CollectionMethod::Autopay->value)
+                ->whereDate('autopay_due_on', $account->current_period_end->copy()->startOfDay())
+                ->orderBy('autopay_attempt')->get()
+            : collect();
+
+        return ['mandate' => $mandate, 'ended' => false, 'attempts' => $attempts, 'state' => $state];
     }
 
     /** Quote adding a brand-new branch to the owner, for the Add-hostel modal summary. */
@@ -570,6 +609,10 @@ class AccountController extends Controller
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
+        if ($refusal = $this->autopayInFlightRefusal($account)) {
+            return $refusal;
+        }
+
         try {
             [$order, $viaLink] = $this->collectOrRecord(
                 $data['collect'] ?? 'offline',
@@ -615,6 +658,10 @@ class AccountController extends Controller
         // so the "nothing to do" case is caught here, before a transaction opens.
         if ($this->billing->quoteAlign($account)['count'] === 0) {
             return back()->with('info', 'Nothing to align — all branches already reach the renewal date.');
+        }
+
+        if ($refusal = $this->autopayInFlightRefusal($account)) {
+            return $refusal;
         }
 
         try {
@@ -674,6 +721,10 @@ class AccountController extends Controller
             'unit' => ['required', Rule::in(['days', 'months'])],
             'reason' => ['required', 'string', 'max:255'],
         ]);
+
+        if ($refusal = $this->autopayInFlightRefusal($account)) {
+            return $refusal;
+        }
 
         $from = $account->current_period_end?->format('d M Y');
         try {
@@ -757,6 +808,10 @@ class AccountController extends Controller
             return back()->with('info', $this->alreadyPaidMessage($order));
         }
 
+        if ($refusal = $this->autopayInFlightRefusal($account, $order)) {
+            return $refusal;
+        }
+
         // ── KILL THE LINK FIRST (S2 · design §6 BP2) ──
         // The charge is being settled some other way, so a live link is now a
         // loaded gun: the customer who paid by bank transfer taps the week-old link
@@ -808,6 +863,10 @@ class AccountController extends Controller
             'order_id' => ['required', 'integer'],
         ])['order_id']);
 
+        if ($refusal = $this->autopayInFlightRefusal($account, $order)) {
+            return $refusal;
+        }
+
         try {
             $order = $this->paymentLinks->issue($order);
         } catch (\RuntimeException $e) {
@@ -815,6 +874,24 @@ class AccountController extends Controller
         }
 
         return $this->linkIssued($order, $order->payment_link_attempts > 1 ? 'Link re-issued' : 'Link issued');
+    }
+
+    /**
+     * Turn the customer's autopay off (S6). Razorpay cancels the mandate at NPCI; a
+     * debit already in flight cannot be recalled and resolves normally.
+     */
+    public function cancelAutopay(Request $request, SubscriptionAccount $account): RedirectResponse
+    {
+        $mandate = $this->autopay->mandateFor($account);
+        if (! $mandate) {
+            return back()->with('info', 'Autopay is not on for this account.');
+        }
+
+        $this->autopay->cancel($mandate, 'operator', $request->user());
+
+        return back()->with('success', $mandate->fresh()->status === \App\Models\SubscriptionMandate::CANCELLED
+            ? 'Autopay turned off.'
+            : 'Autopay is being turned off — the bank confirms within a few minutes. Nothing more will be debited.');
     }
 
     /** Kill a live link so it can never take money again. */
@@ -913,6 +990,10 @@ class AccountController extends Controller
         ]);
 
         $order = $account->orders()->whereKey($data['order_id'])->firstOr(fn () => abort(404));
+
+        if ($refusal = $this->autopayInFlightRefusal($account, $order)) {
+            return $refusal;
+        }
 
         // Before anything is touched (a live link cancelled, say): a payment built on
         // this one's dates means voiding it would withdraw nothing (billing lab L4).

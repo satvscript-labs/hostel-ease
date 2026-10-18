@@ -145,6 +145,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->middleware('throttle:6,1')->name('subscription.add-branch');
         Route::post('subscription/confirm', [\App\Http\Controllers\Admin\SubscriptionController::class, 'confirm'])
             ->middleware('throttle:30,1')->name('subscription.confirm');
+        // UPI Autopay (S6): switched ON with a renewal (subscription.checkout,
+        // autopay=1); switched OFF here. Account owner only (controller).
+        Route::post('subscription/autopay/cancel', [\App\Http\Controllers\Admin\SubscriptionController::class, 'cancelAutopay'])
+            ->middleware('throttle:6,1')->name('subscription.autopay.cancel');
 
         // "Remind me later" on the dashboard renewal card (S4). Quiets the card only;
         // the server picks the date from the renewal date.
@@ -218,6 +222,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('accounts/{account}/orders/link/cancel', [AccountController::class, 'cancelLink'])->name('accounts.orders.link.cancel');
         Route::post('accounts/{account}/orders/link/resend', [AccountController::class, 'resendLink'])->name('accounts.orders.link.resend');
         Route::post('accounts/{account}/orders/link/check', [AccountController::class, 'checkLink'])->name('accounts.orders.link.check');
+
+        // UPI Autopay (S6): the operator can turn a customer's mandate off.
+        Route::post('accounts/{account}/autopay/cancel', [AccountController::class, 'cancelAutopay'])->name('accounts.autopay.cancel');
 
         // Branch removal (D11): the owner asks, the operator decides.
         Route::post('accounts/{account}/branches/cancel', [AccountController::class, 'cancelBranch'])->name('accounts.branches.cancel');

@@ -35,6 +35,7 @@ class WebhookController extends Controller
         protected NotificationService $notifications,
         protected PaymentLinkService $paymentLinks,
         protected CheckoutService $checkout,
+        protected \App\Services\Billing\AutopayService $autopay,
     ) {}
 
     public function razorpay(Request $request): JsonResponse
@@ -58,6 +59,9 @@ class WebhookController extends Controller
             'payment_link.partially_paid' => $this->handlePaymentLinkPartiallyPaid($payload),
             'payment_link.expired' => $this->handlePaymentLinkClosed($payload, 'expired'),
             'payment_link.cancelled' => $this->handlePaymentLinkClosed($payload, 'cancelled'),
+            // S6 — the UPI Autopay mandate's own state (the customer can pause or cancel
+            // it in their UPI app at any time).
+            'token.confirmed', 'token.rejected', 'token.cancelled', 'token.paused' => $this->autopay->onTokenEvent($event, $payload['payload']['token']['entity'] ?? []),
             default => null,
         };
 
@@ -99,6 +103,7 @@ class WebhookController extends Controller
 
         match ($notes['type'] ?? null) {
             'checkout' => $this->handleCheckoutPaid($order, $payment),
+            'autopay' => $this->handleAutopayPaid($order, $payment),
 
             // ── A PAYMENT LINK'S OWN ORDER (S2 · design 10 §6 BP1) ──
             // Every payment link has a Razorpay order behind it, and Razorpay may
@@ -130,6 +135,25 @@ class WebhookController extends Controller
         } finally {
             Tenant::clear();
         }
+    }
+
+    /**
+     * An autopay debit was taken (S6). Our order is found by the Razorpay order id WE
+     * stored when raising the debit — never by notes alone (L5) — then settled by the
+     * same PaymentSettlement as every other payment (amount checked).
+     */
+    protected function handleAutopayPaid(array $order, array $payment): void
+    {
+        $razorpayOrderId = $order['id'] ?? null;
+        $ours = $razorpayOrderId ? SubscriptionOrder::where('razorpay_order_id', $razorpayOrderId)->first() : null;
+
+        if (! $ours || $ours->collection !== \App\Enums\CollectionMethod::Autopay) {
+            $this->alertUnrecognisedOrder($razorpayOrderId, (string) ($payment['id'] ?? ''), (int) ($payment['amount'] ?? 0), $order['notes'] ?? []);
+
+            return;
+        }
+
+        $this->autopay->settleDebit($ours, (string) $payment['id'], (int) ($payment['amount'] ?? 0), 'webhook');
     }
 
     /** A paid Razorpay order this system does not recognise. */
@@ -292,6 +316,12 @@ class WebhookController extends Controller
     protected function handlePaymentFailed(array $payload): void
     {
         $payment = $payload['payload']['payment']['entity'] ?? [];
+
+        // S6: a failed autopay debit ends that attempt; the daily job retries on schedule.
+        $ours = ($payment['order_id'] ?? null) ? SubscriptionOrder::where('razorpay_order_id', $payment['order_id'])->first() : null;
+        if ($ours && $ours->isAutopayInFlight()) {
+            $this->autopay->debitFailed($ours, $payment['error_description'] ?? ($payment['error_reason'] ?? null));
+        }
 
         Log::warning('Razorpay webhook: payment.failed', [
             'payment' => $payment['id'] ?? null,
