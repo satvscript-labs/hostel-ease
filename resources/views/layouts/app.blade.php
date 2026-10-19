@@ -11,7 +11,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <title>@yield('title', 'Dashboard') · {{ config('app.name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
@@ -34,8 +34,8 @@
         </main>
 
         <footer class="premium-footer text-center">
-            <p>&copy; {{ date('Y') }} <span class="fw-bold">{{ config('app.name') }}</span>. All rights reserved.</p>
-            <p class="mt-1">Powered by <span class="signature">SatvScript</span>.</p>
+            <p>&copy; {{ date('Y') }} <span class="fw-bold">{{ config('app.name') }}</span>{{ __('. All rights reserved.') }}</p>
+            <p class="mt-1">{{ __('Powered by') }} <span class="signature">{{ __('SatvScript') }}</span>.</p>
         </footer>
     </div>
 
@@ -44,6 +44,8 @@
 
     <script>
         window.hostelease_SESSION_TIMEOUT = {{ (int) config('hostelease.session_timeout') }};
+        // Words the shared JavaScript shows (S7.1) — in the page's language.
+        window.hostelease_I18N = {!! json_encode(['confirmTitle' => __('Are you sure?'), 'confirmText' => __('This action cannot be undone.'), 'confirmYes' => __('Yes, proceed'), 'cancel' => __('Cancel'), 'noMatches' => __('No matches found.')], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) !!};
         window.hostelease_FLASH = @json([
             'type' => session('success') ? 'success' : (session('warning') ? 'warning' : (session('error') ? 'error' : null)),
             'message' => session('success') ?? session('warning') ?? session('error'),

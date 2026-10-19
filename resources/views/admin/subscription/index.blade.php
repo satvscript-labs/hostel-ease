@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'My Subscription')
+@section('title', __('My Subscription'))
 
 {{-- ─────────────────────────────────────────────────────────────────────────
      The owner's billing page — redesigned 2026-10-06 (doc 23) on the same core as
@@ -30,7 +30,7 @@
     $status = $account->status;
     $days = $account->daysUntilAnchor();
     $q = $quotes[$displayPeriod];
-    $anchorFmt = $account->current_period_end?->format('d M Y');
+    $anchorFmt = $account->current_period_end?->translatedFormat('d M Y');
 
     $hero = match ($status) {
         AccountStatus::Trial => ['tone' => 'trial', 'icon' => 'gift', 'label' => __('Free trial'), 'cta' => __('Subscribe now')],
@@ -442,15 +442,15 @@
                             </div>
                             <div class="os-branch-meta mt-1">
                                 @if($state === 'cancelled')
-                                    {{ __('Closing') }} {{ $branch->subscription_end?->format('d M Y') }} · {{ __('not billed at your next renewal') }}
+                                    {{ __('Closing') }} {{ $branch->subscription_end?->translatedFormat('d M Y') }} · {{ __('not billed at your next renewal') }}
                                 @elseif($state === 'closed')
-                                    {{ __('Closed') }} {{ $branch->subscription_end?->format('d M Y') }}
+                                    {{ __('Closed') }} {{ $branch->subscription_end?->translatedFormat('d M Y') }}
                                 @elseif(! $branch->subscription_end)
                                     {{ $behind ? __('Not on your plan yet — add it to switch it on') : __('Starts when you subscribe — included in your next payment') }}
                                 @elseif($behind)
-                                    {{ __('Covered to') }} {{ $branch->subscription_end->format('d M Y') }} · {{ __('your plan renews') }} {{ $anchorFmt }}
+                                    {{ __('Covered to') }} {{ $branch->subscription_end->translatedFormat('d M Y') }} · {{ __('your plan renews') }} {{ $anchorFmt }}
                                 @else
-                                    {{ __('Covered to') }} {{ $branch->subscription_end->format('d M Y') }}
+                                    {{ __('Covered to') }} {{ $branch->subscription_end->translatedFormat('d M Y') }}
                                 @endif
                             </div>
                             @if($state === 'removal_requested')
@@ -601,9 +601,9 @@
                     {{-- Add a branch, step 1: its details --}}
                     <div x-show="sheet.kind === 'add' && addStep === 1" x-transition:enter.duration.250ms>
                         <label class="form-label fw-bold small text-muted" for="os-add-name">{{ __('BRANCH NAME') }}</label>
-                        <input id="os-add-name" type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="e.g. Sunrise Riverside" maxlength="255" @keydown.enter.prevent="add.name && (addStep = 2)">
+                        <input id="os-add-name" type="text" x-model="add.name" class="form-control bg-white border shadow-sm mb-3" placeholder="{{ __('e.g. Sunrise Riverside') }}" maxlength="255" @keydown.enter.prevent="add.name && (addStep = 2)">
                         <label class="form-label fw-bold small text-muted" for="os-add-city">{{ __('CITY') }} <span class="fw-normal">— {{ __('optional') }}</span></label>
-                        <input id="os-add-city" type="text" x-model="add.city" class="form-control bg-white border shadow-sm" placeholder="e.g. Surat" maxlength="100">
+                        <input id="os-add-city" type="text" x-model="add.city" class="form-control bg-white border shadow-sm" placeholder="{{ __('e.g. Surat') }}" maxlength="100">
                     </div>
 
                     {{-- Every money view: the shared summary (the same rows Account 360 shows) --}}
@@ -896,7 +896,7 @@ document.addEventListener('alpine:init', () => {
             });
             let data = {};
             try { data = await res.json(); } catch (e) { /* non-JSON error page */ }
-            if (!res.ok) throw new Error(data.message || (res.status === 429 ? 'Too many attempts — please wait a minute.' : 'Something went wrong. Please try again.'));
+            if (!res.ok) throw new Error(data.message || (res.status === 429 ? @js(__('Too many attempts — please wait a minute.')) : @js(__('Something went wrong. Please try again.'))));
             return data;
         },
 
@@ -907,7 +907,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const result = await this.post(@json(route('admin.subscription.checkout')), body);
                 if (result.mode === 'checkout' && expected !== undefined && Math.abs(result.razorpay.amount / 100 - expected) > 0.005) {
-                    this.toast('The total has been updated since this page loaded — it is now ' + this.money(result.razorpay.amount / 100) + '.', 'info');
+                    this.toast(@js(__('The total has been updated since this page loaded — it is now :amount.')).replace(':amount', this.money(result.razorpay.amount / 100)), 'info');
                 }
                 this.handle(result);
             } catch (e) {
@@ -956,7 +956,7 @@ document.addEventListener('alpine:init', () => {
                 handler: (response) => this.confirm(response),
             });
             rzp.on('payment.failed', () => {
-                this.toast('That payment did not go through, and you have not been charged. You can try again.', 'error');
+                this.toast(@js(__('That payment did not go through, and you have not been charged. You can try again.')), 'error');
                 this.loading = false;
             });
             rzp.open();
@@ -973,7 +973,7 @@ document.addEventListener('alpine:init', () => {
                 if (window.Swal) {
                     await Swal.fire({
                         icon: result.state === 'pending' ? 'info' : (result.state === 'refused' ? 'warning' : 'success'),
-                        title: result.state === 'pending' ? 'Almost done' : (result.state === 'refused' ? 'We are checking it' : "You're all set!"),
+                        title: result.state === 'pending' ? @js(__('Almost done')) : (result.state === 'refused' ? @js(__('We are checking it')) : @js(__("You're all set!"))),
                         text: result.message, confirmButtonColor: '#4f46e5',
                     });
                 } else {

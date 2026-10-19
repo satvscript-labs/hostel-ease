@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Services\ActivityLogger;
+use App\Services\Auth\SignIn;
+use App\Services\Auth\TwoFactor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,9 +14,11 @@ use Illuminate\View\View;
 
 class LoginController extends Controller
 {
-    public function __construct(protected ActivityLogger $logger)
-    {
-    }
+    public function __construct(
+        protected ActivityLogger $logger,
+        protected TwoFactor $twoFactor,
+        protected SignIn $signIn,
+    ) {}
 
     public function show(): View
     {
@@ -31,18 +35,26 @@ class LoginController extends Controller
         $mobile = preg_replace('/\D+/', '', $credentials['mobile']);
         $mobile = '+91' . substr($mobile, -10);
 
-        if (Auth::attempt(['mobile' => $mobile, 'password' => $credentials['password'], 'is_active' => true], $request->boolean('remember'))) {
-            $request->session()->regenerate();
+        // The password is CHECKED here, not logged in: with two-factor on, the session
+        // is created only after the second step (S7.1).
+        if (Auth::validate(['mobile' => $mobile, 'password' => $credentials['password'], 'is_active' => true])) {
+            /** @var \App\Models\User $user */
+            $user = Auth::getLastAttempted();
+            $remember = $request->boolean('remember');
 
-            $user = Auth::user();
-            $user->forceFill([
-                'last_login_at' => now(),
-                'last_login_ip' => $request->ip(),
-            ])->save();
+            // Auth::attempt() used to upgrade an old password hash on sign-in; validate()
+            // does not, so it is done here (S7.1 audit).
+            if (method_exists(Auth::getProvider(), 'rehashPasswordIfRequired')) {
+                Auth::getProvider()->rehashPasswordIfRequired($user, ['password' => $credentials['password']]);
+            }
 
-            $this->logger->log('login', 'User logged in');
+            if ($this->twoFactor->enabled($user) && ! $this->twoFactor->isTrusted($user, $request)) {
+                $this->twoFactor->startLogin($user, $remember);
 
-            return redirect()->intended(route('dashboard'));
+                return redirect()->route('two-factor.challenge');
+            }
+
+            return $this->signIn->complete($request, $user, $remember, $this->twoFactor->enabled($user) ? 'trusted device' : 'password');
         }
 
         // Keyed `credentials`, not `mobile`: a failed sign-in is about the pair, so

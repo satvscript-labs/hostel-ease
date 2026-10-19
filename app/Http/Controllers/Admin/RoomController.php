@@ -50,7 +50,7 @@ class RoomController extends Controller
         // posts via AJAX and takes the branch above, which is the only reason
         // it went unnoticed.
         return redirect()->route('admin.property.index')
-            ->with('success', "Room {$room->room_number} created with {$result['created']} beds.");
+            ->with('success', __('Room :room created with :n beds.', ['room' => $room->room_number, 'n' => $result['created']]));
     }
 
     public function edit(Room $room): View
@@ -103,7 +103,7 @@ class RoomController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'This room has occupied beds. Release the students first.'], 422);
             }
-            return back()->with('error', 'This room has occupied beds. Release the students first.');
+            return back()->with('error', __('This room has occupied beds. Release the students first.'));
         }
 
         $this->logger->log('room.delete', "Deleted room {$room->room_number}", $room);
@@ -112,6 +112,6 @@ class RoomController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
-        return back()->with('success', 'Room deleted.');
+        return back()->with('success', __('Room deleted.'));
     }
 }

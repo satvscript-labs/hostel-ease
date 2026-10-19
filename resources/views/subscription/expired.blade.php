@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Subscription Expired · {{ config('app.name') }}</title>
+    <title>{{ __('Subscription expired') }} · {{ config('app.name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/scss/app.scss'])
 </head>
@@ -21,13 +21,13 @@
                     <div class="expired-branch">
                         <i class="fa-solid fa-hotel me-1"></i>{{ $activeHostel->name }}
                         @if($activeHostel->subscription_end)
-                            <span class="opacity-75">· ended {{ $activeHostel->subscription_end->format('d M Y') }}</span>
+                            <span class="opacity-75">· {{ __('ended :date', ['date' => $activeHostel->subscription_end->translatedFormat('d M Y')]) }}</span>
                         @endif
                     </div>
                 @endif
             </div>
             <div class="p-4 p-md-5 pt-4">
-                <h1 class="h4 fw-bold mb-2">Subscription expired</h1>
+                <h1 class="h4 fw-bold mb-2">{{ __('Subscription expired') }}</h1>
                 <p class="text-muted mb-4">
                     Access to this hostel has paused because the subscription lapsed.
                     @if(auth()->user()?->isHostelAdmin())
@@ -39,19 +39,19 @@
 
                 <div class="expired-support mb-4">
                     <i class="fa-solid fa-headset text-primary me-2"></i>
-                    <span>SatvScript Support · <a href="mailto:support@satvscript.com">support@satvscript.com</a></span>
+                    <span>{{ __('SatvScript Support ·') }} <a href="mailto:support@satvscript.com">support@satvscript.com</a></span>
                 </div>
 
                 <div class="d-grid gap-2">
                     @if(auth()->user()?->isHostelAdmin())
                         <a href="{{ route('admin.subscription.index') }}" class="btn btn-primary fw-semibold rounded-pill py-2 tactile-btn">
-                            <i class="fa-solid fa-credit-card me-1"></i> Renew subscription
+                            <i class="fa-solid fa-credit-card me-1"></i> {{ __('Renew subscription') }}
                         </a>
                     @endif
                     <form action="{{ route('logout') }}" method="POST">
                         @csrf
                         <button class="btn btn-light border fw-semibold rounded-pill py-2 w-100 tactile-btn">
-                            <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
+                            <i class="fa-solid fa-right-from-bracket me-1"></i> {{ __('Logout') }}
                         </button>
                     </form>
                 </div>

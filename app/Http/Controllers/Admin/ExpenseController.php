@@ -90,7 +90,7 @@ class ExpenseController extends Controller
 
         $this->logger->log('expense.create', "Expense {$expense->category} ".hostelease_money($expense->amount), $expense);
 
-        return back()->with('success', 'Expense recorded.');
+        return back()->with('success', __('Expense recorded.'));
     }
 
     /** New in W6.2 — a typo'd amount used to mean delete + re-enter. */
@@ -99,25 +99,25 @@ class ExpenseController extends Controller
         // Salary mirrors are managed from the Staff page: editing one here
         // would desync it from the salary payment it exists to reflect.
         if ($expense->isSalaryLinked()) {
-            return back()->with('error', 'This entry mirrors a staff salary payment — edit it from the staff member\'s page instead.');
+            return back()->with('error', __('This entry mirrors a staff salary payment — edit it from the staff member\'s page instead.'));
         }
 
         $expense->update($request->validated());
 
         $this->logger->log('expense.update', "Expense #{$expense->id} edited: {$expense->title} ".hostelease_money($expense->amount), $expense);
 
-        return back()->with('success', 'Expense updated.');
+        return back()->with('success', __('Expense updated.'));
     }
 
     public function destroy(Expense $expense): RedirectResponse
     {
         if ($expense->isSalaryLinked()) {
-            return back()->with('error', 'This entry mirrors a staff salary payment — remove the salary entry from the staff member\'s page and this expense goes with it.');
+            return back()->with('error', __('This entry mirrors a staff salary payment — remove the salary entry from the staff member\'s page and this expense goes with it.'));
         }
 
         $this->logger->log('expense.delete', "Deleted expense #{$expense->id}", $expense);
         $expense->delete();
 
-        return back()->with('success', 'Expense removed.');
+        return back()->with('success', __('Expense removed.'));
     }
 }

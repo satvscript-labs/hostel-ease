@@ -100,7 +100,7 @@ class ReportService
             ->groupBy('mode')->orderByDesc('total')
             ->get()
             ->map(fn ($r) => [
-                $names[$r->mode] ?? config('hostelease.payment_modes.'.$r->mode, ucfirst((string) $r->mode)),
+                $names[$r->mode] ?? __((string) config('hostelease.payment_modes.'.$r->mode, ucfirst((string) $r->mode))),
                 (int) $r->cnt,
                 (float) $r->total,
             ]);
@@ -189,7 +189,7 @@ class ReportService
             ? $expenses->groupBy(fn ($e) => $e->expense_date->format('Y-m'))->sortKeys()
                 ->map(fn ($g, $m) => [Carbon::createFromFormat('Y-m', $m)->format('M Y'), $g->count(), (float) $g->sum('amount')])->values()
             : $expenses->groupBy('category')
-                ->map(fn ($g, $c) => [config('hostelease.expense_categories.'.$c, ucfirst((string) $c)), $g->count(), (float) $g->sum('amount')])
+                ->map(fn ($g, $c) => [__((string) config('hostelease.expense_categories.'.$c, ucfirst((string) $c))), $g->count(), (float) $g->sum('amount')])
                 ->sortByDesc(fn ($r) => $r[2])->values();
 
         $total = (float) $expenses->sum('amount');

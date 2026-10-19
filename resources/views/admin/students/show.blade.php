@@ -134,7 +134,7 @@
      @keydown.window.escape="qrOpen = false; collectOpen = false; docOpen = false; feeOpen = false">
 
     {{-- Back --}}
-    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-white rounded-pill px-3 mb-3 shadow-sm fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i> Students</a>
+    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-white rounded-pill px-3 mb-3 shadow-sm fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i> {{ __('Students') }}</a>
 
     {{-- ══ Hero band ══ --}}
     <div class="sp-hero p-4 mb-4 shadow">
@@ -146,31 +146,31 @@
                     <div>
                         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                             <h1 class="h3 fw-bold mb-0">{{ $student->name }}</h1>
-                            <span class="badge bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}-subtle text-{{ $student->status === 'active' ? 'success' : 'secondary' }} rounded-pill px-3 py-1 text-capitalize">{{ $student->status }}</span>
+                            <span class="badge bg-{{ $student->status === 'active' ? 'success' : 'secondary' }}-subtle text-{{ $student->status === 'active' ? 'success' : 'secondary' }} rounded-pill px-3 py-1">{{ hostelease_term($student->status) }}</span>
                             @includeWhen(auth()->user()->canAccessPresence(), 'admin.presence._last_seen_chip', ['person' => $student])
                         </div>
                         <div class="sp-hero-meta d-flex flex-wrap align-items-center">
-                            <span class="me-3"><i class="fa-solid fa-briefcase me-1"></i>{{ config('hostelease.occupation_types.'.$student->occupation_type) }}</span>
+                            <span class="me-3"><i class="fa-solid fa-briefcase me-1"></i>{{ __((string) config('hostelease.occupation_types.'.$student->occupation_type)) }}</span>
                             <span class="me-3"><i class="fa-solid fa-phone me-1"></i>{{ hostelease_phone($student->mobile) }}</span>
                             @if($student->join_date)
-                                <span><i class="fa-solid fa-calendar me-1"></i>Joined {{ $student->join_date->format('d M Y') }}</span>
+                                <span><i class="fa-solid fa-calendar me-1"></i>{{ __('Joined :date', ['date' => $student->join_date->translatedFormat('d M Y')]) }}</span>
                             @endif
                         </div>
                     </div>
                 </div>
                 <div class="sp-hero-actions d-flex flex-wrap gap-2">
-                    <a href="{{ route('admin.students.edit', $student) }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-pen me-2"></i>Edit</a>
-                    <button type="button" class="btn btn-light text-primary rounded-pill px-4 fw-bold shadow-sm" @click="collectOpen = true; $nextTick(() => openCollect({{ $paymentSummary['outstanding'] ?? 0 }}))"><i class="fa-solid fa-indian-rupee-sign me-2"></i>Collect</button>
+                    <a href="{{ route('admin.students.edit', $student) }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-pen me-2"></i>{{ __('Edit') }}</a>
+                    <button type="button" class="btn btn-light text-primary rounded-pill px-4 fw-bold shadow-sm" @click="collectOpen = true; $nextTick(() => openCollect({{ $paymentSummary['outstanding'] ?? 0 }}))"><i class="fa-solid fa-indian-rupee-sign me-2"></i>{{ __('Collect') }}</button>
                     <div class="dropdown">
                         <button type="button" class="btn btn-outline-light rounded-pill px-3 fw-bold sp-more-btn" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2">
                             @if($qrSvg ?? false)
-                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="qrOpen = true"><i class="fa-solid fa-qrcode text-primary me-2"></i>Show ID QR</button></li>
+                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="qrOpen = true"><i class="fa-solid fa-qrcode text-primary me-2"></i>{{ __('Show ID QR') }}</button></li>
                             @endif
-                            <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.pocket-money.show', $student) }}"><i class="fa-solid fa-wallet text-primary me-2"></i>Add pocket money</a></li>
-                            <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.security-deposits.index') }}"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Manage deposits</a></li>
-                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="docOpen = true"><i class="fa-solid fa-upload text-primary me-2"></i>Upload document</button></li>
-                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="feeOpen = true"><i class="fa-solid fa-sliders text-primary me-2"></i>Edit fee plan</button></li>
+                            <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.pocket-money.show', $student) }}"><i class="fa-solid fa-wallet text-primary me-2"></i>{{ __('Add pocket money') }}</a></li>
+                            <li><a class="dropdown-item rounded-3 py-2" href="{{ route('admin.security-deposits.index') }}"><i class="fa-solid fa-shield-halved text-primary me-2"></i>{{ __('Manage deposits') }}</a></li>
+                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="docOpen = true"><i class="fa-solid fa-upload text-primary me-2"></i>{{ __('Upload document') }}</button></li>
+                            <li><button type="button" class="dropdown-item rounded-3 py-2" @click="feeOpen = true"><i class="fa-solid fa-sliders text-primary me-2"></i>{{ __('Edit fee plan') }}</button></li>
                         </ul>
                     </div>
                 </div>
@@ -179,23 +179,23 @@
             {{-- At-a-glance metrics --}}
             <div class="row g-3 mt-2 position-relative" style="z-index: 1;">
                 <div class="col-6 col-md sp-metric">
-                    <div class="sp-metric-label">Outstanding</div>
+                    <div class="sp-metric-label">{{ __('Outstanding') }}</div>
                     <div class="sp-metric-val {{ ($paymentSummary['outstanding'] ?? 0) > 0 ? 'is-due' : '' }}">{{ hostelease_money($paymentSummary['outstanding'] ?? 0) }}</div>
                 </div>
                 <div class="col-6 col-md sp-metric">
-                    <div class="sp-metric-label">Total Paid</div>
+                    <div class="sp-metric-label">{{ __('Total Paid') }}</div>
                     <div class="sp-metric-val">{{ hostelease_money($paymentSummary['total_paid'] ?? 0) }}</div>
                 </div>
                 <div class="col-6 col-md sp-metric">
-                    <div class="sp-metric-label">Credit</div>
+                    <div class="sp-metric-label">{{ __('Credit') }}</div>
                     <div class="sp-metric-val">{{ hostelease_money($student->credit_balance ?? 0) }}</div>
                 </div>
                 <div class="col-6 col-md sp-metric">
-                    <div class="sp-metric-label">Pocket Money</div>
+                    <div class="sp-metric-label">{{ __('Pocket Money') }}</div>
                     <div class="sp-metric-val">{{ hostelease_money($pocketBalance ?? 0) }}</div>
                 </div>
                 <div class="col-6 col-md sp-metric">
-                    <div class="sp-metric-label">Security Deposit</div>
+                    <div class="sp-metric-label">{{ __('Security Deposit') }}</div>
                     <div class="sp-metric-val">{{ hostelease_money($student->securityDeposits()->where('status', 'collected')->sum('amount')) }}</div>
                 </div>
             </div>
@@ -221,20 +221,20 @@
                     'fee' => (float) ($student->fee_amount ?? 0),
                     'frequency' => $student->fee_frequency ?? '',
                     'beds' => $vacantBeds,
-                    'frequencies' => config('hostelease.fee_frequencies'),
+                    'frequencies' => hostelease_options('fee_frequencies'),
                 ]) }})">
-                    <div class="panel-head"><h6><i class="fa-solid fa-bed text-primary me-2"></i>Accommodation</h6></div>
+                    <div class="panel-head"><h6><i class="fa-solid fa-bed text-primary me-2"></i>{{ __('Accommodation') }}</h6></div>
                     <div class="panel-body">
                         @if($student->activeAssignment)
                         <div class="sp-bed p-3 text-center mb-3">
                             <div class="d-flex justify-content-center gap-4 align-items-center">
                                 <div>
-                                    <div class="text-muted small fw-bold text-uppercase">Room</div>
+                                    <div class="text-muted small fw-bold text-uppercase">{{ __('Room') }}</div>
                                     <div class="fs-3 fw-bold text-dark lh-1 mt-1">{{ $student->activeAssignment->bed->room->room_number }}</div>
                                 </div>
                                 <div style="width: 2px; height: 36px; background: rgba(0,0,0,0.06); border-radius: 2px;"></div>
                                 <div>
-                                    <div class="text-muted small fw-bold text-uppercase">Bed</div>
+                                    <div class="text-muted small fw-bold text-uppercase">{{ __('Bed') }}</div>
                                     <div class="fs-3 fw-bold text-primary lh-1 mt-1">{{ $student->activeAssignment->bed->bed_number }}</div>
                                 </div>
                             </div>
@@ -243,13 +243,13 @@
                             </div>
                         </div>
                         <button type="button" class="btn btn-white border w-100 fw-bold text-primary rounded-pill py-2 tactile-btn" @click="openTransfer()">
-                            <i class="fa-solid fa-right-left me-1"></i> Transfer Bed
+                            <i class="fa-solid fa-right-left me-1"></i> {{ __('Transfer Bed') }}
                         </button>
                         @else
                         <div class="text-center py-4">
                             <i class="fa-solid fa-bed-pulse text-muted fs-1 mb-2 opacity-50"></i>
-                            <p class="text-muted fw-bold mb-3">Not assigned to a bed</p>
-                            <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold px-4 shadow-sm tactile-btn" @click="openAssign()">Assign Now</button>
+                            <p class="text-muted fw-bold mb-3">{{ __('Not assigned to a bed') }}</p>
+                            <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold px-4 shadow-sm tactile-btn" @click="openAssign()">{{ __('Assign Now') }}</button>
                         </div>
                         @endif
                     </div>
@@ -260,25 +260,25 @@
                 {{-- Plan & preferences --}}
                 <div class="panel-card">
                     <div class="panel-head">
-                        <h6><i class="fa-solid fa-sliders text-primary me-2"></i>Plan &amp; Preferences</h6>
-                        <button type="button" class="btn btn-sm btn-white border text-primary rounded-pill px-3 fw-semibold" @click="feeOpen = true"><i class="fa-solid fa-pen me-1"></i>Edit</button>
+                        <h6><i class="fa-solid fa-sliders text-primary me-2"></i>{{ __('Plan & Preferences') }}</h6>
+                        <button type="button" class="btn btn-sm btn-white border text-primary rounded-pill px-3 fw-semibold" @click="feeOpen = true"><i class="fa-solid fa-pen me-1"></i>{{ __('Edit') }}</button>
                     </div>
                     <div class="panel-body py-2">
                         <div class="info-row">
-                            <span class="lbl">Fee Amount</span>
+                            <span class="lbl">{{ __('Fee Amount') }}</span>
                             <span class="val">{{ $student->fee_amount ? hostelease_money($student->fee_amount) : 'Not set' }}</span>
                         </div>
                         <div class="info-row">
-                            <span class="lbl">Fee Structure</span>
-                            <span class="val text-capitalize">{{ $student->fee_frequency ?? 'Not set' }}</span>
+                            <span class="lbl">{{ __('Fee Structure') }}</span>
+                            <span class="val">{{ $student->fee_frequency ? hostelease_term($student->fee_frequency) : __('Not set') }}</span>
                         </div>
                         <div class="info-row">
-                            <span class="lbl">Room Preference</span>
-                            <span class="val">{{ $student->room_preference ?? 'Any' }}</span>
+                            <span class="lbl">{{ __('Room Preference') }}</span>
+                            <span class="val">{{ $student->room_preference ? hostelease_term($student->room_preference) : __('Any') }}</span>
                         </div>
                         <div class="info-row">
-                            <span class="lbl">Sharing Preference</span>
-                            <span class="val">{{ $student->sharing_preference ?? 'Any' }}</span>
+                            <span class="lbl">{{ __('Sharing Preference') }}</span>
+                            <span class="val">{{ $student->sharing_preference ? hostelease_term($student->sharing_preference) : __('Any') }}</span>
                         </div>
                     </div>
                 </div>
@@ -291,17 +291,17 @@
             <div class="panel-card">
                 <div class="panel-head">
                     <div class="sp-tabs">
-                        <button type="button" class="sp-tab" :class="{ active: tab === 'overview' }" @click="tab = 'overview'" title="Overview">
-                            <i class="fa-solid fa-user"></i><span class="sp-tab-label">Overview</span>
+                        <button type="button" class="sp-tab" :class="{ active: tab === 'overview' }" @click="tab = 'overview'" title="{{ __('Overview') }}">
+                            <i class="fa-solid fa-user"></i><span class="sp-tab-label">{{ __('Overview') }}</span>
                         </button>
-                        <button type="button" class="sp-tab" :class="{ active: tab === 'fees' }" @click="tab = 'fees'" title="Invoices">
-                            <i class="fa-solid fa-file-invoice-dollar"></i><span class="sp-tab-label">Invoices</span>
+                        <button type="button" class="sp-tab" :class="{ active: tab === 'fees' }" @click="tab = 'fees'" title="{{ __('Invoices') }}">
+                            <i class="fa-solid fa-file-invoice-dollar"></i><span class="sp-tab-label">{{ __('Invoices') }}</span>
                         </button>
-                        <button type="button" class="sp-tab" :class="{ active: tab === 'documents' }" @click="tab = 'documents'" title="Documents">
-                            <i class="fa-solid fa-folder-open"></i><span class="sp-tab-label">Documents</span>
+                        <button type="button" class="sp-tab" :class="{ active: tab === 'documents' }" @click="tab = 'documents'" title="{{ __('Documents') }}">
+                            <i class="fa-solid fa-folder-open"></i><span class="sp-tab-label">{{ __('Documents') }}</span>
                         </button>
-                        <button type="button" class="sp-tab" :class="{ active: tab === 'history' }" @click="tab = 'history'" title="Timeline">
-                            <i class="fa-solid fa-clock-rotate-left"></i><span class="sp-tab-label">Timeline</span>
+                        <button type="button" class="sp-tab" :class="{ active: tab === 'history' }" @click="tab = 'history'" title="{{ __('Timeline') }}">
+                            <i class="fa-solid fa-clock-rotate-left"></i><span class="sp-tab-label">{{ __('Timeline') }}</span>
                         </button>
                     </div>
                 </div>
@@ -312,20 +312,20 @@
                      x-cloak class="sp-pane">
                     <div class="row g-4">
                         <div class="col-md-6">
-                            <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-id-card text-primary me-2"></i>Identity</div>
+                            <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-id-card text-primary me-2"></i>{{ __('Identity') }}</div>
                             <div class="info-row">
-                                <span class="lbl">Aadhaar No.</span>
+                                <span class="lbl">{{ __('Aadhaar No.') }}</span>
                                 <span class="val font-monospace">
                                     <x-aadhaar-field :masked="hostelease_mask_aadhaar($student->aadhaar)"
                                         :url="route('admin.students.aadhaar', $student)" />
                                 </span>
                             </div>
                             <div class="info-row">
-                                <span class="lbl">Join Date</span>
-                                <span class="val">{{ $student->join_date ? $student->join_date->format('d M Y') : '—' }}</span>
+                                <span class="lbl">{{ __('Join Date') }}</span>
+                                <span class="val">{{ $student->join_date ? $student->join_date->translatedFormat('d M Y') : '—' }}</span>
                             </div>
                             <div class="pt-3">
-                                <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-location-dot me-1"></i> Permanent Address</div>
+                                <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-location-dot me-1"></i> {{ __('Permanent Address') }}</div>
                                 <div class="bg-light rounded-3 p-3 fw-semibold border">
                                     {{ $student->address ?? 'Not provided' }}
                                     @if($student->city || $student->state)
@@ -335,30 +335,30 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-users text-primary me-2"></i>Family Contacts</div>
+                            <div class="text-muted fw-bold small text-uppercase mb-2"><i class="fa-solid fa-users text-primary me-2"></i>{{ __('Family Contacts') }}</div>
                             <div class="d-flex flex-column">
                                 <div class="d-flex align-items-center gap-3 py-2">
                                     <div class="sp-ic bg-primary-subtle text-primary"><i class="fa-solid fa-person"></i></div>
                                     <div class="flex-grow-1">
-                                        <div class="text-muted small fw-bold text-uppercase">Father</div>
+                                        <div class="text-muted small fw-bold text-uppercase">{{ __('Father') }}</div>
                                         <div class="fw-bold"><x-mobile-link :mobile="$student->father_mobile" /></div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-3 py-2 border-top">
                                     <div class="sp-ic bg-danger-subtle text-danger"><i class="fa-solid fa-person-dress"></i></div>
                                     <div class="flex-grow-1">
-                                        <div class="text-muted small fw-bold text-uppercase">Mother</div>
+                                        <div class="text-muted small fw-bold text-uppercase">{{ __('Mother') }}</div>
                                         <div class="fw-bold">
-                                            @if($student->mother_mobile)<x-mobile-link :mobile="$student->mother_mobile" />@else<span class="text-muted fw-normal">Not provided</span>@endif
+                                            @if($student->mother_mobile)<x-mobile-link :mobile="$student->mother_mobile" />@else<span class="text-muted fw-normal">{{ __('Not provided') }}</span>@endif
                                         </div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-3 py-2 border-top">
                                     <div class="sp-ic bg-warning-subtle text-warning"><i class="fa-solid fa-shield-halved"></i></div>
                                     <div class="flex-grow-1">
-                                        <div class="text-muted small fw-bold text-uppercase">Guardian</div>
+                                        <div class="text-muted small fw-bold text-uppercase">{{ __('Guardian') }}</div>
                                         <div class="fw-bold">
-                                            @if($student->guardian_mobile)<x-mobile-link :mobile="$student->guardian_mobile" />@else<span class="text-muted fw-normal">Not provided</span>@endif
+                                            @if($student->guardian_mobile)<x-mobile-link :mobile="$student->guardian_mobile" />@else<span class="text-muted fw-normal">{{ __('Not provided') }}</span>@endif
                                         </div>
                                     </div>
                                 </div>
@@ -372,9 +372,9 @@
                      x-transition:enter-start="opacity-0 transform translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0"
                      x-cloak class="sp-pane pt-0">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
-                        <h6 class="fw-bold mb-0"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>Invoice History</h6>
+                        <h6 class="fw-bold mb-0"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>{{ __('Invoice History') }}</h6>
                         <button type="button" class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm fw-bold" @click="collectOpen = true; $nextTick(() => openCollect({{ $paymentSummary['outstanding'] ?? 0 }}))">
-                            <i class="fa-solid fa-indian-rupee-sign me-1"></i> Collect
+                            <i class="fa-solid fa-indian-rupee-sign me-1"></i> {{ __('Collect') }}
                         </button>
                     </div>
                     <div class="d-flex flex-column gap-2">
@@ -387,9 +387,9 @@
                                     </div>
                                     <div>
                                         <div class="fw-bold">{{ $invoice->title }}</div>
-                                        <div class="text-secondary small fw-bold text-uppercase">{{ $invoice->type }}</div>
+                                        <div class="text-secondary small fw-bold text-uppercase">{{ hostelease_term($invoice->type) }}</div>
                                         @if($invoice->status !== 'paid' && $invoice->due_date)
-                                            <div class="small text-danger fw-bold mt-1"><i class="fa-regular fa-clock me-1"></i> Due {{ $invoice->due_date->format('d M Y') }}</div>
+                                            <div class="small text-danger fw-bold mt-1"><i class="fa-regular fa-clock me-1"></i> {{ __('Due: :date', ['date' => $invoice->due_date->translatedFormat('d M Y')]) }}</div>
                                         @endif
                                     </div>
                                 </div>
@@ -397,15 +397,15 @@
                                     <div class="fw-bold fs-5">{{ hostelease_money($invoice->amount) }}</div>
                                     <div class="small fw-bold {{ $invoice->status === 'paid' ? 'text-success' : 'text-danger' }} text-uppercase mt-1">
                                         @if($invoice->status === 'paid')
-                                            <i class="fa-solid fa-check-circle me-1"></i> Paid
+                                            <i class="fa-solid fa-check-circle me-1"></i> {{ __('Paid') }}
                                         @else
-                                            Bal: {{ hostelease_money($invoice->balance) }}
+                                            {{ __('Balance: :amount', ['amount' => hostelease_money($invoice->balance)]) }}
                                         @endif
                                     </div>
                                 </div>
                             </div>
                         @empty
-                            <x-he-empty-state icon="circle-check" title="All cleared up" subtitle="No invoices outstanding for this student." />
+                            <x-he-empty-state icon="circle-check" title="{{ __('All cleared up') }}" subtitle="{{ __('No invoices outstanding for this student.') }}" />
                         @endforelse
                     </div>
                 </div>
@@ -415,9 +415,9 @@
                      x-transition:enter-start="opacity-0 transform translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0"
                      x-cloak class="sp-pane pt-0">
                     <div class="d-flex justify-content-between align-items-center py-3">
-                        <h6 class="fw-bold mb-0"><i class="fa-solid fa-file-lines text-primary me-2"></i>Documents</h6>
+                        <h6 class="fw-bold mb-0"><i class="fa-solid fa-file-lines text-primary me-2"></i>{{ __('Documents') }}</h6>
                         <button type="button" class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm fw-bold" @click="docOpen = true">
-                            <i class="fa-solid fa-upload me-1"></i> Upload
+                            <i class="fa-solid fa-upload me-1"></i> {{ __('Upload') }}
                         </button>
                     </div>
                     <div class="d-flex flex-column gap-2">
@@ -459,12 +459,12 @@
                                     <div class="min-width-0">
                                         <div class="fw-bold text-truncate">{{ $doc->title ?: ucfirst($doc->type) }}</div>
                                         <div class="mt-1 d-flex gap-2 flex-wrap align-items-center">
-                                            <span class="badge bg-primary-subtle text-primary fw-bold text-uppercase">{{ $doc->type }}</span>
+                                            <span class="badge bg-primary-subtle text-primary fw-bold text-uppercase">{{ hostelease_term($doc->type) }}</span>
                                             @if($doc->expiry_date)
-                                                <span class="small fw-bold text-muted"><i class="fa-regular fa-calendar-xmark"></i> Exp {{ $doc->expiry_date->format('d M Y') }}</span>
+                                                <span class="small fw-bold text-muted"><i class="fa-regular fa-calendar-xmark"></i> {{ __('Expires :date', ['date' => $doc->expiry_date->translatedFormat('d M Y')]) }}</span>
                                             @endif
                                             @if($doc->is_signed)
-                                                <span class="small fw-bold text-success"><i class="fa-solid fa-check-circle"></i> Signed</span>
+                                                <span class="small fw-bold text-success"><i class="fa-solid fa-check-circle"></i> {{ __('Signed') }}</span>
                                             @endif
                                         </div>
                                     </div>
@@ -473,7 +473,7 @@
                                     <a href="{{ route('admin.files.show', ['document', $doc->id, 'file_path']) }}" target="_blank" rel="noopener" class="btn btn-white border text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
-                                    <form action="{{ route('admin.students.documents.destroy', [$student, $doc]) }}" method="POST" class="d-inline" data-confirm="Delete this document?">
+                                    <form action="{{ route('admin.students.documents.destroy', [$student, $doc]) }}" method="POST" class="d-inline" data-confirm="{{ __('Delete this document?') }}">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="btn btn-white border text-danger rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                                             <i class="fa-solid fa-trash"></i>
@@ -483,9 +483,9 @@
                             </div>
                         @empty
                             @if($baseDocs->isEmpty())
-                                <x-he-empty-state icon="folder-open" title="No documents yet" subtitle="Keep important student files secure here.">
+                                <x-he-empty-state icon="folder-open" title="{{ __('No documents yet') }}" subtitle="{{ __('Keep important student files secure here.') }}">
                                     <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm mt-3" @click="docOpen = true">
-                                        <i class="fa-solid fa-upload me-1"></i> Upload Document
+                                        <i class="fa-solid fa-upload me-1"></i> {{ __('Upload Document') }}
                                     </button>
                                 </x-he-empty-state>
                             @endif
@@ -497,7 +497,7 @@
                 <div x-show="tab === 'history'" x-transition:enter="transition ease-out duration-300"
                      x-transition:enter-start="opacity-0 transform translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0"
                      x-cloak class="sp-pane">
-                    <h6 class="fw-bold mb-4"><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Activity Timeline</h6>
+                    <h6 class="fw-bold mb-4"><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>{{ __('Activity Timeline') }}</h6>
                     <div class="sp-timeline ps-2 ms-3">
                         @forelse($timeline as $event)
                             <div class="sp-tl-item">
@@ -512,20 +512,20 @@
                                                  columns (join/leave/backdated paid_on) carry
                                                  no clock, and printing 12:00 AM invented one. --}}
                                             @php($at = \Carbon\Carbon::parse($event->date))
-                                            {{ $at->format('d M Y') }}{{ ($event->precise ?? false) ? ', '.$at->format('h:i A') : '' }}
+                                            {{ $at->translatedFormat('d M Y') }}{{ ($event->precise ?? false) ? ', '.$at->translatedFormat('h:i A') : '' }}
                                             @if(isset($event->desc)) · {{ $event->desc }} @endif
                                         </div>
                                     </div>
                                     @if(isset($event->amount))
                                         <div class="text-end">
                                             <div class="fw-bold fs-5 text-{{ $event->color }}">{{ hostelease_money($event->amount) }}</div>
-                                            <div class="small fw-bold text-muted text-uppercase mt-1">{{ $event->status }}</div>
+                                            <div class="small fw-bold text-muted text-uppercase mt-1">{{ hostelease_term($event->status) }}</div>
                                         </div>
                                     @endif
                                 </div>
                             </div>
                         @empty
-                            <div class="ms-2"><x-he-empty-state icon="clock" title="No history yet" subtitle="Activity for this student will appear here." /></div>
+                            <div class="ms-2"><x-he-empty-state icon="clock" title="{{ __('No history yet') }}" subtitle="{{ __('Activity for this student will appear here.') }}" /></div>
                         @endforelse
                     </div>
                 </div>
@@ -541,12 +541,12 @@
     <div class="custom-overlay-backdrop" x-show="qrOpen" x-transition.opacity @click="qrOpen = false" x-cloak style="display: none;">
         <div class="custom-overlay-modal" :class="{ 'is-open': qrOpen }" x-show="qrOpen" @click.stop x-cloak style="display: none; max-width: 360px;">
             <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-qrcode" style="color: var(--he-primary);"></i><span class="ms-1">Student ID QR</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-qrcode" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Student ID QR') }}</span></h5>
                 <button type="button" class="btn-close" @click="qrOpen = false"></button>
             </div>
             <div class="custom-overlay-body text-center">
                 <div class="border rounded-4 p-3 bg-white d-inline-block shadow-sm" style="line-height:0">{!! $qrSvg !!}</div>
-                <p class="text-muted small fw-bold mt-3 mb-0 text-uppercase">Scan for verification</p>
+                <p class="text-muted small fw-bold mt-3 mb-0 text-uppercase">{{ __('Scan for verification') }}</p>
             </div>
         </div>
     </div>
@@ -565,48 +565,48 @@
               style="display: none; max-width: 600px;">
             @csrf
             <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0" id="collectTitle">Collect Payment</h5>
+                <h5 class="fw-bold mb-0" id="collectTitle">{{ __('Collect Payment') }}</h5>
                 <button type="button" class="btn-close" @click="collectOpen = false"></button>
             </div>
             <div class="custom-overlay-body">
                 @if(empty($paymentModes) || $paymentModes->isEmpty())
                     <div class="alert alert-warning fw-bold mb-0 rounded-4">
-                        <i class="fa-solid fa-triangle-exclamation me-1"></i> No payment modes setup. Please add one under <a href="{{ route('admin.payment-modes.index') }}">Settings > Payment Modes</a>.
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i> {{ __('No payment modes setup. Please add one under') }} <a href="{{ route('admin.payment-modes.index') }}">Settings > {{ __('Payment Modes') }}</a>.
                     </div>
                 @else
                     {{-- Pay now / Promise toggle --}}
                     <div class="btn-group w-100 mb-4 shadow-sm rounded-pill overflow-hidden border" role="group">
                         <input type="radio" class="btn-check" name="collect_mode" id="modePay" value="pay" checked onchange="setCollectMode('pay')">
-                        <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePay"><i class="fa-solid fa-indian-rupee-sign me-1"></i> Pay Now</label>
+                        <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePay"><i class="fa-solid fa-indian-rupee-sign me-1"></i> {{ __('Pay Now') }}</label>
 
                         <input type="radio" class="btn-check" name="collect_mode" id="modePromise" value="promise" onchange="setCollectMode('promise')">
-                        <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePromise"><i class="fa-regular fa-calendar-check me-1"></i> Promise</label>
+                        <label class="btn btn-outline-primary border-0 fw-bold py-2" for="modePromise"><i class="fa-regular fa-calendar-check me-1"></i> {{ __('Promise') }}</label>
                     </div>
 
                     {{-- Pay fields --}}
                     <div id="payFields">
                         <div class="bg-light rounded-4 p-3 mb-4 d-flex justify-content-between align-items-center border border-primary-subtle border-opacity-25">
                             <div>
-                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">Outstanding Balance</div>
+                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">{{ __('Outstanding Balance') }}</div>
                                 <div class="fs-4 fw-bold text-dark">₹{{ number_format($paymentSummary['outstanding'] ?? 0, 2) }}</div>
                             </div>
                             @if(($student->credit_balance ?? 0) > 0)
                             <div class="text-end">
-                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">Available Credit</div>
+                                <div class="text-muted small fw-bold text-uppercase letter-spacing-1 mb-1">{{ __('Available Credit') }}</div>
                                 <div class="fs-5 fw-bold text-success">₹{{ number_format($student->credit_balance ?? 0, 2) }}</div>
                             </div>
                             @endif
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-dark mb-2">Total Amount to Pay (₹)</label>
+                            <label class="form-label fw-bold text-dark mb-2">{{ __('Total Amount to Pay (₹)') }}</label>
                             <div class="input-group input-group-lg border rounded-3 overflow-hidden bg-white" :class="{'border-primary shadow-sm': isFocused}">
                                 <span class="input-group-text bg-white border-0 text-muted px-3"><i class="fa-solid fa-indian-rupee-sign"></i></span>
                                 <input type="number" step="0.01" min="0.01" class="form-control border-0 ps-1 fw-bold fs-5 bg-white"
                                        x-model.number="totalPayment" id="collectAmount"
                                        @focus="isFocused = true" @blur="isFocused = false" required>
                             </div>
-                            <div class="form-text text-muted small mt-2"><i class="fa-solid fa-circle-info me-1"></i> Enter the total amount you want to settle.</div>
+                            <div class="form-text text-muted small mt-2"><i class="fa-solid fa-circle-info me-1"></i> {{ __('Enter the total amount you want to settle.') }}</div>
                         </div>
 
                         <!-- Payment Breakdown Section -->
@@ -615,27 +615,27 @@
                                 <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                                     <i class="fa-solid fa-chart-pie"></i>
                                 </div>
-                                Payment Breakdown
+                                {{ __('Payment Breakdown') }}
                             </h6>
 
                             <div class="row g-3 position-relative z-1">
                                 @if(($student->credit_balance ?? 0) > 0)
                                 <div class="col-12">
-                                    <label class="form-label fw-semibold small text-muted">Pay from Credit Balance (₹)</label>
+                                    <label class="form-label fw-semibold small text-muted">{{ __('Pay from Credit Balance (₹)') }}</label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-white text-success border-success-subtle"><i class="fa-solid fa-wallet"></i></span>
                                         <input type="number" step="0.01" min="0" :max="maxCreditAllowed"
                                                class="form-control fw-bold text-success border-success-subtle"
                                                x-model.number="creditUsed"
                                                @input="validateCredit">
-                                        <button type="button" class="btn btn-outline-success text-uppercase fw-bold" style="font-size: 0.75rem;" @click="useMaxCredit">Max</button>
+                                        <button type="button" class="btn btn-outline-success text-uppercase fw-bold" style="font-size: 0.75rem;" @click="useMaxCredit">{{ __('Max') }}</button>
                                     </div>
                                     <input type="hidden" name="credit_used" :value="creditUsed">
                                 </div>
                                 @endif
 
                                 <div class="col-12">
-                                    <label class="form-label fw-semibold small text-muted">Pay via Cash/Online (₹)</label>
+                                    <label class="form-label fw-semibold small text-muted">{{ __('Pay via Cash/Online (₹)') }}</label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-white text-dark"><i class="fa-solid fa-money-bill-wave"></i></span>
                                         <input type="text" class="form-control fw-bold bg-white" :value="cashAmount.toFixed(2)" readonly>
@@ -647,7 +647,7 @@
 
                         <div x-show="cashAmount > 0" x-transition.duration.300ms class="row g-3 mb-4">
                             <div class="col-12 col-md-6">
-                                <label class="form-label fw-bold small">Payment Mode</label>
+                                <label class="form-label fw-bold small">{{ __('Payment Mode') }}</label>
                                 <select name="mode" class="form-select bg-light" x-model="selectedMode" @change="checkReference">
                                     @foreach($paymentModes as $m)
                                         <option value="{{ $m->code }}" data-req="{{ $m->requires_reference ? 1 : 0 }}">{{ $m->name }}</option>
@@ -655,12 +655,12 @@
                                 </select>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label fw-bold small">Payment Date</label>
+                                <label class="form-label fw-bold small">{{ __('Payment Date') }}</label>
                                 <input type="date" name="paid_on" class="form-control bg-light" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
                             </div>
                             <div class="col-12" x-show="requiresReference" x-transition>
-                                <label class="form-label fw-bold small">Reference No. <span class="text-danger">*</span></label>
-                                <input type="text" name="reference_number" x-ref="refInput" class="form-control bg-light" placeholder="e.g. UPI Txn ID, Check No.">
+                                <label class="form-label fw-bold small">{{ __('Reference No.') }} <span class="text-danger">*</span></label>
+                                <input type="text" name="reference_number" x-ref="refInput" class="form-control bg-light" placeholder="{{ __('e.g. UPI Txn ID, Check No.') }}">
                             </div>
                         </div>
 
@@ -673,8 +673,8 @@
                         </template>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Remarks (Optional)</label>
-                            <input type="text" name="remarks" class="form-control bg-light" placeholder="Optional note">
+                            <label class="form-label fw-bold small">{{ __('Remarks (Optional)') }}</label>
+                            <input type="text" name="remarks" class="form-control bg-light" placeholder="{{ __('Optional note') }}">
                         </div>
                     </div>
 
@@ -682,24 +682,24 @@
                     <div id="promiseFields" class="d-none">
                         <div class="alert alert-info py-3 small mb-4 rounded-4 border-info-subtle fw-bold">
                             <i class="fa-solid fa-circle-info me-2 fs-5 float-start"></i>
-                            No money is collected now.<br>This records the promised date to clear the outstanding balance.
+                            {{ __('No money is collected now.') }}<br>{{ __('This records the promised date to clear the outstanding balance.') }}
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Promise Date</label>
+                            <label class="form-label fw-bold">{{ __('Promise Date') }}</label>
                             <input type="date" name="promise_date" id="promiseDate" class="form-control form-control-lg bg-light"
                                    min="{{ now()->toDateString() }}" value="{{ now()->addDays(7)->toDateString() }}" required disabled>
                         </div>
                         <div class="mb-1">
-                            <label class="form-label fw-bold small">Note (optional)</label>
-                            <input type="text" name="promise_note" id="promiseNote" class="form-control bg-light" maxlength="255" placeholder="e.g. Will pay after salary on 5th" disabled>
+                            <label class="form-label fw-bold small">{{ __('Note (optional)') }}</label>
+                            <input type="text" name="promise_note" id="promiseNote" class="form-control bg-light" maxlength="255" placeholder="{{ __('e.g. Will pay after salary on 5th') }}" disabled>
                         </div>
                     </div>
                 @endif
             </div>
             <div class="custom-overlay-footer">
-                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="collectOpen = false">Cancel</button>
+                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="collectOpen = false">{{ __('Cancel') }}</button>
                 @if(!empty($paymentModes) && $paymentModes->isNotEmpty())
-                    <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" id="collectSubmit">Collect Payment</button>
+                    <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" id="collectSubmit">{{ __('Collect Payment') }}</button>
                 @endif
             </div>
         </form>
@@ -713,35 +713,35 @@
               x-show="docOpen" :class="{ 'is-open': docOpen }" @click.stop style="display: none; max-width: 480px;">
             @csrf
             <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-upload" style="color: var(--he-primary);"></i><span class="ms-1">Upload Document</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-upload" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Upload Document') }}</span></h5>
                 <button type="button" class="btn-close" @click="docOpen = false"></button>
             </div>
             <div class="custom-overlay-body">
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">Document Type</label>
+                    <label class="form-label fw-bold small">{{ __('Document Type') }}</label>
                     <x-he-select name="type" icon="file-lines" :submit="false" :selected="'aadhaar'"
-                        :options="['aadhaar' => 'Aadhaar', 'photo' => 'Photo / ID', 'agreement' => 'Rental Agreement', 'other' => 'Other Document']" />
+                        :options="['aadhaar' => __('Aadhaar'), 'photo' => __('Photo / ID'), 'agreement' => __('Rental Agreement'), 'other' => __('Other Document')]" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">Title (optional)</label>
-                    <input type="text" name="title" class="form-control bg-light" placeholder="e.g. Front side of Aadhaar">
+                    <label class="form-label fw-bold small">{{ __('Title (optional)') }}</label>
+                    <input type="text" name="title" class="form-control bg-light" placeholder="{{ __('e.g. Front side of Aadhaar') }}">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">File <span class="text-muted fw-normal">(jpg, png, pdf · max 5MB)</span></label>
+                    <label class="form-label fw-bold small">{{ __('File') }} <span class="text-muted fw-normal">{{ __('(jpg, png, pdf · max 5MB)') }}</span></label>
                     <input type="file" name="file" class="form-control bg-light" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
                 </div>
                 <div class="mb-4">
-                    <label class="form-label fw-bold small">Expiry Date (optional)</label>
+                    <label class="form-label fw-bold small">{{ __('Expiry Date (optional)') }}</label>
                     <input type="date" name="expiry_date" class="form-control bg-light">
                 </div>
                 <label class="form-check bg-light rounded-4 p-3 d-flex align-items-center m-0" for="isSigned" style="cursor: pointer;">
                     <input class="form-check-input m-0 flex-shrink-0" type="checkbox" name="is_signed" value="1" id="isSigned" style="width: 1.25rem; height: 1.25rem;">
-                    <span class="ms-3 fw-bold">This document is physically signed</span>
+                    <span class="ms-3 fw-bold">{{ __('This document is physically signed') }}</span>
                 </label>
             </div>
             <div class="custom-overlay-footer">
-                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="docOpen = false">Cancel</button>
-                <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm">Upload File</button>
+                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="docOpen = false">{{ __('Cancel') }}</button>
+                <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm">{{ __('Upload File') }}</button>
             </div>
         </form>
     </div>
@@ -756,34 +756,34 @@
             @csrf
             @method('PUT')
             <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i><span class="ms-1">Change Fee &amp; Room Plan</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Change Fee & Room Plan') }}</span></h5>
                 <button type="button" class="btn-close" @click="feeOpen = false"></button>
             </div>
             <div class="custom-overlay-body">
                 <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">Room Preference</label>
+                        <label class="form-label fw-bold small">{{ __('Room Preference') }}</label>
                         <x-he-select name="room_preference" icon="door-closed" :submit="false"
                             :selected="$student->room_preference"
-                            :options="['' => 'Select preference', 'AC' => 'AC Room', 'Non-AC' => 'Non-AC Room']" />
+                            :options="['' => __('Select preference'), 'AC' => __('AC room'), 'Non-AC' => __('Non-AC room')]" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">Sharing Preference</label>
+                        <label class="form-label fw-bold small">{{ __('Sharing Preference') }}</label>
                         <x-he-select name="sharing_preference" icon="users" :submit="false"
                             :selected="$student->sharing_preference"
-                            :options="['' => 'Select sharing'] + collect(hostelease_sharing_labels())->mapWithKeys(fn ($l) => [$l => $l])->all()" />
+                            :options="['' => __('Select sharing')] + collect(hostelease_sharing_labels())->mapWithKeys(fn ($l) => [$l => hostelease_term($l)])->all()" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">Fee Structure</label>
+                        <label class="form-label fw-bold small">{{ __('Fee Structure') }}</label>
                         <select name="fee_frequency" class="form-select bg-light" x-model="frequency" @change="fetchPreview" required>
-                            <option value="">Select structure</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="semester">Semester-wise</option>
-                            <option value="yearly">Yearly</option>
+                            <option value="">{{ __('Select structure') }}</option>
+                            <option value="monthly">{{ __('Monthly') }}</option>
+                            <option value="semester">{{ __('Semester-wise') }}</option>
+                            <option value="yearly">{{ __('Yearly') }}</option>
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">New Fee Amount (₹)</label>
+                        <label class="form-label fw-bold small">{{ __('New Fee Amount (₹)') }}</label>
                         <input type="number" name="fee_amount" class="form-control bg-light" x-model="amount" @change="fetchPreview" min="0" step="0.01" required>
                     </div>
                 </div>
@@ -792,31 +792,31 @@
                 <div x-show="preview" x-transition class="bg-primary-subtle bg-opacity-25 p-4 rounded-4 border border-primary-subtle" style="display:none;">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm me-3" style="width: 32px; height: 32px;"><i class="fa-solid fa-calculator"></i></div>
-                        <span class="fw-bold fs-5 text-primary">Proration Calculation</span>
+                        <span class="fw-bold fs-5 text-primary">{{ __('Proration Calculation') }}</span>
                         <div x-show="loading" class="spinner-border spinner-border-sm text-primary ms-3" role="status"></div>
                     </div>
                     <template x-if="preview && preview.has_active_cycle">
                         <div class="fw-bold">
                             <div class="d-flex justify-content-between text-muted mb-2">
-                                <span>Unused days from current plan (<span x-text="preview.days_unused"></span>/<span x-text="preview.days_total"></span>)</span>
+                                <span>{{ __('Unused days from current plan (') }}<span x-text="preview.days_unused"></span>/<span x-text="preview.days_total"></span>)</span>
                                 <span class="text-success">+₹<span x-text="preview.refund_credit"></span></span>
                             </div>
                             <div class="d-flex justify-content-between text-muted mb-2">
-                                <span>Current credit balance</span>
+                                <span>{{ __('Current credit balance') }}</span>
                                 <span class="text-success">+₹<span x-text="preview.current_credit_balance"></span></span>
                             </div>
                             <div class="d-flex justify-content-between text-muted mb-3 pb-3 border-bottom border-secondary-subtle">
-                                <span>Cost of new <span x-text="preview.new_frequency"></span> plan (starts today)</span>
+                                <span x-text="@js(__('Cost of the new :plan plan (starts today)')).replace(':plan', preview.new_frequency || '')"></span>
                                 <span class="text-danger">-₹<span x-text="preview.new_invoice_amount"></span></span>
                             </div>
                             <div class="d-flex justify-content-between fs-5">
-                                <span class="text-dark">Action on Save:</span>
+                                <span class="text-dark">{{ __('Action on Save:') }}</span>
                                 <span>
                                     <template x-if="preview.net_due > 0">
-                                        <span class="text-danger">Invoice generated for ₹<span x-text="preview.net_due"></span></span>
+                                        <span class="text-danger">{{ __('Invoice generated for ₹') }}<span x-text="preview.net_due"></span></span>
                                     </template>
                                     <template x-if="preview.net_due == 0">
-                                        <span class="text-success">Paid by credit (Bal: ₹<span x-text="preview.projected_credit_balance"></span>)</span>
+                                        <span class="text-success">{{ __('Paid by credit (Bal: ₹') }}<span x-text="preview.projected_credit_balance"></span>)</span>
                                     </template>
                                 </span>
                             </div>
@@ -824,21 +824,21 @@
                     </template>
                     <template x-if="preview && !preview.has_active_cycle && preview.has_bed">
                         <div class="fw-bold text-muted">
-                            <i class="fa-solid fa-circle-info me-1"></i> No active cycle to prorate. A new invoice for ₹<span x-text="preview.new_invoice_amount"></span> will be generated.
+                            <i class="fa-solid fa-circle-info me-1"></i> <span x-text="@js(__('No active cycle to prorate. A new invoice for ₹:amount will be generated.')).replace(':amount', preview.new_invoice_amount)"></span>
                         </div>
                     </template>
                     {{-- Rent is for a bed: with no bed assigned, this only saves the
                          intended plan — the first invoice is raised on assignment. --}}
                     <template x-if="preview && !preview.has_bed">
                         <div class="fw-bold text-muted">
-                            <i class="fa-solid fa-circle-info me-1"></i> This saves the plan only. The first invoice is raised when a bed is assigned — dated from the join date.
+                            <i class="fa-solid fa-circle-info me-1"></i> {{ __('This saves the plan only. The first invoice is raised when a bed is assigned — dated from the join date.') }}
                         </div>
                     </template>
                 </div>
             </div>
             <div class="custom-overlay-footer">
-                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="feeOpen = false">Cancel</button>
-                <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" :disabled="loading"><i class="fa-solid fa-save me-2"></i>Confirm &amp; Save</button>
+                <button type="button" class="btn btn-white border rounded-pill px-4 fw-bold" @click="feeOpen = false">{{ __('Cancel') }}</button>
+                <button type="submit" class="btn btn-premium rounded-pill px-4 fw-bold shadow-sm" :disabled="loading"><i class="fa-solid fa-save me-2"></i>{{ __('Confirm & Save') }}</button>
             </div>
         </form>
     </div>
@@ -876,7 +876,7 @@ function prorationPreview() {
 }
 
 function openCollect(amount) {
-    document.getElementById('collectTitle').textContent = 'Collect Payment';
+    document.getElementById('collectTitle').textContent = @js(__('Collect Payment'));
     // The Alpine state handles the amount initialization automatically
     const payRadio = document.getElementById('modePay');
     if (payRadio) { payRadio.checked = true; setCollectMode('pay'); }
@@ -897,7 +897,7 @@ function setCollectMode(mode) {
     pay.querySelectorAll('input,select').forEach(el => el.disabled = promising);
     promise.querySelectorAll('input').forEach(el => el.disabled = !promising);
 
-    submit.innerHTML = promising ? '<i class="fa-solid fa-calendar-check me-2"></i>Save Promise' : '<i class="fa-solid fa-indian-rupee-sign me-2"></i>Collect Payment';
+    submit.innerHTML = promising ? '<i class="fa-solid fa-calendar-check me-2"></i>' + @js(__('Save Promise')) : '<i class="fa-solid fa-indian-rupee-sign me-2"></i>' + @js(__('Collect Payment'));
     submit.classList.toggle('btn-premium', !promising);
     submit.classList.toggle('btn-warning', promising);
 

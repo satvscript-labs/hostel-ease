@@ -8,7 +8,7 @@
 
 @forelse($grouped as $date => $rows)
     @php $day = \Illuminate\Support\Carbon::parse($date); @endphp
-    <div class="log-day">{{ $day->isToday() ? __('Today') : ($day->isYesterday() ? __('Yesterday') : $day->format('D, d M Y')) }}</div>
+    <div class="log-day">{{ $day->isToday() ? __('Today') : ($day->isYesterday() ? __('Yesterday') : $day->translatedFormat('D, d M Y')) }}</div>
 
     <div class="d-flex flex-column">
         @foreach($rows as $p)

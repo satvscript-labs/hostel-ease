@@ -347,9 +347,9 @@
         <div class="hero-content">
             <div class="hero-badge">
                 <i class="fa-regular fa-calendar me-2"></i>
-                {{ now()->format('l, j M Y') }}
+                {{ now()->translatedFormat('l, j M Y') }}
             </div>
-            <h1 class="display-5 fw-bold mb-2">{{ $stats['greeting'] }}, Admin!</h1>
+            <h1 class="display-5 fw-bold mb-2">{{ $stats['greeting'] }}</h1>
             <p class="fs-5 opacity-75 mb-0">{!! $stats['summary'] !!}</p>
         </div>
     </div>
@@ -358,23 +358,23 @@
     <div class="quick-actions-row">
         <a href="{{ route('admin.students.index') }}" class="action-tile">
             <div class="action-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
-            <div class="fw-bold small">Collect Payment</div>
+            <div class="fw-bold small">{{ __('Collect Payment') }}</div>
         </a>
         <a href="{{ route('admin.property.index') }}" class="action-tile">
             <div class="action-icon"><i class="fa-solid fa-bed"></i></div>
-            <div class="fw-bold small">Assign Bed</div>
+            <div class="fw-bold small">{{ __('Assign Bed') }}</div>
         </a>
         <a href="{{ route('admin.registrations.index') }}" class="action-tile">
             <div class="action-icon"><i class="fa-solid fa-user-plus"></i></div>
-            <div class="fw-bold small">New Student</div>
+            <div class="fw-bold small">{{ __('New Student') }}</div>
         </a>
         <a href="{{ route('admin.expenses.index') }}" class="action-tile">
             <div class="action-icon text-danger"><i class="fa-solid fa-receipt"></i></div>
-            <div class="fw-bold small">Add Expense</div>
+            <div class="fw-bold small">{{ __('Add Expense') }}</div>
         </a>
         <a href="{{ route('admin.frontdesk.index') }}" class="action-tile">
             <div class="action-icon text-warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <div class="fw-bold small">Log Complaint</div>
+            <div class="fw-bold small">{{ __('Log Complaint') }}</div>
         </a>
         @if(($stats['presence_configured'] ?? false) && auth()->user()->canAccessPresence())
         {{-- Currently-out tile (P5, idea #3): links to the live board; goes red
@@ -383,7 +383,7 @@
             <div class="action-icon {{ $stats['presence_late'] > 0 ? 'text-danger' : '' }}"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
             <div class="fw-bold small">
                 <span class="fs-5 fw-bold {{ $stats['presence_late'] > 0 ? 'text-danger' : '' }}">{{ $stats['presence_out'] }}</span> Out now
-                @if($stats['presence_late'] > 0)<div class="text-danger" style="font-size:0.65rem;font-weight:800;">{{ $stats['presence_late'] }} past curfew</div>@endif
+                @if($stats['presence_late'] > 0)<div class="text-danger" style="font-size:0.65rem;font-weight:800;">{{ __(':n past curfew', ['n' => $stats['presence_late']]) }}</div>@endif
             </div>
         </a>
         @endif
@@ -392,24 +392,24 @@
     {{-- 3. Financial Snapshot Bento --}}
     <div class="dash-card bento-finance">
         <div class="dash-card-header d-flex justify-content-between align-items-center mb-4">
-            <h3 class="h5 fw-bold mb-0">Financial Snapshot</h3>
+            <h3 class="h5 fw-bold mb-0">{{ __('Financial Snapshot') }}</h3>
             <a href="{{ route('admin.finance.index') }}" class="dash-link-btn">
-                <span class="dash-link-text">View Finances</span>
+                <span class="dash-link-text">{{ __('View Finances') }}</span>
                 <i class="fa-solid fa-chevron-right dash-link-icon"></i>
             </a>
         </div>
 
         <div class="finance-metrics">
             <div class="f-metric">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Monthly Income</div>
+                <div class="text-muted small fw-bold text-uppercase mb-1">{{ __('Monthly Income') }}</div>
                 <div class="f-metric-value fw-bold text-success">{{ hostelease_money($stats['monthly_income']) }}</div>
             </div>
             <div class="f-metric">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Pending Dues</div>
+                <div class="text-muted small fw-bold text-uppercase mb-1">{{ __('Pending Dues') }}</div>
                 <div class="f-metric-value fw-bold text-danger">{{ hostelease_money($stats['pending_fees']) }}</div>
             </div>
             <div class="f-metric">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Monthly Expenses</div>
+                <div class="text-muted small fw-bold text-uppercase mb-1">{{ __('Monthly Expenses') }}</div>
                 <div class="f-metric-value fw-bold text-warning">{{ hostelease_money($stats['expenses_month']) }}</div>
             </div>
         </div>
@@ -422,7 +422,7 @@
 
     {{-- 4. Operations & Occupancy (Pulse) --}}
     <div class="dash-card bento-pulse">
-        <h3 class="h5 fw-bold mb-4">Hostel Pulse</h3>
+        <h3 class="h5 fw-bold mb-4">{{ __('Hostel Pulse') }}</h3>
         
         <div class="radial-widget" x-data="{ pct: 0 }" x-init="setTimeout(() => pct = {{ $stats['occupancy_pct'] }}, 300)">
             <svg width="160" height="160" viewBox="0 0 160 160" class="svg-ring">
@@ -438,7 +438,7 @@
             </svg>
             <div class="radial-center">
                 <span class="fs-2 fw-bold" x-text="Math.round(pct) + '%'">0%</span>
-                <span class="text-muted small text-uppercase" style="letter-spacing: 1px;">Occupied</span>
+                <span class="text-muted small text-uppercase" style="letter-spacing: 1px;">{{ __('Occupied') }}</span>
             </div>
         </div>
         
@@ -446,8 +446,8 @@
             <div class="d-flex align-items-center">
                 <div class="bg-primary-subtle text-primary rounded p-2 me-3"><i class="fa-solid fa-bed"></i></div>
                 <div>
-                    <div class="fw-bold">{{ $stats['empty_beds'] }} Beds Available</div>
-                    <div class="small text-muted">Out of {{ $stats['total_beds'] }} total</div>
+                    <div class="fw-bold">{{ __(':n beds available', ['n' => $stats['empty_beds']]) }}</div>
+                    <div class="small text-muted">{{ __('Out of :n in total', ['n' => $stats['total_beds']]) }}</div>
                 </div>
             </div>
         </div>
@@ -455,8 +455,8 @@
             <div class="d-flex align-items-center">
                 <div class="bg-warning-subtle text-warning rounded p-2 me-3"><i class="fa-solid fa-triangle-exclamation"></i></div>
                 <div>
-                    <div class="fw-bold">{{ $stats['unresolved_complaints'] }} Open Complaints</div>
-                    <div class="small text-muted">Require your attention</div>
+                    <div class="fw-bold">{{ __(':n open complaints', ['n' => $stats['unresolved_complaints']]) }}</div>
+                    <div class="small text-muted">{{ __('Require your attention') }}</div>
                 </div>
             </div>
         </div>
@@ -464,8 +464,8 @@
             <div class="d-flex align-items-center">
                 <div class="bg-info-subtle text-info rounded p-2 me-3"><i class="fa-solid fa-users"></i></div>
                 <div>
-                    <div class="fw-bold">{{ $stats['visitors_today'] }} Expected Visitors</div>
-                    <div class="small text-muted">For today</div>
+                    <div class="fw-bold">{{ __(':n expected visitors', ['n' => $stats['visitors_today']]) }}</div>
+                    <div class="small text-muted">{{ __('For today') }}</div>
                 </div>
             </div>
         </div>
@@ -474,7 +474,7 @@
     {{-- 5. Unified Live Feed --}}
     <div class="dash-card bento-feed">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="h5 fw-bold mb-0">Live Activity Feed</h3>
+            <h3 class="h5 fw-bold mb-0">{{ __('Live Activity Feed') }}</h3>
         </div>
         
         <div class="timeline-feed">
@@ -492,8 +492,8 @@
                     </div>
                 </div>
             @empty
-                <x-he-empty-state icon="mug-hot" title="No recent activity"
-                    subtitle="New payments, check-ins and alerts will show up here as they happen." />
+                <x-he-empty-state icon="mug-hot" title="{{ __('No recent activity') }}"
+                    subtitle="{{ __('New payments, check-ins and alerts will show up here as they happen.') }}" />
             @endforelse
         </div>
     </div>
@@ -540,8 +540,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    titleFont: { family: 'Plus Jakarta Sans', size: 13 },
-                    bodyFont: { family: 'Plus Jakarta Sans', size: 14, weight: 'bold' },
+                    titleFont: { family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", size: 13 },
+                    bodyFont: { family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", size: 14, weight: 'bold' },
                     padding: 12,
                     cornerRadius: 8,
                     displayColors: false,
@@ -557,14 +557,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     grid: { color: 'rgba(0,0,0,0.03)', drawBorder: false },
                     ticks: {
-                        font: { family: 'Plus Jakarta Sans', size: 12 },
+                        font: { family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", size: 12 },
                         color: '#64748b',
                         callback: function(value) { return '₹' + (value/1000) + 'k'; }
                     }
                 },
                 x: {
                     grid: { display: false, drawBorder: false },
-                    ticks: { font: { family: 'Plus Jakarta Sans', size: 12 }, color: '#64748b' }
+                    ticks: { font: { family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", size: 12 }, color: '#64748b' }
                 }
             },
             animation: {

@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Student Registrations')
+@section('title', __('Student Registrations'))
 
 @push('styles')
 <style>
@@ -70,7 +70,7 @@
 @section('content')
 <div class="page-enter" x-data="registrationManager()">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-        <h1 class="reg-page-title fw-bold mb-0 text-dark">Student Registrations</h1>
+        <h1 class="reg-page-title fw-bold mb-0 text-dark">{{ __('Student Registrations') }}</h1>
         <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center">
             <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true" style="width: 0.5rem; height: 0.5rem;"></span>
             <span id="pending-count">{{ $pending->count() }}</span>&nbsp;Pending
@@ -85,24 +85,24 @@
                         <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 34px; height: 34px; font-size: 0.95rem;">
                             <i class="fa-solid fa-link"></i>
                         </div>
-                        <h6 class="fw-bold fs-5 mb-0">Self-Registration Link</h6>
+                        <h6 class="fw-bold fs-5 mb-0">{{ __('Self-Registration Link') }}</h6>
                     </div>
                     <div class="w-100 min-width-0">
-                        <p class="text-muted small mb-3">Share this link with students so they can fill out their own entry form. Submissions appear below for your approval.</p>
+                        <p class="text-muted small mb-3">{{ __('Share this link with students so they can fill out their own entry form. Submissions appear below for your approval.') }}</p>
                         <div class="reg-link-group shadow-sm rounded-3 overflow-hidden border">
                             <input type="text" class="form-control bg-light border-0 reg-link-input" value="{{ $url }}" id="reg-url" readonly>
                             <div class="reg-link-btns">
-                                <button class="btn btn-white fw-bold text-primary reg-link-btn" type="button" onclick="navigator.clipboard.writeText(document.getElementById('reg-url').value); window.Swal && Swal.fire({toast:true,position:'top-end',icon:'success',title:'Link copied',showConfirmButton:false,timer:1800})">
-                                    <i class="fa-regular fa-copy me-1"></i> Copy
+                                <button class="btn btn-white fw-bold text-primary reg-link-btn" type="button" onclick="navigator.clipboard.writeText(document.getElementById('reg-url').value); window.Swal && Swal.fire({toast:true,position:'top-end',icon:'success',title:@js(__('Link copied')),showConfirmButton:false,timer:1800})">
+                                    <i class="fa-regular fa-copy me-1"></i> {{ __('Copy') }}
                                 </button>
-                                <a class="btn btn-white fw-bold text-dark reg-link-btn" href="{{ $url }}" target="_blank" title="Open link">
-                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i><span class="reg-link-open-label">Open</span>
+                                <a class="btn btn-white fw-bold text-dark reg-link-btn" href="{{ $url }}" target="_blank" title="{{ __('Open link') }}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i><span class="reg-link-open-label">{{ __('Open') }}</span>
                                 </a>
                             </div>
                         </div>
-                        <form action="{{ route('admin.registrations.regenerate') }}" method="POST" class="mt-3" data-confirm="Generate a new link? The current link/QR will stop working.">
+                        <form action="{{ route('admin.registrations.regenerate') }}" method="POST" class="mt-3" data-confirm="{{ __('Generate a new link? The current link/QR will stop working.') }}">
                             @csrf
-                            <button class="btn btn-light btn-sm rounded-pill fw-bold border"><i class="fa-solid fa-rotate me-1 text-muted"></i> Generate new link</button>
+                            <button class="btn btn-light btn-sm rounded-pill fw-bold border"><i class="fa-solid fa-rotate me-1 text-muted"></i> {{ __('Generate new link') }}</button>
                         </form>
                     </div>
                 </div>
@@ -110,13 +110,13 @@
         </div>
         <div class="col-lg-5">
             <div class="panel-card h-100 text-center d-flex flex-column align-items-center justify-content-center p-4">
-                <h6 class="fw-bold fs-5 mb-3">Scan to Register</h6>
+                <h6 class="fw-bold fs-5 mb-3">{{ __('Scan to Register') }}</h6>
                 @if($qr)
                     <div class="bg-white p-3 rounded-4 shadow-sm border d-inline-block" style="line-height:0">
                         {!! $qr !!}
                     </div>
                 @else
-                    <div class="p-4 bg-light rounded-4 text-muted"><i class="fa-solid fa-qrcode fs-1 mb-2"></i><br>QR unavailable</div>
+                    <div class="p-4 bg-light rounded-4 text-muted"><i class="fa-solid fa-qrcode fs-1 mb-2"></i><br>{{ __('QR unavailable') }}</div>
                 @endif
             </div>
         </div>
@@ -124,8 +124,8 @@
 
     <div class="panel-card">
         <div class="panel-head">
-            <h6><i class="fa-solid fa-inbox text-primary me-2"></i>Pending Applications</h6>
-            <div class="small fw-bold text-muted"><i class="fa-solid fa-rotate me-1" :class="{'fa-spin text-primary': isPolling}"></i> Auto-refresh</div>
+            <h6><i class="fa-solid fa-inbox text-primary me-2"></i>{{ __('Pending Applications') }}</h6>
+            <div class="small fw-bold text-muted"><i class="fa-solid fa-rotate me-1" :class="{'fa-spin text-primary': isPolling}"></i> {{ __('Auto-refresh') }}</div>
         </div>
 
         {{-- Polling target — swapped wholesale by fetchUpdates(). --}}
@@ -138,18 +138,18 @@
                         <div class="reg-name">{{ $r->name }}</div>
                         <div class="reg-meta">
                             <span><i class="fa-solid fa-phone me-1"></i>{{ hostelease_phone($r->mobile) }}</span>
-                            <span><i class="fa-solid fa-briefcase me-1"></i>{{ config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type)) }}</span>
+                            <span><i class="fa-solid fa-briefcase me-1"></i>{{ __((string) config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type))) }}</span>
                             @if($r->city)<span><i class="fa-solid fa-location-dot me-1"></i>{{ $r->city }}</span>@endif
                         </div>
-                        <div class="reg-time"><i class="fa-regular fa-clock me-1"></i>{{ $r->created_at->format('d M, h:i A') }} · {{ $r->created_at->diffForHumans() }}</div>
+                        <div class="reg-time"><i class="fa-regular fa-clock me-1"></i>{{ $r->created_at->translatedFormat('d M, h:i A') }} · {{ $r->created_at->diffForHumans() }}</div>
                     </div>
                     <button class="btn btn-premium btn-sm rounded-pill px-3 shadow-sm fw-bold reg-review-btn"
                             @click="openReview({
                                 id: '{{ $r->public_id }}',
                                 name: '{{ addslashes($r->name) }}',
                                 mobile: '{{ $r->mobile }}',
-                                occupation: '{{ addslashes(config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type))) }}',
-                                joining_date: '{{ $r->joining_date ? \Illuminate\Support\Carbon::parse($r->joining_date)->format('d M Y') : '' }}',
+                                occupation: '{{ addslashes(__((string) config('hostelease.occupation_types.'.$r->occupation_type, ucfirst($r->occupation_type)))) }}',
+                                joining_date: '{{ $r->joining_date ? \Illuminate\Support\Carbon::parse($r->joining_date)->translatedFormat('d M Y') : '' }}',
                                 aadhaar: '{{ hostelease_mask_aadhaar($r->aadhaar) }}',
                                 father_mobile: '{{ $r->father_mobile }}',
                                 mother_mobile: '{{ $r->mother_mobile }}',
@@ -157,12 +157,12 @@
                                 city: '{{ $r->city }}',
                                 state: '{{ $r->state }}'
                             })">
-                        <i class="fa-solid fa-magnifying-glass me-1"></i> Review
+                        <i class="fa-solid fa-magnifying-glass me-1"></i> {{ __('Review') }}
                     </button>
                 </div>
             @empty
-                <x-he-empty-state icon="box-open" title="No pending registrations"
-                    subtitle="New student applications will appear here automatically." />
+                <x-he-empty-state icon="box-open" title="{{ __('No pending registrations') }}"
+                    subtitle="{{ __('New student applications will appear here automatically.') }}" />
             @endforelse
         </div>
     </div>
@@ -173,40 +173,40 @@
     <div class="custom-overlay-backdrop" x-show="reviewOpen" x-transition.opacity @click="reviewOpen = false" x-cloak style="display: none;">
         <div class="custom-overlay-modal" :class="{ 'is-open': reviewOpen }" x-show="reviewOpen" @click.stop x-cloak style="display: none; max-width: 640px;">
             <div class="custom-overlay-header">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-user-check" style="color: var(--he-primary);"></i><span class="ms-1">Review Application</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-user-check" style="color: var(--he-primary);"></i><span class="ms-1">{{ __('Review Application') }}</span></h5>
                 <button type="button" class="btn-close" @click="reviewOpen = false"></button>
             </div>
             <div class="custom-overlay-body">
                 <div class="row g-3">
-                    <div class="col-md-6"><div class="reg-field"><div class="reg-field-lbl">Full Name</div><div class="reg-field-val" x-text="current.name"></div></div></div>
-                    <div class="col-md-6"><div class="reg-field"><div class="reg-field-lbl">Mobile</div><div class="reg-field-val" x-text="current.mobile ? '+91 ' + current.mobile : '—'"></div></div></div>
-                    <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Joining Date</div><div class="reg-field-val" x-text="current.joining_date || '—'"></div></div></div>
-                    <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Occupation</div><div class="reg-field-val" x-text="current.occupation || '—'"></div></div></div>
-                    <div class="col-12 col-md-4"><div class="reg-field"><div class="reg-field-lbl">Aadhaar</div>
+                    <div class="col-md-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('Full Name') }}</div><div class="reg-field-val" x-text="current.name"></div></div></div>
+                    <div class="col-md-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('Mobile') }}</div><div class="reg-field-val" x-text="current.mobile ? '+91 ' + current.mobile : '—'"></div></div></div>
+                    <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">{{ __('Joining Date') }}</div><div class="reg-field-val" x-text="current.joining_date || '—'"></div></div></div>
+                    <div class="col-6 col-md-4"><div class="reg-field"><div class="reg-field-lbl">{{ __('Occupation') }}</div><div class="reg-field-val" x-text="current.occupation || '—'"></div></div></div>
+                    <div class="col-12 col-md-4"><div class="reg-field"><div class="reg-field-lbl">{{ __('Aadhaar') }}</div>
                         {{-- Masked by default; the eye toggle hits a LOGGED reveal endpoint (P5). --}}
                         <div class="reg-field-val d-flex align-items-center gap-2">
                             <span x-text="(aadhaarShown ? aadhaarFull : current.aadhaar) || '—'"></span>
                             <button type="button" x-show="current.aadhaar && current.aadhaar !== '—'" @click="revealAadhaar()" :disabled="aadhaarLoading"
-                                    class="btn btn-sm btn-link p-0 text-muted lh-1" :title="aadhaarShown ? 'Hide' : 'Reveal — this is logged'">
+                                    class="btn btn-sm btn-link p-0 text-muted lh-1" :title="aadhaarShown ? @js(__('Hide')) : @js(__('Reveal — this is logged'))">
                                 <i class="fa-solid" :class="aadhaarLoading ? 'fa-spinner fa-spin' : (aadhaarShown ? 'fa-eye-slash' : 'fa-eye')"></i>
                             </button>
                         </div>
                     </div></div>
-                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">Father's Mobile</div><div class="reg-field-val" x-text="current.father_mobile ? '+91 ' + current.father_mobile : '—'"></div></div></div>
-                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">Mother's Mobile</div><div class="reg-field-val" x-text="current.mother_mobile ? '+91 ' + current.mother_mobile : '—'"></div></div></div>
-                    <div class="col-12"><div class="reg-field"><div class="reg-field-lbl">Address</div><div class="reg-field-val" x-text="current.address || '—'"></div></div></div>
-                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">City</div><div class="reg-field-val" x-text="current.city || '—'"></div></div></div>
-                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">State</div><div class="reg-field-val" x-text="current.state || '—'"></div></div></div>
+                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('Father\'s Mobile') }}</div><div class="reg-field-val" x-text="current.father_mobile ? '+91 ' + current.father_mobile : '—'"></div></div></div>
+                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('Mother\'s Mobile') }}</div><div class="reg-field-val" x-text="current.mother_mobile ? '+91 ' + current.mother_mobile : '—'"></div></div></div>
+                    <div class="col-12"><div class="reg-field"><div class="reg-field-lbl">{{ __('Address') }}</div><div class="reg-field-val" x-text="current.address || '—'"></div></div></div>
+                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('City') }}</div><div class="reg-field-val" x-text="current.city || '—'"></div></div></div>
+                    <div class="col-6"><div class="reg-field"><div class="reg-field-lbl">{{ __('State') }}</div><div class="reg-field-val" x-text="current.state || '—'"></div></div></div>
                 </div>
             </div>
             <div class="custom-overlay-footer">
-                <form method="POST" class="flex-fill" :action="'{{ url('admin/registrations') }}/' + current.id + '/reject'" data-confirm="Reject this application?">
+                <form method="POST" class="flex-fill" :action="'{{ url('admin/registrations') }}/' + current.id + '/reject'" data-confirm="{{ __('Reject this application?') }}">
                     @csrf
-                    <button type="submit" class="btn btn-white border text-danger rounded-pill w-100 fw-bold tactile-btn"><i class="fa-solid fa-xmark me-1"></i> Reject</button>
+                    <button type="submit" class="btn btn-white border text-danger rounded-pill w-100 fw-bold tactile-btn"><i class="fa-solid fa-xmark me-1"></i> {{ __('Reject') }}</button>
                 </form>
-                <form method="POST" class="flex-fill" :action="'{{ url('admin/registrations') }}/' + current.id + '/approve'" data-confirm="Approve this application and create the student?">
+                <form method="POST" class="flex-fill" :action="'{{ url('admin/registrations') }}/' + current.id + '/approve'" data-confirm="{{ __('Approve this application and create the student?') }}">
                     @csrf
-                    <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold shadow-sm tactile-btn"><i class="fa-solid fa-check me-1"></i> Approve &amp; Create</button>
+                    <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold shadow-sm tactile-btn"><i class="fa-solid fa-check me-1"></i> {{ __('Approve & Create') }}</button>
                 </form>
             </div>
         </div>

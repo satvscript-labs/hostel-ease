@@ -106,7 +106,7 @@ class BoardController extends Controller
             'search' => $search,
             'sort' => $sort,
             'floors' => $type === 'student' ? Floor::orderBy('name')->get(['id', 'name']) : collect(),
-            'occupations' => $type === 'student' ? config('hostelease.occupation_types') : [],
+            'occupations' => $type === 'student' ? hostelease_options('occupation_types') : [],
             'designations' => $type === 'staff'
                 ? Staff::active()->whereNotNull('designation')->distinct()->orderBy('designation')->pluck('designation')
                 : collect(),

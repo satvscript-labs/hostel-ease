@@ -31,35 +31,35 @@
                     </div>
 
                     <div class="id-info-grid">
-                        <div class="id-info-item" title="Room Allocation">
+                        <div class="id-info-item" title="{{ __('Room Allocation') }}">
                             <i class="fa-solid fa-bed id-info-icon text-primary"></i>
                             <div class="id-info-val text-truncate" style="max-width: 100%;">
                                 @if($asg)
                                     R:{{ $asg->bed->room->room_number }} / B:{{ $asg->bed->bed_number }}
                                 @else
-                                    <span class="text-warning">No Bed</span>
+                                    <span class="text-warning">{{ __('No Bed') }}</span>
                                 @endif
                             </div>
                         </div>
 
-                        <div class="id-info-item" title="Mobile Number">
+                        <div class="id-info-item" title="{{ __('Mobile Number') }}">
                             <i class="fa-solid fa-phone id-info-icon text-success"></i>
                             <div class="id-info-val text-truncate" style="max-width: 100%;">
                                 {{ substr($s->mobile, 0, 5) }}...
                             </div>
                         </div>
 
-                        <div class="id-info-item" title="Occupation" style="grid-column: span 2;">
+                        <div class="id-info-item" title="{{ __('Occupation') }}" style="grid-column: span 2;">
                             <i class="fa-solid fa-briefcase id-info-icon text-info"></i>
                             <div class="id-info-val">
-                                {{ config('hostelease.occupation_types.'.$s->occupation_type, ucfirst($s->occupation_type)) }}
+                                {{ __((string) config('hostelease.occupation_types.'.$s->occupation_type, ucfirst($s->occupation_type))) }}
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="id-overlay">
-                    <div class="overlay-btn"><i class="fa-regular fa-eye me-1"></i> View Profile</div>
+                    <div class="overlay-btn"><i class="fa-regular fa-eye me-1"></i> {{ __('View Profile') }}</div>
                 </div>
             </a>
         </div>
@@ -67,13 +67,13 @@
         <div class="col-12">
             <div class="card-premium">
                 @if($isFiltered)
-                    <x-he-empty-state icon="magnifying-glass" title="No matches"
-                        subtitle="No students match your search or filter." />
+                    <x-he-empty-state icon="magnifying-glass" title="{{ __('No matches') }}"
+                        subtitle="{{ __('No students match your search or filter.') }}" />
                 @else
-                    <x-he-empty-state icon="users" title="No students yet"
-                        subtitle="Add your first student to get started.">
+                    <x-he-empty-state icon="users" title="{{ __('No students yet') }}"
+                        subtitle="{{ __('Add your first student to get started.') }}">
                         <a href="{{ route('admin.students.create') }}" class="btn btn-primary rounded-pill px-4 mt-3 tactile-btn">
-                            <i class="fa-solid fa-plus me-1"></i> Add Student
+                            <i class="fa-solid fa-plus me-1"></i> {{ __('Add Student') }}
                         </a>
                     </x-he-empty-state>
                 @endif

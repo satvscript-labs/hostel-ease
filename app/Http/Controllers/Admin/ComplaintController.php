@@ -33,7 +33,7 @@ class ComplaintController extends Controller
         $complaint = Complaint::create($data + ['status' => 'open', 'created_by' => Auth::id()]);
         $this->logger->log('complaint.create', "Complaint: {$complaint->title}", $complaint);
 
-        return back()->with('success', 'Complaint logged.');
+        return back()->with('success', __('Complaint logged.'));
     }
 
     public function update(Request $request, Complaint $complaint): RedirectResponse
@@ -47,14 +47,14 @@ class ComplaintController extends Controller
         $complaint->update($data);
         $this->logger->log('complaint.update', "Complaint #{$complaint->id} → {$data['status']}", $complaint);
 
-        return back()->with('success', 'Complaint updated.');
+        return back()->with('success', __('Complaint updated.'));
     }
 
     public function destroy(Complaint $complaint): RedirectResponse
     {
         $complaint->delete();
 
-        return back()->with('success', 'Complaint removed.');
+        return back()->with('success', __('Complaint removed.'));
     }
 }
 

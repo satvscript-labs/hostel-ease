@@ -44,14 +44,14 @@ class EnrollmentController extends Controller
 
         $this->enrollment->enroll($person, $data['card_number'] ?? null);
 
-        return back()->with('success', "Pushed to the gate — ask {$person->name} to register their face at the device.");
+        return back()->with('success', __('Pushed to the gate — ask :name to register their face at the device.', ['name' => $person->name]));
     }
 
     public function rePush(PresenceProfile $profile): RedirectResponse
     {
         $this->enrollment->rePush($profile);
 
-        return back()->with('success', 'Re-pushed to the gate device.');
+        return back()->with('success', __('Re-pushed to the gate device.'));
     }
 
     public function revoke(PresenceProfile $profile): RedirectResponse
@@ -59,7 +59,7 @@ class EnrollmentController extends Controller
         $name = $profile->presenceable?->name ?? 'This person';
         $this->enrollment->revoke($profile);
 
-        return back()->with('success', "{$name} removed from every gate device. Their history is kept.");
+        return back()->with('success', __(':name removed from every gate device. Their history is kept.', ['name' => $name]));
     }
 
     /** Floor-phased bulk enroll (owner 06 §4) — staged so a terminal isn't swamped. */
@@ -132,7 +132,7 @@ class EnrollmentController extends Controller
             $this->logger->log('presence.match', "Matched device id {$data['device_user_id']} to {$person->name}", $profile);
         });
 
-        return back()->with('success', "“{$data['device_user_id']}” is now {$person->name}. Their past punches were attached.");
+        return back()->with('success', __('“:id” is now :name. Their past punches were attached.', ['id' => $data['device_user_id'], 'name' => $person->name]));
     }
 
     /** Resolve a Student/Staff by opaque public_id, tenant-scoped by the models. */

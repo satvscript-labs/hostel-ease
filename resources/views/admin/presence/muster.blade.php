@@ -56,7 +56,7 @@
         </div>
         <div class="right">
             <button class="print-btn no-print" onclick="window.print()">🖨 {{ __('Print') }}</button>
-            <div style="margin-top:0.5rem;">{{ __('Generated') }}<br>{{ $generatedAt->format('d M Y · H:i') }}</div>
+            <div style="margin-top:0.5rem;">{{ __('Generated') }}<br>{{ $generatedAt->translatedFormat('d M Y · H:i') }}</div>
         </div>
     </div>
 

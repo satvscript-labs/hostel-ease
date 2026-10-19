@@ -5,14 +5,14 @@
     ═══════════════════════════════════════════════════════════════ --}}
     <div class="sidebar-brand">
         <div class="brand-logo-wrap">
-            <img src="{{ asset('hostel-ease-icon.svg') }}" alt="Hostel Ease" class="brand-logo">
+            <img src="{{ asset('hostel-ease-icon.svg') }}" alt="{{ __('Hostel Ease') }}" class="brand-logo">
             <div class="brand-glow"></div>
         </div>
         <div class="brand-text">
-            <span class="brand-name">Hostel Ease</span>
-            <span class="brand-tagline">Hostel Management</span>
+            <span class="brand-name">{{ __('Hostel Ease') }}</span>
+            <span class="brand-tagline">{{ __('Hostel Management') }}</span>
         </div>
-        <button type="button" class="sidebar-close-btn d-lg-none" data-sidebar-close aria-label="Close menu">
+        <button type="button" class="sidebar-close-btn d-lg-none" data-sidebar-close aria-label="{{ __('Close menu') }}">
             <i class="fa-solid fa-xmark"></i>
         </button>
     </div>
@@ -235,7 +235,7 @@
             </div>
             <div class="sidebar-user-info">
                 <span class="sidebar-user-name">{{ Str::limit($user->name, 14) }}</span>
-                <span class="sidebar-user-role">{{ $user->isSuperAdmin() ? __('Super Admin') : (config('hostelease.roles.'.$user->role) ?? config('hostelease.staff_roles.'.$user->role, ucfirst(str_replace('_', ' ', $user->role)))) }}</span>
+                <span class="sidebar-user-role">{{ hostelease_role_label($user->role) }}</span>
             </div>
             <button type="button" class="sidebar-user-logout" title="{{ __('Logout') }}" aria-label="{{ __('Logout') }}"
                     onclick="document.getElementById('logout-form').submit()">

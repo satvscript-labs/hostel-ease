@@ -67,7 +67,7 @@ class BackupService
             $rows = $dumper->dump(function (string $chunk) use ($handle, $gzip) {
                 $written = $gzip ? gzwrite($handle, $chunk) : fwrite($handle, $chunk);
                 if ($written === false || $written < strlen($chunk)) {
-                    throw new \RuntimeException('the disk is full or not writable');
+                    throw new \RuntimeException(__('the disk is full or not writable'));
                 }
             }, (array) config('hostelease.backup.skip_data'), (int) config('hostelease.backup.rows_per_insert', 200));
 
@@ -106,7 +106,7 @@ class BackupService
     public function createFiles(): string
     {
         if (! class_exists(\ZipArchive::class)) {
-            throw new \RuntimeException('Backup failed: the PHP zip extension is not installed on this server.');
+            throw new \RuntimeException(__('Backup failed: the PHP zip extension is not installed on this server.'));
         }
 
         $this->allowLongRun();
@@ -161,7 +161,7 @@ class BackupService
             ], JSON_PRETTY_PRINT));
 
             if (! $zip->close()) {
-                throw new \RuntimeException('the zip could not be finished (is the disk full?)');
+                throw new \RuntimeException(__('the zip could not be finished (is the disk full?)'));
             }
             // close() writes a fresh file with the default mode, so restrict it NOW: the
             // archive holds Aadhaar scans and must not be world-readable.
@@ -195,18 +195,18 @@ class BackupService
     {
         $path = $this->path($filename);
         if (! $path) {
-            return ['ok' => false, 'message' => 'No such backup.'];
+            return ['ok' => false, 'message' => __('No such backup.')];
         }
 
         $meta = $this->meta($filename);
         if (! empty($meta['sha256']) && ! hash_equals($meta['sha256'], hash_file('sha256', $path))) {
-            return ['ok' => false, 'message' => 'The checksum does not match — the file has changed or is damaged since it was made.'];
+            return ['ok' => false, 'message' => __('The checksum does not match — the file has changed or is damaged since it was made.')];
         }
 
         if ($this->typeOf($filename) === self::FILES) {
             $problem = $this->verifyZip($path, isset($meta['files']) ? $meta['files'] + 1 : null);
 
-            return $problem ? ['ok' => false, 'message' => $problem] : ['ok' => true, 'message' => 'Complete.'];
+            return $problem ? ['ok' => false, 'message' => $problem] : ['ok' => true, 'message' => __('Complete.')];
         }
 
         $check = (new SqlVerifier)->verify($path);

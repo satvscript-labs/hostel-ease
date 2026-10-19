@@ -19,6 +19,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Month and day names follow the language (S7.1): every App::setLocale —
+        // the request middleware, a mail sent in its reader's language, a job running
+        // for one owner — moves Carbon with it.
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Foundation\Events\LocaleUpdated::class,
+            fn ($e) => \Illuminate\Support\Carbon::setLocale($e->locale));
+
         // Avoid index length errors on older MySQL/MariaDB.
         Schema::defaultStringLength(191);
 

@@ -32,7 +32,7 @@
     <meta name="description" content="{{ __('Run your hostel or PG from one place — beds, rent, students and staff.') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -57,11 +57,15 @@
 
         html, body { height: 100%; margin: 0; }
         body {
-            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            font-family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, sans-serif;
             color: var(--g-ink); background: #fff;
             -webkit-font-smoothing: antialiased;
         }
 
+        /* S7.1 — Hindi & Gujarati: letter-spacing splits Indic conjuncts in some
+           browsers, and the scripts need a little more height. */
+        html:lang(hi) *, html:lang(gu) * { letter-spacing: normal !important; }
+        html:lang(hi) body, html:lang(gu) body { line-height: 1.6; }
         .g-layout { display: grid; min-height: 100vh; grid-template-columns: 1fr; }
         @media (min-width: 992px) { .g-layout { grid-template-columns: minmax(440px, 520px) 1fr; } }
 

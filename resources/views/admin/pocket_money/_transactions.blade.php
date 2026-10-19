@@ -15,7 +15,7 @@
                         @if($tx->note)<span class="fw-normal text-muted">· {{ $tx->note }}</span>@endif
                     </div>
                     <div class="text-muted small text-truncate">
-                        {{ $tx->created_at->format('d M Y, h:i A') }}
+                        {{ $tx->created_at->translatedFormat('d M Y, h:i A') }}
                         @if($tx->creator) · {{ $tx->creator->name }}@endif
                     </div>
                 </div>

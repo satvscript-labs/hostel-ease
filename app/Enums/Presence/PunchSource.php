@@ -16,8 +16,8 @@ enum PunchSource: string
     public function label(): string
     {
         return match ($this) {
-            self::Device => 'Device',
-            self::Manual => 'Manual',
+            self::Device => __('Device'),
+            self::Manual => __('Manual'),
         };
     }
 }

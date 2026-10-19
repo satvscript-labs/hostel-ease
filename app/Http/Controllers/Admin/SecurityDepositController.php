@@ -109,7 +109,7 @@ class SecurityDepositController extends Controller
         $this->logger->log('deposit.create', "Security deposit {$deposit->receipt_number} — "
             .hostelease_money($deposit->amount)." from {$deposit->student->name}", $deposit);
 
-        return back()->with('success', 'Security deposit recorded.');
+        return back()->with('success', __('Security deposit recorded.'));
     }
 
     /**
@@ -120,7 +120,7 @@ class SecurityDepositController extends Controller
     public function update(Request $request, SecurityDeposit $securityDeposit): RedirectResponse
     {
         if ($securityDeposit->status !== 'collected') {
-            return back()->with('error', 'This deposit has been refunded — its record is settled. Revert the refund first if something is wrong.');
+            return back()->with('error', __('This deposit has been refunded — its record is settled. Revert the refund first if something is wrong.'));
         }
 
         $data = $request->validate([
@@ -134,7 +134,7 @@ class SecurityDepositController extends Controller
         $this->logger->log('deposit.update', "Security deposit {$securityDeposit->receipt_number} edited — "
             .hostelease_money($securityDeposit->amount), $securityDeposit);
 
-        return back()->with('success', 'Deposit updated.');
+        return back()->with('success', __('Deposit updated.'));
     }
 
     public function refund(Request $request, SecurityDeposit $securityDeposit): RedirectResponse
@@ -150,7 +150,7 @@ class SecurityDepositController extends Controller
         ]);
 
         if ($securityDeposit->status !== 'collected') {
-            return back()->with('error', 'Deposit has already been refunded.');
+            return back()->with('error', __('Deposit has already been refunded.'));
         }
 
         // FULL settlement (owner decision, W6.4): refunded + deducted must
@@ -226,13 +226,13 @@ class SecurityDepositController extends Controller
             .hostelease_money($data['refunded_amount']).' refunded, '
             .hostelease_money($data['deducted_amount']).' deducted against dues', $securityDeposit);
 
-        return back()->with('success', 'Security deposit settled — every rupee accounted for.');
+        return back()->with('success', __('Security deposit settled — every rupee accounted for.'));
     }
 
     public function revertRefund(SecurityDeposit $securityDeposit, \App\Services\PaymentService $paymentService): RedirectResponse
     {
         if ($securityDeposit->status !== 'refunded') {
-            return back()->with('error', 'Deposit is not currently refunded.');
+            return back()->with('error', __('Deposit is not currently refunded.'));
         }
 
         DB::transaction(function () use ($securityDeposit, $paymentService) {
@@ -252,7 +252,7 @@ class SecurityDepositController extends Controller
 
         $this->logger->log('deposit.revert', "Security deposit {$securityDeposit->receipt_number} refund reverted — deposit held again", $securityDeposit);
 
-        return back()->with('success', 'Refund reverted — deducted dues reinstated, deposit held again.');
+        return back()->with('success', __('Refund reverted — deducted dues reinstated, deposit held again.'));
     }
 
     /**

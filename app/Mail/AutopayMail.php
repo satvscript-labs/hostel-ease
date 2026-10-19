@@ -45,7 +45,7 @@ class AutopayMail extends Mailable
             'name' => $this->account->owner?->name ?? __('there'),
             'kind' => $this->kind,
             'amount' => hostelease_money($this->amount),
-            'renewsOn' => $this->renewsOn->format('d M Y'),
+            'renewsOn' => $this->renewsOn->translatedFormat('d M Y'),
             'payUrl' => route('admin.subscription.index'),
         ]);
     }

@@ -70,7 +70,7 @@ class CheckoutService
     public function startRenewal(SubscriptionAccount $account, string $period, bool $autopay = false, ?\App\Models\User $viewer = null): array
     {
         if (! in_array($period, ['yearly', 'monthly'], true)) {
-            throw new RuntimeException('Choose a yearly or monthly renewal.');
+            throw new RuntimeException(__('Choose a yearly or monthly renewal.'));
         }
 
         return DB::transaction(function () use ($account, $period, $autopay, $viewer) {
@@ -88,7 +88,7 @@ class CheckoutService
             }
 
             if ($this->billing->includedBranches($account)->isEmpty()) {
-                throw new RuntimeException('There are no branches on your plan to renew. Contact us if that is not right.');
+                throw new RuntimeException(__('There are no branches on your plan to renew. Contact us if that is not right.'));
             }
 
             // Every pending renewal, newest first. Only one that would still BUY
@@ -119,7 +119,7 @@ class CheckoutService
             // An operator's charge is paid as it is — autopay is switched on at the next
             // renewal instead of re-pricing theirs.
             if ($open && $autopay && ! $this->isOwnersOwn($open) && ! $open->isAutopayInFlight()) {
-                throw new RuntimeException('We have already raised this renewal for you — pay it first, and turn on autopay at your next renewal.');
+                throw new RuntimeException(__('We have already raised this renewal for you — pay it first, and turn on autopay at your next renewal.'));
             }
 
             if ($open && ! $this->isOwnersOwn($open)) {
@@ -222,7 +222,7 @@ class CheckoutService
 
             $anchor = $account->current_period_end;
             if (! $account->period?->isPaid() || ! $anchor || ! $anchor->isFuture()) {
-                throw new RuntimeException('Renew your plan to bring this branch on — it will renew together with the rest.');
+                throw new RuntimeException(__('Renew your plan to bring this branch on — it will renew together with the rest.'));
             }
             if ($branch->subscription_end && ! $branch->subscription_end->lt($anchor)) {
                 throw new RuntimeException("{$branch->name} is already covered to your renewal date. Nothing to pay.");
@@ -290,12 +290,12 @@ class CheckoutService
 
             $anchor = $account->current_period_end;
             if (! $account->period?->isPaid() || ! $anchor || ! $anchor->isFuture()) {
-                throw new RuntimeException('Renew your plan to bring these branches on — they will renew together with the rest.');
+                throw new RuntimeException(__('Renew your plan to bring these branches on — they will renew together with the rest.'));
             }
 
             $quote = $this->billing->quoteAlign($account);
             if ($quote['count'] === 0) {
-                throw new RuntimeException('Every branch is already covered to your renewal date. Nothing to pay.');
+                throw new RuntimeException(__('Every branch is already covered to your renewal date. Nothing to pay.'));
             }
 
             $pending = $account->orders()
@@ -339,7 +339,7 @@ class CheckoutService
             ]);
 
             if (! $order || $order->amountPaise() < 100) {
-                throw new RuntimeException('There is nothing to pay to bring your branches onto the renewal date.');
+                throw new RuntimeException(__('There is nothing to pay to bring your branches onto the renewal date.'));
             }
 
             return $this->payExisting($order);
@@ -361,7 +361,7 @@ class CheckoutService
             $order->refresh();
 
             if ($order->account_id !== $account->id) {
-                throw new RuntimeException('That charge is not on your account.');
+                throw new RuntimeException(__('That charge is not on your account.'));
             }
             if ($order->payment_status !== PaymentStatus::Pending) {
                 throw new RuntimeException($order->payment_status === PaymentStatus::Paid
@@ -369,7 +369,7 @@ class CheckoutService
                     : 'That charge is no longer payable.');
             }
             if (! $order->kind?->isChargeable() || $order->amountPaise() < 100) {
-                throw new RuntimeException('There is nothing to pay on that charge.');
+                throw new RuntimeException(__('There is nothing to pay on that charge.'));
             }
 
             return $this->payExisting($order);
@@ -403,7 +403,7 @@ class CheckoutService
         // still somebody else's order.
         $order = $account->orders()->where('razorpay_order_id', $razorpayOrderId)->first();
         if (! $order) {
-            throw new RuntimeException('We could not match that payment to a charge on your account. If you were charged, it will be confirmed within a few minutes.');
+            throw new RuntimeException(__('We could not match that payment to a charge on your account. If you were charged, it will be confirmed within a few minutes.'));
         }
 
         // The gateway's own record is the authority on what was paid. If it cannot be
@@ -416,7 +416,7 @@ class CheckoutService
                 'order_id' => $order->id, 'payment' => $paymentId, 'error' => $e->getMessage(),
             ]);
 
-            return ['state' => 'pending', 'message' => 'Payment received — we are confirming it now. Your plan will update within a few minutes.'];
+            return ['state' => 'pending', 'message' => __('Payment received — we are confirming it now. Your plan will update within a few minutes.')];
         }
 
         if ($payment['order_id'] && $payment['order_id'] !== $razorpayOrderId) {
@@ -430,7 +430,7 @@ class CheckoutService
         // Authorised but not yet captured: the money is not ours yet. order.paid fires
         // on capture, and the webhook settles it then.
         if ($payment['status'] !== 'captured') {
-            return ['state' => 'pending', 'message' => 'Payment received — we are confirming it now. Your plan will update within a few minutes.'];
+            return ['state' => 'pending', 'message' => __('Payment received — we are confirming it now. Your plan will update within a few minutes.')];
         }
 
         $result = $this->settleOrder($order, $paymentId, $payment['amount'], 'callback', $payment['token_id'] ?? null, $payment['customer_id'] ?? null);
@@ -438,11 +438,11 @@ class CheckoutService
         return match ($result) {
             PaymentSettlement::APPLIED, PaymentSettlement::ALREADY => [
                 'state' => $result,
-                'message' => 'Payment successful — your plan is updated.',
+                'message' => __('Payment successful — your plan is updated.'),
             ],
             default => [
                 'state' => 'refused',
-                'message' => 'Your payment was received, but we need to check it before it is applied. Our team has been alerted and will be in touch — you have not lost anything.',
+                'message' => __('Your payment was received, but we need to check it before it is applied. Our team has been alerted and will be in touch — you have not lost anything.'),
             ],
         };
     }
@@ -533,10 +533,10 @@ class CheckoutService
         // open a payment for a charge whose every date is already covered.
         $state = $order->coverageState(fresh: true);
         if ($state === 'stale') {
-            throw new RuntimeException('This charge is out of date — your branches or free renewals changed since it was raised, so its amount is no longer right. Start the renewal again and you will see the correct total.');
+            throw new RuntimeException(__('This charge is out of date — your branches or free renewals changed since it was raised, so its amount is no longer right. Start the renewal again and you will see the correct total.'));
         }
         if ($state !== 'extends') {
-            throw new RuntimeException('Everything this charge covers is already paid up, so there is nothing to pay on it. If you think that is wrong, please contact us.');
+            throw new RuntimeException(__('Everything this charge covers is already paid up, so there is nothing to pay on it. If you think that is wrong, please contact us.'));
         }
 
         // One live instrument per order. A live link means the operator's link IS
@@ -547,7 +547,7 @@ class CheckoutService
             // API — so only ever an https one. Anything else means the stored link is
             // not what we think it is: stop, rather than redirect a customer to it.
             if (! str_starts_with((string) $order->payment_link_url, 'https://')) {
-                throw new RuntimeException('This payment link could not be opened. Please contact us and we will send you a fresh one.');
+                throw new RuntimeException(__('This payment link could not be opened. Please contact us and we will send you a fresh one.'));
             }
 
             return ['mode' => 'link', 'order' => $order, 'url' => $order->payment_link_url];
@@ -571,7 +571,7 @@ class CheckoutService
             // Never trust a 200 that does not name an order — the same rule as S2's
             // empty-link guard. Throwing rolls the pending order back with it.
             if (! filled($rzp['id'] ?? null)) {
-                throw new RuntimeException('Online payment could not be started just now. Nothing has been charged — please try again in a moment.');
+                throw new RuntimeException(__('Online payment could not be started just now. Nothing has been charged — please try again in a moment.'));
             }
 
             $order->update(['razorpay_order_id' => $rzp['id']]);
@@ -610,12 +610,12 @@ class CheckoutService
     {
         $this->assertConfigured();
         if ($order->coverageState(fresh: true) !== 'extends' || ! $owner) {
-            throw new RuntimeException('Autopay could not be set up for this renewal. Please try again.');
+            throw new RuntimeException(__('Autopay could not be set up for this renewal. Please try again.'));
         }
 
         $setup = $this->autopay->prepareSetup($order, $owner);
         if (! filled($setup['razorpay_order_id'] ?? null)) {
-            throw new RuntimeException('Online payment could not be started just now. Nothing has been charged — please try again in a moment.');
+            throw new RuntimeException(__('Online payment could not be started just now. Nothing has been charged — please try again in a moment.'));
         }
         $order->update(['razorpay_order_id' => $setup['razorpay_order_id']]);
 
@@ -666,14 +666,14 @@ class CheckoutService
             try {
                 $payments = $this->razorpay->fetchOrderPayments($open->razorpay_order_id);
             } catch (RuntimeException $e) {
-                throw new RuntimeException('We could not check your earlier payment attempt just now. Please try again in a moment — you will not be charged twice.');
+                throw new RuntimeException(__('We could not check your earlier payment attempt just now. Please try again in a moment — you will not be charged twice.'));
             }
 
             // A payment still IN FLIGHT - started or authorised, not yet captured -
             // means "wait", not "abandoned" (S3 audit). Voiding now would land its
             // capture, seconds later, on a voided order: a refund case made by us.
             if (collect($payments)->contains(fn (array $p) => in_array($p['status'], ['created', 'authorized'], true))) {
-                throw new RuntimeException('Your earlier payment attempt is still being processed. Give it a minute, then refresh this page - you will not be charged twice.');
+                throw new RuntimeException(__('Your earlier payment attempt is still being processed. Give it a minute, then refresh this page - you will not be charged twice.'));
             }
 
             $captured = collect($payments)->firstWhere('status', 'captured');
@@ -690,12 +690,12 @@ class CheckoutService
                     ? [
                         'mode' => 'held',
                         'order' => $open->fresh(),
-                        'message' => 'We found a payment from your earlier attempt that needs a check before it is applied. Our team has been alerted and will be in touch - please do not pay again.',
+                        'message' => __('We found a payment from your earlier attempt that needs a check before it is applied. Our team has been alerted and will be in touch - please do not pay again.'),
                     ]
                     : [
                         'mode' => 'paid',
                         'order' => $open->fresh(),
-                        'message' => 'Good news - your earlier payment had already gone through, so there is nothing more to pay. Your plan is updated.',
+                        'message' => __('Good news - your earlier payment had already gone through, so there is nothing more to pay. Your plan is updated.'),
                     ];
             }
         }
@@ -775,7 +775,7 @@ class CheckoutService
         $account->refresh();
 
         if ($account->status === AccountStatus::Suspended) {
-            throw new RuntimeException('Your account is on hold, so online payments are paused. Please contact us and we will sort it out with you.');
+            throw new RuntimeException(__('Your account is on hold, so online payments are paused. Please contact us and we will sort it out with you.'));
         }
     }
 
@@ -783,7 +783,7 @@ class CheckoutService
     protected function assertConfigured(): void
     {
         if (! $this->razorpay->isConfigured()) {
-            throw new RuntimeException('Online payment is not available right now. Please contact us and we will renew your plan for you.');
+            throw new RuntimeException(__('Online payment is not available right now. Please contact us and we will renew your plan for you.'));
         }
     }
 

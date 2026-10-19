@@ -26,7 +26,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -37,7 +37,7 @@
            Kept the strong dark-mesh concept; rebuilt execution + added a working
            mobile drawer, a how-it-works band, a CTA band, and real config
            pricing (was hardcoded at half the real price). */
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--he-bg-canvas, #f8fafc); color: var(--he-text-main, #0f172a); overflow-x: hidden; }
+        body { font-family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif; background: var(--he-bg-canvas, #f8fafc); color: var(--he-text-main, #0f172a); overflow-x: hidden; }
         section { position: relative; }
         .lp-dark { background: var(--he-gradient-mesh, linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)); }
 
@@ -213,7 +213,7 @@
                             <div class="bg-white border-end d-none d-md-flex flex-column p-3" style="width: 210px;">
                                 <div class="d-flex align-items-center gap-2 mb-4">
                                     <div class="rounded text-white d-flex align-items-center justify-content-center fw-bold" style="width:28px; height:28px; font-size:0.8rem; background: var(--he-primary);">H</div>
-                                    <span class="fw-bold text-dark">HostelEase</span>
+                                    <span class="fw-bold text-dark">{{ __('HostelEase') }}</span>
                                 </div>
                                 @foreach([['chart-pie','Dashboard',true],['bed','Bed Matrix',false],['users','Students',false],['file-invoice-dollar','Billing',false]] as [$ic,$lbl,$on])
                                     <div class="p-2 rounded-3 fw-semibold small {{ $on ? 'text-primary' : 'text-secondary' }}" @style(['background: var(--he-primary-soft)' => $on])><i class="fa-solid fa-{{ $ic }} me-2"></i>{{ $lbl }}</div>
@@ -385,7 +385,7 @@
                 <a href="{{ route('refund') }}">{{ __('Refund Policy') }}</a>
             </div>
             <p class="small mb-1">&copy; {{ date('Y') }} {{ config('app.name') }}. {{ __('All rights reserved.') }}</p>
-            <p class="small mb-0">{{ __('Powered by') }} <span class="text-white fw-bold">SatvScript</span>.</p>
+            <p class="small mb-0">{{ __('Powered by') }} <span class="text-white fw-bold">{{ __('SatvScript') }}</span>.</p>
         </div>
     </footer>
 

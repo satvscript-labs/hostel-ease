@@ -37,7 +37,7 @@ class RenewalCard
         $isOwner = $account->owner_id === $viewer->id;
 
         $headline = match ($tone) {
-            'grace' => __('Renew by :date to keep access', ['date' => $c['grace_until']->format('d M')]),
+            'grace' => __('Renew by :date to keep access', ['date' => $c['grace_until']->translatedFormat('d M')]),
             'today' => $c['is_trial'] ? __('Your trial ends today') : __('Your plan renews today'),
             default => $c['is_trial']
                 ? trans_choice('Your trial ends in :n day|Your trial ends in :n days', $days, ['n' => $days])
@@ -86,11 +86,11 @@ class RenewalCard
         $span = max(1, max($this->reminders->windows($account)));
         $progress = $days < 0 ? 1.0 : round(1 - min($days, $span) / $span, 3);
 
-        $timeline = [['label' => $c['is_trial'] ? __('Trial ends') : __('Renews'), 'date' => $c['renews_on']->format('d M')]];
+        $timeline = [['label' => $c['is_trial'] ? __('Trial ends') : __('Renews'), 'date' => $c['renews_on']->translatedFormat('d M')]];
         if ($c['grace_until']->greaterThan($c['renews_on'])) {
-            $timeline[] = ['label' => __('Grace until'), 'date' => $c['grace_until']->format('d M')];
+            $timeline[] = ['label' => __('Grace until'), 'date' => $c['grace_until']->translatedFormat('d M')];
         }
-        $timeline[] = ['label' => __('Access pauses'), 'date' => $c['pauses_on']->format('d M')];
+        $timeline[] = ['label' => __('Access pauses'), 'date' => $c['pauses_on']->translatedFormat('d M')];
 
         // The number in the ring: days left to renew, or — in grace — days of access left.
         $graceLeft = max(0, (int) now()->startOfDay()->diffInDays($c['grace_until'], false));
@@ -114,7 +114,7 @@ class RenewalCard
             'cycle' => $account->current_period_end->toDateString(),
             'snoozedUntil' => $snoozedUntil,
             'snoozeChoices' => collect($this->reminders->snoozeChoices($account))
-                ->map(fn ($date, $before) => ['before' => $before, 'date' => $date->format('d M')])
+                ->map(fn ($date, $before) => ['before' => $before, 'date' => $date->translatedFormat('d M')])
                 ->values()->all(),
         ];
     }

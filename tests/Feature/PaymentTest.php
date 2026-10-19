@@ -57,6 +57,21 @@ class PaymentTest extends TestCase
         $this->get('/admin/payments/'.$payment->id.'/pdf')->assertNotFound();
     }
 
+    /** S7.1: a queued receipt is rendered later by the worker — in the sender's language. */
+    public function test_an_emailed_receipt_goes_out_in_the_senders_language(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->admin->forceFill(['locale' => 'gu'])->save();
+        $this->post(route('admin.students.collect', $this->student), [
+            'amount' => 5000, 'mode' => 'cash', 'paid_on' => now()->toDateString(),
+        ]);
+        $payment = Payment::firstOrFail();
+
+        $this->actingAs($this->admin->fresh())->post(route('admin.payments.email', $payment), ['email' => 'parent@example.test'])->assertRedirect();
+
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\ReceiptMail::class, fn ($m) => $m->locale === 'gu');
+    }
+
     public function test_recording_a_payment_generates_a_unique_receipt(): void
     {
         $this->post(route('admin.students.collect', $this->student), [

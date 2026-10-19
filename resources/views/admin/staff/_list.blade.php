@@ -50,7 +50,7 @@
                                     @if($s->mobile)<x-mobile-link :mobile="$s->mobile" />@else<span class="text-muted">—</span>@endif
                                 </div>
                                 <div class="text-muted small lh-sm text-truncate">
-                                    {{ $s->join_date ? __('Joined').' '.$s->join_date->format('M Y') : __('Join date not set') }}
+                                    {{ $s->join_date ? __('Joined').' '.$s->join_date->translatedFormat('M Y') : __('Join date not set') }}
                                 </div>
                             </div>
                         </div>

@@ -17,9 +17,9 @@ enum DiscountRecurrence: string
     public function label(): string
     {
         return match ($this) {
-            self::OneTime => 'One-time',
-            self::OneRenewal => 'Next renewal',
-            self::EveryRenewal => 'Permanent (every renewal)',
+            self::OneTime => __('One-time'),
+            self::OneRenewal => __('Next renewal'),
+            self::EveryRenewal => __('Permanent (every renewal)'),
         };
     }
 

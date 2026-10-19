@@ -16,9 +16,9 @@ enum DeviceStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Online => 'Online',
-            self::Offline => 'Offline',
-            self::Unknown => 'Unknown',
+            self::Online => __('Online'),
+            self::Offline => __('Offline'),
+            self::Unknown => __('Unknown'),
         };
     }
 

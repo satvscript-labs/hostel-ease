@@ -95,7 +95,7 @@ class SqlVerifier
             }
         }
 
-        return ['ok' => true, 'message' => 'Complete.', 'tables' => count($declared), 'rows' => array_sum($declared)];
+        return ['ok' => true, 'message' => __('Complete.'), 'tables' => count($declared), 'rows' => array_sum($declared)];
     }
 
     /**
@@ -107,7 +107,7 @@ class SqlVerifier
     {
         $handle = @gzopen($path, 'rb');
         if ($handle === false) {
-            throw new \RuntimeException('cannot open the file');
+            throw new \RuntimeException(__('cannot open the file'));
         }
 
         try {
@@ -117,7 +117,7 @@ class SqlVerifier
 
             // gzgets also returns false on a corrupt stream, not just at the end.
             if (! gzeof($handle)) {
-                throw new \RuntimeException('the compressed data is damaged');
+                throw new \RuntimeException(__('the compressed data is damaged'));
             }
         } finally {
             gzclose($handle);

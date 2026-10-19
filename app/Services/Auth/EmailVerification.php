@@ -149,7 +149,7 @@ class EmailVerification
 
         try {
             // Sent, not queued: the person is waiting on the screen for it.
-            Mail::to($pending['email'])->send(new EmailCodeMail($code, $user->name));
+            Mail::to($pending['email'])->locale($user->preferredLocale())->send(new EmailCodeMail($code, $user->name));
         } catch (Throwable $e) {
             Log::warning('Email verification code could not be sent', ['user' => $user->id, 'error' => $e->getMessage()]);
 

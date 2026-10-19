@@ -332,7 +332,7 @@
                  length overflow a phone row, and .he-tabs answers overflow with
                  a horizontal scroll — so the second tab sat half off the edge
                  instead of beside the first. --}}
-            <i class="fa-solid fa-address-book me-1"></i> {{ __('Directory') }}<span class="d-none d-sm-inline"> &amp; {{ __('Payroll') }}</span>
+            <i class="fa-solid fa-address-book me-1"></i> <span class="d-sm-none">{{ __('Directory') }}</span><span class="d-none d-sm-inline">{{ __('Directory & Payroll') }}</span>
             <div x-show="tab === 'directory'" class="position-absolute bottom-0 start-0 w-100" style="height: 3px; background: var(--he-primary); border-radius: 3px 3px 0 0;" x-transition></div>
         </button>
         <button class="he-tab bg-transparent border-0 py-3 px-2 px-sm-4 fw-medium text-secondary position-relative tactile-btn"

@@ -38,8 +38,8 @@
     'selected' => null,
     'placeholder' => '— Select —',
     'none' => null,
-    'searchPlaceholder' => 'Search…',
-    'emptyText' => 'No matches',
+    'searchPlaceholder' => __('Search…'),
+    'emptyText' => __('No matches'),
 ])
 @php
     $items = collect($options)->map(fn ($o) => [

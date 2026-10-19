@@ -21,10 +21,10 @@ enum CollectionMethod: string
     public function label(): string
     {
         return match ($this) {
-            self::Offline => 'Recorded offline',
-            self::Link => 'Payment link',
-            self::Checkout => 'Online checkout',
-            self::Autopay => 'Auto-debit',
+            self::Offline => __('Recorded offline'),
+            self::Link => __('Payment link'),
+            self::Checkout => __('Online checkout'),
+            self::Autopay => __('Auto-debit'),
         };
     }
 

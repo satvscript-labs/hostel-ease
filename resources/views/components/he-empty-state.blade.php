@@ -2,7 +2,7 @@
      .agents/ui_design_guidelines.md section 5. Use for any list/table with zero rows. --}}
 @props([
     'icon' => 'circle-info',
-    'title' => 'Nothing here yet',
+    'title' => __('Nothing here yet'),
     'subtitle' => null,
 ])
 <div {{ $attributes->class(['text-center py-5']) }}>

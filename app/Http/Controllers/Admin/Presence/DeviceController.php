@@ -89,7 +89,7 @@ class DeviceController extends Controller
         $device = PresenceDevice::create($data + ['is_active' => true]);
         $this->logger->log('presence.device.add', "Added gate device {$device->name}", $device);
 
-        return back()->with('success', "Device “{$device->name}” added. Enroll people, then run a sync.");
+        return back()->with('success', __('Device “:name” added. Enroll people, then run a sync.', ['name' => $device->name]));
     }
 
     public function update(Request $request, PresenceDevice $device): RedirectResponse
@@ -103,7 +103,7 @@ class DeviceController extends Controller
         $device->update($data + ['is_active' => $request->boolean('is_active')]);
         $this->logger->log('presence.device.update', "Updated gate device {$device->name}", $device);
 
-        return back()->with('success', 'Device updated.');
+        return back()->with('success', __('Device updated.'));
     }
 
     public function destroy(PresenceDevice $device): RedirectResponse
@@ -111,7 +111,7 @@ class DeviceController extends Controller
         $device->delete();
         $this->logger->log('presence.device.remove', "Removed gate device {$device->name}", $device);
 
-        return back()->with('success', "Device “{$device->name}” removed. Its punch history is kept.");
+        return back()->with('success', __('Device “:name” removed. Its punch history is kept.', ['name' => $device->name]));
     }
 
     public function syncTime(PresenceDevice $device): RedirectResponse

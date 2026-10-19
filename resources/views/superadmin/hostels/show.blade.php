@@ -176,6 +176,14 @@
                                     <i class="fa-solid fa-key text-muted" style="font-size:.75rem;"></i>
                                 </button>
                             </form>
+                            @if($a->two_factor_confirmed_at)
+                            <form action="{{ route('superadmin.admins.reset-2fa', $a) }}" method="POST" class="d-inline ms-1" data-confirm="Turn off two-factor sign-in for {{ $a->name }}? Only after confirming it is really them — they lost their phone and recovery codes.">
+                                @csrf @method('PATCH')
+                                <button class="btn btn-sm btn-light rounded-circle shadow-sm" style="width:30px;height:30px;" title="Reset two-factor sign-in">
+                                    <i class="fa-solid fa-shield-halved text-primary" style="font-size:.75rem;"></i>
+                                </button>
+                            </form>
+                            @endif
                         </div>
                     </div>
                 @empty

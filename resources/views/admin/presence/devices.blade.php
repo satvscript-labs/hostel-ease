@@ -466,7 +466,7 @@
         <div class="mb-3" x-show="!editing">
             <label class="form-label fw-bold small text-uppercase">{{ __('Serial number') }}</label>
             <input type="text" name="serial_number" x-model="form.serial_number" class="form-control bg-light"
-                   placeholder="TW60000324000187" autocomplete="off">
+                   placeholder="{{ __('TW60000324000187') }}" autocomplete="off">
             <div class="d-flex justify-content-between align-items-center mt-2">
                 <span class="small text-muted">{{ __('Printed on the device / iDMS.') }}</span>
                 <button type="button" class="btn btn-sm btn-link text-decoration-none fw-bold p-0" @click="runDiscover()" :disabled="discovering">

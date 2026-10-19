@@ -143,7 +143,7 @@
                                 <span><i class="fa-solid fa-phone me-1"></i>{{ hostelease_phone($staff->mobile) }}</span>
                             @endif
                             @if($staff->join_date)
-                                <span><i class="fa-solid fa-calendar me-1"></i>{{ __('Joined') }} {{ $staff->join_date->format('d M Y') }}</span>
+                                <span><i class="fa-solid fa-calendar me-1"></i>{{ __('Joined') }} {{ $staff->join_date->translatedFormat('d M Y') }}</span>
                             @endif
                         </div>
                     </div>
@@ -192,11 +192,11 @@
                     <div class="st-metric-val">{{ hostelease_money($staff->monthly_salary) }}</div>
                 </div>
                 <div class="col-6 col-md">
-                    <div class="st-metric-label">{{ __('Paid') }} · {{ now()->format('M') }}</div>
+                    <div class="st-metric-label">{{ __('Paid') }} · {{ now()->translatedFormat('M') }}</div>
                     <div class="st-metric-val" style="color: #6ee7b7;">{{ hostelease_money($paidThisMonth) }}</div>
                 </div>
                 <div class="col-6 col-md">
-                    <div class="st-metric-label">{{ __('Present') }} · {{ now()->format('M') }}</div>
+                    <div class="st-metric-label">{{ __('Present') }} · {{ now()->translatedFormat('M') }}</div>
                     <div class="st-metric-val">{{ $counts['present'] + $counts['half_day'] }} <span class="fs-6 opacity-50 fw-normal">{{ __('days') }}</span></div>
                 </div>
                 <div class="col-6 col-md">
@@ -266,7 +266,7 @@
             <div class="panel-card mb-4">
                 <div class="panel-head">
                     <h6><i class="fa-solid fa-clipboard-user me-2" style="color: var(--he-primary);"></i>{{ __('Attendance') }}</h6>
-                    <span class="text-muted small fw-semibold">{{ now()->format('F Y') }}</span>
+                    <span class="text-muted small fw-semibold">{{ now()->translatedFormat('F Y') }}</span>
                 </div>
                 <div class="panel-body">
                     <div class="st-counts">
@@ -294,9 +294,9 @@
                     <div class="st-pay">
                         <div class="st-pay__ic"><i class="fa-solid fa-money-bill-wave"></i></div>
                         <div class="flex-grow-1" style="min-width: 0;">
-                            <div class="fw-bold text-dark text-truncate">{{ $p->salary_month->format('F Y') }}</div>
+                            <div class="fw-bold text-dark text-truncate">{{ $p->salary_month->translatedFormat('F Y') }}</div>
                             <div class="text-muted small text-truncate">
-                                {{ $p->paid_on->format('d M Y') }} · {{ $modeNames[$p->mode] ?? ucfirst($p->mode) }}@if($p->reference_number) · {{ $p->reference_number }}@endif
+                                {{ $p->paid_on->translatedFormat('d M Y') }} · {{ $modeNames[$p->mode] ?? ucfirst($p->mode) }}@if($p->reference_number) · {{ $p->reference_number }}@endif
                             </div>
                             @if($p->notes)
                                 <div class="text-muted small text-truncate fst-italic">{{ $p->notes }}</div>

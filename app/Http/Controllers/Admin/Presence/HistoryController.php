@@ -67,7 +67,7 @@ class HistoryController extends Controller
             $at = now();
         }
         if ($at->lt(now()->subDay())) {
-            return back()->with('error', 'Corrections can only be back-dated up to 24 hours.');
+            return back()->with('error', __('Corrections can only be back-dated up to 24 hours.'));
         }
 
         $punch = PresencePunch::create([
@@ -87,7 +87,7 @@ class HistoryController extends Controller
         $name = $profile->presenceable?->name ?? 'this person';
         $this->logger->log('presence.correct', "Manual presence correction for {$name}: {$data['direction']} — {$data['reason']}", $punch);
 
-        return back()->with('success', "Correction saved — {$name} marked ".($data['direction'] === 'in' ? 'inside' : 'out').'.');
+        return back()->with('success', $data['direction'] === 'in' ? __('Correction saved — :name marked inside.', ['name' => $name]) : __('Correction saved — :name marked out.', ['name' => $name]));
     }
 
     /** Mark a known absence (gone home / on leave) — suppresses curfew flags. */
@@ -99,14 +99,14 @@ class HistoryController extends Controller
         $name = $profile->presenceable?->name ?? 'this person';
         $this->logger->log('presence.leave', "Marked {$name} on leave until {$data['until']}", $profile);
 
-        return back()->with('success', "{$name} marked on leave — curfew alerts paused until ".Carbon::parse($data['until'])->format('d M').'.');
+        return back()->with('success', __(':name marked on leave — curfew alerts paused until :date.', ['name' => $name, 'date' => Carbon::parse($data['until'])->translatedFormat('d M')]));
     }
 
     public function clearLeave(PresenceProfile $profile): RedirectResponse
     {
         $profile->forceFill(['on_leave_until' => null])->save();
 
-        return back()->with('success', 'Leave cleared.');
+        return back()->with('success', __('Leave cleared.'));
     }
 
     public function reset(PresenceProfile $profile): RedirectResponse
@@ -121,6 +121,6 @@ class HistoryController extends Controller
         $name = $profile->presenceable?->name ?? 'this person';
         $this->logger->log('presence.reset', "Reset presence state to unknown for {$name}", $profile);
 
-        return back()->with('success', "{$name}'s state reset to unknown.");
+        return back()->with('success', __("The state of :name was reset to unknown.", ['name' => $name]));
     }
 }

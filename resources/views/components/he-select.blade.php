@@ -148,7 +148,7 @@
         @if($searchable)
             <div class="p-2 border-bottom">
                 <input type="text" x-model="search" x-ref="searchInput"
-                    class="form-control form-control-sm bg-light border-0" placeholder="Search...">
+                    class="form-control form-control-sm bg-light border-0" placeholder="{{ __('Search...') }}">
             </div>
         @endif
         <div @if($searchable) style="max-height: 220px; overflow-y: auto;" @endif>
@@ -164,7 +164,7 @@
                     <i class="fa-solid fa-check" x-show="value === val"></i>
                 </button>
             </template>
-            <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">No results</div>
+            <div x-show="filteredOptions.length === 0" class="p-3 text-center text-muted small">{{ __('No results') }}</div>
         </div>
     </div>
 </div>

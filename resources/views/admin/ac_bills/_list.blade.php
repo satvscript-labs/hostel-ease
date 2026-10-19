@@ -26,7 +26,7 @@
             $editPayload = \Illuminate\Support\Js::from([
                 'action' => route('admin.ac-bills.update', $bill),
                 'room' => (string) $bill->room->room_number,
-                'month' => $bill->bill_month->format('M Y'),
+                'month' => $bill->bill_month->translatedFormat('M Y'),
                 'prev' => (float) $bill->previous_reading,
                 'curr' => (float) $bill->current_reading,
                 'rate' => (float) $bill->unit_price,
@@ -48,7 +48,7 @@
                                 <div class="text-muted small lh-sm text-truncate">{{ $bill->room->floor?->name ?? '—' }}</div>
                             </div>
                             <div class="ac-c-block">
-                                <div class="fw-semibold text-dark lh-sm text-nowrap">{{ $bill->bill_month->format('M Y') }}</div>
+                                <div class="fw-semibold text-dark lh-sm text-nowrap">{{ $bill->bill_month->translatedFormat('M Y') }}</div>
                                 <div class="text-muted small lh-sm text-nowrap" style="font-feature-settings: 'tnum';">
                                     {{ rtrim(rtrim(number_format($bill->total_units, 2), '0'), '.') }} {{ __('units') }} · {{ hostelease_money($bill->unit_price) }}/u
                                 </div>
@@ -98,7 +98,7 @@
                     <div class="d-flex align-items-center gap-2" role="button" @click="open = !open">
                         <div class="ac-avatar ac-avatar--sm flex-shrink-0"><i class="fa-solid fa-snowflake"></i></div>
                         <div class="flex-grow-1" style="min-width: 0;">
-                            <div class="fw-bold text-dark text-truncate">{{ __('Room') }} {{ $bill->room->room_number }} · {{ $bill->bill_month->format('M Y') }}</div>
+                            <div class="fw-bold text-dark text-truncate">{{ __('Room') }} {{ $bill->room->room_number }} · {{ $bill->bill_month->translatedFormat('M Y') }}</div>
                             <div class="text-muted small text-truncate" style="font-feature-settings: 'tnum';">
                                 {{ rtrim(rtrim(number_format($bill->total_units, 2), '0'), '.') }} {{ __('units') }} · {{ $sharesCount }} {{ __('students') }}
                             </div>
@@ -152,7 +152,7 @@
                         </div>
                         <div class="ac-meter-cell">
                             <span class="ac-row-lbl">{{ __('Generated') }}</span>
-                            <span class="fw-semibold text-dark">{{ $bill->created_at->format('d M Y') }}</span>
+                            <span class="fw-semibold text-dark">{{ $bill->created_at->translatedFormat('d M Y') }}</span>
                         </div>
                     </div>
 
@@ -244,7 +244,7 @@
         @if($isFiltered)
             <x-he-empty-state icon="magnifying-glass" title="{{ __('No matches') }}" subtitle="{{ __('No AC bills for this month and floor.') }}" />
         @else
-            <x-he-empty-state icon="snowflake" title="{{ __('No AC bills for :month', ['month' => $filterMonth->format('F Y')]) }}" subtitle="{{ __('Generate a bill for a room to get started.') }}" />
+            <x-he-empty-state icon="snowflake" title="{{ __('No AC bills for :month', ['month' => $filterMonth->translatedFormat('F Y')]) }}" subtitle="{{ __('Generate a bill for a room to get started.') }}" />
         @endif
     @endforelse
 </div>

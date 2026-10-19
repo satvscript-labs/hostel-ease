@@ -43,7 +43,7 @@
     {{-- On-leave banner (a known absence — curfew flags paused) --}}
     @if($profile->isOnLeave())
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3 p-2 px-3 rounded-3" style="background: var(--he-bg-surface-raised);">
-            <span class="small fw-semibold text-muted"><i class="fa-solid fa-plane-departure me-1"></i>{{ __('On leave until') }} {{ $profile->on_leave_until->format('d M Y') }}</span>
+            <span class="small fw-semibold text-muted"><i class="fa-solid fa-plane-departure me-1"></i>{{ __('On leave until') }} {{ $profile->on_leave_until->translatedFormat('d M Y') }}</span>
             <form method="POST" action="{{ route('admin.presence.history.leave.clear', $profile) }}" class="m-0">
                 @csrf @method('DELETE')
                 <button class="btn btn-sm btn-link text-decoration-none p-0 fw-bold">{{ __('Clear') }}</button>
@@ -110,7 +110,7 @@
     {{-- Timeline --}}
     @forelse($days as $date => $events)
         @php $day = \Illuminate\Support\Carbon::parse($date); @endphp
-        <div class="hist-day">{{ $day->isToday() ? __('Today') : ($day->isYesterday() ? __('Yesterday') : $day->format('D, d M Y')) }}</div>
+        <div class="hist-day">{{ $day->isToday() ? __('Today') : ($day->isYesterday() ? __('Yesterday') : $day->translatedFormat('D, d M Y')) }}</div>
         <div class="hist-line">
             @foreach($events as $i => $p)
                 <div class="hist-event">

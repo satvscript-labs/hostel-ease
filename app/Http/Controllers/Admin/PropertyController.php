@@ -131,7 +131,7 @@ class PropertyController extends Controller
             .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $assignment);
 
         return $this->afterMove($request, $student)
-            ->with('success', "{$student->name} assigned to bed {$bed->bed_number}.");
+            ->with('success', __(':name assigned to bed :bed.', ['name' => $student->name, 'bed' => $bed->bed_number]));
     }
 
     public function release(Request $request, BedAssignment $assignment): RedirectResponse
@@ -159,7 +159,7 @@ class PropertyController extends Controller
         $this->logger->log('assignment.release',
             "Released {$assignment->student->name} from bed", $assignment);
 
-        return back()->with('success', 'Student released from bed.');
+        return back()->with('success', __('Student released from bed.'));
     }
 
     public function transfer(Request $request, BedAssignment $assignment): RedirectResponse
@@ -201,7 +201,7 @@ class PropertyController extends Controller
             .hostelease_money($data['fee_amount'])." ({$data['fee_frequency']})", $target);
 
         return $this->afterMove($request, $assignment->student)
-            ->with('success', 'Student transferred successfully.');
+            ->with('success', __('Student transferred successfully.'));
     }
 
     /**

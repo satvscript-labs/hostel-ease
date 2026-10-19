@@ -688,7 +688,8 @@ class AutopayService
     protected function mail(string $to, AutopayMail $mail): void
     {
         try {
-            Mail::to($to)->send($mail);
+            // In the owner's language (S7.1) — the job has no request to take it from.
+            Mail::to($to)->locale($mail->account->owner?->preferredLocale())->send($mail);
         } catch (Throwable $e) {
             Log::warning('Autopay email could not be sent', ['to' => $to, 'error' => $e->getMessage()]);
         }

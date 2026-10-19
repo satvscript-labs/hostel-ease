@@ -20,13 +20,13 @@ enum OrderKind: string
     public function label(): string
     {
         return match ($this) {
-            self::Purchase => 'Purchase',
-            self::Renewal => 'Renewal',
-            self::AddBranch => 'Branch added',
-            self::Align => 'Alignment',
-            self::Comp => 'Complimentary',
-            self::Trial => 'Free trial',
-            self::Adjustment => 'Adjustment',
+            self::Purchase => __('Purchase'),
+            self::Renewal => __('Renewal'),
+            self::AddBranch => __('Branch added'),
+            self::Align => __('Alignment'),
+            self::Comp => __('Complimentary'),
+            self::Trial => __('Free trial'),
+            self::Adjustment => __('Adjustment'),
         };
     }
 

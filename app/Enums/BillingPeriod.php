@@ -16,9 +16,9 @@ enum BillingPeriod: string
     public function label(): string
     {
         return match ($this) {
-            self::Yearly => 'Yearly',
-            self::Monthly => 'Monthly',
-            self::Trial => 'Trial',
+            self::Yearly => __('Yearly'),
+            self::Monthly => __('Monthly'),
+            self::Trial => __('Trial'),
         };
     }
 

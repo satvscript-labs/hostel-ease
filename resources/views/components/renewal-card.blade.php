@@ -105,7 +105,7 @@
             @if($card['snoozedUntil'])
                 <div class="rc-pill" x-show="!open">
                     <i class="fa-solid fa-moon"></i>
-                    <span class="flex-grow-1 min-w-0 text-truncate">{{ __('Renewal on') }} <b>{{ $card['timeline'][0]['date'] }}</b> · {{ __('quiet until :date', ['date' => $card['snoozedUntil']->format('d M')]) }}</span>
+                    <span class="flex-grow-1 min-w-0 text-truncate">{{ __('Renewal on') }} <b>{{ $card['timeline'][0]['date'] }}</b> · {{ __('quiet until :date', ['date' => $card['snoozedUntil']->translatedFormat('d M')]) }}</span>
                     <button type="button" class="rc-pill-btn" @click="open = true">{{ __('Show') }}</button>
                 </div>
             @endif

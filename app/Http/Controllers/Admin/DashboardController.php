@@ -25,9 +25,10 @@ class DashboardController extends Controller
 
         // Greeting Logic
         $hour = now()->hour;
-        if ($hour < 12) $greeting = "Good Morning";
-        elseif ($hour < 17) $greeting = "Good Afternoon";
-        else $greeting = "Good Evening";
+        $name = \Illuminate\Support\Str::of((string) auth()->user()?->name)->before(' ')->toString() ?: __('there');
+        if ($hour < 12) $greeting = __('Good morning, :name!', ['name' => $name]);
+        elseif ($hour < 17) $greeting = __('Good afternoon, :name!', ['name' => $name]);
+        else $greeting = __('Good evening, :name!', ['name' => $name]);
 
         $unresolvedComplaints = Complaint::where('status', '!=', 'resolved')->count();
         $pendingDues = (float) Invoice::where('status', '!=', 'paid')->sum('balance');
@@ -35,13 +36,15 @@ class DashboardController extends Controller
 
         // Building the summary text
         $summaryParts = [];
-        if ($unresolvedComplaints > 0) $summaryParts[] = "<span class=\"text-danger fw-bold\">{$unresolvedComplaints} unresolved complaints</span>";
-        if ($studentsLeaving > 0) $summaryParts[] = "{$studentsLeaving} students leaving soon";
-        if ($pendingDues > 0) $summaryParts[] = "₹" . number_format($pendingDues) . " in pending dues";
-        
-        $summaryText = empty($summaryParts) 
-            ? "All systems normal. You have no pending urgent items today."
-            : "You have " . implode(', ', $summaryParts) . " requiring attention.";
+        // Rendered raw (the complaint count is red): every part is a number in a
+        // translated sentence — nothing here comes from user input.
+        if ($unresolvedComplaints > 0) $summaryParts[] = '<span class="text-danger fw-bold">'.e(trans_choice(':n unresolved complaint|:n unresolved complaints', $unresolvedComplaints, ['n' => $unresolvedComplaints])).'</span>';
+        if ($studentsLeaving > 0) $summaryParts[] = e(trans_choice(':n student leaving soon|:n students leaving soon', $studentsLeaving, ['n' => $studentsLeaving]));
+        if ($pendingDues > 0) $summaryParts[] = e(__(':amount in pending dues', ['amount' => '₹'.number_format($pendingDues)]));
+
+        $summaryText = empty($summaryParts)
+            ? e(__('All systems normal. You have no pending urgent items today.'))
+            : __('You have :items that need attention.', ['items' => implode(', ', $summaryParts)]);
 
         $stats = [
             'greeting' => $greeting,

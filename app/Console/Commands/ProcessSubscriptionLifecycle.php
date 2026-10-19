@@ -57,7 +57,9 @@ class ProcessSubscriptionLifecycle extends Command
                     return;
                 }
 
-                $result = $this->deliver($account, $window, $reminders, $billing, $notifications);
+                // In the owner's language (S7.1): the email AND the bell entry.
+                $result = hostelease_in_locale($account->owner?->preferredLocale(),
+                    fn () => $this->deliver($account, $window, $reminders, $billing, $notifications));
                 if ($result) {
                     $tally[$result]++;
                 }
@@ -123,7 +125,7 @@ class ProcessSubscriptionLifecycle extends Command
             $status = 'no_email';
         } else {
             try {
-                Mail::to($email)->send(new SubscriptionReminderMail($account, $window));
+                Mail::to($owner)->send(new SubscriptionReminderMail($account, $window));
                 $status = 'sent';
                 $detail['email_verified'] = (bool) $owner->email_verified_at;
                 unset($detail['error']);
@@ -156,7 +158,7 @@ class ProcessSubscriptionLifecycle extends Command
         $days = (int) $account->daysUntilAnchor();
 
         [$title, $level] = match (true) {
-            $window === 'grace' => [__('Your :noun has ended — renew by :date', ['noun' => $noun, 'date' => $c['grace_until']->format('d M')]), 'danger'],
+            $window === 'grace' => [__('Your :noun has ended — renew by :date', ['noun' => $noun, 'date' => $c['grace_until']->translatedFormat('d M')]), 'danger'],
             $window === 'expired' => [__('Your :noun has expired', ['noun' => $noun]), 'danger'],
             $days === 0 => [__('Your :noun renews today', ['noun' => $noun]), 'danger'],
             default => [trans_choice('Your :noun renews in :n day|Your :noun renews in :n days', $days, ['noun' => $noun, 'n' => $days]), $days <= 7 ? 'warning' : 'info'],

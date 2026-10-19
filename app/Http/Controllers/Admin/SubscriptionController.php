@@ -168,10 +168,10 @@ class SubscriptionController extends Controller
             'offer' => $canManage && $this->autopay->setupRefusal($account, $viewer, 'monthly', 1.0) === null,
             'ceiling' => $this->autopay->ceiling(),
             'status' => $live?->status,
-            'next_on' => $state['next_on']?->format('d M Y'),
+            'next_on' => $state['next_on']?->translatedFormat('d M Y'),
             'next_amount' => $live?->isActive() ? (float) $this->billing->quoteRenewal($account, 'monthly')['total'] : null,
             'max' => $live ? (float) $live->max_amount : null,
-            'in_flight' => $state['in_flight'] ? ['amount' => (float) $state['in_flight']->amount, 'raised' => $state['in_flight']->created_at?->format('d M Y')] : null,
+            'in_flight' => $state['in_flight'] ? ['amount' => (float) $state['in_flight']->amount, 'raised' => $state['in_flight']->created_at?->translatedFormat('d M Y')] : null,
             'over_limit' => $state['over_limit'],
             'idle' => $live ? $state['idle'] : null,
             // Every attempt for THIS renewal has failed (or it was above the limit).
@@ -284,7 +284,7 @@ class SubscriptionController extends Controller
         if ($joinsTrial) {
             return response()->json([
                 'mode' => 'created',
-                'message' => "{$branch->name} has been added to your free trial — it works until ".$account->current_period_end->format('d M Y').'. Every branch is billed together when you subscribe.',
+                'message' => "{$branch->name} has been added to your free trial — it works until ".$account->current_period_end->translatedFormat('d M Y').'. Every branch is billed together when you subscribe.',
                 'redirect' => route('admin.subscription.index'),
             ]);
         }
@@ -365,7 +365,7 @@ class SubscriptionController extends Controller
 
         if (! config('hostelease.owner_self_serve')) {
             return [$account, response()->json([
-                'message' => 'Online billing is handled by HostelEase support right now — please contact us and we will set it up for you.',
+                'message' => __('Online billing is handled by HostelEase support right now — please contact us and we will set it up for you.'),
             ], 503)];
         }
 
@@ -374,13 +374,13 @@ class SubscriptionController extends Controller
         // stale tab or a crafted request.
         if ($account->isManaged()) {
             return [$account, response()->json([
-                'message' => 'Billing on your account is handled by the HostelEase team — please contact us and we will set it up for you.',
+                'message' => __('Billing on your account is handled by the HostelEase team — please contact us and we will set it up for you.'),
             ], 403)];
         }
 
         if ($account->owner_id !== $viewer->id) {
             return [$account, response()->json([
-                'message' => 'Only the account owner can make payments or add branches. Please ask them to do it from their login.',
+                'message' => __('Only the account owner can make payments or add branches. Please ask them to do it from their login.'),
             ], 403)];
         }
 
@@ -390,7 +390,7 @@ class SubscriptionController extends Controller
         // created on an account the operator has frozen.
         if ($account->status === \App\Enums\AccountStatus::Suspended) {
             return [$account, response()->json([
-                'message' => 'Your account is on hold, so changes and online payments are paused. Please contact us and we will sort it out with you.',
+                'message' => __('Your account is on hold, so changes and online payments are paused. Please contact us and we will sort it out with you.'),
             ], 423)];
         }
 
@@ -417,7 +417,7 @@ class SubscriptionController extends Controller
             'link' => [
                 'mode' => 'link',
                 'url' => $result['url'],
-                'message' => 'We have already sent you a secure payment link for this — opening it now.',
+                'message' => __('We have already sent you a secure payment link for this — opening it now.'),
             ],
             'paid', 'held' => [
                 'mode' => $result['mode'],
@@ -462,8 +462,8 @@ class SubscriptionController extends Controller
             ])->values()->all(),
             'gifts_waiting' => (int) $q['gifts_waiting'],
             'gifts_term' => $account->period?->isPaid() ? $account->period->value : null,
-            'current_anchor' => $q['current_anchor']?->format('d M Y'),
-            'new_anchor' => $q['new_anchor']->format('d M Y'),
+            'current_anchor' => $q['current_anchor']?->translatedFormat('d M Y'),
+            'new_anchor' => $q['new_anchor']->translatedFormat('d M Y'),
             // Which branches this renews, and which are left out because they are
             // closing — so the owner never has to guess what they are paying for.
             'included' => $this->billing->includedBranches($account)->pluck('name')->values()->all(),
@@ -520,9 +520,9 @@ class SubscriptionController extends Controller
             'amount' => (float) $o->amount,
             'period' => $o->period?->label(),
             'quantity' => $o->quantity,
-            'raised' => $o->created_at?->format('d M Y'),
+            'raised' => $o->created_at?->translatedFormat('d M Y'),
             'link_url' => $linkUrl,
-            'link_expires' => $linkUrl ? $o->payment_link_expires_at?->format('d M Y') : null,
+            'link_expires' => $linkUrl ? $o->payment_link_expires_at?->translatedFormat('d M Y') : null,
             // The breakdown shown before paying: what each line buys. Display only —
             // what is charged is the order's own amount, read on the server.
             'kind' => $o->kind?->value,
@@ -530,8 +530,8 @@ class SubscriptionController extends Controller
             'discount' => (float) $o->discount_total,
             'lines' => $o->lines->map(fn ($l) => [
                 'name' => $l->branch?->name ?? __('Branch'),
-                'from' => $l->start_date?->format('d M Y'),
-                'to' => $l->end_date?->format('d M Y'),
+                'from' => $l->start_date?->translatedFormat('d M Y'),
+                'to' => $l->end_date?->translatedFormat('d M Y'),
                 'amount' => (float) $l->amount,
                 // Free only when it cost nothing: a trial's free month on a yearly term
                 // uses the gift but still pays the rest.
@@ -551,7 +551,7 @@ class SubscriptionController extends Controller
         return [
             'count' => $q['count'],
             'total' => round((float) $q['subtotal'], 2),
-            'anchor' => $q['anchor']?->format('d M Y'),
+            'anchor' => $q['anchor']?->translatedFormat('d M Y'),
             'lines' => collect($q['lines'])->map(fn (array $l) => [
                 'name' => $l['branch']->name,
                 'days' => (int) $l['days'],
@@ -569,7 +569,7 @@ class SubscriptionController extends Controller
     protected function newBranchQuote(SubscriptionAccount $account): array
     {
         if ($this->billing->trialJoinable($account)) {
-            return ['mode' => 'trial', 'until' => $account->current_period_end->format('d M Y')];
+            return ['mode' => 'trial', 'until' => $account->current_period_end->translatedFormat('d M Y')];
         }
 
         if ($account->period?->isPaid() && $account->current_period_end?->isFuture()) {
@@ -583,7 +583,7 @@ class SubscriptionController extends Controller
                 'volume' => round((float) ($q['breakdown']['volume_amount'] ?? 0), 2),
                 'manual' => round((float) ($q['breakdown']['manual_amount'] ?? 0), 2),
                 'final' => round((float) $q['breakdown']['final'], 2),
-                'anchor' => $q['anchor']?->format('d M Y'),
+                'anchor' => $q['anchor']?->translatedFormat('d M Y'),
                 'term' => $account->period->label(),
             ];
         }
@@ -613,7 +613,7 @@ class SubscriptionController extends Controller
                 'free' => (float) $o->amount <= 0,
                 'branches' => $o->quantity,
                 'period' => $o->period?->isPaid() ? $o->period->label() : null,
-                'date' => $o->created_at?->format('d M Y'),
+                'date' => $o->created_at?->translatedFormat('d M Y'),
                 'invoice' => $o->invoiceNumber(),
                 'receipt' => (float) $o->amount > 0 ? route('admin.subscription.receipt', $o) : null,
             ])
@@ -670,7 +670,7 @@ class SubscriptionController extends Controller
                     'prorated' => round((float) $q['prorated'], 2),
                     'volume' => round((float) ($q['breakdown']['volume_amount'] ?? 0), 2),
                     'manual' => round((float) ($q['breakdown']['manual_amount'] ?? 0), 2),
-                    'anchor' => $q['anchor']?->format('d M Y'),
+                    'anchor' => $q['anchor']?->translatedFormat('d M Y'),
                 ]];
             })
             ->filter(fn (array $q) => $q['amount'] >= 1)

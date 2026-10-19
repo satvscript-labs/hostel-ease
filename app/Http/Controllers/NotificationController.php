@@ -22,14 +22,14 @@ class NotificationController extends Controller
         $this->authorizeAccess($notification);
         $notification->markAsRead();
 
-        return back()->with('success', 'Marked as read.');
+        return back()->with('success', __('Marked as read.'));
     }
 
     public function readAll(): RedirectResponse
     {
         Notification::forUser(auth()->user())->unread()->update(['read_at' => now()]);
 
-        return back()->with('success', 'All notifications marked as read.');
+        return back()->with('success', __('All notifications marked as read.'));
     }
 
     public function destroy(Notification $notification): RedirectResponse
@@ -37,7 +37,7 @@ class NotificationController extends Controller
         $this->authorizeAccess($notification);
         $notification->delete();
 
-        return back()->with('success', 'Notification removed.');
+        return back()->with('success', __('Notification removed.'));
     }
 
     protected function authorizeAccess(Notification $notification): void

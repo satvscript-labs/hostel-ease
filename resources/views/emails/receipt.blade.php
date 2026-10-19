@@ -9,7 +9,7 @@ We have received your payment. The details are below, and a PDF copy is attached
 **Receipt No:** {{ $payment->receipt_number }}
 **Amount:** {{ hostelease_money($payment->amount) }}
 **Mode:** {{ strtoupper($payment->mode) }}
-**Date:** {{ $payment->paid_on->format('d M Y') }}
+**Date:** {{ $payment->paid_on->translatedFormat('d M Y') }}
 @endcomponent
 
 Thank you,<br>

@@ -90,17 +90,17 @@ class InvoiceController extends Controller
 
         $this->logger->log('invoice.update', "Invoice #{$invoice->id} edited: {$invoice->title}", $invoice);
 
-        return back()->with('success', 'Invoice updated.');
+        return back()->with('success', __('Invoice updated.'));
     }
 
     public function destroy(Invoice $invoice): RedirectResponse
     {
         if ((float) $invoice->paid_amount > 0) {
-            return back()->with('error', 'This invoice has payments against it — reverse the receipt(s) first.');
+            return back()->with('error', __('This invoice has payments against it — reverse the receipt(s) first.'));
         }
 
         $invoice->delete();
 
-        return back()->with('success', 'Invoice removed.');
+        return back()->with('success', __('Invoice removed.'));
     }
 }

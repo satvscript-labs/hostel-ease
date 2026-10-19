@@ -19,9 +19,9 @@ enum PresenceState: string
     public function label(): string
     {
         return match ($this) {
-            self::In => 'Inside',
-            self::Out => 'Out',
-            self::Unknown => 'Unknown',
+            self::In => __('Inside'),
+            self::Out => __('Out'),
+            self::Unknown => __('Unknown'),
         };
     }
 

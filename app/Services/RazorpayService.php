@@ -50,7 +50,7 @@ class RazorpayService
     public function createOrder(int $amountPaise, string $receipt, array $notes = [], string $currency = 'INR'): array
     {
         if ($amountPaise < 100) {
-            throw new RuntimeException('Amount must be at least 100 paise.');
+            throw new RuntimeException(__('Amount must be at least 100 paise.'));
         }
 
         $data = $this->send('post', '/orders', [
@@ -152,10 +152,10 @@ class RazorpayService
     public function createMandateOrder(int $amountPaise, int $maxAmountPaise, string $customerId, string $receipt, array $notes = []): array
     {
         if ($amountPaise < 100) {
-            throw new RuntimeException('Amount must be at least 100 paise.');
+            throw new RuntimeException(__('Amount must be at least 100 paise.'));
         }
         if ($amountPaise > $maxAmountPaise) {
-            throw new RuntimeException('This payment is above the autopay limit.');
+            throw new RuntimeException(__('This payment is above the autopay limit.'));
         }
 
         $data = $this->send('post', '/orders', [
@@ -187,7 +187,7 @@ class RazorpayService
     public function createDebitOrder(int $amountPaise, string $receipt, array $notes = []): array
     {
         if ($amountPaise < 100) {
-            throw new RuntimeException('Amount must be at least 100 paise.');
+            throw new RuntimeException(__('Amount must be at least 100 paise.'));
         }
 
         $order = $this->send('post', '/orders', [
@@ -199,7 +199,7 @@ class RazorpayService
         ], 'Razorpay could not create the autopay order.');
 
         if (! filled($order['id'] ?? null)) {
-            throw new RuntimeException('Razorpay did not return an order for the autopay debit.', 502);
+            throw new RuntimeException(__('Razorpay did not return an order for the autopay debit.'), 502);
         }
 
         return ['id' => (string) $order['id']];
@@ -279,7 +279,7 @@ class RazorpayService
         string $currency = 'INR',
     ): array {
         if ($amountPaise < 100) {
-            throw new RuntimeException('A payment link needs at least ₹1 — this charge is ₹0, so there is nothing to collect.');
+            throw new RuntimeException(__('A payment link needs at least ₹1 — this charge is ₹0, so there is nothing to collect.'));
         }
 
         // Only send the contact fields we actually hold. Razorpay rejects the whole
@@ -452,7 +452,7 @@ class RazorpayService
     private function send(string $method, string $path, array $payload, string $fallbackMessage): array
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('Razorpay is not configured.');
+            throw new RuntimeException(__('Razorpay is not configured.'));
         }
 
         try {
@@ -467,11 +467,11 @@ class RazorpayService
             // what had happened or whether they had charged someone.
             Log::warning('Razorpay could not be reached', ['path' => $path, 'error' => $e->getMessage()]);
 
-            throw new RuntimeException('Razorpay could not be reached just now, so nothing was charged or recorded. Try again in a moment, or record this payment offline.', 503, $e);
+            throw new RuntimeException(__('Razorpay could not be reached just now, so nothing was charged or recorded. Try again in a moment, or record this payment offline.'), 503, $e);
         }
 
         if ($response->status() === 401) {
-            throw new RuntimeException('Razorpay authentication failed.', 401);
+            throw new RuntimeException(__('Razorpay authentication failed.'), 401);
         }
         if ($response->failed()) {
             $message = $response->json('error.description') ?? $fallbackMessage;

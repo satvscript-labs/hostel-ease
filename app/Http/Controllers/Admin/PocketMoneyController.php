@@ -122,6 +122,6 @@ class PocketMoneyController extends Controller
 
         $transaction->delete();
 
-        return back()->with('success', 'Transaction removed.');
+        return back()->with('success', __('Transaction removed.'));
     }
 }

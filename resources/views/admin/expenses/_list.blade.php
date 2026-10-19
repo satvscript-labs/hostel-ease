@@ -21,7 +21,7 @@
     @forelse($expenses as $expense)
         @php
             $icon = $catIcons[$expense->category] ?? 'receipt';
-            $catLabel = config('hostelease.expense_categories.'.$expense->category, ucfirst($expense->category));
+            $catLabel = __((string) config('hostelease.expense_categories.'.$expense->category, ucfirst($expense->category)));
             $modeLabel = $modeNames[$expense->mode] ?? ucfirst($expense->mode);
             $salaryStaff = $expense->isSalaryLinked() ? $expense->salaryPayment?->staff : null;
             $editPayload = $expense->isSalaryLinked() ? null : \Illuminate\Support\Js::from([
@@ -60,7 +60,7 @@
                     <div class="exp-row-meta">
                         <div class="exp-cell-date">
                             <div class="exp-row-lbl">{{ __('Date') }}</div>
-                            <div class="fw-semibold text-dark small text-nowrap">{{ $expense->expense_date->format('d M Y') }}</div>
+                            <div class="fw-semibold text-dark small text-nowrap">{{ $expense->expense_date->translatedFormat('d M Y') }}</div>
                         </div>
 
                         <div class="exp-cell-mode" style="min-width: 0;">
@@ -113,7 +113,7 @@
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="fw-bold text-dark text-truncate">{{ $expense->title }}</div>
                             <div class="text-muted small text-truncate">
-                                {{ $expense->expense_date->format('d M') }} &middot; {{ $modeLabel }}
+                                {{ $expense->expense_date->translatedFormat('d M') }} &middot; {{ $modeLabel }}
                                 @if($expense->paid_to) &middot; {{ $expense->paid_to }}@endif
                             </div>
                         </div>

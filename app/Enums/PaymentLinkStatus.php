@@ -25,11 +25,11 @@ enum PaymentLinkStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Created => 'Awaiting payment',
-            self::PartiallyPaid => 'Partially paid',
-            self::Paid => 'Paid',
-            self::Expired => 'Expired',
-            self::Cancelled => 'Cancelled',
+            self::Created => __('Awaiting payment'),
+            self::PartiallyPaid => __('Partially paid'),
+            self::Paid => __('Paid'),
+            self::Expired => __('Expired'),
+            self::Cancelled => __('Cancelled'),
         };
     }
 

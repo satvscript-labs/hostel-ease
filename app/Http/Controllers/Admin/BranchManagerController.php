@@ -55,7 +55,7 @@ class BranchManagerController extends Controller
         $this->logger->log('branch.rename', "Branch renamed — '{$old}' → '{$hostel->name}'", $hostel);
 
         return redirect()->route('admin.settings.index', ['tab' => 'branches'])
-            ->with('success', 'Branch details updated.');
+            ->with('success', __('Branch details updated.'));
     }
 
     /**
@@ -86,11 +86,11 @@ class BranchManagerController extends Controller
         abort_unless($hostel->owner_id === $request->user()->id, 404);
 
         if ($hostel->isCancelled()) {
-            return back()->with('info', "{$hostel->name} is already scheduled for removal.");
+            return back()->with('info', __(':name is already scheduled for removal.', ['name' => $hostel->name]));
         }
 
         if (! $this->accountBilling->requestRemoval($hostel, $data['reason'])) {
-            return back()->with('info', 'We already have your request for this branch — our team will be in touch.');
+            return back()->with('info', __('We already have your request for this branch — our team will be in touch.'));
         }
 
         $this->logger->log('branch.removal_requested', "Removal requested for {$hostel->name} — {$data['reason']}", $hostel);
@@ -105,7 +105,7 @@ class BranchManagerController extends Controller
             'warning',
         );
 
-        return back()->with('success', 'Request received — our team will contact you before anything changes. Nothing has been cancelled yet.');
+        return back()->with('success', __('Request received — our team will contact you before anything changes. Nothing has been cancelled yet.'));
     }
 
     /** The owner changes their mind. Leaves no billing trace. */
@@ -114,12 +114,12 @@ class BranchManagerController extends Controller
         abort_unless($hostel->owner_id === $request->user()->id, 404);
 
         if (! $this->accountBilling->clearRemovalRequest($hostel)) {
-            return back()->with('info', 'There is no open removal request for that branch.');
+            return back()->with('info', __('There is no open removal request for that branch.'));
         }
 
         $this->logger->log('branch.removal_withdrawn', "Removal request withdrawn for {$hostel->name}", $hostel);
         $this->notifications->clear(null, 'branch_removal_request', 'branch_removal_request:'.$hostel->id);
 
-        return back()->with('success', 'Request withdrawn — nothing changes.');
+        return back()->with('success', __('Request withdrawn — nothing changes.'));
     }
 }

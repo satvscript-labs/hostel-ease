@@ -265,7 +265,7 @@ class StaffController extends Controller
             .($staff->designation ? " ({$staff->designation})" : '')
             .' at '.hostelease_money($staff->monthly_salary).'/month', $staff);
 
-        return back()->with('success', 'Staff added.');
+        return back()->with('success', __('Staff added.'));
     }
 
     public function update(Request $request, Staff $staff): RedirectResponse
@@ -294,7 +294,7 @@ class StaffController extends Controller
 
         $this->logger->log('staff.update', "Staff updated — {$staff->name}", $staff);
 
-        return back()->with('success', 'Staff updated.');
+        return back()->with('success', __('Staff updated.'));
     }
 
     /**
@@ -316,7 +316,7 @@ class StaffController extends Controller
 
         $this->logger->log('staff.delete', "Staff removed — {$staff->name}. Salary history kept.", $staff);
 
-        return back()->with('success', "{$staff->name} removed — salary history kept.");
+        return back()->with('success', __(':name removed — salary history kept.', ['name' => $staff->name]));
     }
 
     public function restore(Staff $staff): RedirectResponse
@@ -328,7 +328,7 @@ class StaffController extends Controller
 
         $this->logger->log('staff.restore', "Staff restored — {$staff->name}", $staff);
 
-        return back()->with('success', "{$staff->name} restored.");
+        return back()->with('success', __(':name restored.', ['name' => $staff->name]));
     }
 
     public function show(Staff $staff): View
@@ -436,7 +436,7 @@ class StaffController extends Controller
         }
 
         return redirect()->route('admin.staff.index', ['tab' => 'attendance', 'date' => $date->toDateString()])
-            ->with('success', 'Attendance saved.');
+            ->with('success', __('Attendance saved.'));
     }
 
     public function paySalary(Request $request, Staff $staff): RedirectResponse
@@ -505,7 +505,7 @@ class StaffController extends Controller
                 .hostelease_money($data['amount']), $payment);
         });
 
-        return back()->with('success', "Salary recorded for {$staff->name} — logged to expenses.");
+        return back()->with('success', __('Salary recorded for :name — logged to expenses.', ['name' => $staff->name]));
     }
 
     public function deleteSalary(Staff $staff, StaffSalaryPayment $payment): RedirectResponse
@@ -524,7 +524,7 @@ class StaffController extends Controller
                 .$payment->salary_month->format('M Y').' · '.hostelease_money($payment->amount), $staff);
         });
 
-        return back()->with('success', 'Salary entry removed — its expense entry went with it.');
+        return back()->with('success', __('Salary entry removed — its expense entry went with it.'));
     }
 
     /**

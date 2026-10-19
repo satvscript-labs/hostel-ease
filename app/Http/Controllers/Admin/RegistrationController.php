@@ -41,7 +41,7 @@ class RegistrationController extends Controller
         $hostel = Hostel::findOrFail(Tenant::id());
         $hostel->forceFill(['registration_token' => Str::random(24)])->save();
 
-        return back()->with('success', 'New registration link generated. The old link no longer works.');
+        return back()->with('success', __('New registration link generated. The old link no longer works.'));
     }
 
     /**
@@ -92,7 +92,7 @@ class RegistrationController extends Controller
         $registration->update(['status' => 'approved', 'student_id' => $student->id, 'reviewed_at' => now()]);
         $this->logger->log('registration.approve', "Approved {$registration->name}", $student);
 
-        return redirect()->route('admin.students.show', $student)->with('success', 'Registration approved — student created.');
+        return redirect()->route('admin.students.show', $student)->with('success', __('Registration approved — student created.'));
     }
 
     public function reject(StudentRegistration $registration): RedirectResponse
@@ -100,6 +100,6 @@ class RegistrationController extends Controller
         abort_unless($registration->status === 'pending' && $registration->hostel_id === Tenant::id(), 404);
         $registration->update(['status' => 'rejected', 'reviewed_at' => now()]);
 
-        return back()->with('success', 'Registration rejected.');
+        return back()->with('success', __('Registration rejected.'));
     }
 }

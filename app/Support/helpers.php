@@ -1,5 +1,79 @@
 <?php
 
+if (! function_exists('hostelease_options')) {
+    /**
+     * A config label list (config/hostelease.php) with its labels in the reader's
+     * language — for selects and filters (S7.1). Keys stay as stored.
+     *
+     * @return array<string, string>
+     */
+    function hostelease_options(string $key): array
+    {
+        return array_map(fn ($label) => is_string($label) ? __($label) : $label, (array) config('hostelease.'.$key, []));
+    }
+}
+
+if (! function_exists('hostelease_term')) {
+    /**
+     * A stored code word shown to people — `monthly`, `ac`, `aadhaar`, `half_day` — as
+     * a word in their language (S7.1). Unknown words pass through capitalised.
+     */
+    function hostelease_term(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        if (preg_match('/^(\d+) Sharing$/i', $value, $m)) {
+            return __(':n sharing', ['n' => $m[1]]);
+        }
+        $label = match (strtolower($value)) {
+            'ac' => 'AC',
+            'non-ac', 'non_ac', 'nonac' => 'Non-AC',
+            default => ucfirst(str_replace('_', ' ', $value)),
+        };
+
+        return __($label);
+    }
+}
+
+if (! function_exists('hostelease_role_label')) {
+    /** A role's name for people to read, in their language (S7.1). */
+    function hostelease_role_label(?string $role): string
+    {
+        if ($role === 'super_admin') {
+            return __('Super Admin');
+        }
+        $label = config('hostelease.roles.'.$role) ?? config('hostelease.staff_roles.'.$role) ?? ucfirst(str_replace('_', ' ', (string) $role));
+
+        return __($label);
+    }
+}
+
+if (! function_exists('hostelease_in_locale')) {
+    /**
+     * Run $fn in another language, then put the current one back (S7.1). For text made
+     * outside a request for one person — the daily jobs' bell entries and emails.
+     *
+     * @template T
+     *
+     * @param  \Closure(): T  $fn
+     * @return T
+     */
+    function hostelease_in_locale(?string $locale, \Closure $fn): mixed
+    {
+        $before = app()->getLocale();
+        if ($locale && array_key_exists($locale, config('app.available_locales', []))) {
+            app()->setLocale($locale);
+        }
+
+        try {
+            return $fn();
+        } finally {
+            app()->setLocale($before);
+        }
+    }
+}
+
 use Illuminate\Support\Str;
 
 if (! function_exists('hostelease_phone')) {

@@ -144,7 +144,8 @@ class UserController extends Controller
             $user->loadMissing('hostels:id,name');
             $actor = auth()->user();
 
-            Mail::to($user->email)->send(new StaffInviteMail(
+            // In the language of the owner adding them (S7.1) — the new person has none yet.
+            Mail::to($user->email)->locale(app()->getLocale())->send(new StaffInviteMail(
                 $user,
                 config('hostelease.staff_roles.'.$user->role, ucfirst($user->role)),
                 $user->hostels->pluck('name')->implode(', ') ?: config('app.name', 'HostelEase'),
@@ -167,7 +168,7 @@ class UserController extends Controller
         $user->update(['is_active' => ! $user->is_active]);
         $this->logger->log('user.toggle', ($user->is_active ? 'Enabled' : 'Disabled')." {$user->name}", $user);
 
-        return back()->with('active_tab', 'users')->with('success', 'User '.($user->is_active ? 'enabled' : 'disabled').'.');
+        return back()->with('active_tab', 'users')->with('success', $user->is_active ? __('User enabled.') : __('User disabled.'));
     }
 
     public function resetPassword(User $user): RedirectResponse
@@ -177,8 +178,25 @@ class UserController extends Controller
         $password = Str::upper(Str::random(3)).random_int(10000, 99999);
         $user->update(['password' => Hash::make($password)]);
 
+        // Whoever knew the old password is signed out everywhere (S7.1).
+        \App\Http\Controllers\SecurityController::endOtherSessions($user);
+        app(\App\Services\Auth\TwoFactor::class)->forgetDevices($user);
+
         return back()->with('active_tab', 'users')->with('credentials', ['mobile' => $user->mobile, 'password' => $password])
-            ->with('success', 'Password reset — share the new login below.');
+            ->with('success', __('Password reset — share the new login below.'));
+    }
+
+    /**
+     * Turn off a team member's two-factor sign-in (S7.1) — they lost their phone and
+     * their recovery codes. They sign in with the password and can turn it on again.
+     */
+    public function resetTwoFactor(User $user): RedirectResponse
+    {
+        $this->authorizeManage($user, adminAllowed: true);
+        app(\App\Services\Auth\TwoFactor::class)->disable($user, 'admin');
+        app(\App\Services\ActivityLogger::class)->log('security.2fa_reset', "Reset two-factor sign-in for {$user->name}", $user);
+
+        return back()->with('active_tab', 'users')->with('success', __('Two-factor sign-in is off for :name. They can sign in with their password and turn it on again.', ['name' => $user->name]));
     }
 
     public function destroy(User $user): RedirectResponse
@@ -187,7 +205,7 @@ class UserController extends Controller
         $this->authorizeManage($user);
         $user->delete();
 
-        return back()->with('active_tab', 'users')->with('success', 'User removed.');
+        return back()->with('active_tab', 'users')->with('success', __('User removed.'));
     }
 
     /**

@@ -44,7 +44,7 @@ class WebhookController extends Controller
         $signature = (string) $request->header('X-Razorpay-Signature', '');
 
         if (! $this->razorpay->verifyWebhook($raw, $signature)) {
-            return response()->json(['message' => 'Invalid signature'], 400);
+            return response()->json(['message' => __('Invalid signature')], 400);
         }
 
         $payload = json_decode($raw, true) ?: [];

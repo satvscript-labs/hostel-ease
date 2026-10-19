@@ -64,13 +64,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = e.target.closest('form[data-confirm]');
         if (!form) return;
         e.preventDefault();
+        const t = window.hostelease_I18N || {};
         Swal.fire({
-            title: 'Are you sure?',
-            text: form.dataset.confirm || 'This action cannot be undone.',
+            title: t.confirmTitle || 'Are you sure?',
+            text: form.dataset.confirm || t.confirmText || 'This action cannot be undone.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
-            confirmButtonText: 'Yes, proceed',
+            confirmButtonText: t.confirmYes || 'Yes, proceed',
+            cancelButtonText: t.cancel || 'Cancel',
         }).then((r) => r.isConfirmed && form.submit());
     });
 
@@ -566,7 +568,7 @@ function initGlobalSearch() {
         if (!results.length) {
             panel.innerHTML = `<div class="he-search-empty">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <span>No matches found.</span>
+                <span>${esc((window.hostelease_I18N || {}).noMatches || 'No matches found.')}</span>
             </div>`;
             panel.classList.add('show');
             return;

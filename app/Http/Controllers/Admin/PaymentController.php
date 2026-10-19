@@ -54,7 +54,7 @@ class PaymentController extends Controller
         if ($this->whatsapp->enabled()) {
             $this->whatsapp->send($payment->student->mobile, $message);
 
-            return back()->with('success', 'Receipt sent on WhatsApp.');
+            return back()->with('success', __('Receipt sent on WhatsApp.'));
         }
 
         return redirect()->away($this->whatsapp->link($payment->student->mobile, $message));
@@ -67,10 +67,11 @@ class PaymentController extends Controller
         $payment->load(self::RECEIPT_RELATIONS);
         $pdf = Pdf::loadView('admin.payments.receipt_pdf', ['payment' => $payment])->output();
 
-        Mail::to($data['email'])->queue(new ReceiptMail($payment, $pdf));
+        // Queued: rendered later by the worker, so the language is fixed now (S7.1).
+        Mail::to($data['email'])->locale(app()->getLocale())->queue(new ReceiptMail($payment, $pdf));
         $this->logger->log('payment.email', "Emailed receipt {$payment->receipt_number} to {$data['email']}", $payment);
 
-        return back()->with('success', "Receipt emailed to {$data['email']}.");
+        return back()->with('success', __('Receipt emailed to :email.', ['email' => $data['email']]));
     }
 
     public function destroy(Payment $payment): RedirectResponse
@@ -78,7 +79,7 @@ class PaymentController extends Controller
         // Reverse against the linked invoice(s) so the student's balance is restored.
         $this->payments->reverse($payment);
 
-        return redirect()->route('admin.finance.index')->with('success', 'Payment removed and balance restored.');
+        return redirect()->route('admin.finance.index')->with('success', __('Payment removed and balance restored.'));
     }
 
     protected function receiptMessage(Payment $payment): string

@@ -53,7 +53,7 @@ class HostelService
             if ($existing) {
                 if (! $existing->isHostelAdmin()) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'mobile' => ['This mobile number belongs to another (non-admin) login.'],
+                        'mobile' => [__('This mobile number belongs to another (non-admin) login.')],
                     ]);
                 }
                 $admin = $existing;

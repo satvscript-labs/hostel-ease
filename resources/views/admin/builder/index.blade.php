@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Layout Builder')
+@section('title', __('Layout Builder'))
 
 @push('styles')
 <style>
@@ -324,15 +324,15 @@
 
     <div class="builder-header d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 fw-bold mb-1">Smart Layout Builder</h1>
-            <p class="text-muted mb-0">Design your hostel hierarchy instantly without page reloads.</p>
+            <h1 class="h3 fw-bold mb-1">{{ __('Smart Layout Builder') }}</h1>
+            <p class="text-muted mb-0">{{ __('Design your hostel hierarchy instantly without page reloads.') }}</p>
         </div>
         <div class="builder-header-actions d-flex gap-2">
             <a href="{{ route('admin.property.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
-                <i class="fa-solid fa-arrow-left me-2"></i><span class="builder-back-label">Back to Property Board</span><span class="builder-back-label-short">Back</span>
+                <i class="fa-solid fa-arrow-left me-2"></i><span class="builder-back-label">{{ __('Back to Property Board') }}</span><span class="builder-back-label-short">{{ __('Back') }}</span>
             </a>
             <button type="button" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold" @click="openRoomSettings()">
-                <i class="fa-solid fa-sliders me-2"></i>Room Settings
+                <i class="fa-solid fa-sliders me-2"></i>{{ __('Room Settings') }}
             </button>
         </div>
     </div>
@@ -354,8 +354,8 @@
         <!-- Sidebar: Floors -->
         <div class="builder-sidebar">
             <div class="sidebar-header">
-                <h4 class="fw-bold mb-0">Floors</h4>
-                <div class="small opacity-75">Select a floor to manage rooms</div>
+                <h4 class="fw-bold mb-0">{{ __('Floors') }}</h4>
+                <div class="small opacity-75">{{ __('Select a floor to manage rooms') }}</div>
             </div>
             
             <div class="floor-list" x-sort="reorderFloors">
@@ -365,10 +365,10 @@
                             <i class="fa-solid fa-grip-vertical text-muted opacity-50 me-3 fs-5" style="cursor: grab;" x-sort:handle></i>
                             <div>
                                 <div class="fw-bold fs-5" x-text="floor.name"></div>
-                                <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> Rooms</div>
+                                <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> {{ __('Rooms') }}</div>
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-link text-danger p-0" @click.stop="deleteFloor(floor.id)" title="Delete Floor">
+                        <button class="btn btn-sm btn-link text-danger p-0" @click.stop="deleteFloor(floor.id)" title="{{ __('Delete Floor') }}">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -376,15 +376,15 @@
                 
                 <!-- Add Floor Input -->
                 <div x-show="addingFloor" class="mt-3 p-3 bg-light rounded-3 border" x-cloak>
-                    <input type="text" x-model="newFloorName" class="form-control mb-2" placeholder="Floor Name (e.g. Ground Floor)" @keydown.enter="saveNewFloor" x-ref="newFloorInput">
+                    <input type="text" x-model="newFloorName" class="form-control mb-2" placeholder="{{ __('Floor Name (e.g. Ground Floor)') }}" @keydown.enter="saveNewFloor" x-ref="newFloorInput">
                     <div class="d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-fill" @click="saveNewFloor" :disabled="isLoading">Save</button>
-                        <button class="btn btn-light btn-sm flex-fill" @click="addingFloor = false">Cancel</button>
+                        <button class="btn btn-primary btn-sm flex-fill" @click="saveNewFloor" :disabled="isLoading">{{ __('Save') }}</button>
+                        <button class="btn btn-light btn-sm flex-fill" @click="addingFloor = false">{{ __('Cancel') }}</button>
                     </div>
                 </div>
                 
                 <button x-show="!addingFloor" class="btn btn-outline-primary w-100 rounded-pill mt-3 fw-bold border-dashed" @click="startAddingFloor">
-                    <i class="fa-solid fa-plus me-1"></i> Add Floor
+                    <i class="fa-solid fa-plus me-1"></i> {{ __('Add Floor') }}
                 </button>
             </div>
         </div>
@@ -396,8 +396,8 @@
                     <div class="bg-light rounded-circle p-4 mb-3 d-inline-block">
                         <i class="fa-solid fa-layer-group fs-1 opacity-50"></i>
                     </div>
-                    <h4 class="fw-bold">Select a Floor</h4>
-                    <p>Choose a floor to manage its layout.</p>
+                    <h4 class="fw-bold">{{ __('Select a Floor') }}</h4>
+                    <p>{{ __('Choose a floor to manage its layout.') }}</p>
                 </div>
             </template>
             
@@ -409,11 +409,11 @@
                                 <i class="fa-solid fa-layer-group text-primary me-2"></i>
                                 <span x-text="activeFloor.name"></span>
                             </h3>
-                            <div class="text-muted small">Auto-saving changes instantly.</div>
+                            <div class="text-muted small">{{ __('Auto-saving changes instantly.') }}</div>
                         </div>
                         <div class="d-flex gap-2">
                             <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 fs-6">
-                                <span x-text="activeFloor.rooms ? activeFloor.rooms.length : 0"></span> Rooms
+                                <span x-text="activeFloor.rooms ? activeFloor.rooms.length : 0"></span> {{ __('Rooms') }}
                             </span>
                         </div>
                     </div>
@@ -427,24 +427,24 @@
                             <div class="room-card">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <div>
-                                        <div class="text-muted small fw-bold text-uppercase mb-1">Room No.</div>
+                                        <div class="text-muted small fw-bold text-uppercase mb-1">{{ __('Room No.') }}</div>
                                         <input type="text" x-model="room.room_number" class="room-number-input" @change="updateRoom(room)">
                                     </div>
-                                    <button class="btn btn-sm btn-light text-danger rounded-circle" @click="deleteRoom(room.id)" title="Delete Room">
+                                    <button class="btn btn-sm btn-light text-danger rounded-circle" @click="deleteRoom(room.id)" title="{{ __('Delete Room') }}">
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
                                 </div>
 
                                 <div class="mb-4">
-                                    <div class="text-muted small fw-bold text-uppercase mb-2">Room Type</div>
+                                    <div class="text-muted small fw-bold text-uppercase mb-2">{{ __('Room Type') }}</div>
                                     <div class="smart-toggle">
                                         <div class="smart-toggle-btn" :class="{'active': room.room_type === 'ac'}" @click="room.room_type = 'ac'; updateRoomDebounced(room)">AC</div>
-                                        <div class="smart-toggle-btn" :class="{'active': room.room_type === 'non_ac'}" @click="room.room_type = 'non_ac'; updateRoomDebounced(room)">Non-AC</div>
+                                        <div class="smart-toggle-btn" :class="{'active': room.room_type === 'non_ac'}" @click="room.room_type = 'non_ac'; updateRoomDebounced(room)">{{ __('Non-AC') }}</div>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <div class="text-muted small fw-bold text-uppercase mb-2">Sharing Capacity</div>
+                                    <div class="text-muted small fw-bold text-uppercase mb-2">{{ __('Sharing Capacity') }}</div>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="sharing-control">
                                             <button class="sharing-btn" @click="room._pendingSharing = Math.max(1, (room._pendingSharing ?? room.sharing) - 1)"><i class="fa-solid fa-minus"></i></button>
@@ -456,7 +456,7 @@
                                                 x-transition.opacity
                                                 :class="{ 'is-saved': room._justSaved }"
                                                 :disabled="room._savingSharing"
-                                                :title="room._justSaved ? 'Saved' : 'Save sharing capacity'"
+                                                :title="room._justSaved ? @js(__('Saved')) : @js(__('Save sharing capacity'))"
                                                 @click="saveSharing(room)">
                                             <i class="fa-solid" :class="room._savingSharing ? 'fa-spinner fa-spin' : (room._justSaved ? 'fa-check' : 'fa-floppy-disk')" style="font-size: 0.75rem;"></i>
                                         </button>
@@ -465,8 +465,8 @@
                                 
                                 <div class="mt-3 pt-3 border-top">
                                     <div class="d-flex justify-content-between text-muted small">
-                                        <span>Beds Status</span>
-                                        <span class="fw-bold"><span x-text="room.occupied_beds_count || 0"></span> / <span x-text="room.beds_count || room.sharing"></span> Occupied</span>
+                                        <span>{{ __('Beds Status') }}</span>
+                                        <span class="fw-bold"><span x-text="room.occupied_beds_count || 0"></span> / <span x-text="room.beds_count || room.sharing"></span> {{ __('Occupied') }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -478,8 +478,8 @@
                                 <i class="fa-solid fa-plus fs-4"></i>
                             </div>
                             <div class="add-room-text">
-                                <h5 class="fw-bold mb-0">Add New Room</h5>
-                                <div class="small opacity-75">Tap to add instantly</div>
+                                <h5 class="fw-bold mb-0">{{ __('Add New Room') }}</h5>
+                                <div class="small opacity-75">{{ __('Tap to add instantly') }}</div>
                             </div>
                         </div>
                         
@@ -526,7 +526,7 @@
                 </div>
                 <div class="custom-overlay-footer">
                     <template x-if="alertModal.isConfirm">
-                        <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="alertModal.show = false">Cancel</button>
+                        <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="alertModal.show = false">{{ __('Cancel') }}</button>
                     </template>
                     <button type="button" class="btn fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
                             :class="{
@@ -553,10 +553,10 @@
             <div class="builder-floors-sheet" :class="{ 'is-open': floorsSheetOpen }" x-show="floorsSheetOpen" @click.stop x-cloak style="display: none;">
                 <div class="bfs-header">
                     <div>
-                        <h5 class="fw-bold mb-0">Floors</h5>
-                        <div class="small opacity-75">Select a floor to manage rooms</div>
+                        <h5 class="fw-bold mb-0">{{ __('Floors') }}</h5>
+                        <div class="small opacity-75">{{ __('Select a floor to manage rooms') }}</div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" @click="floorsSheetOpen = false" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" @click="floorsSheetOpen = false" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="bfs-body" x-sort="reorderFloors">
                     <template x-for="floor in floors" :key="floor.id">
@@ -565,23 +565,23 @@
                             <span class="bfs-floor-ic"><i class="fa-solid fa-layer-group"></i></span>
                             <div class="bfs-floor-text">
                                 <div class="fw-bold" x-text="floor.name"></div>
-                                <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> Rooms</div>
+                                <div class="small text-muted"><span x-text="floor.rooms ? floor.rooms.length : 0"></span> {{ __('Rooms') }}</div>
                             </div>
-                            <button type="button" class="bfs-floor-del" @click.stop="deleteFloor(floor.id)" title="Delete Floor">
+                            <button type="button" class="bfs-floor-del" @click.stop="deleteFloor(floor.id)" title="{{ __('Delete Floor') }}">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>
                     </template>
 
                     <div x-show="addingFloor" class="bfs-add-form" x-cloak>
-                        <input type="text" x-model="newFloorName" class="form-control mb-2" placeholder="Floor Name (e.g. Ground Floor)" @keydown.enter="saveNewFloor" x-ref="newFloorInputSheet">
+                        <input type="text" x-model="newFloorName" class="form-control mb-2" placeholder="{{ __('Floor Name (e.g. Ground Floor)') }}" @keydown.enter="saveNewFloor" x-ref="newFloorInputSheet">
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-primary btn-sm flex-fill" @click="saveNewFloor" :disabled="isLoading">Save</button>
-                            <button type="button" class="btn btn-light btn-sm flex-fill" @click="addingFloor = false">Cancel</button>
+                            <button type="button" class="btn btn-primary btn-sm flex-fill" @click="saveNewFloor" :disabled="isLoading">{{ __('Save') }}</button>
+                            <button type="button" class="btn btn-light btn-sm flex-fill" @click="addingFloor = false">{{ __('Cancel') }}</button>
                         </div>
                     </div>
                     <button type="button" x-show="!addingFloor" class="btn btn-outline-primary w-100 rounded-pill mt-2 fw-bold" @click="startAddingFloor">
-                        <i class="fa-solid fa-plus me-1"></i> Add Floor
+                        <i class="fa-solid fa-plus me-1"></i> {{ __('Add Floor') }}
                     </button>
                 </div>
             </div>
@@ -599,13 +599,13 @@
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0">
                         <i class="fa-solid fa-sliders" style="color: var(--he-primary);"></i>
-                        <span class="ms-1">Room Settings</span>
+                        <span class="ms-1">{{ __('Room Settings') }}</span>
                     </h5>
                     <button type="button" class="btn-close" @click="roomSettings.open = false"></button>
                 </div>
                 <div class="custom-overlay-body">
-                    <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Maximum Sharing Capacity</label>
-                    <p class="small text-muted mb-3">The largest number of beds allowed in a single room. Raise this before adding bigger dorm-style rooms — every sharing picker across the app follows this ceiling automatically.</p>
+                    <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">{{ __('Maximum Sharing Capacity') }}</label>
+                    <p class="small text-muted mb-3">{{ __('The largest number of beds allowed in a single room. Raise this before adding bigger dorm-style rooms — every sharing picker across the app follows this ceiling automatically.') }}</p>
 
                     <div class="sharing-control">
                         <button type="button" class="sharing-btn" @click="roomSettings.value = Math.max(1, roomSettings.value - 1)">
@@ -623,10 +623,10 @@
                     <div class="text-danger small mt-2" x-show="roomSettings.error" x-text="roomSettings.error"></div>
                 </div>
                 <div class="custom-overlay-footer bg-light">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="roomSettings.open = false">Cancel</button>
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="roomSettings.open = false">{{ __('Cancel') }}</button>
                     <button type="button" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm tactile-btn" @click="saveRoomSettings()" :disabled="roomSettings.saving">
-                        <span x-show="!roomSettings.saving"><i class="fa-solid fa-check me-2"></i>Save</span>
-                        <span x-show="roomSettings.saving"><i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...</span>
+                        <span x-show="!roomSettings.saving"><i class="fa-solid fa-check me-2"></i>{{ __('Save') }}</span>
+                        <span x-show="roomSettings.saving"><i class="fa-solid fa-spinner fa-spin me-2"></i>{{ __('Saving...') }}</span>
                     </button>
                 </div>
             </div>

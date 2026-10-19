@@ -16,7 +16,7 @@ class EnsureUserRole
         $user = $request->user();
 
         if (! $user || ! $user->is_active) {
-            abort(403, 'Your account is inactive.');
+            abort(403, __('Your account is inactive.'));
         }
 
         if (! empty($roles)) {
@@ -32,7 +32,7 @@ class EnsureUserRole
                 }
             }
             if (! $allowed) {
-                return redirect()->back()->with('error', 'You are not authorised to access this area.');
+                return redirect()->back()->with('error', __('You are not authorised to access this area.'));
             }
         }
 

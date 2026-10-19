@@ -88,12 +88,12 @@ class BedController extends Controller
         ]);
 
         if ($bed->status === 'occupied') {
-            return back()->with('error', 'This bed is occupied — release the student from Bed Assignment to change it.');
+            return back()->with('error', __('This bed is occupied — release the student from Bed Assignment to change it.'));
         }
 
         $bed->update($data);
         $this->logger->log('bed.status', "Bed {$bed->bed_number} → {$data['status']}", $bed);
 
-        return back()->with('success', "Bed {$bed->bed_number} marked as {$data['status']}.");
+        return back()->with('success', __('Bed :bed marked as :status.', ['bed' => $bed->bed_number, 'status' => __(ucfirst($data['status']))]));
     }
 }

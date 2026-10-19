@@ -14,12 +14,12 @@ enum PaymentMethod: string
     public function label(): string
     {
         return match ($this) {
-            self::Cash => 'Cash',
-            self::Upi => 'UPI',
-            self::Cheque => 'Cheque',
-            self::Rtgs => 'RTGS / NEFT',
-            self::Online => 'Online (Razorpay)',
-            self::Comp => 'Complimentary',
+            self::Cash => __('Cash'),
+            self::Upi => __('UPI'),
+            self::Cheque => __('Cheque'),
+            self::Rtgs => __('RTGS / NEFT'),
+            self::Online => __('Online (Razorpay)'),
+            self::Comp => __('Complimentary'),
         };
     }
 }

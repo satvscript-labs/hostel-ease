@@ -267,14 +267,14 @@ class RenewalReminders
     {
         $c = $this->context($account);
         $name = $account->owner?->name ?? __('there');
-        $date = $c['renews_on']->format('d M Y');
+        $date = $c['renews_on']->translatedFormat('d M Y');
         $days = (int) $account->daysUntilAnchor();
         $noun = $c['is_trial'] ? __('free trial') : __('HostelEase plan');
 
         $when = match (true) {
             $days > 0 => __('renews on :date (in :n days)', ['date' => $date, 'n' => $days]),
             $days === 0 => __('renews today (:date)', ['date' => $date]),
-            $this->billing->computeStatus($account) === AccountStatus::Grace => __('ended on :date — access continues until :until', ['date' => $date, 'until' => $c['grace_until']->format('d M Y')]),
+            $this->billing->computeStatus($account) === AccountStatus::Grace => __('ended on :date — access continues until :until', ['date' => $date, 'until' => $c['grace_until']->translatedFormat('d M Y')]),
             default => __('ended on :date and access is paused', ['date' => $date]),
         };
 

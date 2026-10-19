@@ -229,7 +229,7 @@ class AccountBillingService
             $joinsTrial = false;
             if ($bp === BillingPeriod::Trial && ! $this->trialAvailable($account, $branch)) {
                 if (! $this->trialJoinable($account)) {
-                    throw new RuntimeException('This customer has already had their free trial, and it has ended — the trial belongs to the account, once, not to each branch. Choose a paid plan for this branch.');
+                    throw new RuntimeException(__('This customer has already had their free trial, and it has ended — the trial belongs to the account, once, not to each branch. Choose a paid plan for this branch.'));
                 }
                 $joinsTrial = true;
             }
@@ -754,7 +754,7 @@ class AccountBillingService
         // and we would write an empty order and push the anchor a year forward —
         // making a closed account look renewed, forever.
         if ($branches->isEmpty()) {
-            throw new RuntimeException('This account has no billable branches — every branch has been cancelled or removed. Restore a branch, or add one, before renewing.');
+            throw new RuntimeException(__('This account has no billable branches — every branch has been cancelled or removed. Restore a branch, or add one, before renewing.'));
         }
 
         return DB::transaction(function () use ($account, $period, $payment, $branches) {
@@ -1284,10 +1284,10 @@ class AccountBillingService
     {
         $anchor = $account->current_period_end;
         if (! $anchor || ! $anchor->copy()->endOfDay()->isFuture()) {
-            throw new RuntimeException('This account has no live renewal date to extend — renew it first.');
+            throw new RuntimeException(__('This account has no live renewal date to extend — renew it first.'));
         }
         if ($amount < 1 || ($unit === 'months' ? $amount > 12 : $amount > 366)) {
-            throw new RuntimeException('Extend by 1–366 days or 1–12 months.');
+            throw new RuntimeException(__('Extend by 1–366 days or 1–12 months.'));
         }
 
         return DB::transaction(function () use ($account, $anchor, $amount, $unit, $reason) {
@@ -1297,7 +1297,7 @@ class AccountBillingService
                 ->values();
 
             if ($branches->isEmpty()) {
-                throw new RuntimeException('No branch is covered up to the renewal date, so there is nothing to extend.');
+                throw new RuntimeException(__('No branch is covered up to the renewal date, so there is nothing to extend.'));
             }
 
             $label = $amount.' '.($unit === 'months' ? \Illuminate\Support\Str::plural('month', $amount) : \Illuminate\Support\Str::plural('day', $amount));

@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Students')
+@section('title', __('Students'))
 
 @push('styles')
 <style>
@@ -242,11 +242,11 @@
     <!-- Hero Banner -->
     <div class="students-hero">
         <div>
-            <h1 class="h2 fw-bold mb-1">Student Directory</h1>
-            <p class="mb-0 opacity-75">Manage all active and past residents</p>
+            <h1 class="h2 fw-bold mb-1">{{ __('Student Directory') }}</h1>
+            <p class="mb-0 opacity-75">{{ __('Manage all active and past residents') }}</p>
         </div>
         <a href="{{ route('admin.students.create') }}" class="btn btn-light fw-bold rounded-pill px-4 shadow-sm text-primary">
-            <i class="fa-solid fa-plus me-1"></i> Add Student
+            <i class="fa-solid fa-plus me-1"></i> {{ __('Add Student') }}
         </a>
     </div>
 
@@ -258,10 +258,10 @@
             <div class="he-search he-search--inline he-search--clearable students-search" x-data="{ q: @js($search) }">
                 <span class="he-search__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
                 <input type="text" name="q" class="he-search__input" x-model="q" value="{{ $search }}"
-                       placeholder="Search by name, mobile, room…"
+                       placeholder="{{ __('Search by name, mobile, room…') }}"
                        @input.debounce.450ms="$el.form.requestSubmit()">
                 <button type="button" class="he-search__clear" x-show="q.length" x-cloak
-                        @click="q = ''; $root.closest('form').requestSubmit()" aria-label="Clear search">
+                        @click="q = ''; $root.closest('form').requestSubmit()" aria-label="{{ __('Clear search') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -270,7 +270,7 @@
                     '' => ['label' => __('All Students'), 'icon' => 'users'],
                     'active' => ['label' => __('Active'), 'icon' => 'circle-check'],
                     'left' => ['label' => __('Left'), 'icon' => 'door-open'],
-                ] + collect(config('hostelease.occupation_types'))->mapWithKeys(fn ($l, $k) => [$k => ['label' => $l, 'icon' => 'briefcase']])->all()" />
+                ] + collect(hostelease_options('occupation_types'))->mapWithKeys(fn ($l, $k) => [$k => ['label' => $l, 'icon' => 'briefcase']])->all()" />
         </form>
     </div>
 
@@ -284,7 +284,7 @@
          lingering transform, which would trap the fixed FAB to the page
          (it'd sit at the end of the content instead of the screen corner). --}}
     <template x-teleport="body">
-        <a href="{{ route('admin.students.create') }}" class="fab" title="Add Student">
+        <a href="{{ route('admin.students.create') }}" class="fab" title="{{ __('Add Student') }}">
             <i class="fa-solid fa-plus"></i>
         </a>
     </template>

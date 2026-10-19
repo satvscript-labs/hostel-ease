@@ -51,7 +51,7 @@
                             </div>
                             <div class="sd-c-block">
                                 <div class="fw-semibold text-dark small lh-sm text-truncate">{{ $deposit->paymentMode?->name ?? '—' }}</div>
-                                <div class="text-muted small lh-sm text-truncate">{{ __('Collected') }} {{ $deposit->collected_on->format('d M Y') }}</div>
+                                <div class="text-muted small lh-sm text-truncate">{{ __('Collected') }} {{ $deposit->collected_on->translatedFormat('d M Y') }}</div>
                             </div>
                         </div>
                     </div>
@@ -84,7 +84,7 @@
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                         @else
-                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-2">{{ __('Refunded') }} {{ optional($deposit->refunded_on)->format('d M') }}</span>
+                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-2">{{ __('Refunded') }} {{ optional($deposit->refunded_on)->translatedFormat('d M') }}</span>
                             <form action="{{ route('admin.security-deposits.revert-refund', $deposit) }}" method="POST" class="m-0"
                                   data-confirm="{{ __('Revert this refund? Deducted dues will be reinstated and the deposit held again.') }}">
                                 @csrf
@@ -105,7 +105,7 @@
                                 <a href="{{ route('admin.students.show', $student) }}" class="fw-bold text-dark text-decoration-none">{{ $student->name }}</a>
                                 @if($left)<span class="sd-left-chip"><i class="fa-solid fa-person-walking-arrow-right"></i>{{ __('Left') }}</span>@endif
                             </div>
-                            <div class="text-muted small text-truncate">{{ $deposit->receipt_number }} · {{ $deposit->collected_on->format('d M') }}</div>
+                            <div class="text-muted small text-truncate">{{ $deposit->receipt_number }} · {{ $deposit->collected_on->translatedFormat('d M') }}</div>
                         </div>
                         <span class="badge {{ $held ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }} rounded-pill px-2 py-1 flex-shrink-0">
                             {{ $held ? __('Held') : __('Refunded') }}

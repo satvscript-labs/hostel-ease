@@ -167,7 +167,7 @@
             // Short label for the mobile date chip. rescue(): request('date') is
             // user input — an unparseable value must degrade to "no date", not 500.
             $fdDateLabel = request('date')
-                ? rescue(fn () => \Illuminate\Support\Carbon::parse(request('date'))->format('d M'), null, false)
+                ? rescue(fn () => \Illuminate\Support\Carbon::parse(request('date'))->translatedFormat('d M'), null, false)
                 : null;
         @endphp
         <div class="row g-3 mb-4 align-items-stretch stagger-4 fd-filter-row">
@@ -263,9 +263,9 @@
                             {{-- Timing --}}
                             <div class="col-6 col-lg-3">
                                 <div class="fd-label">{{ __('Timing') }}</div>
-                                <div class="fw-semibold text-dark small"><i class="fa-solid fa-arrow-right-to-bracket text-success me-1"></i>{{ $v->check_in->format('h:i A, d M') }}</div>
+                                <div class="fw-semibold text-dark small"><i class="fa-solid fa-arrow-right-to-bracket text-success me-1"></i>{{ $v->check_in->translatedFormat('h:i A, d M') }}</div>
                                 @if($v->check_out)
-                                    <div class="fw-semibold text-secondary small mt-1"><i class="fa-solid fa-arrow-right-from-bracket text-danger me-1"></i>{{ $v->check_out->format('h:i A, d M') }}</div>
+                                    <div class="fw-semibold text-secondary small mt-1"><i class="fa-solid fa-arrow-right-from-bracket text-danger me-1"></i>{{ $v->check_out->translatedFormat('h:i A, d M') }}</div>
                                 @endif
                             </div>
 
@@ -343,12 +343,12 @@
                                 <div style="min-width: 0;">
                                     <h5 class="fw-bold text-dark mb-1">{{ $c->title }}</h5>
                                     <div class="small text-muted fw-semibold">
-                                        {{ config('hostelease.complaint_categories.'.$c->category, $c->category) }} · {{ __('Logged') }} {{ $c->created_at->format('M d') }}
+                                        {{ __((string) config('hostelease.complaint_categories.'.$c->category, $c->category)) }} · {{ __('Logged') }} {{ $c->created_at->translatedFormat('M d') }}
                                     </div>
                                 </div>
                                 <span class="badge bg-{{ $prio }} {{ $prio === 'warning' || $prio === 'info' ? 'text-dark' : '' }} rounded-pill px-3 py-2 shadow-sm flex-shrink-0">
                                     @if($c->priority === 'high')<i class="fa-solid fa-triangle-exclamation me-1"></i>@endif
-                                    {{ config('hostelease.complaint_priorities.'.$c->priority, $c->priority) }}
+                                    {{ __((string) config('hostelease.complaint_priorities.'.$c->priority, $c->priority)) }}
                                 </span>
                             </div>
 
@@ -396,7 +396,7 @@
                                                 @csrf @method('PATCH')
                                                 <input type="hidden" name="status" x-model="pending">
 
-                                                @foreach(config('hostelease.complaint_statuses') as $k => $l)
+                                                @foreach(hostelease_options('complaint_statuses') as $k => $l)
                                                     <button type="button" @click="choose({{ \Illuminate\Support\Js::from($k) }})"
                                                         class="btn btn-sm w-100 text-start rounded-3 mb-1 text-nowrap d-flex align-items-center"
                                                         :class="pending === {{ \Illuminate\Support\Js::from($k) }} ? 'bg-light fw-bold text-dark' : 'text-muted'">
@@ -531,7 +531,7 @@
                         <label class="form-label fw-bold small">{{ __('Priority Level') }}</label>
                         <div class="chip-group">
                             @php $prioColors = ['low' => 'info', 'medium' => 'warning', 'high' => 'danger']; @endphp
-                            @foreach(config('hostelease.complaint_priorities') as $k => $l)
+                            @foreach(hostelease_options('complaint_priorities') as $k => $l)
                                 <label class="position-relative flex-grow-1">
                                     <input type="radio" name="priority" value="{{ $k }}" class="chip-radio"
                                            @checked($k === 'medium')>
@@ -552,8 +552,8 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold small">{{ __('Category') }}</label>
                         <x-he-select name="category" icon="tags" :submit="false" compact
-                            :selected="array_key_first(config('hostelease.complaint_categories'))"
-                            :options="config('hostelease.complaint_categories')" />
+                            :selected="array_key_first(hostelease_options('complaint_categories'))"
+                            :options="hostelease_options('complaint_categories')" />
                     </div>
 
                     <div class="mb-3">

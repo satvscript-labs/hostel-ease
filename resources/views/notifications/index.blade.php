@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Notifications')
+@section('title', __('Notifications'))
 
 @section('content')
 <div class="page-enter" style="max-width: 820px; margin-inline: auto;">
@@ -55,8 +55,8 @@
                 @endforeach
             </div>
         @else
-            <x-he-empty-state icon="bell-slash" title="You're all caught up"
-                subtitle="New alerts, reminders and account activity will appear here." />
+            <x-he-empty-state icon="bell-slash" title="{{ __('You\'re all caught up') }}"
+                subtitle="{{ __('New alerts, reminders and account activity will appear here.') }}" />
         @endif
     </div>
 

@@ -8,8 +8,8 @@
                     {{ $d['kind'] }} · {{ $d['label'] }}
                 </div>
                 <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size: var(--he-text-sm);">
-                    <span class="text-muted">Billed: <span class="fw-semibold text-body">{{ hostelease_money($d['total']) }}</span></span>
-                    <span class="text-success">Paid: <span class="fw-semibold">{{ hostelease_money($d['paid']) }}</span></span>
+                    <span class="text-muted">{{ __('Billed:') }} <span class="fw-semibold text-body">{{ hostelease_money($d['total']) }}</span></span>
+                    <span class="text-success">{{ __('Paid:') }} <span class="fw-semibold">{{ hostelease_money($d['paid']) }}</span></span>
                 </div>
             </div>
             <div class="text-end flex-shrink-0">
@@ -21,13 +21,13 @@
         </div>
         @if(!empty($d['due_date']))
             <div class="mt-1" style="font-size: var(--he-text-xs); color: var(--he-text-muted);">
-                <i class="fa-regular fa-calendar me-1"></i>Due: {{ \Carbon\Carbon::parse($d['due_date'])->format('d M Y') }}
+                <i class="fa-regular fa-calendar me-1"></i>{{ __('Due: :date', ['date' => \Carbon\Carbon::parse($d['due_date'])->translatedFormat('d M Y')]) }}
             </div>
         @endif
     </div>
 @empty
     <div class="empty-state py-4">
         <i class="fa-solid fa-receipt d-block"></i>
-        <p>No dues recorded yet.</p>
+        <p>{{ __('No dues recorded yet.') }}</p>
     </div>
 @endforelse

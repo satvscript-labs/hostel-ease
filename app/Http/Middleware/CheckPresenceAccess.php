@@ -34,7 +34,7 @@ class CheckPresenceAccess
         // Same allow-list the sidebar and User::canAccessPresence() use.
         if (! $user->canAccessPresence()) {
             return redirect()->route('admin.dashboard')
-                ->with('error', 'Your role does not have access to Presence.');
+                ->with('error', __('Your role does not have access to Presence.'));
         }
 
         return $next($request);

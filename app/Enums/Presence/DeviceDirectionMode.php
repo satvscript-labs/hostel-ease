@@ -18,9 +18,9 @@ enum DeviceDirectionMode: string
     public function label(): string
     {
         return match ($this) {
-            self::Entry => 'Entry only',
-            self::Exit => 'Exit only',
-            self::Toggle => 'Toggle (both ways)',
+            self::Entry => __('Entry only'),
+            self::Exit => __('Exit only'),
+            self::Toggle => __('Toggle (both ways)'),
         };
     }
 

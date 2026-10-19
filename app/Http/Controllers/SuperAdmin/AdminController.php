@@ -87,11 +87,24 @@ class AdminController extends Controller
         abort_unless($admin->isHostelAdmin(), 403);
 
         $password = $this->hostels->resetPassword($admin);
+        \App\Http\Controllers\SecurityController::endOtherSessions($admin);
+        app(\App\Services\Auth\TwoFactor::class)->forgetDevices($admin);
         $this->logger->log('admin.reset', "Reset password for {$admin->name}", $admin);
 
         return back()
             ->with('credentials', ['mobile' => $admin->mobile, 'password' => $password])
             ->with('success', 'Password reset. Share the new credentials below.');
+    }
+
+    /** An owner who lost their phone AND their recovery codes (S7.1): two-factor off. */
+    public function resetTwoFactor(User $admin): RedirectResponse
+    {
+        abort_unless($admin->isHostelAdmin(), 403);
+
+        app(\App\Services\Auth\TwoFactor::class)->disable($admin, 'admin');
+        $this->logger->log('admin.reset_2fa', "Reset two-factor sign-in for {$admin->name}", $admin);
+
+        return back()->with('success', "Two-factor sign-in turned off for {$admin->name}. They can sign in with their password.");
     }
 
     /**

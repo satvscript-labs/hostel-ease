@@ -39,7 +39,7 @@
                             </div>
                             <div class="fin-c-block">
                                 <div class="text-dark fw-semibold text-uppercase lh-sm text-truncate">{{ $payment->mode }}</div>
-                                <div class="text-muted small lh-sm text-truncate">{{ $payment->paid_on->format('d M Y') }}</div>
+                                <div class="text-muted small lh-sm text-truncate">{{ $payment->paid_on->translatedFormat('d M Y') }}</div>
                             </div>
                         </div>
                     </div>
@@ -91,7 +91,7 @@
                         </div>
                         <div class="text-end flex-shrink-0" style="font-feature-settings: 'tnum';">
                             <div class="text-success fw-bold">+{{ hostelease_money($payment->amount) }}</div>
-                            <div class="text-muted small text-uppercase">{{ $payment->mode }} · {{ $payment->paid_on->format('d M') }}</div>
+                            <div class="text-muted small text-uppercase">{{ $payment->mode }} · {{ $payment->paid_on->translatedFormat('d M') }}</div>
                         </div>
                     </div>
 

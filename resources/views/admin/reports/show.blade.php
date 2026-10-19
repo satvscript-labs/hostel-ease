@@ -78,7 +78,7 @@
             <div style="min-width: 0;">
                 <h1 class="h4 fw-bold mb-0 text-dark text-truncate"><i class="fa-solid fa-{{ $icon }} me-2" style="color: var(--he-primary);"></i>{{ $label }}</h1>
                 <p class="text-muted small mb-0 text-truncate">
-                    @if($needsRange){{ $from->format('d M Y') }} — {{ $to->format('d M Y') }}@else{{ __('Live snapshot') }}@endif
+                    @if($needsRange){{ $from->translatedFormat('d M Y') }} — {{ $to->translatedFormat('d M Y') }}@else{{ __('Live snapshot') }}@endif
                 </p>
             </div>
         </div>
@@ -118,7 +118,7 @@
                     <span class="he-datechip__ic"><i class="fa-solid fa-calendar-day"></i></span>
                     <span class="he-datechip__txt">
                         <span class="he-datechip__lbl">{{ __('From') }}</span>
-                        <span class="fw-bold small">{{ $from->format('d M y') }}</span>
+                        <span class="fw-bold small">{{ $from->translatedFormat('d M y') }}</span>
                     </span>
                     <input type="date" name="from" value="{{ $from->toDateString() }}" max="{{ now()->toDateString() }}"
                            @click="$event.target.showPicker?.()" @change="range = ''; $refs.f.requestSubmit()">
@@ -127,7 +127,7 @@
                     <span class="he-datechip__ic"><i class="fa-solid fa-calendar-check"></i></span>
                     <span class="he-datechip__txt">
                         <span class="he-datechip__lbl">{{ __('To') }}</span>
-                        <span class="fw-bold small">{{ $to->format('d M y') }}</span>
+                        <span class="fw-bold small">{{ $to->translatedFormat('d M y') }}</span>
                     </span>
                     <input type="date" name="to" value="{{ $to->toDateString() }}" max="{{ now()->toDateString() }}"
                            @click="$event.target.showPicker?.()" @change="range = ''; $refs.f.requestSubmit()">

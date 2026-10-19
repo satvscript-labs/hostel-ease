@@ -13,11 +13,11 @@
     <meta name="robots" content="index, follow">
     <link rel="icon" href="{{ asset('hostel-ease-icon.svg') }}" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/scss/app.scss'])
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--he-bg-canvas, #f8fafc); color: var(--he-text-main, #0f172a); }
+        body { font-family: "'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif", 'Noto Sans Devanagari', 'Noto Sans Gujarati', sans-serif; background: var(--he-bg-canvas, #f8fafc); color: var(--he-text-main, #0f172a); }
         .lg-top { background: var(--he-gradient-mesh, linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)); color: #fff; padding: 1.1rem 0; position: sticky; top: 0; z-index: 10; }
         .lg-brand { display: flex; align-items: center; gap: 0.55rem; color: #fff; text-decoration: none; font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px; }
         .lg-back { color: rgba(255, 255, 255, 0.8); text-decoration: none; font-weight: 600; font-size: 0.9rem; }

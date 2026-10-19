@@ -52,7 +52,7 @@
                             </div>
                             <div class="fin-c-block">
                                 <div class="text-dark fw-semibold lh-sm text-truncate">{{ $invoice->title }}</div>
-                                <div class="text-muted small text-uppercase lh-sm text-truncate" style="letter-spacing: 0.04em;">{{ $invoice->type }} &bull; {{ $invoice->created_at->format('d M Y') }}</div>
+                                <div class="text-muted small text-uppercase lh-sm text-truncate" style="letter-spacing: 0.04em;">{{ hostelease_term($invoice->type) }} &bull; {{ $invoice->created_at->translatedFormat('d M Y') }}</div>
                             </div>
                         </div>
                     </div>
@@ -104,7 +104,7 @@
                         </div>
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="fw-bold text-dark text-truncate">{{ $invoice->student->name }}</div>
-                            <div class="text-muted small text-truncate">{{ $invoice->title }} · {{ $invoice->created_at->format('d M') }}</div>
+                            <div class="text-muted small text-truncate">{{ $invoice->title }} · {{ $invoice->created_at->translatedFormat('d M') }}</div>
                         </div>
                         <span class="badge bg-{{ $statusBadge[0] }}-subtle text-{{ $statusBadge[0] }} rounded-pill px-2 py-1 flex-shrink-0">{{ $statusBadge[1] }}</span>
                     </div>

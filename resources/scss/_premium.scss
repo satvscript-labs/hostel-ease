@@ -70,7 +70,15 @@
 body {
     background-color: var(--he-bg-canvas);
     color: var(--he-text-main);
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, sans-serif;
+}
+
+/* S7.1 — Hindi & Gujarati. Letter-spacing splits Indic conjuncts (the joined
+   letters) in some browsers, and the scripts sit taller: a little more line height.
+   Uppercase labels need nothing — the scripts have no case. */
+html:lang(hi), html:lang(gu) {
+    *, *::before, *::after { letter-spacing: normal !important; }
+    body { line-height: 1.6; }
 }
 
 /* Liquid Motion Primitives */
@@ -2009,7 +2017,7 @@ body {
 .swal2-popup {
     border-radius: var(--he-radius-lg) !important;
     box-shadow: var(--he-shadow-float) !important;
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, -apple-system, sans-serif !important;
     padding-bottom: 1.75rem !important;
 }
 .swal2-title { font-weight: 800 !important; color: var(--he-text-main) !important; }

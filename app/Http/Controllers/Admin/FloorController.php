@@ -51,7 +51,7 @@ class FloorController extends Controller
             return response()->json(['success' => true, 'max_room_sharing' => $data['max_room_sharing']]);
         }
 
-        return back()->with('success', 'Room settings updated.');
+        return back()->with('success', __('Room settings updated.'));
     }
 
     public function reorder(Request $request)
@@ -77,7 +77,7 @@ class FloorController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'floor' => $floor]);
         }
-        return back()->with('success', 'Floor added successfully.');
+        return back()->with('success', __('Floor added successfully.'));
     }
 
     public function update(StoreFloorRequest $request, Floor $floor)
@@ -89,7 +89,7 @@ class FloorController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'floor' => $floor]);
         }
-        return back()->with('success', 'Floor updated successfully.');
+        return back()->with('success', __('Floor updated successfully.'));
     }
 
     public function destroy(Request $request, Floor $floor)
@@ -98,7 +98,7 @@ class FloorController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Remove the rooms on this floor before deleting it.'], 422);
             }
-            return back()->with('error', 'Remove the rooms on this floor before deleting it.');
+            return back()->with('error', __('Remove the rooms on this floor before deleting it.'));
         }
 
         $this->logger->log('floor.delete', "Deleted floor {$floor->name}", $floor);
@@ -107,6 +107,6 @@ class FloorController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
-        return back()->with('success', 'Floor deleted.');
+        return back()->with('success', __('Floor deleted.'));
     }
 }

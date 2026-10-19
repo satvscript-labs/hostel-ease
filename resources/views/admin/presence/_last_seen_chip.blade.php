@@ -20,7 +20,7 @@
     <span class="ls-chip ls-chip--{{ $cls }}" title="{{ __('Gate presence') }}">
         <span class="ls-chip__dot"></span>
         {{ $st->label() }}@if($dur) · {{ $st === PresenceState::Out ? __('out') : ($st === PresenceState::In ? __('since') : '') }}
-            @if($st === PresenceState::In && $since){{ $since->isToday() ? $since->format('H:i') : $since->format('d M') }}@else {{ $dur }}@endif
+            @if($st === PresenceState::In && $since){{ $since->isToday() ? $since->format('H:i') : $since->translatedFormat('d M') }}@else {{ $dur }}@endif
         @endif
     </span>
     @once

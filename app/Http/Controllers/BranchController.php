@@ -17,6 +17,6 @@ class BranchController extends Controller
 
         $request->session()->put('active_hostel_id', $hostel->id);
 
-        return redirect()->route('dashboard')->with('success', "Switched to {$hostel->name}.");
+        return redirect()->route('dashboard')->with('success', __('Switched to :name.', ['name' => $hostel->name]));
     }
 }

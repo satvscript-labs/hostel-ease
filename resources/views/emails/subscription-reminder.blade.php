@@ -3,9 +3,9 @@
      they render as code blocks. --}}
 @php
     $noun = $c['is_trial'] ? __('free trial') : __('plan');
-    $renews = $c['renews_on']->format('d M Y');
-    $graceUntil = $c['grace_until']->format('d M Y');
-    $pausesOn = $c['pauses_on']->format('d M Y');
+    $renews = $c['renews_on']->translatedFormat('d M Y');
+    $graceUntil = $c['grace_until']->translatedFormat('d M Y');
+    $pausesOn = $c['pauses_on']->translatedFormat('d M Y');
     $waiting = $c['waiting_amount'] !== null;
     $cta = match (true) {
         $waiting && $c['pay_url'] !== null => __('Pay :amount', ['amount' => hostelease_money($c['waiting_amount'])]),

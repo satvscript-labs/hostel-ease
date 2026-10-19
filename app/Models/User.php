@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasPublicId;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasLocalePreference
 {
     use HasApiTokens, HasFactory, HasPublicId, Notifiable, SoftDeletes;
 
@@ -28,9 +29,25 @@ class User extends Authenticatable
         'last_login_ip',
     ];
 
+    /**
+     * S7.1 columns default to null on a NEW model too, so code that asks "is two-factor
+     * on?" or "which language?" works on a user that was just created, not only on one
+     * read back from the database (strict mode forbids reading a missing attribute).
+     */
+    protected $attributes = [
+        'locale' => null,
+        'two_factor_method' => null,
+        'two_factor_secret' => null,
+        'two_factor_recovery_codes' => null,
+        'two_factor_confirmed_at' => null,
+        'two_factor_last_step' => null,
+    ];
+
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -40,7 +57,35 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            // S7.1 — two-factor sign-in. Never mass-assignable: only TwoFactor writes these.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_last_step' => 'integer',
         ];
+    }
+
+    /**
+     * The language this person reads (S7.1): mail sent to them — receipts, reminders,
+     * codes — goes out in it, wherever it is sent from. The Super Admin reads English.
+     */
+    public function preferredLocale(): string
+    {
+        if ($this->role === 'super_admin') {
+            return 'en';
+        }
+
+        return array_key_exists((string) $this->locale, config('app.available_locales', [])) ? $this->locale : config('app.locale');
+    }
+
+    public function hasTwoFactor(): bool
+    {
+        return app(\App\Services\Auth\TwoFactor::class)->enabled($this);
+    }
+
+    public function trustedDevices(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TrustedDevice::class);
     }
 
     /**

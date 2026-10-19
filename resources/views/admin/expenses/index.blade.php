@@ -149,7 +149,7 @@
         'rent' => 'building',
         'other' => 'receipt',
     ];
-    $categoryOptions = collect(config('hostelease.expense_categories'))
+    $categoryOptions = collect(hostelease_options('expense_categories'))
         ->map(fn ($label, $key) => ['label' => $label, 'icon' => $catIcons[$key] ?? 'receipt'])
         ->all();
     $fragmentTargets = '#exp-summary, #exp-filter-aux, #exp-cat-chips, #expense-list';
@@ -179,7 +179,7 @@
         <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="text-muted small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('Profit & Loss') }}</span>
             <span class="text-muted small fw-semibold" style="font-feature-settings: 'tnum';">
-                {{ $from->format('d M Y') }} &ndash; {{ $to->format('d M Y') }}
+                {{ $from->translatedFormat('d M Y') }} &ndash; {{ $to->translatedFormat('d M Y') }}
             </span>
         </div>
         @php $profitable = $summary['profit'] >= 0; @endphp
@@ -280,7 +280,7 @@
                        class="exp-cat-chip {{ $isActive ? 'active' : '' }}"
                        title="{{ $isActive ? __('Clear category filter') : __('Filter by this category') }}">
                         <i class="fa-solid fa-{{ $catIcons[$catKey] ?? 'receipt' }}"></i>
-                        {{ config('hostelease.expense_categories.'.$catKey, ucfirst($catKey)) }}
+                        {{ __((string) config('hostelease.expense_categories.'.$catKey, ucfirst($catKey))) }}
                         <span class="exp-chip-amt">{{ hostelease_money($catTotal) }}</span>
                     </a>
                 @endforeach
@@ -323,7 +323,7 @@
                         <div class="col-md-6 mb-4">
                             <label class="form-label fw-bold small text-uppercase letter-spacing-1">{{ __('Category') }} <span class="text-danger">*</span></label>
                             <x-he-select name="category" compact :submit="false" x-model="f.category"
-                                :selected="array_key_first(config('hostelease.expense_categories'))"
+                                :selected="array_key_first(hostelease_options('expense_categories'))"
                                 :options="$categoryOptions" />
                         </div>
                         <div class="col-md-6 mb-4">
@@ -425,7 +425,7 @@ document.addEventListener('alpine:init', () => {
             this.isEdit = false;
             this.f = {
                 action: '',
-                category: @json(array_key_first(config('hostelease.expense_categories'))),
+                category: @json(array_key_first(hostelease_options('expense_categories'))),
                 title: '', amount: '',
                 date: @json(now()->toDateString()),
                 paid_to: '',

@@ -34,19 +34,27 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'mobile' => ['These credentials do not match our records.'],
+                'mobile' => [__('These credentials do not match our records.')],
             ]);
         }
 
         if (! $user->isHostelStaff()) {
             throw ValidationException::withMessages([
-                'mobile' => ['This app is for hostel staff only.'],
+                'mobile' => [__('This app is for hostel staff only.')],
             ]);
         }
 
         if (! $user->is_active) {
             throw ValidationException::withMessages([
-                'mobile' => ['Your account is inactive. Contact the administrator.'],
+                'mobile' => [__('Your account is inactive. Contact the administrator.')],
+            ]);
+        }
+
+        // S7.1: a token on the password alone would walk round two-factor sign-in.
+        // Until the app asks for the second step, accounts that use it sign in on the web.
+        if ($user->hasTwoFactor()) {
+            throw ValidationException::withMessages([
+                'mobile' => [__('Two-factor sign-in is on for this account. Please sign in on the website.')],
             ]);
         }
 
@@ -75,7 +83,7 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out.']);
+        return response()->json(['message' => __('Logged out.')]);
     }
 
     /**

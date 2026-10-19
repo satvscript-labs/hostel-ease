@@ -27,8 +27,8 @@ enum BillingMode: string
     public function label(): string
     {
         return match ($this) {
-            self::SelfServe => 'Self-serve',
-            self::Managed => 'Managed by HostelEase',
+            self::SelfServe => __('Self-serve'),
+            self::Managed => __('Managed by HostelEase'),
         };
     }
 

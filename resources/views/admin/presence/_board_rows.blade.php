@@ -79,7 +79,7 @@
                             <div class="pb-row-lbl small text-muted text-uppercase" style="font-size:.6rem;letter-spacing:.06em;font-weight:700;">{{ __('Last punch') }}</div>
                             <span class="pb-last text-truncate">
                                 <b>{{ $lp->direction === PresenceState::Out ? __('Out') : __('In') }}</b>
-                                {{ $lp->punched_at->isToday() ? $lp->punched_at->format('H:i') : $lp->punched_at->format('d M · H:i') }}
+                                {{ $lp->punched_at->isToday() ? $lp->punched_at->format('H:i') : $lp->punched_at->translatedFormat('d M · H:i') }}
                                 @if($lp->device) · {{ $lp->device->name }}@endif
                             </span>
                         @else

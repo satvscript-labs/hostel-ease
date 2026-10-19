@@ -297,7 +297,7 @@
                     <span class="text-dark fw-medium">{{ __('Password:') }}</span> <code class="fs-6 bg-transparent text-dark fw-bold p-0">{{ session('credentials')['password'] }}</code>
                 </p>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
         </div>
     @endif
 
@@ -313,7 +313,7 @@
                     <div class="pf-identity-body">
                         <div class="pf-ava">{{ strtoupper(mb_substr($owner->name, 0, 1)) }}</div>
                         <h5 class="pf-name">{{ $owner->name }}</h5>
-                        <div class="pf-role">{{ config('hostelease.roles.'.$owner->role, ucfirst($owner->role)) }}</div>
+                        <div class="pf-role">{{ hostelease_role_label($owner->role) }}</div>
 
                         <div class="pf-chips">
                             @if($viewerIsOwner)
@@ -331,17 +331,17 @@
                         <div class="pf-facts">
                             <div class="st-kv"><span class="k">{{ __('Login (mobile)') }}</span><span class="v">{{ hostelease_phone($owner->mobile) }}</span></div>
                             <div class="st-kv"><span class="k">{{ __('Branches') }}</span><span class="v">{{ $myBranches->count() }}</span></div>
-                            <div class="st-kv"><span class="k">{{ __('Renewal date') }}</span><span class="v">{{ $account->current_period_end?->format('d M Y') ?? '—' }}</span></div>
-                            <div class="st-kv"><span class="k">{{ __('Member since') }}</span><span class="v">{{ $owner->created_at?->format('M Y') ?? '—' }}</span></div>
-                            <div class="st-kv"><span class="k">{{ __('Last login') }}</span><span class="v">{{ $owner->last_login_at?->format('d M Y · h:i A') ?? '—' }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Renewal date') }}</span><span class="v">{{ $account->current_period_end?->translatedFormat('d M Y') ?? '—' }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Member since') }}</span><span class="v">{{ $owner->created_at?->translatedFormat('M Y') ?? '—' }}</span></div>
+                            <div class="st-kv"><span class="k">{{ __('Last login') }}</span><span class="v">{{ $owner->last_login_at?->translatedFormat('d M Y · h:i A') ?? '—' }}</span></div>
                         </div>
 
                         <div class="pt-3 mt-2 border-top d-grid gap-2">
-                            <a href="{{ route('profile.password') }}" class="st-action tactile-btn">
-                                <span class="st-action-ic"><i class="fa-solid fa-key"></i></span>
+                            <a href="{{ route('profile.security') }}" class="st-action tactile-btn">
+                                <span class="st-action-ic"><i class="fa-solid {{ $owner->two_factor_confirmed_at ? 'fa-shield-halved' : 'fa-key' }}"></i></span>
                                 <span class="st-action-txt">
-                                    <span class="st-action-name">{{ __('Change password') }}</span>
-                                    <span class="st-action-sub">{{ __('Update your login password') }}</span>
+                                    <span class="st-action-name">{{ __('Security') }}</span>
+                                    <span class="st-action-sub">{{ $owner->two_factor_confirmed_at ? __('Password · two-factor sign-in is on') : __('Password · turn on two-factor sign-in') }}</span>
                                 </span>
                                 <i class="fa-solid fa-chevron-right st-action-chev"></i>
                             </a>
@@ -528,6 +528,12 @@
                                     @csrf @method('PATCH')
                                     <button class="he-icon-btn" title="{{ __('Reset password') }}" aria-label="{{ __('Reset password') }}"><i class="fa-solid fa-key text-warning"></i></button>
                                 </form>
+                                @if($u->two_factor_confirmed_at)
+                                    <form action="{{ route('admin.users.reset-2fa', $u) }}" method="POST" class="m-0" data-confirm="{{ __('Turn off two-factor sign-in for :name? Do this only if they lost their phone and recovery codes.', ['name' => $u->name]) }}">
+                                        @csrf @method('PATCH')
+                                        <button class="he-icon-btn" title="{{ __('Reset two-factor sign-in') }}" aria-label="{{ __('Reset two-factor sign-in') }}"><i class="fa-solid fa-shield-halved text-primary"></i></button>
+                                    </form>
+                                @endif
                             @else
                                 @if($u->email && ! $u->email_verified_at)
                                     <form action="{{ route('admin.users.verification', $u) }}" method="POST" class="m-0">
@@ -540,6 +546,12 @@
                                     @csrf @method('PATCH')
                                     <button class="he-icon-btn" title="{{ __('Reset password') }}" aria-label="{{ __('Reset password') }}"><i class="fa-solid fa-key text-warning"></i></button>
                                 </form>
+                                @if($u->two_factor_confirmed_at)
+                                    <form action="{{ route('admin.users.reset-2fa', $u) }}" method="POST" class="m-0" data-confirm="{{ __('Turn off two-factor sign-in for :name? Do this only if they lost their phone and recovery codes.', ['name' => $u->name]) }}">
+                                        @csrf @method('PATCH')
+                                        <button class="he-icon-btn" title="{{ __('Reset two-factor sign-in') }}" aria-label="{{ __('Reset two-factor sign-in') }}"><i class="fa-solid fa-shield-halved text-primary"></i></button>
+                                    </form>
+                                @endif
                                 <form action="{{ route('admin.users.destroy', $u) }}" method="POST" class="m-0" data-confirm="{{ __('Remove :name?', ['name' => $u->name]) }}">
                                     @csrf @method('DELETE')
                                     <button class="he-icon-btn is-danger" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}"><i class="fa-solid fa-trash"></i></button>
@@ -569,7 +581,7 @@
                 <i class="fa-solid fa-calendar-check text-primary"></i>
                 {{ __('All branches renew together') }}
                 @if($account->current_period_end)
-                    — <span class="fw-bold text-dark">{{ $account->current_period_end->format('d M Y') }}</span>
+                    — <span class="fw-bold text-dark">{{ $account->current_period_end->translatedFormat('d M Y') }}</span>
                 @endif
             </div>
             <a href="{{ route('admin.subscription.index') }}" class="btn btn-light border rounded-pill shadow-sm px-4 fw-semibold tactile-btn d-inline-flex align-items-center">
@@ -599,7 +611,7 @@
                         @endif
                         @if($branch->subscription_end)
                             <span class="small {{ $isCurrent ? 'text-white-50' : 'text-muted' }} fw-semibold">
-                                {{ __('Ends') }} {{ $branch->subscription_end->format('d M Y') }}
+                                {{ __('Ends') }} {{ $branch->subscription_end->translatedFormat('d M Y') }}
                                 @if(!is_null($days) && $days > 0) · {{ $days }}d @endif
                             </span>
                         @endif

@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Bed History')
+@section('title', __('Bed History'))
 
 @push('styles')
 <style>
@@ -100,13 +100,13 @@
         <div class="header-mesh"></div>
         <div class="history-header-content">
             <a href="{{ route('admin.property.index') }}" class="btn btn-light rounded-pill px-4 mb-4 fw-bold shadow-sm">
-                <i class="fa-solid fa-arrow-left me-2"></i>Back to Property Board
+                <i class="fa-solid fa-arrow-left me-2"></i>{{ __('Back to Property Board') }}
             </a>
             
-            <h1 class="display-5 fw-bold mb-2">Bed History</h1>
+            <h1 class="display-5 fw-bold mb-2">{{ __('Bed History') }}</h1>
             <div class="d-flex align-items-center gap-3">
                 <div class="fs-4 opacity-75">
-                    {{ $bed->room->floor->name }} &bull; Room {{ $bed->room->room_number }} &bull; Bed {{ $bed->bed_number }}
+                    {{ $bed->room->floor->name }} &bull; {{ __('Room :room', ['room' => $bed->room->room_number]) }} &bull; {{ __('Bed :bed', ['bed' => $bed->bed_number]) }}
                 </div>
                 <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold">
                     {{ ucfirst($bed->status) }}
@@ -120,8 +120,8 @@
             <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
                 <i class="fa-solid fa-clock-rotate-left fs-1 text-muted"></i>
             </div>
-            <h3 class="fw-bold text-muted">No History</h3>
-            <p class="text-muted">This bed has never been occupied.</p>
+            <h3 class="fw-bold text-muted">{{ __('No History') }}</h3>
+            <p class="text-muted">{{ __('This bed has never been occupied.') }}</p>
         </div>
     @else
         <div class="timeline">
@@ -137,23 +137,23 @@
                             <h4 class="fw-bold mb-1">
                                 <a href="{{ route('admin.students.show', $a->student) }}" class="text-decoration-none text-dark text-hover-primary">{{ $a->student->name }}</a>
                                 @if($a->is_active)
-                                    <span class="badge bg-success ms-2 rounded-pill shadow-sm">Currently Occupying</span>
+                                    <span class="badge bg-success ms-2 rounded-pill shadow-sm">{{ __('Currently Occupying') }}</span>
                                 @endif
                             </h4>
                             <div class="text-muted small">
                                 <i class="fa-solid fa-phone me-1"></i> <x-mobile-link :mobile="$a->student->mobile" />
                             </div>
                             <div class="mt-2">
-                                <a href="{{ route('admin.students.show', $a->student) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View Profile</a>
+                                <a href="{{ route('admin.students.show', $a->student) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">{{ __('View Profile') }}</a>
                             </div>
                         </div>
                         
                         <div class="bg-light rounded-3 p-3 text-center border">
-                            <div class="small text-muted text-uppercase fw-bold mb-1">Duration</div>
-                            <div class="fw-bold text-dark">{{ $a->durationInDays() }} Days</div>
+                            <div class="small text-muted text-uppercase fw-bold mb-1">{{ __('Duration') }}</div>
+                            <div class="fw-bold text-dark">{{ trans_choice(':n day|:n days', $a->durationInDays(), ['n' => $a->durationInDays()]) }}</div>
                             <div class="small text-muted mt-1">
-                                {{ $a->join_date->format('d M, Y') }} &mdash; 
-                                {{ optional($a->leave_date)->format('d M, Y') ?? 'Present' }}
+                                {{ $a->join_date->translatedFormat('d M, Y') }} &mdash; 
+                                {{ optional($a->leave_date)->translatedFormat('d M, Y') ?? 'Present' }}
                             </div>
                         </div>
 

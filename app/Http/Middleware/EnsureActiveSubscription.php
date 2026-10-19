@@ -29,7 +29,7 @@ class EnsureActiveSubscription
 
                 return redirect()
                     ->route($target)
-                    ->with('warning', 'Your hostel subscription has expired. Please renew to continue.');
+                    ->with('warning', __('Your hostel subscription has expired. Please renew to continue.'));
             }
         }
 

@@ -52,7 +52,7 @@ class PaymentModeController extends Controller
 
         $this->logger->log('payment_mode.create', "Added payment mode {$data['name']}");
 
-        return back()->with('success', 'Payment mode added.');
+        return back()->with('success', __('Payment mode added.'));
     }
 
     public function update(Request $request, PaymentMode $payment_mode): RedirectResponse
@@ -64,7 +64,7 @@ class PaymentModeController extends Controller
         // (collect, expense, salary, deposit) validates against active modes;
         // zero active modes means nobody can record money at all.
         if ($goingInactive && ! PaymentMode::active()->whereKeyNot($payment_mode->id)->exists()) {
-            return back()->with('error', 'This is the last active payment mode — every money form needs at least one. Add or activate another before deactivating this.');
+            return back()->with('error', __('This is the last active payment mode — every money form needs at least one. Add or activate another before deactivating this.'));
         }
 
         $payment_mode->update([
@@ -75,7 +75,7 @@ class PaymentModeController extends Controller
 
         $this->logger->log('payment_mode.update', "Updated payment mode {$payment_mode->name}", $payment_mode);
 
-        return back()->with('success', 'Payment mode updated.');
+        return back()->with('success', __('Payment mode updated.'));
     }
 
     public function destroy(PaymentMode $payment_mode): RedirectResponse
@@ -89,13 +89,13 @@ class PaymentModeController extends Controller
         }
 
         if ($payment_mode->is_active && ! PaymentMode::active()->whereKeyNot($payment_mode->id)->exists()) {
-            return back()->with('error', 'This is the last active payment mode — every money form needs at least one. Add another before removing this.');
+            return back()->with('error', __('This is the last active payment mode — every money form needs at least one. Add another before removing this.'));
         }
 
         $payment_mode->delete();
         $this->logger->log('payment_mode.delete', "Deleted payment mode {$payment_mode->name}");
 
-        return back()->with('success', 'Payment mode removed.');
+        return back()->with('success', __('Payment mode removed.'));
     }
 
     /** @return array<int, int> mode id => total references across the four modules */

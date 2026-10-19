@@ -83,7 +83,7 @@ class SettingsController extends Controller
             'owner' => $owner,
             'viewerIsOwner' => $viewerIsOwner,
             'users' => $users,
-            'roles' => config('hostelease.staff_roles'),
+            'roles' => array_map(fn ($l) => __($l), config('hostelease.staff_roles')),
             'roleAccess' => config('hostelease.role_access'),
             'userBranches' => $myBranches,
             'myBranches' => $myBranches,

@@ -8,20 +8,29 @@ use Illuminate\Support\Facades\App;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Applies the user's chosen locale (stored in session) for the request,
- * falling back to the app default. Only locales listed in config('app.available_locales')
- * are honoured.
+ * The language for this request (S7.1 · 34_S7_1_DESIGN.md §2):
+ *   - the Super Admin always reads English (D-S7-2);
+ *   - a signed-in person reads the language saved on their account;
+ *   - a guest (sign-in, sign-up, student registration) the one picked in this session;
+ *   - otherwise the app default.
+ * Only locales in config('app.available_locales') are honoured.
  */
 class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->hasSession()) {
-            $locale = $request->session()->get('locale', config('app.locale'));
+        $available = config('app.available_locales', []);
+        $user = $request->user();
 
-            if (array_key_exists($locale, config('app.available_locales', []))) {
-                App::setLocale($locale);
-            }
+        $locale = match (true) {
+            $user?->isSuperAdmin() => 'en',
+            $user && array_key_exists((string) $user->locale, $available) => $user->locale,
+            $request->hasSession() => $request->session()->get('locale', config('app.locale')),
+            default => config('app.locale'),
+        };
+
+        if (array_key_exists($locale, $available)) {
+            App::setLocale($locale);
         }
 
         return $next($request);

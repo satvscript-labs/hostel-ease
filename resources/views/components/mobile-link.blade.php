@@ -8,7 +8,7 @@
             {{ $label ?? $phone }}
         @endif
         <a href="{{ hostelease_whatsapp_link($mobile) }}" target="_blank" rel="noopener"
-           class="text-success ms-1" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+           class="text-success ms-1" title="{{ __('WhatsApp') }}"><i class="fa-brands fa-whatsapp"></i></a>
     </span>
 @else
     <span class="text-muted">—</span>

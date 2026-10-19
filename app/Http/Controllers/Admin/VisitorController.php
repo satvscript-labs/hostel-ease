@@ -46,7 +46,7 @@ class VisitorController extends Controller
         $visitor = Visitor::create($data);
         $this->logger->log('visitor.checkin', "Visitor {$visitor->name} checked in", $visitor);
 
-        return back()->with('success', 'Visitor checked in.');
+        return back()->with('success', __('Visitor checked in.'));
     }
 
     public function checkout(Visitor $visitor): RedirectResponse
@@ -56,13 +56,13 @@ class VisitorController extends Controller
             $this->logger->log('visitor.checkout', "Visitor {$visitor->name} checked out", $visitor);
         }
 
-        return back()->with('success', 'Visitor checked out.');
+        return back()->with('success', __('Visitor checked out.'));
     }
 
     public function destroy(Visitor $visitor): RedirectResponse
     {
         $visitor->delete();
 
-        return back()->with('success', 'Visitor record removed.');
+        return back()->with('success', __('Visitor record removed.'));
     }
 }

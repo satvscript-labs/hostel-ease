@@ -80,6 +80,13 @@ Route::middleware('guest')->group(function () {
     // honest "how to get back in" page, not a dead link. It becomes the OTP
     // entry point once an SMS provider is chosen (pending_requirements #1).
     Route::view('recover', 'auth.recover')->name('recover');
+
+    // Two-factor sign-in, step 2 (S7.1). The password was already checked; nobody is
+    // signed in until a code is right. Each sign-in allows 5 wrong codes on top of this.
+    Route::get('login/two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'show'])->name('two-factor.challenge');
+    Route::post('login/two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'verify'])->middleware('throttle:10,1')->name('two-factor.verify');
+    Route::post('login/two-factor/resend', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'resend'])->middleware('throttle:3,1')->name('two-factor.resend');
+    Route::post('login/two-factor/cancel', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'cancel'])->name('two-factor.cancel');
 });
 
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
@@ -108,8 +115,21 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     // Global instant search (both roles)
     Route::get('search', [SearchController::class, 'index'])->name('search');
 
-    // Change password + basic profile (both roles)
-    Route::get('profile/password', [ProfileController::class, 'edit'])->name('profile.password');
+    // Security (S7.1): password, two-factor sign-in, devices — every role. The old
+    // Change password page now lives here; its URL redirects.
+    Route::get('profile/password', fn () => redirect()->route('profile.security'))->name('profile.password');
+    Route::get('profile/security', [\App\Http\Controllers\SecurityController::class, 'show'])->name('profile.security');
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('profile/security/two-factor/app', [\App\Http\Controllers\SecurityController::class, 'beginApp'])->name('security.2fa.app');
+        Route::post('profile/security/two-factor/email', [\App\Http\Controllers\SecurityController::class, 'beginEmail'])->name('security.2fa.email');
+        Route::post('profile/security/two-factor/resend', [\App\Http\Controllers\SecurityController::class, 'resendSetupCode'])->middleware('throttle:3,1')->name('security.2fa.resend');
+        Route::post('profile/security/two-factor/confirm', [\App\Http\Controllers\SecurityController::class, 'confirm'])->name('security.2fa.confirm');
+        Route::post('profile/security/two-factor/cancel', [\App\Http\Controllers\SecurityController::class, 'cancel'])->name('security.2fa.cancel');
+        Route::post('profile/security/two-factor/recovery-codes', [\App\Http\Controllers\SecurityController::class, 'regenerate'])->name('security.2fa.codes');
+        Route::delete('profile/security/two-factor', [\App\Http\Controllers\SecurityController::class, 'disable'])->name('security.2fa.disable');
+        Route::delete('profile/security/devices/{device}', [\App\Http\Controllers\SecurityController::class, 'forgetDevice'])->whereNumber('device')->name('security.devices.forget');
+        Route::post('profile/security/sign-out-others', [\App\Http\Controllers\SecurityController::class, 'logoutOthers'])->name('security.logout-others');
+    });
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     // Email is proven by a 6-digit code before it is saved or shown as verified.
@@ -247,6 +267,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('admins', [AdminController::class, 'store'])->name('admins.store');
         Route::patch('admins/{admin}/toggle', [AdminController::class, 'toggle'])->name('admins.toggle');
         Route::patch('admins/{admin}/reset-password', [AdminController::class, 'resetPassword'])->name('admins.reset');
+        Route::patch('admins/{admin}/reset-two-factor', [AdminController::class, 'resetTwoFactor'])->name('admins.reset-2fa');
         Route::put('admins/{admin}/branches', [AdminController::class, 'branches'])->name('admins.branches');
 
         Route::get('activity', [AdminController::class, 'activity'])->name('activity');
@@ -456,6 +477,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
                 Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
                 Route::patch('users/{user}/toggle', [\App\Http\Controllers\Admin\UserController::class, 'toggle'])->name('users.toggle');
                 Route::patch('users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset');
+                Route::patch('users/{user}/reset-two-factor', [\App\Http\Controllers\Admin\UserController::class, 'resetTwoFactor'])->name('users.reset-2fa');
                 Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
                 Route::post('users/{user}/verification', [\App\Http\Controllers\Admin\UserController::class, 'resendVerification'])->middleware('throttle:6,1')->name('users.verification');
             });

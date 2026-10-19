@@ -52,8 +52,8 @@
                 @isset($footer)
                     {{ $footer }}
                 @else
-                    <button type="button" class="btn btn-light border fw-semibold rounded-pill px-4" @click="{{ $open }} = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm"><i class="fa-solid fa-check me-2"></i> Save</button>
+                    <button type="button" class="btn btn-light border fw-semibold rounded-pill px-4" @click="{{ $open }} = false">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-primary fw-semibold rounded-pill px-4 shadow-sm"><i class="fa-solid fa-check me-2"></i> {{ __('Save') }}</button>
                 @endisset
             </div>
         </{{ $tag }}>

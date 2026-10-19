@@ -106,49 +106,49 @@
     <div class="d-flex flex-column gap-4">
         
         <div class="premium-panel p-4 text-center">
-            <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">Profile Photo</h3>
+            <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">{{ __('Profile Photo') }}</h3>
             <label class="photo-upload-wrap mb-3 d-block mx-auto">
-                <img src="{{ $student?->photo_url ?? 'https://ui-avatars.com/api/?name=New&background=2563eb&color=fff' }}" id="photoPreview" alt="Photo">
+                <img src="{{ $student?->photo_url ?? 'https://ui-avatars.com/api/?name=New&background=2563eb&color=fff' }}" id="photoPreview" alt="{{ __('Photo') }}">
                 <div class="upload-overlay">
                     <div class="text-center">
                         <i class="fa-solid fa-camera fs-4 mb-1"></i>
-                        <div class="small fw-bold">Upload</div>
+                        <div class="small fw-bold">{{ __('Upload') }}</div>
                     </div>
                 </div>
                 <input type="file" name="photo" accept="image/*" class="d-none" onchange="document.getElementById('photoPreview').src=window.URL.createObjectURL(this.files[0])">
             </label>
-            <p class="text-muted small fw-bold mb-0">JPG, PNG · max 2MB</p>
+            <p class="text-muted small fw-bold mb-0">{{ __('JPG, PNG · max 2MB') }}</p>
         </div>
 
         <div class="premium-panel p-4 text-center mt-0">
-            <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">Aadhaar Card <span class="text-danger">*</span></h3>
+            <h3 class="h6 fw-bold mb-4 text-uppercase text-muted">{{ __('Aadhaar Card') }} <span class="text-danger">*</span></h3>
             <label class="photo-upload-wrap mb-3 d-block mx-auto" style="border-radius: 10px;">
-                <img src="{{ $student?->aadhaar_file ? route('admin.files.show', ['student', $student->id, 'aadhaar_file']) : 'https://ui-avatars.com/api/?name=Doc&background=f1f5f9&color=94a3b8' }}" id="aadhaarPreview" alt="Aadhaar">
+                <img src="{{ $student?->aadhaar_file ? route('admin.files.show', ['student', $student->id, 'aadhaar_file']) : 'https://ui-avatars.com/api/?name=Doc&background=f1f5f9&color=94a3b8' }}" id="aadhaarPreview" alt="{{ __('Aadhaar') }}">
                 <div class="upload-overlay" style="border-radius: 6px;">
                     <div class="text-center">
                         <i class="fa-solid fa-file-arrow-up fs-4 mb-1"></i>
-                        <div class="small fw-bold">Upload</div>
+                        <div class="small fw-bold">{{ __('Upload') }}</div>
                     </div>
                 </div>
                 <input type="file" name="aadhaar_file" accept="image/*" class="d-none" onchange="document.getElementById('aadhaarPreview').src=window.URL.createObjectURL(this.files[0])" {{ $student?->aadhaar_file ? '' : 'required' }}>
             </label>
-            <p class="text-muted small fw-bold mb-0">JPG, PNG · max 4MB</p>
+            <p class="text-muted small fw-bold mb-0">{{ __('JPG, PNG · max 4MB') }}</p>
         </div>
 
         {{-- Desktop actions (mobile uses the sticky bar below). --}}
         <div class="premium-panel p-4 d-none d-lg-block">
-            <h3 class="h6 fw-bold mb-3 text-uppercase text-muted">Actions</h3>
+            <h3 class="h6 fw-bold mb-3 text-uppercase text-muted">{{ __('Actions') }}</h3>
             <button type="submit" class="btn btn-premium w-100 rounded-pill fw-bold shadow-sm mb-3 py-2">
                 <i class="fa-solid fa-floppy-disk me-2"></i> {{ $student ? 'Update Student' : 'Save Student' }}
             </button>
             <a href="{{ $student ? route('admin.students.show', $student) : route('admin.students.index') }}" class="btn btn-light w-100 rounded-pill fw-bold py-2 border">
-                Cancel
+                {{ __('Cancel') }}
             </a>
 
             @unless($student)
                 <div class="alert alert-info mt-4 mb-0 py-2 small fw-bold rounded-4 border-info-subtle">
                     <i class="fa-solid fa-info-circle me-1"></i>
-                    Upload docs & assign a bed from the profile after saving.
+                    {{ __('Upload docs & assign a bed from the profile after saving.') }}
                 </div>
             @endunless
         </div>
@@ -159,22 +159,22 @@
         
         <!-- Personal Details -->
         <div class="premium-panel p-4 p-md-5">
-            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-user text-primary me-2"></i> Personal Details</h4>
+            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-user text-primary me-2"></i> {{ __('Personal Details') }}</h4>
             <div class="row g-4">
                 <div class="col-12 col-md-6">
-                    <label class="form-label fw-bold small">Full Name <span class="text-danger">*</span></label>
-                    <input type="text" name="name" class="form-control" value="{{ old('name', $student?->name) }}" required maxlength="150" placeholder="Enter full name">
+                    <label class="form-label fw-bold small">{{ __('Full Name') }} <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control" value="{{ old('name', $student?->name) }}" required maxlength="150" placeholder="{{ __('Enter full name') }}">
                 </div>
                 <div class="col-12 col-sm-6 col-md-3">
-                    <label class="form-label fw-bold small">Mobile <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold small">{{ __('Mobile') }} <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
+                        <input type="tel" name="mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="{{ __('10-digit mobile number') }}"
                                value="{{ old('mobile', substr($student?->mobile ?? '', -10) ?: '') }}" required placeholder="9876543210">
                     </div>
                 </div>
                 <div class="col-12 col-sm-6 col-md-3">
-                    <label class="form-label fw-bold small">Occupation <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold small">{{ __('Occupation') }} <span class="text-danger">*</span></label>
                     <input type="hidden" name="occupation_type" :value="occupation">
                     
                     <div class="position-relative">
@@ -185,7 +185,7 @@
                         
                         <div x-show="occDropdown" @click.outside.capture="occDropdown = false" x-transition.opacity.duration.200ms class="position-absolute bg-white border rounded-4 shadow-lg mt-2 w-100" style="display: none; z-index: 1050;">
                             <div class="list-group list-group-flush rounded-4 py-2">
-                                @foreach(config('hostelease.occupation_types') as $k => $label)
+                                @foreach(hostelease_options('occupation_types') as $k => $label)
                                 <a href="javascript:void(0)" class="list-group-item list-group-item-action border-0 py-2 px-3 fw-medium" data-occ="{{ $k }}" :class="occupation === '{{ $k }}' ? 'active bg-primary text-white fw-bold' : 'text-dark'" @click="occupation = '{{ $k }}'; occDropdown = false;">
                                     {{ $label }}
                                 </a>
@@ -196,43 +196,43 @@
                 </div>
                 
                 <div class="col-12 col-md-6" x-show="occupation === 'student'" x-transition x-cloak>
-                    <label class="form-label fw-bold small">College / University <span class="text-danger">*</span></label>
-                    <input type="text" name="college" class="form-control" maxlength="255" value="{{ old('college', $student?->college) }}" placeholder="e.g. ABC College" :required="occupation === 'student'">
+                    <label class="form-label fw-bold small">{{ __('College / University') }} <span class="text-danger">*</span></label>
+                    <input type="text" name="college" class="form-control" maxlength="255" value="{{ old('college', $student?->college) }}" placeholder="{{ __('e.g. ABC College') }}" :required="occupation === 'student'">
                 </div>
                 
                 <div class="col-12 col-md-6" x-show="occupation === 'student'" x-transition x-cloak>
-                    <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
-                    <input type="text" name="field_of_study" class="form-control" maxlength="255" value="{{ old('field_of_study', $student?->field_of_study) }}" placeholder="e.g. B.Tech Computer Science" :required="occupation === 'student'">
+                    <label class="form-label fw-bold small">{{ __('Field of Study') }} <span class="text-danger">*</span></label>
+                    <input type="text" name="field_of_study" class="form-control" maxlength="255" value="{{ old('field_of_study', $student?->field_of_study) }}" placeholder="{{ __('e.g. B.Tech Computer Science') }}" :required="occupation === 'student'">
                 </div>
             </div>
         </div>
 
         <!-- Family Contacts -->
         <div class="premium-panel p-4 p-md-5">
-            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-users text-primary me-2"></i> Family Contacts</h4>
+            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-users text-primary me-2"></i> {{ __('Family Contacts') }}</h4>
             <div class="row g-4">
                 <div class="col-12 col-md-4">
-                    <label class="form-label fw-bold small">Father's Mobile <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold small">{{ __('Father\'s Mobile') }} <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number" required
-                               value="{{ old('father_mobile', substr($student?->father_mobile ?? '', -10) ?: '') }}" placeholder="10-digit mobile number">
+                        <input type="tel" name="father_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="{{ __('10-digit mobile number') }}" required
+                               value="{{ old('father_mobile', substr($student?->father_mobile ?? '', -10) ?: '') }}" placeholder="{{ __('10-digit mobile number') }}">
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <label class="form-label fw-bold small">Mother's Mobile</label>
+                    <label class="form-label fw-bold small">{{ __('Mother\'s Mobile') }}</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="mother_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
-                               value="{{ old('mother_mobile', substr($student?->mother_mobile ?? '', -10) ?: '') }}" placeholder="Optional">
+                        <input type="tel" name="mother_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="{{ __('10-digit mobile number') }}"
+                               value="{{ old('mother_mobile', substr($student?->mother_mobile ?? '', -10) ?: '') }}" placeholder="{{ __('Optional') }}">
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <label class="form-label fw-bold small">Guardian's Mobile</label>
+                    <label class="form-label fw-bold small">{{ __('Guardian\'s Mobile') }}</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0 text-muted fw-bold">+91</span>
-                        <input type="tel" name="guardian_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="10-digit mobile number"
-                               value="{{ old('guardian_mobile', substr($student?->guardian_mobile ?? '', -10) ?: '') }}" placeholder="Optional">
+                        <input type="tel" name="guardian_mobile" class="form-control border-start-0 ps-0" inputmode="numeric" maxlength="10" minlength="10" pattern="\d{10}" title="{{ __('10-digit mobile number') }}"
+                               value="{{ old('guardian_mobile', substr($student?->guardian_mobile ?? '', -10) ?: '') }}" placeholder="{{ __('Optional') }}">
                     </div>
                 </div>
             </div>
@@ -240,7 +240,7 @@
 
         <!-- Identity & Address -->
         <div class="premium-panel p-4 p-md-5">
-            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> Identity & Address</h4>
+            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-id-card text-primary me-2"></i> {{ __('Identity & Address') }}</h4>
             <div class="row g-4">
                 <div class="col-12 col-sm-6 col-md-4">
                     <label class="form-label fw-bold small">Aadhaar Number @unless($student)<span class="text-danger">*</span>@endunless</label>
@@ -251,37 +251,37 @@
                            placeholder="{{ $student ? hostelease_mask_aadhaar($student->aadhaar).' · leave blank to keep' : '12-digit number' }}">
                 </div>
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">City <span class="text-danger">*</span></label>
-                    <input type="text" name="city" class="form-control" required maxlength="100" value="{{ old('city', $student?->city) }}" placeholder="City name">
+                    <label class="form-label fw-bold small">{{ __('City') }} <span class="text-danger">*</span></label>
+                    <input type="text" name="city" class="form-control" required maxlength="100" value="{{ old('city', $student?->city) }}" placeholder="{{ __('City name') }}">
                 </div>
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">State <span class="text-danger">*</span></label>
-                    <input type="text" name="state" class="form-control" required maxlength="100" value="{{ old('state', $student?->state) }}" placeholder="State name">
+                    <label class="form-label fw-bold small">{{ __('State') }} <span class="text-danger">*</span></label>
+                    <input type="text" name="state" class="form-control" required maxlength="100" value="{{ old('state', $student?->state) }}" placeholder="{{ __('State name') }}">
                 </div>
                 <div class="col-12">
-                    <label class="form-label fw-bold small">Full Address <span class="text-danger">*</span></label>
-                    <textarea name="address" class="form-control" rows="2" required maxlength="500" placeholder="Street address, locality...">{{ old('address', $student?->address) }}</textarea>
+                    <label class="form-label fw-bold small">{{ __('Full Address') }} <span class="text-danger">*</span></label>
+                    <textarea name="address" class="form-control" rows="2" required maxlength="500" placeholder="{{ __('Street address, locality...') }}">{{ old('address', $student?->address) }}</textarea>
                 </div>
             </div>
         </div>
 
         <!-- Stay Information -->
         <div class="premium-panel p-4 p-md-5">
-            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-calendar-days text-primary me-2"></i> Stay Information</h4>
+            <h4 class="h5 fw-bold mb-4 d-flex align-items-center"><i class="fa-solid fa-calendar-days text-primary me-2"></i> {{ __('Stay Information') }}</h4>
             <div class="row g-4">
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">Join Date <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold small">{{ __('Join Date') }} <span class="text-danger">*</span></label>
                     <input type="date" name="join_date" class="form-control" required value="{{ old('join_date', optional($student?->join_date)->format('Y-m-d')) }}">
                 </div>
                 <div class="col-6 col-md-4">
-                    <label class="form-label fw-bold small">Leave Date</label>
+                    <label class="form-label fw-bold small">{{ __('Leave Date') }}</label>
                     <input type="date" name="leave_date" class="form-control" value="{{ old('leave_date', optional($student?->leave_date)->format('Y-m-d')) }}">
                 </div>
                 <div class="col-12 col-md-4">
-                    <label class="form-label fw-bold small">Status <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold small">{{ __('Status') }} <span class="text-danger">*</span></label>
                     <x-he-select name="status" icon="toggle-on" :submit="false"
                         :selected="old('status', $student?->status ?? 'active')"
-                        :options="['active' => 'Active', 'left' => 'Left']" />
+                        :options="['active' => __('Active'), 'left' => __('Left')]" />
                 </div>
             </div>
         </div>
@@ -292,7 +292,7 @@
 {{-- Mobile sticky Save bar (teleported so position:fixed anchors to the viewport). --}}
 <template x-teleport="body">
     <div class="form-mobile-bar" x-data>
-        <a href="{{ $student ? route('admin.students.show', $student) : route('admin.students.index') }}" class="btn btn-light border rounded-pill fw-bold px-4 py-2">Cancel</a>
+        <a href="{{ $student ? route('admin.students.show', $student) : route('admin.students.index') }}" class="btn btn-light border rounded-pill fw-bold px-4 py-2">{{ __('Cancel') }}</a>
         <button type="submit" form="studentForm" class="btn btn-premium rounded-pill fw-bold py-2 flex-grow-1">
             <i class="fa-solid fa-floppy-disk me-2"></i>{{ $student ? 'Update Student' : 'Save Student' }}
         </button>

@@ -53,7 +53,7 @@ class StudentDocumentController extends Controller
 
         $this->logger->log('document.upload', "Uploaded {$document->type} for {$student->name}", $document);
 
-        return back()->with('success', 'Document uploaded successfully.');
+        return back()->with('success', __('Document uploaded successfully.'));
     }
 
     public function destroy(Student $student, StudentDocument $document): RedirectResponse
@@ -65,6 +65,6 @@ class StudentDocumentController extends Controller
 
         $this->logger->log('document.delete', "Deleted document for {$student->name}", $student);
 
-        return back()->with('success', 'Document deleted.');
+        return back()->with('success', __('Document deleted.'));
     }
 }

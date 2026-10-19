@@ -18,11 +18,6 @@ class ProfileController extends Controller
     {
     }
 
-    public function edit(): View
-    {
-        return view('profile.password', ['user' => Auth::user()]);
-    }
-
     /**
      * Profile name. The mobile is the LOGIN username and the identity linking an
      * owner to their branches — it is only changed via the Super Admin's hostel-edit
@@ -95,14 +90,20 @@ class ProfileController extends Controller
             'current_password' => ['required', 'current_password'],
             'password' => ['required', 'confirmed', Password::min(8)],
         ], [
-            'current_password.current_password' => 'Your current password is incorrect.',
+            'current_password.current_password' => __('Your current password is incorrect.'),
         ]);
 
         $user = Auth::user();
         $user->forceFill(['password' => Hash::make($data['password'])])->save();
 
+        // A new password ends every OTHER session, stops "keep me signed in" elsewhere
+        // and un-trusts every device (S7.1) — the usual reason to change it is that
+        // someone else may know the old one.
+        SecurityController::endOtherSessions($user, $request->session()->getId());
+        app(\App\Services\Auth\TwoFactor::class)->forgetDevices($user);
+
         $this->logger->log('password.change', 'Changed account password');
 
-        return back()->with('success', 'Password changed successfully.');
+        return redirect()->route('profile.security')->with('success', __('Password changed. You are signed out on every other device.'));
     }
 }

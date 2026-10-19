@@ -1,7 +1,7 @@
 @php($user = auth()->user())
 <header class="he-topbar" x-data="{ searchOpen: false }">
     {{-- Mobile Sidebar Toggle --}}
-    <button class="topbar-hamburger d-lg-none" data-sidebar-toggle type="button" aria-label="Toggle menu">
+    <button class="topbar-hamburger d-lg-none" data-sidebar-toggle type="button" aria-label="{{ __('Toggle menu') }}">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -79,7 +79,8 @@
             </div>
         @endif
 
-        {{-- Language Switcher --}}
+        {{-- Language Switcher — not for the Super Admin, who reads English (S7.1 · D-S7-2). --}}
+        @unless(auth()->user()?->isSuperAdmin())
         <div class="dropdown">
             <button class="topbar-action-btn" data-bs-toggle="dropdown" title="{{ __('Language') }}">
                 <span class="lang-badge">{{ strtoupper(app()->getLocale()) }}</span>
@@ -87,13 +88,14 @@
             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 py-2">
                 @foreach(config('app.available_locales') as $code => $label)
                     <li>
-                        <a class="dropdown-item py-2 {{ app()->getLocale() === $code ? 'active bg-primary-subtle text-primary fw-bold' : '' }}" href="{{ route('locale.switch', $code) }}">
+                        <a class="dropdown-item py-2 {{ app()->getLocale() === $code ? 'active bg-primary-subtle text-primary fw-bold' : '' }}" href="{{ route('locale.switch', $code) }}" lang="{{ $code }}">
                             {{ $label }}
                         </a>
                     </li>
                 @endforeach
             </ul>
         </div>
+        @endunless
 
         {{-- Notifications --}}
         <div class="dropdown">
@@ -145,7 +147,7 @@
                 <span class="topbar-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                 <span class="topbar-account-txt d-none d-lg-flex">
                     <span class="topbar-account-name">{{ \Illuminate\Support\Str::limit($user->name, 16) }}</span>
-                    <span class="topbar-account-role">{{ config('hostelease.roles.'.$user->role) ?? config('hostelease.staff_roles.'.$user->role, ucfirst($user->role)) }}</span>
+                    <span class="topbar-account-role">{{ hostelease_role_label($user->role) }}</span>
                 </span>
                 <i class="fa-solid fa-chevron-down d-none d-lg-inline topbar-branch-chev"></i>
             </button>
@@ -171,11 +173,11 @@
                 </li>
                 @endif
                 <li>
-                    <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2" href="{{ route('profile.password') }}">
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-3 rounded-2" href="{{ route('profile.security') }}">
                         <div class="bg-light rounded d-flex align-items-center justify-content-center text-secondary" style="width: 28px; height: 28px;">
-                            <i class="fa-solid fa-key" style="font-size: 0.75rem;"></i>
+                            <i class="fa-solid fa-shield-halved" style="font-size: 0.75rem;"></i>
                         </div>
-                        <span class="fw-semibold small">{{ __('Change Password') }}</span>
+                        <span class="fw-semibold small">{{ __('Security') }}</span>
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-2"></li>

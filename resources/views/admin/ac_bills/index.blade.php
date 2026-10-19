@@ -250,7 +250,7 @@
     <div id="ac-summary">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="text-muted small fw-bold text-uppercase" style="letter-spacing: 1px;">{{ __('AC Billing') }}</span>
-            <span class="text-muted small fw-semibold">{{ $filterMonth->format('F Y') }}</span>
+            <span class="text-muted small fw-semibold">{{ $filterMonth->translatedFormat('F Y') }}</span>
         </div>
         <div class="he-stats mb-4 stagger-2">
             <div class="he-stats__grid" style="--he-stats-cols: 3;">

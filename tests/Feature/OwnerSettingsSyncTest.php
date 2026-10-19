@@ -174,7 +174,7 @@ class OwnerSettingsSyncTest extends TestCase
     {
         $owner = $this->owner();
 
-        $this->actingAs($owner)->get(route('profile.password'))
+        $this->actingAs($owner)->get(route('profile.security'))
             ->assertOk()
             ->assertSee('pw-hero', false)
             ->assertSee('pw-meter', false);

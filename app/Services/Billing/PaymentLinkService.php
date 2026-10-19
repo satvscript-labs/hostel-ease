@@ -110,13 +110,13 @@ class PaymentLinkService
         $account = $order->account;
 
         if (! $account) {
-            throw new RuntimeException('That charge is not attached to a customer account, so there is nobody to send a link to.');
+            throw new RuntimeException(__('That charge is not attached to a customer account, so there is nobody to send a link to.'));
         }
 
         // S6 · L1: an autopay debit is the bank's to finish — a link beside it would be
         // a second way to pay one renewal.
         if ($order->collection === \App\Enums\CollectionMethod::Autopay) {
-            throw new RuntimeException('This renewal is being collected by autopay. Wait for the bank\'s answer — if it fails, raise a fresh charge.');
+            throw new RuntimeException(__('This renewal is being collected by autopay. Wait for the bank\'s answer — if it fails, raise a fresh charge.'));
         }
 
         // SERIALISE ON THE ACCOUNT ROW before reading what links it already has.
@@ -138,7 +138,7 @@ class PaymentLinkService
         // ── Guards (design §6 BP11). Each says what to do about it, because an
         // operator reading "refused" with no reason will just click again. ──
         if ($order->payment_status === PaymentStatus::Paid) {
-            throw new RuntimeException('That charge is already paid — there is nothing to collect.');
+            throw new RuntimeException(__('That charge is already paid — there is nothing to collect.'));
         }
         if ($order->payment_status !== PaymentStatus::Pending) {
             throw new RuntimeException('A payment link can only be issued for a charge that is awaiting payment (this one is '.$order->payment_status->label().').');
@@ -147,24 +147,24 @@ class PaymentLinkService
             throw new RuntimeException('A payment link needs at least ₹1. This charge is '.hostelease_money($order->amount).', so collect nothing and accept it instead.');
         }
         if ($order->hasLiveLink()) {
-            throw new RuntimeException('This charge already has a live payment link. Cancel it before issuing another — two live links for one charge is how a customer pays twice.');
+            throw new RuntimeException(__('This charge already has a live payment link. Cancel it before issuing another — two live links for one charge is how a customer pays twice.'));
         }
 
         // Overtaken (S3 audit): every date this charge would grant is already covered,
         // so a link would ask the customer to pay for nothing.
         $state = $order->coverageState(fresh: true);
         if ($state === 'stale') {
-            throw new RuntimeException('This renewal is out of date — a branch joined, a top-up was paid separately, or a free renewal changed since it was raised, so collecting it would charge the wrong amount. Void it and renew again to get the right total.');
+            throw new RuntimeException(__('This renewal is out of date — a branch joined, a top-up was paid separately, or a free renewal changed since it was raised, so collecting it would charge the wrong amount. Void it and renew again to get the right total.'));
         }
         if ($state !== 'extends') {
-            throw new RuntimeException('Everything this charge covers is already paid up — it has been overtaken (a later renewal or another payment covered it). Void it rather than collecting for it.');
+            throw new RuntimeException(__('Everything this charge covers is already paid up — it has been overtaken (a later renewal or another payment covered it). Void it rather than collecting for it.'));
         }
 
         // The owner has this charge open in online checkout (S3). Razorpay orders
         // cannot be cancelled, so that checkout stays payable — a link beside it
         // would give the customer two ways to pay one bill.
         if ($order->hasOpenCheckout()) {
-            throw new RuntimeException('The customer has opened this charge for online checkout, which stays payable. Ask them to complete it there — or void this charge and quote a fresh one if it needs to change.');
+            throw new RuntimeException(__('The customer has opened this charge for online checkout, which stays payable. Ask them to complete it there — or void this charge and quote a fresh one if it needs to change.'));
         }
 
         $this->assertNoDuplicateLiveLink($account, $order);
@@ -176,7 +176,7 @@ class PaymentLinkService
         // will re-issue one charge 255 times, which is exactly why this should say
         // something human rather than fall over.
         if ($attempt > 255) {
-            throw new RuntimeException('This charge has had 255 payment links issued against it. Something is wrong — void it and raise a fresh charge rather than issuing another link.');
+            throw new RuntimeException(__('This charge has had 255 payment links issued against it. Something is wrong — void it and raise a fresh charge rather than issuing another link.'));
         }
         $reference = $this->reference($order, $attempt);
         $expireBy = $this->expiryTimestamp();
@@ -203,7 +203,7 @@ class PaymentLinkService
         // offering the operator a Send button with nothing behind it. Throwing here
         // rolls the whole charge back, which is the honest outcome.
         if (! filled($link['id']) || ! filled($link['short_url'])) {
-            throw new RuntimeException('Razorpay accepted the request but returned no usable payment link. Nothing has been charged or recorded — try again, or record this payment offline.');
+            throw new RuntimeException(__('Razorpay accepted the request but returned no usable payment link. Nothing has been charged or recorded — try again, or record this payment offline.'));
         }
 
         $order->update([
@@ -402,7 +402,7 @@ class PaymentLinkService
         $this->assertConfigured();
 
         if (! $order->hasLiveLink()) {
-            throw new RuntimeException('There is no live payment link on this charge to re-send.');
+            throw new RuntimeException(__('There is no live payment link on this charge to re-send.'));
         }
 
         $this->razorpay->notifyPaymentLink($order->payment_link_id, $medium);
@@ -434,7 +434,7 @@ class PaymentLinkService
         $this->assertConfigured();
 
         if (! $order->payment_link_id) {
-            throw new RuntimeException('There is no payment link on this charge to check.');
+            throw new RuntimeException(__('There is no payment link on this charge to check.'));
         }
 
         $link = $this->razorpay->fetchPaymentLink($order->payment_link_id);
@@ -714,7 +714,7 @@ class PaymentLinkService
     protected function assertConfigured(): void
     {
         if (! $this->razorpay->isConfigured()) {
-            throw new RuntimeException('Razorpay is not configured, so online collection is unavailable. Set RAZORPAY_ENABLED, RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, then record this payment offline in the meantime.');
+            throw new RuntimeException(__('Razorpay is not configured, so online collection is unavailable. Set RAZORPAY_ENABLED, RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, then record this payment offline in the meantime.'));
         }
     }
 

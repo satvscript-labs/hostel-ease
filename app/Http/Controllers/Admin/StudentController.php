@@ -45,7 +45,7 @@ class StudentController extends Controller
 
         $this->payments->record(array_merge($data, ['student_id' => $student->id]));
 
-        return back()->with('success', 'Payment collected — balances updated.');
+        return back()->with('success', __('Payment collected — balances updated.'));
     }
 
     /**
@@ -60,7 +60,7 @@ class StudentController extends Controller
 
         $unpaidInvoices = $student->invoices()->where('status', '!=', 'paid')->get();
         if ($unpaidInvoices->isEmpty()) {
-            return back()->with('error', 'No unpaid dues to set a promise against.');
+            return back()->with('error', __('No unpaid dues to set a promise against.'));
         }
 
         foreach ($unpaidInvoices as $invoice) {
@@ -73,7 +73,7 @@ class StudentController extends Controller
         $this->logger->log('promise.set',
             "Global promise to pay set for {$data['promise_date']} — {$student->name}", $student);
 
-        return back()->with('success', 'Promise to pay saved for all dues.');
+        return back()->with('success', __('Promise to pay saved for all dues.'));
     }
 
     public function index(Request $request): View
@@ -132,7 +132,7 @@ class StudentController extends Controller
         $this->logger->log('student.create', "Added student {$student->name}", $student);
 
         return redirect()->route('admin.students.show', $student)
-            ->with('success', 'Student added successfully.');
+            ->with('success', __('Student added successfully.'));
     }
 
     /**
@@ -335,7 +335,7 @@ class StudentController extends Controller
         $this->logger->log('student.update', "Updated student {$student->name}", $student);
 
         return redirect()->route('admin.students.show', $student)
-            ->with('success', 'Student updated successfully.');
+            ->with('success', __('Student updated successfully.'));
     }
 
     public function previewProration(Request $request, Student $student, \App\Services\ProrationService $prorationService)
@@ -368,7 +368,7 @@ class StudentController extends Controller
             }
 
             return redirect()->route('admin.students.show', $student)
-                ->with('success', 'Plan changed and prorated invoice generated successfully.');
+                ->with('success', __('Plan changed and prorated invoice generated successfully.'));
         }
 
         // Otherwise just update and generate the initial invoice (shared with
@@ -383,18 +383,18 @@ class StudentController extends Controller
         }
 
         return redirect()->route('admin.students.show', $student)
-            ->with('success', 'Fee settings updated successfully.');
+            ->with('success', __('Fee settings updated successfully.'));
     }
 
     public function destroy(Student $student): RedirectResponse
     {
         if ($student->activeAssignment()->exists()) {
-            return back()->with('error', 'This student occupies a bed. Release them from Bed Assignment first.');
+            return back()->with('error', __('This student occupies a bed. Release them from Bed Assignment first.'));
         }
 
         $this->logger->log('student.delete', "Deleted student {$student->name}", $student);
         $student->delete();
 
-        return redirect()->route('admin.students.index')->with('success', 'Student removed.');
+        return redirect()->route('admin.students.index')->with('success', __('Student removed.'));
     }
 }

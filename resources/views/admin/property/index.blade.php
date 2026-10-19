@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Property Board')
+@section('title', __('Property Board'))
 
 @push('styles')
 <style>
@@ -512,21 +512,21 @@
 @endpush
 
 @section('content')
-<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), @js($vacantBeds), @js(config('hostelease.fee_frequencies')))" class="page-enter pb-5" @keydown.window.escape="closeAssign(); closeTransfer(); releaseOpen = false; bedStatus.open = false; closeDetails()">
+<div x-data="propertyBoard(@js($floors->first()?->id), @js($unassignedStudents), @js($vacantBeds), @js(hostelease_options('fee_frequencies')))" class="page-enter pb-5" @keydown.window.escape="closeAssign(); closeTransfer(); releaseOpen = false; bedStatus.open = false; closeDetails()">
     
     <!-- Header -->
     <div class="pb-header flex-wrap gap-3">
         <div>
-            <h1 class="h3 fw-bold mb-1">Property Board</h1>
-            <p class="text-muted mb-0">Visualize and manage your entire hostel layout instantly.</p>
+            <h1 class="h3 fw-bold mb-1">{{ __('Property Board') }}</h1>
+            <p class="text-muted mb-0">{{ __('Visualize and manage your entire hostel layout instantly.') }}</p>
         </div>
         <div class="pb-toolbar d-flex gap-3 align-items-center">
             <div class="he-search pb-search-field">
                 <span class="he-search__icon"><i class="fa-solid fa-search"></i></span>
-                <input type="text" class="he-search__input" placeholder="Find room or occupant..." x-model="searchQuery">
+                <input type="text" class="he-search__input" placeholder="{{ __('Find room or occupant...') }}" x-model="searchQuery">
             </div>
             <a href="{{ route('admin.floors.index') }}" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold pb-builder-btn">
-                <i class="fa-solid fa-hammer me-2 pb-builder-ic"></i><span class="pb-builder-text">Layout Builder</span>
+                <i class="fa-solid fa-hammer me-2 pb-builder-ic"></i><span class="pb-builder-text">{{ __('Layout Builder') }}</span>
             </a>
         </div>
     </div>
@@ -537,28 +537,28 @@
             <div class="pb-stat-icon pb-stat-primary"><i class="fa-solid fa-building"></i></div>
             <div>
                 <div class="fs-4 fw-bold">{{ $totalBeds }}</div>
-                <div class="text-muted small fw-bold text-uppercase">Total Beds</div>
+                <div class="text-muted small fw-bold text-uppercase">{{ __('Total Beds') }}</div>
             </div>
         </div>
         <div class="pb-stat-card">
             <div class="pb-stat-icon pb-stat-success"><i class="fa-solid fa-bed"></i></div>
             <div>
                 <div class="fs-4 fw-bold">{{ $vacant }}</div>
-                <div class="text-muted small fw-bold text-uppercase">Available</div>
+                <div class="text-muted small fw-bold text-uppercase">{{ __('Available') }}</div>
             </div>
         </div>
         <div class="pb-stat-card">
             <div class="pb-stat-icon pb-stat-danger"><i class="fa-solid fa-user-check"></i></div>
             <div>
                 <div class="fs-4 fw-bold">{{ $occupied }}</div>
-                <div class="text-muted small fw-bold text-uppercase">Occupied</div>
+                <div class="text-muted small fw-bold text-uppercase">{{ __('Occupied') }}</div>
             </div>
         </div>
         <div class="pb-stat-card">
             <div class="pb-stat-icon pb-stat-warning"><i class="fa-solid fa-wrench"></i></div>
             <div>
                 <div class="fs-4 fw-bold">{{ $maintenance }}</div>
-                <div class="text-muted small fw-bold text-uppercase">Maintenance</div>
+                <div class="text-muted small fw-bold text-uppercase">{{ __('Maintenance') }}</div>
             </div>
         </div>
     </div>
@@ -571,7 +571,7 @@
                 <div class="floor-header-bar"></div>
                 <h2>{{ $floor->name }}</h2>
                 <div class="ms-auto badge bg-light text-muted border border-light-subtle rounded-pill px-3 py-2 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                    {{ $floor->rooms->count() }} ROOMS TOTAL
+                    {{ __(':n rooms', ['n' => $floor->rooms->count()]) }}
                 </div>
             </div>
             
@@ -580,8 +580,8 @@
                 <div class="room-card" 
                      :class="{ 'dimmed': !roomMatchesSearch('{{ $room->room_number }}', {{ json_encode($room->beds->map(fn($b) => $b->activeAssignment?->student->name)->filter()->values()) }}) }">
                     <div class="room-header">
-                        <div class="room-number">Room {{ $room->room_number }}</div>
-                        <div class="room-type {{ $room->isAc() ? 'ac' : 'non-ac' }}">{{ $room->isAc() ? 'AC ROOM' : 'NON AC' }}</div>
+                        <div class="room-number">{{ __('Room :room', ['room' => $room->room_number]) }}</div>
+                        <div class="room-type {{ $room->isAc() ? 'ac' : 'non-ac' }}">{{ $room->isAc() ? __('AC room') : __('Non-AC') }}</div>
                     </div>
                     
                     <div class="bed-grid">
@@ -595,19 +595,19 @@
                                          'isAc' => $room->isAc(),
                                          'lastReading' => $roomFloors[$room->id] ?? null,
                                      ]) }})"
-                                     title="Assign a student">
+                                     title="{{ __('Assign a student') }}">
                                      <i class="fa-solid fa-circle-plus"></i>
-                                     <span class="bed-status-text">{{ $bed->bed_number }} AVAILABLE</span>
+                                     <span class="bed-status-text">{{ __(':bed available', ['bed' => $bed->bed_number]) }}</span>
                                 </div>
                             @elseif($bed->status === 'maintenance')
                                 <div class="bed-tile bed-maintenance"
                                      @click="openBedStatus('{{ $bed->public_id }}', '{{ $room->room_number }}', '{{ $bed->bed_number }}', '{{ $bed->status }}')"
-                                     title="Manage Bed">
+                                     title="{{ __('Manage Bed') }}">
                                      <div class="d-flex align-items-center gap-2">
                                         <i class="fa-solid fa-wrench"></i>
-                                        <span class="maintenance-text">MAINTENANCE</span>
+                                        <span class="maintenance-text">{{ __('MAINTENANCE') }}</span>
                                      </div>
-                                     <span class="maintenance-bed-label">Bed {{ $bed->bed_number }}</span>
+                                     <span class="maintenance-bed-label">{{ __('Bed :bed', ['bed' => $bed->bed_number]) }}</span>
                                 </div>
                             @elseif($bed->status === 'occupied' && $bed->activeAssignment)
                                 @php 
@@ -622,7 +622,7 @@
                                          'student_name' => $student->name,
                                          'student_mobile' => $student->mobile,
                                          'student_photo' => $student->photo_url,
-                                         'join_date' => $assignment->join_date->format('d M Y'),
+                                         'join_date' => $assignment->join_date->translatedFormat('d M Y'),
                                          'join_date_raw' => $assignment->join_date->toDateString(),
                                          'duration' => $assignment->durationInDays(),
                                          'room_is_ac' => $room->isAc(),
@@ -869,60 +869,60 @@
             <div class="d-flex flex-column h-100">
                 <div class="slide-header">
                     <div>
-                        <h4 class="fw-bold mb-0">Occupant Details</h4>
-                        <div class="text-danger fw-bold mt-1">Room <span x-text="panels.details.room"></span> &bull; Bed <span x-text="panels.details.bed"></span></div>
+                        <h4 class="fw-bold mb-0">{{ __('Occupant Details') }}</h4>
+                        <div class="text-danger fw-bold mt-1">{{ __('Room') }} <span x-text="panels.details.room"></span> &bull; Bed <span x-text="panels.details.bed"></span></div>
                     </div>
                     <button type="button" class="btn-close" @click="closeDetails()"></button>
                 </div>
                 
                 <div class="slide-body">
                     <div class="student-card-preview">
-                        <img :src="panels.details.data.student_photo" alt="Photo">
+                        <img :src="panels.details.data.student_photo" alt="{{ __('Photo') }}">
                         <h4 class="fw-bold mb-1" x-text="panels.details.data.student_name"></h4>
                         <div class="text-muted small mb-3" x-text="panels.details.data.student_mobile"></div>
                         
                         <div class="d-flex justify-content-center gap-3 text-start bg-light rounded-3 p-3 mt-3">
                             <div>
-                                <div class="small text-muted text-uppercase fw-bold">Joined On</div>
+                                <div class="small text-muted text-uppercase fw-bold">{{ __('Joined On') }}</div>
                                 <div class="fw-bold" x-text="panels.details.data.join_date"></div>
                             </div>
                             <div class="border-start ps-3">
-                                <div class="small text-muted text-uppercase fw-bold">Stay Duration</div>
-                                <div class="fw-bold"><span x-text="panels.details.data.duration"></span> days</div>
+                                <div class="small text-muted text-uppercase fw-bold">{{ __('Stay Duration') }}</div>
+                                <div class="fw-bold"><span x-text="panels.details.data.duration"></span> {{ __('days') }}</div>
                             </div>
                         </div>
                         
                         <div class="mt-4">
                             <a :href="'/admin/students/' + panels.details.data.student_public_id" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
-                                View Full Profile <i class="fa-solid fa-arrow-right ms-1"></i>
+                                {{ __('View full profile') }} <i class="fa-solid fa-arrow-right ms-1"></i>
                             </a>
                         </div>
                     </div>
 
                     <div class="d-flex flex-column gap-2 mt-auto">
-                        <h6 class="text-uppercase text-muted fw-bold small mb-2">Quick Actions</h6>
+                        <h6 class="text-uppercase text-muted fw-bold small mb-2">{{ __('Quick Actions') }}</h6>
                         
                         <button type="button" class="btn btn-light text-start p-3 rounded-4 fw-bold d-flex align-items-center" @click="openTransfer()">
                             <div class="bg-primary text-white rounded-3 p-2 me-3"><i class="fa-solid fa-right-left"></i></div>
                             <div>
-                                <div class="fs-6 text-primary">Transfer Bed</div>
-                                <div class="small text-muted fw-normal">Move to a different room</div>
+                                <div class="fs-6 text-primary">{{ __('Transfer Bed') }}</div>
+                                <div class="small text-muted fw-normal">{{ __('Move to a different room') }}</div>
                             </div>
                         </button>
                         
                         <button type="button" class="btn btn-light text-start p-3 rounded-4 fw-bold d-flex align-items-center" @click="openRelease()">
                             <div class="bg-danger text-white rounded-3 p-2 me-3"><i class="fa-solid fa-right-from-bracket"></i></div>
                             <div>
-                                <div class="fs-6 text-danger">Release Student</div>
-                                <div class="small text-muted fw-normal">Vacate bed and keep history</div>
+                                <div class="fs-6 text-danger">{{ __('Release Student') }}</div>
+                                <div class="small text-muted fw-normal">{{ __('Vacate bed and keep history') }}</div>
                             </div>
                         </button>
                         
                         <a :href="'/admin/beds/' + panels.details.bedId + '/history'" class="btn btn-light text-start p-3 rounded-4 fw-bold d-flex align-items-center">
                             <div class="bg-secondary text-white rounded-3 p-2 me-3"><i class="fa-solid fa-clock-rotate-left"></i></div>
                             <div>
-                                <div class="fs-6">View Bed History</div>
-                                <div class="small text-muted fw-normal">See everyone who stayed here</div>
+                                <div class="fs-6">{{ __('View Bed History') }}</div>
+                                <div class="small text-muted fw-normal">{{ __('See everyone who stayed here') }}</div>
                             </div>
                         </a>
                     </div>
@@ -1150,15 +1150,15 @@
                 <div class="custom-overlay-header">
                     <h5 class="fw-bold mb-0 text-danger">
                         <i class="fa-solid fa-right-from-bracket"></i>
-                        <span class="ms-1">Release Student</span>
+                        <span class="ms-1">{{ __('Release Student') }}</span>
                     </h5>
                     <button type="button" class="btn-close" @click="releaseOpen = false"></button>
                 </div>
                 <div class="custom-overlay-body">
-                    <p class="text-muted mb-4">Release <strong x-text="panels.details.data.student_name"></strong> from bed <strong x-text="panels.details.bed"></strong>? The bed will become available immediately.</p>
+                    <p class="text-muted mb-4" x-text="@js(__('Release :name from bed :bed? The bed will become available immediately.')).replace(':name', panels.details.data.student_name || '').replace(':bed', panels.details.bed || '')"></p>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">Leave Date</label>
+                        <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">{{ __('Leave Date') }}</label>
                         <input type="date" name="leave_date" class="form-control bg-light" value="{{ now()->toDateString() }}" required :min="panels.details.data.join_date_raw">
                     </div>
 
@@ -1166,11 +1166,11 @@
                          at what they were actually present for. --}}
                     <div class="mb-4" x-show="panels.details.data.room_is_ac" x-cloak>
                         <label class="form-label fw-bold small text-uppercase letter-spacing-1 d-block mb-2">
-                            <i class="fa-solid fa-bolt text-warning me-1"></i>AC Meter Reading Now <span class="text-danger">*</span>
+                            <i class="fa-solid fa-bolt text-warning me-1"></i>{{ __('AC Meter Reading Now') }} <span class="text-danger">*</span>
                         </label>
                         <input type="number" name="meter_reading" x-model.number="releaseMeter" min="0" step="0.01" class="form-control bg-light"
                                :required="panels.details.data.room_is_ac" :disabled="!panels.details.data.room_is_ac"
-                               placeholder="Read the room's meter before releasing">
+                               placeholder="{{ __('Read the room\'s meter before releasing') }}">
                         <div class="form-text small" x-show="releaseFloor !== null" x-cloak>
                             {{ __('Last recorded:') }} <span class="fw-bold" x-text="fmt(releaseFloor)"></span>
                         </div>
@@ -1192,11 +1192,11 @@
                     </label>
                 </div>
                 <div class="custom-overlay-footer">
-                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="releaseOpen = false">Cancel</button>
+                    <button type="button" class="btn btn-white border fw-semibold rounded-pill px-4 tactile-btn" @click="releaseOpen = false">{{ __('Cancel') }}</button>
                     {{-- §4.4: ring the unanswered reset confirmation, never fail silently. --}}
                     <button type="submit" class="btn btn-danger fw-semibold rounded-pill px-4 shadow-sm tactile-btn"
                             @click="if (releaseBelowFloor && !releaseReset) { $event.preventDefault(); window.heRing?.([$refs.releaseResetBox], 'primary'); }">
-                        <i class="fa-solid fa-right-from-bracket me-2"></i>Release Student
+                        <i class="fa-solid fa-right-from-bracket me-2"></i>{{ __('Release Student') }}
                     </button>
                 </div>
             </form>

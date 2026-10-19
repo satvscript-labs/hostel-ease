@@ -27,12 +27,12 @@ class CheckAccess
         }
 
         if (! $user->canAccessArea($area)) {
-            return redirect()->back()->with('error', 'Your role does not have access to this section.');
+            return redirect()->back()->with('error', __('Your role does not have access to this section.'));
         }
 
         // Read-only roles may only perform safe (GET/HEAD) requests.
         if ($user->isReadonly() && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
-            return redirect()->back()->with('error', 'Your role has read-only access.');
+            return redirect()->back()->with('error', __('Your role has read-only access.'));
         }
 
         return $next($request);

@@ -38,7 +38,7 @@
         </div>
     </template>
     <div class="he-summary-total">
-        <span class="he-summary-total-lbl" x-text="{{ $data }}.finalLabel || 'Payable now'"></span>
+        <span class="he-summary-total-lbl" x-text="{{ $data }}.finalLabel || @js(__('Payable now'))"></span>
         <span class="he-summary-total-val" x-text="heMoney({{ $data }}.final)"></span>
     </div>
     <template x-if="{{ $data }}.note">

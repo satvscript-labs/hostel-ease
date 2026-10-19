@@ -19,10 +19,10 @@ enum EnrollmentStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'Pending — register face at device',
-            self::Active => 'Active',
-            self::Failed => 'Failed',
-            self::Removed => 'Removed',
+            self::Pending => __('Pending — register face at device'),
+            self::Active => __('Active'),
+            self::Failed => __('Failed'),
+            self::Removed => __('Removed'),
         };
     }
 
